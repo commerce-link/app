@@ -170,7 +170,7 @@ public class MarketplaceOfferMatching {
                 toReview.add(row(offer, eans, null, OfferMatchResult.NO_EAN, null));
                 return;
             }
-            // an unchanged link is not written again, so a rerun does not rewrite thousands of items
+            // an unchanged link is not written again, so a rerun does not rewrite thousands of links
             boolean unchanged = existing != null && Set.copyOf(link.getEans()).equals(eanSet(existing));
             if (!unchanged && !linkRepository.saveUnlessManual(link)) {
                 // linked by an operator after this run read the store's links

@@ -183,7 +183,7 @@ public class MarketplaceOfferResolver {
                 for (int position = 0; position < all.size(); position++) {
                     String ean = all.get(position).getEan();
                     if (StringUtils.isNotBlank(ean)) {
-                        index.computeIfAbsent(ean, key -> new ArrayList<>()).add(position);
+                        index.computeIfAbsent(unifyEan(ean.trim()), key -> new ArrayList<>()).add(position);
                     }
                 }
                 catalogPositionsByEan = index;

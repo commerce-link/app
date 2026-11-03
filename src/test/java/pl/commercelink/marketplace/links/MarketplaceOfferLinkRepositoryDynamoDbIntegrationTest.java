@@ -19,7 +19,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The offer link queries against DynamoDB Local, on the table as V024 creates it. 
+ * The offer link queries and conditional saves against DynamoDB Local, on the table as V024 creates it.
  */
 @Testcontainers(disabledWithoutDocker = true)
 class MarketplaceOfferLinkRepositoryDynamoDbIntegrationTest {

@@ -26,7 +26,8 @@ import java.util.Set;
 /**
  * The operator's "Link to product" on an order item whose marketplace offer was not recognised: saves a MANUAL offer
  * link to the chosen catalog product's EAN, so later imports resolve the offer, and fills this item and the store's
- * other New items carrying the same offer key. Items already in fulfilment are left to the operator, as with "Assign SKU"; the link is saved regardless.
+ * other New items carrying the same offer key. Items already in fulfilment are left to the operator, as with
+ * "Assign SKU"; the link is saved regardless.
  */
 @Slf4j
 @Component
@@ -83,7 +84,9 @@ public class MarketplaceOfferLinking {
         Product product = storeOffers.catalogProducts().stream()
                 .filter(candidate -> Objects.equals(candidate.getCategoryId(), categoryId)
                         && Objects.equals(candidate.getProductId(), productId))
-                .filter(candidate -> StringUtils.isNotBlank(candidate.getEan()))
+                // same rule as the dialog's list: a product without an EAN or a manufacturer code cannot be linked
+                .filter(candidate -> StringUtils.isNotBlank(candidate.getEan())
+                        && StringUtils.isNotBlank(candidate.getManufacturerCode()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException(PRODUCT_NOT_IN_CATALOG));
         String offerKey = chosen.getMarketplaceOfferKey();
@@ -181,7 +184,9 @@ public class MarketplaceOfferLinking {
     /**
      * @param productRecognised false when the link is saved but does not lead to one product: another product of the
      *                          store's catalogs has the same EAN with a different manufacturer code, so the items are
-     *                          not filled; the operator is told so instead of seeing a success with 0 items
+     *                          not filled; the operator is told so instead of seeing a success with 0 items. A chosen
+     *                          product without an EAN or a manufacturer code never gets here: it is refused with
+     *                          {@link #PRODUCT_NOT_IN_CATALOG} before any link is saved
      */
     public record LinkResult(int updatedItems, boolean productRecognised) {
 

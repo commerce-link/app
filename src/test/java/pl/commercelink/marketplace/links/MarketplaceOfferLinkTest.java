@@ -40,6 +40,16 @@ class MarketplaceOfferLinkTest {
     }
 
     @Test
+    void ofTrimsPaddedEansBeforeUnifyingThem() {
+        // when
+        MarketplaceOfferLink link = MarketplaceOfferLink.of("store-1", "Empik", "K-1",
+                List.of(" 05901234123457 ", "5901234123457"), MarketplaceOfferLinkSource.MANUAL, null, Instant.EPOCH);
+
+        // then
+        assertThat(link.getEans()).containsExactly("5901234123457");
+    }
+
+    @Test
     void ofUnifiesEansDropsBlanksAndDuplicatesKeepingTheFirstAppearanceOrder() {
         // when
         MarketplaceOfferLink link = MarketplaceOfferLink.of("store-1", "Empik", "K-1",

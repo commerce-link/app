@@ -71,7 +71,8 @@ class MarketplaceOfferLinkingTest {
         lenient().when(resolver.forStore(STORE)).thenReturn(storeOffers);
         lenient().when(storeOffers.catalogProducts()).thenReturn(List.of(
                 catalogProduct("c1", "p1", null, EAN, "ab 123"),
-                catalogProduct("c1", "p2", "pim-2", null, "NO-EAN")));
+                catalogProduct("c1", "p2", "pim-2", null, "NO-EAN"),
+                catalogProduct("c1", "p3", null, "5909999999999", " ")));
         lenient().when(storeOffers.resolve(EMPIK, KEY, null)).thenReturn(Optional.of(OFFER));
         lenient().when(orderItemsRepository.findByOrderIds(anyList())).thenAnswer(invocation -> {
             List<String> ids = invocation.getArgument(0);
@@ -226,6 +227,20 @@ class MarketplaceOfferLinkingTest {
 
         // when / then
         assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", "p2", "user-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG);
+        verify(linkRepository, never()).save(any());
+    }
+
+    @Test
+    void linkRejectsACatalogProductWithoutAManufacturerCode() {
+        // given
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        when(orderItemsRepository.findById("o1", "i1")).thenReturn(item);
+
+        // when / then
+        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", "p3", "user-1"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage(MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG);
         verify(linkRepository, never()).save(any());

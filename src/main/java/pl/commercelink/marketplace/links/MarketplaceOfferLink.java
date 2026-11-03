@@ -69,7 +69,7 @@ public class MarketplaceOfferLink {
         LinkedHashSet<String> unified = new LinkedHashSet<>();
         if (eans != null) {
             for (String ean : eans) {
-                String value = ean == null || ean.isBlank() ? null : unifyEan(ean);
+                String value = ean == null || ean.isBlank() ? null : unifyEan(ean.trim());
                 if (value != null && !value.isBlank()) {
                     unified.add(value);
                 }

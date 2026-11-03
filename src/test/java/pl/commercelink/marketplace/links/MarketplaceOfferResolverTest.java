@@ -22,6 +22,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -409,5 +410,148 @@ class MarketplaceOfferResolverTest {
 
         // then
         assertThat(match).isEqualTo(new CatalogMatch.NoManufacturerCode(List.of(first, second)));
+    }
+
+    @Test
+    void ownOfferPrefersCatalogProductCodesOverPimPrimaryCodes() {
+        // given
+        storeSees("pim-1", globalEntry("pim-1", "5900000000011", "M1", "cat-a"));
+        when(aliases.aliasesOf(STORE, "pim-1")).thenReturn(Set.of("pim-1"));
+        catalogCategory("c1", "Krzesła");
+        Product elsewhere = new Product("other-store-category");
+        elsewhere.setProductId("p2");
+        Product projection = new Product("c1");
+        projection.setProductId("p1");
+        Product full = new Product("c1");
+        full.setProductId("p1");
+        full.setEan("5901234567890");
+        full.setManufacturerCode("7041");
+        when(products.findAllByPimId("pim-1")).thenReturn(List.of(elsewhere, projection));
+        when(products.findByProductId("c1", "p1")).thenReturn(full);
+
+        // when
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "pim-1", null);
+
+        // then
+        assertThat(result).contains(new ResolvedOffer("pim-1", "5901234567890", "7041", "cat-a", Source.OWN_OFFER));
+    }
+
+    @Test
+    void ownOfferUsesPimPrimaryCodesWhenTheProductIsNotInTheStoreCatalog() {
+        // given
+        storeSees("pim-1", globalEntry("pim-1", "5900000000011", "M1", "cat-a"));
+        when(aliases.aliasesOf(STORE, "pim-1")).thenReturn(Set.of("pim-1"));
+        catalogCategory("c1", "Krzesła");
+        Product foreign = new Product("other-store-category");
+        foreign.setProductId("p2");
+        when(products.findAllByPimId("pim-1")).thenReturn(List.of(foreign));
+
+        // when
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "pim-1", null);
+
+        // then
+        assertThat(result).contains(new ResolvedOffer("pim-1", "5900000000011", "M1", "cat-a", Source.OWN_OFFER));
+    }
+
+    @Test
+    void ownOfferFindsTheStoreProductStillPinnedToTheClonesSource() {
+        // given
+        storeSees("src", cloneEntry("clone", STORE, "src", "5900000000011", "M1", "cat-a"));
+        when(aliases.aliasesOf(STORE, "clone")).thenReturn(Set.of("clone", "src"));
+        catalogCategory("c1", "Krzesła");
+        when(products.findAllByPimId("clone")).thenReturn(List.of());
+        catalogProduct("c1", "p1", "src", "5901234567890", "7041");
+
+        // when
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "src", null);
+
+        // then
+        assertThat(result).contains(new ResolvedOffer("clone", "5901234567890", "7041", "cat-a", Source.OWN_OFFER));
+    }
+
+    @Test
+    void ownOfferIgnoresAProductPinnedToAnIdThatIsNotAnAliasOfTheClone() {
+        // given
+        storeSees("src", cloneEntry("clone", STORE, "src", "5900000000011", "M1", "cat-a"));
+        when(aliases.aliasesOf(STORE, "clone")).thenReturn(Set.of("clone"));
+        catalogCategory("c1", "Krzesła");
+        when(products.findAllByPimId("clone")).thenReturn(List.of());
+
+        // when
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "src", null);
+
+        // then
+        assertThat(result).contains(new ResolvedOffer("clone", "5900000000011", "M1", "cat-a", Source.OWN_OFFER));
+        verify(products, never()).findAllByPimId("src");
+    }
+
+    @Test
+    void ownOfferUsesTheCatalogCategoryNameWhenThePimEntryHasNoCategory() {
+        // given
+        storeSees("pim-1", globalEntry("pim-1", "5900000000011", "M1", null));
+        when(aliases.aliasesOf(STORE, "pim-1")).thenReturn(Set.of("pim-1"));
+        catalogCategory("c1", "Krzesła");
+        catalogProduct("c1", "p1", "pim-1", "5901234567890", "7041");
+
+        // when
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "pim-1", null);
+
+        // then
+        assertThat(result).map(ResolvedOffer::category).contains("Krzesła");
+    }
+
+    @Test
+    void ownOfferTakesCatalogCodesOnlyFromProductsInTheStoresOwnCategories() {
+        // given
+        storeSees("pim-1", globalEntry("pim-1", "5900000000011", "M1", "cat-a"));
+        storeSees("pim-2", globalEntry("pim-2", "5900000000022", "M2", "cat-b"));
+        when(aliases.aliasesOf(STORE, "pim-1")).thenReturn(Set.of("pim-1"));
+        when(aliases.aliasesOf(STORE, "pim-2")).thenReturn(Set.of("pim-2"));
+        catalogCategory("c1", "Krzesła");
+        catalogProduct("c1", "p1", "pim-1", "5901234567890", "7041");
+        Product foreign = new Product("other-store-category");
+        foreign.setProductId("p2");
+        foreign.setEan("5909999999999");
+        foreign.setManufacturerCode("9999");
+        when(products.findAllByPimId("pim-2")).thenReturn(List.of(foreign));
+
+        // when
+        Optional<ResolvedOffer> own = resolver.resolve(STORE, EMPIK, "pim-1", null);
+        Optional<ResolvedOffer> other = resolver.resolve(STORE, EMPIK, "pim-2", null);
+
+        // then
+        assertThat(own).map(ResolvedOffer::mfn).contains("7041");
+        assertThat(other).contains(new ResolvedOffer("pim-2", "5900000000022", "M2", "cat-b", Source.OWN_OFFER));
+        verify(products, never()).findByProductId("other-store-category", "p2");
+    }
+
+    @Test
+    void anAmbiguousLinkFallsThroughToTheManufacturerCodeStep() {
+        // given
+        link("K", "5901234567890", "5901234567891");
+        storeCatalogs(catalog("main", category("c1", "Krzesła")));
+        categoryHolds("c1", product("c1", "p1", null, "5901234567890", "7041"),
+                product("c1", "p2", null, "5901234567891", "7042"));
+        mpnIn("1696938202", globalEntry("pim-2", "5900000000022", "1696938202", "cat-b"));
+
+        // when
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", "1696938202");
+
+        // then
+        assertThat(result).contains(new ResolvedOffer("pim-2", "5900000000022", "1696938202", "cat-b", Source.MFN));
+    }
+
+    @Test
+    void matchCatalogTrimsPaddedEansOfTheCatalogProducts() {
+        // given
+        storeCatalogs(catalog("main", category("c1", "Krzesła")));
+        Product chair = product("c1", "p1", null, " 5901234567890 ", "7041");
+        categoryHolds("c1", chair);
+
+        // when
+        CatalogMatch match = resolver.forStore(STORE).matchCatalog(List.of("5901234567890"));
+
+        // then
+        assertThat(match).isEqualTo(new CatalogMatch.Found(chair, "Krzesła"));
     }
 }

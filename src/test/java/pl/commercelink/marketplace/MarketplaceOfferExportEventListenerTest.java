@@ -991,13 +991,12 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     @Test
-    void skipsProductOnACloneWhoseSourceIsLinkedToForeignOffer() {
-        // given the product sits on the clone C of S, and its EAN is linked to a foreign offer
+    void skipsAClonedProductWhoseEanIsLinkedToForeignOffer() {
+        // given the clone C of S is exported under S's offer id, which is not the offer the EAN is linked to
         Product product = product("clone-C", "EAN-A");
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
         when(aliases.offerIdOf(STORE_ID, "clone-C")).thenReturn("source-S");
-        when(aliases.aliasesOf(STORE_ID, "clone-C")).thenReturn(Set.of("clone-C", "source-S"));
         linksOnTheMarketplace(link("SILLO-84980", "EAN-A"));
 
         // when
@@ -1006,6 +1005,39 @@ class MarketplaceOfferExportEventListenerTest {
         // then
         verify(provider, never()).exportOffers(any(), any(), any());
         assertThat(captureSavedRows()).isEmpty();
+    }
+
+    @Test
+    void exportsAClonedProductWhoseEanIsLinkedToItsSourceOfferId() {
+        // given the link points at the offer we published under the clone's offer id (its source's id)
+        Product product = product("clone-C", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        when(aliases.offerIdOf(STORE_ID, "clone-C")).thenReturn("source-S");
+        linksOnTheMarketplace(link("source-S", "EAN-A"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(capturePublishedOffers()).extracting(MarketplaceOffer::productId).containsExactly("source-S");
+    }
+
+    @Test
+    void skipsProductWhoseEanIsFormattedDifferentlyInTheStoredLink() {
+        // given a stored link whose EAN keeps a leading zero that the catalog's EAN does not have
+        Product product = product("pim-1", "5901234123457");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        MarketplaceOfferLink padded = link("SILLO-84980", "5901234123457");
+        padded.setEans(List.of("05901234123457"));
+        linksOnTheMarketplace(padded);
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        verify(provider, never()).exportOffers(any(), any(), any());
     }
 
     @Test

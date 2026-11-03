@@ -3,8 +3,9 @@
 // from a catalog's pricelist (fetched once per catalog) or typed by hand and joins them with ":"; Link to product picks
 // one product of the catalog (every product with an EAN and a manufacturer code, the price where the pricelist has
 // one) and posts its category and product id; Assign supplier offers the item's own codes and turns a gross price net
-// with the item's VAT for the hint (the server converts it); Assign from warehouse lists the stock of the item's category; Split bundle keeps the rows numbered rows[0..n] and the total
-// balanced; Serial numbers never submit on Enter; Move previews the target order.
+// with the item's VAT for the hint (the server converts it); Assign from warehouse lists the stock of the item's
+// category; Split bundle keeps the rows numbered rows[0..n] and the total balanced; Serial numbers never submit on
+// Enter; Move previews the target order.
 (function () {
     'use strict';
 
