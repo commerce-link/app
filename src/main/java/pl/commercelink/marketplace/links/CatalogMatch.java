@@ -4,6 +4,7 @@ import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.products.Product;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
 
@@ -32,11 +33,30 @@ public sealed interface CatalogMatch {
          * what resolves the conflict, not fixing a duplicated EAN.
          */
         public boolean onlyMissingCodes() {
+            return distinctCodes(products) <= 1;
+        }
+
+        /**
+         * True when one EAN alone is carried by catalog products with different (or missing) manufacturer codes: a
+         * duplicate in the catalog, which only a catalog fix resolves. False when each EAN leads to one product and only
+         * the offer's several EANs point at different ones, which an operator settles by linking the right product.
+         */
+        public boolean sharedEanInCatalog() {
+            return products.stream()
+                    .collect(Collectors.groupingBy(product -> String.valueOf(OfferEans.unify(product.getEan()))))
+                    .values().stream()
+                    .anyMatch(sameEan -> sameEan.stream()
+                            .map(product -> StringUtils.defaultString(unifyMfn(product.getManufacturerCode())))
+                            .distinct()
+                            .count() > 1);
+        }
+
+        private static long distinctCodes(List<Product> products) {
             return products.stream()
                     .map(product -> unifyMfn(product.getManufacturerCode()))
                     .filter(StringUtils::isNotBlank)
                     .distinct()
-                    .count() <= 1;
+                    .count();
         }
     }
 

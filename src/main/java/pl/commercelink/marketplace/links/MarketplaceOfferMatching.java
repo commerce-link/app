@@ -251,9 +251,15 @@ public class MarketplaceOfferMatching {
                 .toList();
     }
 
-    // a code-less product next to coded ones sharing one code is fixed by filling the code, not by fixing the EAN
+    /**
+     * The offer's EANs pointing at different products is settled by linking the right one by hand; one EAN shared by
+     * products with different codes only by fixing the catalog, or by filling the code when that is all that is missing.
+     */
     private static String reasonOf(CatalogMatch.Ambiguous ambiguous) {
-        return ambiguous.onlyMissingCodes() ? OfferMatchResult.NO_MFN : OfferMatchResult.AMBIGUOUS;
+        if (!ambiguous.sharedEanInCatalog()) {
+            return OfferMatchResult.AMBIGUOUS;
+        }
+        return ambiguous.onlyMissingCodes() ? OfferMatchResult.NO_MFN : OfferMatchResult.DUPLICATED_EAN;
     }
 
     private static Set<String> eanSet(MarketplaceOfferLink link) {

@@ -362,6 +362,21 @@ class MarketplaceOfferMatchingTest {
     }
 
     @Test
+    void anEanSharedByCatalogProductsWithDifferentCodesIsReviewedAsADuplicatedEan() {
+        // given two catalog products carry the offer's one EAN under different codes: only a catalog fix helps
+        catalog.put("5900000000062", new CatalogMatch.Ambiguous(List.of(
+                product("Pościel biała", "5900000000062", "PB-B"), product("Pościel szara", "5900000000062", "PB-S"))));
+        MarketplaceOfferMatching matching = matching();
+
+        // when
+        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("SILLO-5", "5900000000062"))));
+
+        // then
+        assertThat(result.toReview()).extracting(OfferMatchResult.Row::sellerOfferKey, OfferMatchResult.Row::reason)
+                .containsExactly(tuple("SILLO-5", "duplicated-ean"));
+    }
+
+    @Test
     void anOfferWhoseOnlyConflictIsAProductWithoutACodeIsReviewedForTheMissingCode() {
         // given one product with a code and one without share the EAN: filling the code resolves it
         catalog.put("5900000000055", new CatalogMatch.Ambiguous(List.of(

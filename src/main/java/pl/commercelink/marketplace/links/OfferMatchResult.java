@@ -17,6 +17,8 @@ public record OfferMatchResult(Instant finishedAt, int total, List<Row> linked, 
     public static final String NO_KEY = "no-key";
     /** In {@code toReview}: the EANs point at catalog products with different manufacturer codes. */
     public static final String AMBIGUOUS = "ambiguous";
+    /** One EAN of the offer is carried by catalog products with different manufacturer codes: a catalog duplicate. */
+    public static final String DUPLICATED_EAN = "duplicated-ean";
     /** In {@code toReview}: the catalog product the EANs point at has no manufacturer code, which an order line needs. */
     public static final String NO_MFN = "no-mfn";
     /** In {@code notInCatalog}: linked by an operator, no catalog product has the link's EANs yet. */
