@@ -8,8 +8,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CarrierDictionaryWriterTest {
 
-    private static final String MORELE = CarrierDictionaries.marketplaceImport("Morele");
-    private static final String SHOPER = CarrierDictionaries.supplier("store-1", "Shoper-1");
+    private static final String MORELE = CarrierDictionary.marketplaceImport("Morele");
+    private static final String SHOPER = CarrierDictionary.supplier("store-1", "Shoper-1");
 
     private final InMemoryCarrierDictionaries repository = new InMemoryCarrierDictionaries();
     private final CarrierDictionaryWriter writer = new CarrierDictionaryWriter(repository);

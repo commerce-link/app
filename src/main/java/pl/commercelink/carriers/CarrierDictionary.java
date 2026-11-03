@@ -19,6 +19,10 @@ import java.util.Optional;
  * One set of names or codes of an external system, as an ordered list of {text, carrier} pairs. Within a dictionary
  * the mapping works both ways, and the order settles both ambiguities: of several texts of one carrier the first goes
  * out, of several carriers of one text the first comes in.
+ * <p>
+ * The key is {scope}#{type}#{name}. The caller always knows where a text came from, so it names the dictionary;
+ * there is no fallback from a store to the global scope. The separator is '#' because supplier connection ids
+ * contain '-'.
  */
 @DynamoDBTable(tableName = CarrierDictionary.TABLE_NAME)
 @Getter
@@ -27,6 +31,12 @@ import java.util.Optional;
 public class CarrierDictionary {
 
     public static final String TABLE_NAME = "CarrierMappings";
+
+    private static final String GLOBAL = "global";
+    private static final String MARKETPLACE = "marketplace";
+    private static final String SHIPPING = "shipping";
+    private static final String SUPPLIER = "supplier";
+    private static final String SEPARATOR = "#";
 
     @DynamoDBHashKey(attributeName = "dictionary")
     private String dictionary;
@@ -42,6 +52,33 @@ public class CarrierDictionary {
 
     public static CarrierDictionary empty(String dictionary) {
         return new CarrierDictionary(dictionary, List.of());
+    }
+
+    /** The carrier text an imported order of the marketplace brings (Allegro: delivery method names). */
+    public static String marketplaceImport(String marketplace) {
+        return key(GLOBAL, MARKETPLACE, lower(marketplace) + SEPARATOR + "import");
+    }
+
+    /** The carrier code sent with the shipment status and received with returns; empty for a marketplace that takes none. */
+    public static String marketplaceStatus(String marketplace) {
+        return key(GLOBAL, MARKETPLACE, lower(marketplace) + SEPARATOR + "status");
+    }
+
+    public static String shipping(String integration) {
+        return key(GLOBAL, SHIPPING, lower(integration));
+    }
+
+    public static String supplier(String storeId, String connection) {
+        return key(storeId, SUPPLIER, connection);
+    }
+
+    /** Names and supplier methods are free text that only matches exactly; marketplaces and labels also by fragment. */
+    public static boolean matchesByFragment(String dictionary) {
+        return type(dictionary).filter(type -> type.equals(MARKETPLACE) || type.equals(SHIPPING)).isPresent();
+    }
+
+    public static boolean isSupplier(String dictionary) {
+        return type(dictionary).filter(SUPPLIER::equals).isPresent();
     }
 
     public Optional<String> inboundMappingFor(String text) {
@@ -85,6 +122,19 @@ public class CarrierDictionary {
 
     public static String normalize(String text) {
         return StringUtils.trimToNull(StringUtils.normalizeSpace(text));
+    }
+
+    private static Optional<String> type(String dictionary) {
+        String[] parts = StringUtils.split(dictionary, SEPARATOR);
+        return parts != null && parts.length >= 3 ? Optional.of(parts[1]) : Optional.empty();
+    }
+
+    private static String key(String scope, String type, String name) {
+        return scope + SEPARATOR + type + SEPARATOR + name;
+    }
+
+    private static String lower(String name) {
+        return StringUtils.trimToEmpty(name).toLowerCase(Locale.ROOT);
     }
 
     private List<CarrierMapping> mappings() {

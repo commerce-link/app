@@ -9,11 +9,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CarrierMappingsTest {
 
-    private static final String ALLEGRO_METHODS = CarrierDictionaries.marketplaceImport("Allegro");
-    private static final String ALLEGRO = CarrierDictionaries.marketplaceStatus("Allegro").orElseThrow();
-    private static final String MORELE = CarrierDictionaries.marketplaceImport("Morele");
-    private static final String FURGONETKA = CarrierDictionaries.shipping("furgonetka");
-    private static final String SHOPER = CarrierDictionaries.supplier("store-1", "Shoper-k7f3a9c2");
+    private static final String ALLEGRO_METHODS = CarrierDictionary.marketplaceImport("Allegro");
+    private static final String ALLEGRO = CarrierDictionary.marketplaceStatus("Allegro");
+    private static final String MORELE = CarrierDictionary.marketplaceImport("Morele");
+    private static final String FURGONETKA = CarrierDictionary.shipping("furgonetka");
+    private static final String SHOPER = CarrierDictionary.supplier("store-1", "Shoper-k7f3a9c2");
 
     private final CarrierMappings mappings = new InMemoryCarrierDictionaries()
             .with(ALLEGRO_METHODS, "Paczkomat=InPost", "Kurier24 InPost=InPost Kurier", "InPost=InPost", "DPD=DPD")
@@ -77,7 +77,7 @@ class CarrierMappingsTest {
     @Test
     void missingDictionaryRecognizesNothing() {
         // when / then
-        assertThat(mappings.inboundMappingFor(CarrierDictionaries.shipping("apaczka"), "inpost")).isEmpty();
-        assertThat(mappings.outboundMappingFor(CarrierDictionaries.shipping("apaczka"), "InPost")).isEmpty();
+        assertThat(mappings.inboundMappingFor(CarrierDictionary.shipping("apaczka"), "inpost")).isEmpty();
+        assertThat(mappings.outboundMappingFor(CarrierDictionary.shipping("apaczka"), "InPost")).isEmpty();
     }
 }

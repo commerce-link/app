@@ -26,7 +26,7 @@ public class CarrierMappings {
         }
         CarrierDictionary entries = repository.get(dictionary);
         Optional<String> exact = entries.inboundMappingFor(text);
-        if (exact.isPresent() || !CarrierDictionaries.matchesByFragment(dictionary)) {
+        if (exact.isPresent() || !CarrierDictionary.matchesByFragment(dictionary)) {
             return exact;
         }
         Optional<String> fragment = entries.fragmentMappingFor(text);

@@ -15,18 +15,22 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
 import pl.commercelink.carriers.Carrier;
-import pl.commercelink.carriers.CarrierDictionaries;
 import pl.commercelink.carriers.CarrierDictionary;
 import pl.commercelink.carriers.CarrierDictionaryRepository;
 import pl.commercelink.carriers.CarrierDictionaryWriter;
 import pl.commercelink.carriers.CarrierMapping;
 import pl.commercelink.carriers.CarriersRepository;
+import pl.commercelink.marketplace.MarketplaceProviderFactory;
+import pl.commercelink.provider.api.ProviderDescriptor;
+import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.web.settings.SettingsFlash;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
+import java.util.function.Function;
 
 /** Our carriers and the shared dictionaries that translate them, for the super admin. */
 @Controller
@@ -41,21 +45,23 @@ public class CarriersController {
     private final CarrierDictionaryRepository dictionaryRepository;
     private final CarrierDictionaryWriter dictionaryWriter;
     private final MessageSource messageSource;
+    private final MarketplaceProviderFactory marketplaces;
+    private final ShippingProviderFactory shipping;
 
-    public record DictionaryRow(String key, int pairs, String href) {
+    public record DictionaryRow(String key, String purpose, int pairs, String href) {
     }
 
-    public record MissingStatusCode(String carrier, String importDictionary, String statusDictionary) {
+    private record SharedDictionary(String key, String purpose, String integration) {
     }
 
     @GetMapping(PATH)
-    public String carriers(Model model) {
-        List<DictionaryRow> dictionaries = CarrierDictionaries.shared().stream()
-                .map(key -> new DictionaryRow(key, dictionaryRepository.get(key).getMappings().size(), dictionaryHref(key)))
+    public String carriers(Model model, Locale locale) {
+        List<DictionaryRow> dictionaries = sharedDictionaries().stream()
+                .map(d -> new DictionaryRow(d.key(), message(d.purpose(), locale, d.integration()),
+                        dictionaryRepository.get(d.key()).getMappings().size(), dictionaryHref(d.key())))
                 .toList();
         model.addAttribute("carriers", carriersRepository.findAll());
         model.addAttribute("dictionaries", dictionaries);
-        model.addAttribute("missingStatusCodes", missingStatusCodes());
         return "carriers";
     }
 
@@ -105,7 +111,7 @@ public class CarriersController {
         model.addAttribute("pairs", withEmptyRow(pairs));
         model.addAttribute("version", version);
         model.addAttribute("carrierNames", carriersRepository.names());
-        model.addAttribute("fragments", CarrierDictionaries.matchesByFragment(dictionary));
+        model.addAttribute("fragments", CarrierDictionary.matchesByFragment(dictionary));
         model.addAttribute(SettingsFlash.ERROR_MESSAGE, error);
         return "carrier-dictionary";
     }
@@ -120,17 +126,24 @@ public class CarriersController {
         return rows;
     }
 
-    private List<MissingStatusCode> missingStatusCodes() {
-        List<MissingStatusCode> missing = new ArrayList<>();
-        for (Map.Entry<String, String> pair : CarrierDictionaries.requiredStatusCodes()) {
-            CarrierDictionary status = dictionaryRepository.get(pair.getValue());
-            dictionaryRepository.get(pair.getKey()).getMappings().stream()
-                    .map(CarrierMapping::getCarrier)
-                    .distinct()
-                    .filter(carrier -> status.outboundMappingFor(carrier).isEmpty())
-                    .forEach(carrier -> missing.add(new MissingStatusCode(carrier, pair.getKey(), pair.getValue())));
+    /** Every installed marketplace and shipping adapter has its dictionaries; supplier ones belong to the stores. */
+    private List<SharedDictionary> sharedDictionaries() {
+        List<SharedDictionary> dictionaries = new ArrayList<>();
+        for (ProviderDescriptor<?> marketplace : sorted(marketplaces.availableProviders())) {
+            dictionaries.add(new SharedDictionary(CarrierDictionary.marketplaceImport(marketplace.name()),
+                    "carriers.dictionary.purpose.import", marketplace.displayName()));
+            dictionaries.add(new SharedDictionary(CarrierDictionary.marketplaceStatus(marketplace.name()),
+                    "carriers.dictionary.purpose.status", marketplace.displayName()));
         }
-        return missing;
+        for (ProviderDescriptor<?> integration : sorted(shipping.availableProviders())) {
+            dictionaries.add(new SharedDictionary(CarrierDictionary.shipping(integration.name()),
+                    "carriers.dictionary.purpose.shipping", integration.displayName()));
+        }
+        return dictionaries;
+    }
+
+    private static <D extends ProviderDescriptor<?>> List<D> sorted(Collection<D> descriptors) {
+        return descriptors.stream().sorted(Comparator.comparing((Function<D, String>) ProviderDescriptor::name)).toList();
     }
 
     private static List<CarrierMapping> pairs(List<String> texts, List<String> carriers) {
@@ -144,8 +157,8 @@ public class CarriersController {
     }
 
     // store dictionaries (supplier connections) are edited by the store, not here
-    private static String requireShared(String dictionary) {
-        if (!CarrierDictionaries.shared().contains(dictionary)) {
+    private String requireShared(String dictionary) {
+        if (sharedDictionaries().stream().noneMatch(shared -> shared.key().equals(dictionary))) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         return dictionary;

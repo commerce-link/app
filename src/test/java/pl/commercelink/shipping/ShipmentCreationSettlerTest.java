@@ -1,6 +1,6 @@
 package pl.commercelink.shipping;
 
-import pl.commercelink.carriers.CarrierDictionaries;
+import pl.commercelink.carriers.CarrierDictionary;
 import pl.commercelink.carriers.InMemoryCarrierDictionaries;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,7 +58,7 @@ class ShipmentCreationSettlerTest {
         when(owners.get(ShipmentOwnerType.ORDER)).thenReturn(owner);
         when(owners.get(ShipmentOwnerType.RMA_RETURN)).thenReturn(returnOwner);
         settler = new ShipmentCreationSettler(owners, immediatePickup, new InMemoryCarrierDictionaries()
-                .with(CarrierDictionaries.shipping("furgonetka"), "dpd=DPD", "inpost_courier=InPost Kurier").mappings());
+                .with(CarrierDictionary.shipping("furgonetka"), "dpd=DPD", "inpost_courier=InPost Kurier").mappings());
     }
 
     private static ShipmentCreationCheckRequest request() {

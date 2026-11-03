@@ -4,7 +4,7 @@ import io.awspring.cloud.sqs.annotation.SqsListener;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import pl.commercelink.carriers.CarrierDictionaries;
+import pl.commercelink.carriers.CarrierDictionary;
 import pl.commercelink.carriers.CarrierMappings;
 import pl.commercelink.documents.Document;
 import pl.commercelink.marketplace.api.InvoiceUpdate;
@@ -145,10 +145,9 @@ public class MarketplaceOrderLifecycleEventListener {
                 ? shipment.getProvider()
                 : store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
         List<String> sources = integration != null
-                ? List.of(CarrierDictionaries.shipping(integration), CarrierDictionaries.marketplaceImport(marketplace))
-                : List.of(CarrierDictionaries.marketplaceImport(marketplace));
-        return CarrierDictionaries.marketplaceStatus(marketplace)
-                .flatMap(status -> carrierMappings.outboundMappingFor(status, shipment.getCarrier(), sources))
+                ? List.of(CarrierDictionary.shipping(integration), CarrierDictionary.marketplaceImport(marketplace))
+                : List.of(CarrierDictionary.marketplaceImport(marketplace));
+        return carrierMappings.outboundMappingFor(CarrierDictionary.marketplaceStatus(marketplace), shipment.getCarrier(), sources)
                 .orElse(null);
     }
 

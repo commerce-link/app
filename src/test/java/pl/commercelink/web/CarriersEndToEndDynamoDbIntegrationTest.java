@@ -19,26 +19,32 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.springframework.web.servlet.View;
 import org.springframework.web.servlet.view.RedirectView;
 import org.thymeleaf.context.Context;
-import pl.commercelink.carriers.CarrierDictionaries;
 import pl.commercelink.carriers.CarrierDictionary;
 import pl.commercelink.carriers.CarrierDictionaryRepository;
 import pl.commercelink.carriers.CarrierDictionaryWriter;
 import pl.commercelink.carriers.CarrierMapping;
 import pl.commercelink.carriers.CarrierMappings;
 import pl.commercelink.carriers.CarriersRepository;
+import pl.commercelink.marketplace.MarketplaceProviderFactory;
+import pl.commercelink.marketplace.api.MarketplaceProviderDescriptor;
 import pl.commercelink.migration.V024_CreateCarrierTables;
 import pl.commercelink.carriers.CarrierSeed;
 import pl.commercelink.migration.V025_LocalDevelopmentCarriersSeed;
+import pl.commercelink.shipping.ShippingProviderFactory;
+import pl.commercelink.shipping.api.ShippingProviderDescriptor;
 import pl.commercelink.testsupport.DynamoDbLocalImage;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
@@ -56,14 +62,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CarriersEndToEndDynamoDbIntegrationTest {
 
     private static final Locale PL = Locale.forLanguageTag("pl");
-    private static final String ALLEGRO_METHODS = CarrierDictionaries.marketplaceImport("Allegro");
-    private static final String ALLEGRO = CarrierDictionaries.marketplaceStatus("Allegro").orElseThrow();
-    private static final String CENEO_FORMS = CarrierDictionaries.marketplaceImport("Ceneo");
-    private static final String CENEO = CarrierDictionaries.marketplaceStatus("Ceneo").orElseThrow();
-    private static final String EMPIK = CarrierDictionaries.marketplaceImport("Empik");
-    private static final String MORELE = CarrierDictionaries.marketplaceImport("Morele");
-    private static final String FURGONETKA = CarrierDictionaries.shipping("furgonetka");
-    private static final String WZA = CarrierDictionaries.shipping("allegro");
+    private static final String ALLEGRO_METHODS = CarrierDictionary.marketplaceImport("Allegro");
+    private static final String ALLEGRO = CarrierDictionary.marketplaceStatus("Allegro");
+    private static final String CENEO_FORMS = CarrierDictionary.marketplaceImport("Ceneo");
+    private static final String CENEO = CarrierDictionary.marketplaceStatus("Ceneo");
+    private static final String EMPIK = CarrierDictionary.marketplaceImport("Empik");
+    private static final String MORELE = CarrierDictionary.marketplaceImport("Morele");
+    private static final String FURGONETKA = CarrierDictionary.shipping("furgonetka");
+    private static final String WZA = CarrierDictionary.shipping("allegro");
 
     @Container
     static final GenericContainer<?> DYNAMODB =
@@ -99,15 +105,15 @@ class CarriersEndToEndDynamoDbIntegrationTest {
               "carriers": [{"name": "InPost"}, {"name": "InPost Kurier"}, {"name": "DPD"}, {"name": "DHL"},
                            {"name": "Poczta Polska"}, {"name": "Orlen"}],
               "dictionaries": [
-                {"dictionary": "global#marketplace#ceneo-forms", "mappings": [
+                {"dictionary": "global#marketplace#ceneo#import", "mappings": [
                   {"text": "InPost", "carrier": "InPost"}, {"text": "DPD", "carrier": "DPD"},
                   {"text": "Poczta Polska", "carrier": "Poczta Polska"}]},
-                {"dictionary": "global#marketplace#ceneo", "mappings": [
+                {"dictionary": "global#marketplace#ceneo#status", "mappings": [
                   {"text": "1", "carrier": "InPost"}, {"text": "1", "carrier": "InPost Kurier"},
                   {"text": "2", "carrier": "DHL"}, {"text": "3", "carrier": "DPD"}, {"text": "4", "carrier": "Poczta Polska"}]},
-                {"dictionary": "global#marketplace#empik", "mappings": [
+                {"dictionary": "global#marketplace#empik#import", "mappings": [
                   {"text": "INPOST", "carrier": "InPost"}, {"text": "DPD", "carrier": "DPD"}]},
-                {"dictionary": "global#marketplace#morele", "mappings": [
+                {"dictionary": "global#marketplace#morele#import", "mappings": [
                   {"text": "2", "carrier": "InPost"}, {"text": "4", "carrier": "Orlen"}, {"text": "7", "carrier": "Poczta Polska"}]},
                 {"dictionary": "global#shipping#furgonetka", "mappings": [
                   {"text": "inpost", "carrier": "InPost"}, {"text": "inpost_courier", "carrier": "InPost Kurier"},
@@ -123,7 +129,8 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         messages.setDefaultEncoding("UTF-8");
         messages.setFallbackToSystemLocale(false);
         CarriersController controller = new CarriersController(carriers, dictionaries,
-                new CarrierDictionaryWriter(dictionaries), messages);
+                new CarrierDictionaryWriter(dictionaries), messages, marketplaces("Morele", "Allegro", "Ceneo", "Empik"),
+                shippingIntegrations("furgonetka", "allegro"));
         // the HTML is rendered from the returned model (render), so the view itself writes nothing
         View noOutput = (model, request, response) -> { };
         mvc = MockMvcBuilders.standaloneSetup(controller)
@@ -140,7 +147,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         assertThat(tables).contains(CarrierDictionary.TABLE_NAME, "Carriers");
         assertThat(carriers.names()).contains("InPost", "InPost Kurier", "Allegro One", "Meest", "X-press");
         assertThat(mappings.inboundMappingFor(ALLEGRO, "AMBRO_EXPRESS")).contains("Ambro Express");
-        assertThat(CarrierDictionaries.shared())
+        assertThat(List.of(ALLEGRO_METHODS, ALLEGRO, CENEO_FORMS, CENEO, EMPIK, MORELE, FURGONETKA, WZA))
                 .allSatisfy(dictionary -> assertThat(dictionaries.find(dictionary)).isPresent());
     }
 
@@ -245,8 +252,8 @@ class CarriersEndToEndDynamoDbIntegrationTest {
 
         // when / then
         for (String source : sources) {
-            assertThat(mappings.carrierNameFor(CarrierDictionaries.marketplaceImport(source), "DPD")).isEqualTo("DPD");
-            assertThat(CarrierDictionaries.marketplaceStatus(source)).isEmpty();
+            assertThat(mappings.carrierNameFor(CarrierDictionary.marketplaceImport(source), "DPD")).isEqualTo("DPD");
+            assertThat(mappings.outboundMappingFor(CarrierDictionary.marketplaceStatus(source), "DPD")).isEmpty();
         }
     }
 
@@ -275,19 +282,33 @@ class CarriersEndToEndDynamoDbIntegrationTest {
     }
 
     @Test
-    void theCarriersPageListsCarriersAndEverySharedDictionary() throws Exception {
+    void theCarriersPageListsCarriersAndTheDictionariesOfEveryInstalledAdapter() throws Exception {
         // when
         MvcResult result = mvc.perform(get(CarriersController.PATH).locale(PL))
                 .andExpect(status().isOk())
                 .andExpect(view().name("carriers"))
-                .andExpect(model().attribute("missingStatusCodes", List.of()))
                 .andReturn();
         String html = render("carriers", result);
 
         // then
+        assertThat(result.getModelAndView().getModel().get("dictionaries"))
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.list(CarriersController.DictionaryRow.class))
+                .extracting(CarriersController.DictionaryRow::key)
+                .containsExactly(ALLEGRO_METHODS, ALLEGRO, CENEO_FORMS, CENEO, EMPIK,
+                        CarrierDictionary.marketplaceStatus("Empik"), MORELE, CarrierDictionary.marketplaceStatus("Morele"),
+                        WZA, FURGONETKA);
         assertThat(html).contains("InPost Kurier").contains("Allegro One")
-                .contains("global#marketplace#allegro-methods").contains("global#shipping#furgonetka")
-                .contains("/dashboard/carriers/dictionary?dictionary=global%23marketplace%23ceneo-forms");
+                .contains("global#marketplace#allegro#import").contains("global#shipping#furgonetka")
+                .contains("Ceneo: teksty przewoźnika w importowanym zamówieniu")
+                .contains("/dashboard/carriers/dictionary?dictionary=global%23marketplace%23ceneo%23import");
+    }
+
+    @Test
+    void anAdapterThatIsNotInstalledHasNoDictionaryPage() throws Exception {
+        // when / then
+        mvc.perform(get(CarriersController.DICTIONARY_PATH)
+                        .param("dictionary", CarrierDictionary.marketplaceImport("Erli")))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -359,31 +380,34 @@ class CarriersEndToEndDynamoDbIntegrationTest {
     void onlyTheSharedDictionariesAreEditedHere() throws Exception {
         // when / then
         mvc.perform(get(CarriersController.DICTIONARY_PATH)
-                        .param("dictionary", CarrierDictionaries.supplier("store-1", "Shoper-1")))
+                        .param("dictionary", CarrierDictionary.supplier("store-1", "Shoper-1")))
                 .andExpect(status().isNotFound());
     }
 
-    @Test
-    void aCeneoCarrierWithoutAStatusCodeIsFlaggedOnTheCarriersPage() throws Exception {
-        // given
-        CarrierDictionary forms = dictionaries.get(CENEO_FORMS);
-        List<CarrierMapping> seeded = List.copyOf(forms.getMappings());
-        forms.getMappings().add(new CarrierMapping("Kurier Pocztex", "Pocztex Kurier48"));
-        carriers.create(new pl.commercelink.carriers.Carrier("Pocztex Kurier48", null));
-        dictionaries.save(forms);
-
-        try {
-            // when
-            MvcResult result = mvc.perform(get(CarriersController.PATH).locale(PL)).andReturn();
-
-            // then
-            assertThat(render("carriers", result)).contains("Ceneo odrzuci status")
-                    .contains("Pocztex Kurier48: jest w global#marketplace#ceneo-forms, ale nie ma kodu w global#marketplace#ceneo");
-        } finally {
-            // the other tests read the seeded Ceneo forms
-            forms.setMappings(new java.util.ArrayList<>(seeded));
-            dictionaries.save(forms);
+    private static MarketplaceProviderFactory marketplaces(String... names) {
+        MarketplaceProviderFactory factory = mock(MarketplaceProviderFactory.class);
+        List<MarketplaceProviderDescriptor> descriptors = new ArrayList<>();
+        for (String name : names) {
+            MarketplaceProviderDescriptor descriptor = mock(MarketplaceProviderDescriptor.class);
+            when(descriptor.name()).thenReturn(name);
+            when(descriptor.displayName()).thenReturn(name);
+            descriptors.add(descriptor);
         }
+        when(factory.availableProviders()).thenReturn(descriptors);
+        return factory;
+    }
+
+    private static ShippingProviderFactory shippingIntegrations(String... names) {
+        ShippingProviderFactory factory = mock(ShippingProviderFactory.class);
+        List<ShippingProviderDescriptor> descriptors = new ArrayList<>();
+        for (String name : names) {
+            ShippingProviderDescriptor descriptor = mock(ShippingProviderDescriptor.class);
+            when(descriptor.name()).thenReturn(name);
+            when(descriptor.displayName()).thenReturn(name);
+            descriptors.add(descriptor);
+        }
+        when(factory.availableProviders()).thenReturn(descriptors);
+        return factory;
     }
 
     private static MockHttpServletRequestBuilder dictionaryPost(String dictionary, Long version, String... pairs) {

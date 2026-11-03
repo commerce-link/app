@@ -14,17 +14,6 @@
             </header>
             <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
 
-            <div th:unless="${missingStatusCodes.isEmpty()}" class="cl-alert is-warn" role="status">
-                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
-                <div>
-                    <p class="cl-alert-title" th:text="#{carriers.missingStatus.title}"></p>
-                    <ul class="cl-alert-text">
-                        <li th:each="m : ${missingStatusCodes}"
-                            th:text="#{carriers.missingStatus.item(${m.carrier()}, ${m.importDictionary()}, ${m.statusDictionary()})}"></li>
-                    </ul>
-                </div>
-            </div>
-
             <section class="cl-card" aria-labelledby="carriers-list-title">
                 <div class="cl-card-head">
                     <h2 class="cl-card-title" id="carriers-list-title" th:text="#{carriers.list.title}"></h2>
@@ -70,7 +59,7 @@
                         <div>
                             <div class="cl-list-title"><code th:text="${d.key()}"></code></div>
                             <p class="cl-list-desc">
-                                <span th:text="#{${'carriers.dictionary.purpose.' + d.key()}}"></span>
+                                <span th:text="${d.purpose()}"></span>
                                 <span th:text="'· ' + #{carriers.dictionaries.pairs(${d.pairs()})}"></span>
                             </p>
                         </div>

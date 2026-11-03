@@ -1,12 +1,11 @@
 package pl.commercelink.marketplace;
 
-import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
-import pl.commercelink.carriers.CarrierDictionaries;
+import pl.commercelink.carriers.CarrierDictionary;
 import pl.commercelink.carriers.CarrierMappings;
 import pl.commercelink.marketplace.api.MarketplaceCustomer;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
@@ -23,7 +22,6 @@ import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Service
 public class MarketplaceOrderImporter {
 
@@ -113,13 +111,7 @@ public class MarketplaceOrderImporter {
     }
 
     String toCarrierName(String marketplaceName, String shippingCarrier) {
-        Optional<String> carrier = carrierMappings.recognize(CarrierDictionaries.marketplaceImport(marketplaceName), shippingCarrier);
-        carrier.filter(name -> CarrierDictionaries.statusRequiresCode(marketplaceName))
-                .ifPresent(name -> CarrierDictionaries.marketplaceStatus(marketplaceName)
-                        .filter(status -> carrierMappings.outboundMappingFor(status, name).isEmpty())
-                        .ifPresent(status -> log.error("Carrier {} of a {} order has no code in {}: its shipment status "
-                                + "will be refused until the dictionary gets one", name, marketplaceName, status)));
-        return carrier.orElse(shippingCarrier);
+        return carrierMappings.carrierNameFor(CarrierDictionary.marketplaceImport(marketplaceName), shippingCarrier);
     }
 
     static String toCollectionPointCode(PickupPoint pickupPoint) {

@@ -3,7 +3,7 @@ package pl.commercelink.shipping;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import pl.commercelink.carriers.CarrierDictionaries;
+import pl.commercelink.carriers.CarrierDictionary;
 import pl.commercelink.carriers.CarrierMappings;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.shipping.api.ShipmentResult;
@@ -42,7 +42,7 @@ public class ShipmentCreationSettler {
         if (provider == null) {
             return;
         }
-        String dictionary = CarrierDictionaries.shipping(provider);
+        String dictionary = CarrierDictionary.shipping(provider);
         created.forEach(shipment -> shipment.setCarrier(carrierMappings.carrierNameFor(dictionary, shipment.getCarrier())));
     }
 

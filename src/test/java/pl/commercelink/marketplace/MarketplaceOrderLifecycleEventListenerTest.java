@@ -16,7 +16,7 @@ import pl.commercelink.documents.DocumentType;
 import pl.commercelink.marketplace.api.InvoiceUpdate;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.ShipmentUpdate;
-import pl.commercelink.carriers.CarrierDictionaries;
+import pl.commercelink.carriers.CarrierDictionary;
 import pl.commercelink.carriers.CarrierMappings;
 import pl.commercelink.carriers.InMemoryCarrierDictionaries;
 import pl.commercelink.orders.Order;
@@ -55,9 +55,9 @@ class MarketplaceOrderLifecycleEventListenerTest {
     @Mock private OrdersRepository ordersRepository;
     @Mock private MarketplaceProviderFactory providerFactory;
     @Spy private CarrierMappings carrierMappings = new InMemoryCarrierDictionaries()
-            .with(CarrierDictionaries.marketplaceStatus("Allegro").orElseThrow(), "INPOST=InPost", "INPOST=InPost Kurier", "DPD=DPD")
-            .with(CarrierDictionaries.shipping("furgonetka"), "inpost=InPost", "inpost_courier=InPost Kurier")
-            .with(CarrierDictionaries.marketplaceImport("Empik"), "DPD=DPD")
+            .with(CarrierDictionary.marketplaceStatus("Allegro"), "INPOST=InPost", "INPOST=InPost Kurier", "DPD=DPD")
+            .with(CarrierDictionary.shipping("furgonetka"), "inpost=InPost", "inpost_courier=InPost Kurier")
+            .with(CarrierDictionary.marketplaceImport("Empik"), "DPD=DPD")
             .mappings();
 
     @Mock private Store store;

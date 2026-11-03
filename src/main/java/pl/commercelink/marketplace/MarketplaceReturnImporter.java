@@ -22,7 +22,7 @@ import pl.commercelink.orders.rma.RMAItemsRepository;
 import pl.commercelink.orders.rma.RMARepository;
 import pl.commercelink.orders.rma.RMAResolutionType;
 import pl.commercelink.orders.rma.RMAStatus;
-import pl.commercelink.carriers.CarrierDictionaries;
+import pl.commercelink.carriers.CarrierDictionary;
 import pl.commercelink.carriers.CarrierMappings;
 import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.stores.Store;
@@ -33,7 +33,6 @@ import pl.commercelink.stores.StoreNotificationType;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -242,14 +241,12 @@ public class MarketplaceReturnImporter {
 
     /** Returns carry the marketplace's carrier ids, the vocabulary of its shipment status. */
     private List<Shipment> toShipments(String marketplace, MarketplaceReturn ret) {
-        Optional<String> dictionary = CarrierDictionaries.marketplaceStatus(marketplace);
+        String dictionary = CarrierDictionary.marketplaceStatus(marketplace);
         List<Shipment> shipments = new ArrayList<>();
         for (MarketplaceReturn.Parcel parcel : ret.parcels()) {
             Shipment shipment = new Shipment(ShipmentType.Courier);
             shipment.setTrackingNo(parcel.trackingNo());
-            shipment.setCarrier(dictionary
-                    .map(d -> carrierMappings.carrierNameFor(d, parcel.carrierId()))
-                    .orElse(parcel.carrierId()));
+            shipment.setCarrier(carrierMappings.carrierNameFor(dictionary, parcel.carrierId()));
             shipments.add(shipment);
         }
         return shipments;

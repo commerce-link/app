@@ -19,7 +19,7 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.pim.api.PimCatalog;
-import pl.commercelink.carriers.CarrierDictionaries;
+import pl.commercelink.carriers.CarrierDictionary;
 import pl.commercelink.carriers.CarrierMappings;
 import pl.commercelink.carriers.InMemoryCarrierDictionaries;
 import pl.commercelink.stores.FulfilmentConfiguration;
@@ -45,7 +45,7 @@ class MarketplaceOrderImporterTest {
 
     @Spy
     private CarrierMappings carrierMappings = new InMemoryCarrierDictionaries()
-            .with(CarrierDictionaries.marketplaceImport("Morele"), "2=InPost", "6=Zabka", "4=Orlen")
+            .with(CarrierDictionary.marketplaceImport("Morele"), "2=InPost", "6=Zabka", "4=Orlen")
             .mappings();
 
     @Mock

@@ -14,7 +14,7 @@ them: the data a deployment uses is its own and is not kept in this repository.
   ],
   "dictionaries": [
     {
-      "dictionary": "global#marketplace#allegro",
+      "dictionary": "global#marketplace#allegro#status",
       "mappings": [
         {"text": "INPOST", "carrier": "InPost"},
         {"text": "INPOST", "carrier": "InPost Kurier"}
@@ -25,8 +25,10 @@ them: the data a deployment uses is its own and is not kept in this repository.
 ```
 
 - A carrier's `name` is its identifier: it is stored in shipments and never changes.
-- `dictionary` is `{scope}#{type}#{dictionary}`; the shared ones are listed on `/dashboard/carriers`
-  (`CarrierDictionaries.shared()`), a supplier connection's is `{storeId}#supplier#{connection}`.
+- `dictionary` is `{scope}#{type}#{name}`: `global#marketplace#{adapter}#import` and
+  `global#marketplace#{adapter}#status` for a marketplace, `global#shipping#{adapter}` for a shipping integration
+  (the adapter name in lower case, as listed on `/dashboard/carriers`), `{storeId}#supplier#{connection}` for a
+  supplier connection.
 - The order of `mappings` matters: the first pair with a text decides the carrier that comes in, the first pair
   with a carrier decides the text that goes out.
 - Every carrier a pair names has to be in the file or already in the table.

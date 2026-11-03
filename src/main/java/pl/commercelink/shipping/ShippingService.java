@@ -4,7 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import pl.commercelink.carriers.CarrierDictionaries;
+import pl.commercelink.carriers.CarrierDictionary;
 import pl.commercelink.carriers.CarrierMappings;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.ShippingDetails;
@@ -272,7 +272,7 @@ public class ShippingService {
         if (integration == null || StringUtils.isBlank(deliveryTarget.carrier())) {
             return Optional.empty();
         }
-        String dictionary = CarrierDictionaries.shipping(integration);
+        String dictionary = CarrierDictionary.shipping(integration);
         return carrierMappings.outboundMappingFor(dictionary, deliveryTarget.carrier(), List.of(dictionary));
     }
 

@@ -63,7 +63,7 @@ public class CarrierDictionaryWriter {
     }
 
     private static Optional<Result> validate(String dictionary, List<CarrierMapping> pairs) {
-        boolean supplier = CarrierDictionaries.type(dictionary).filter(CarrierDictionaries.SUPPLIER::equals).isPresent();
+        boolean supplier = CarrierDictionary.isSupplier(dictionary);
         Set<String> seenPairs = new HashSet<>();
         Map<String, String> carrierByText = new HashMap<>();
         for (CarrierMapping pair : pairs) {

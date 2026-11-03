@@ -1,6 +1,6 @@
 package pl.commercelink.inventory.deliveries;
 
-import pl.commercelink.carriers.CarrierDictionaries;
+import pl.commercelink.carriers.CarrierDictionary;
 import pl.commercelink.carriers.CarrierMappings;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -199,7 +199,7 @@ public class DropshipTrackingService {
             String collectionPointCode = pickup != null ? pickup.getCollectionPointCode() : null;
             LocalDateTime shippedAt = parcel.shippedAt() != null ? parcel.shippedAt() : now;
             String carrier = carrierMappings.carrierNameFor(
-                    CarrierDictionaries.supplier(storeId, delivery.getProvider()), parcel.carrier());
+                    CarrierDictionary.supplier(storeId, delivery.getProvider()), parcel.carrier());
             DropshipShipment shipment = new DropshipShipment(type, carrier, parcel.trackingNo(),
                     collectionPointCode, shippedAt, parcel.trackingUrl());
             String invalidShipment = shipment.validationError();
