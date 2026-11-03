@@ -2685,7 +2685,9 @@ class OrderDetailsTemplateTest {
         assertThat(html).contains("data-cl-dialog-open=\"link-offer-dialog\"").contains("data-offer-key=\"SILLO-84980\"")
                 .containsPattern("data-cl-dialog-open=\"link-offer-dialog\"[^>]*>Połącz z produktem</a>")
                 .contains("id=\"link-offer-dialog\"")
-                .contains("action=\"/dashboard/orders/" + order.getOrderId() + "/link-offer\"");
+                .contains("action=\"/dashboard/orders/" + order.getOrderId() + "/link-offer\"")
+                .contains("name=\"categoryId\"").contains("name=\"productId\"")
+                .doesNotContain("name=\"pimId\"");
     }
 
     @Test

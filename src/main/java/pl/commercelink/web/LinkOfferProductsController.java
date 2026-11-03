@@ -20,10 +20,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
+
 /**
- * The products "Link to product" offers for one catalog: every product of the catalog with a pimId, which is what the
- * link endpoint accepts. The pricelist only carries available products, so a product without supplier stock or added
- * after the last pricelist run would be missing from it; it supplies the price where it has one.
+ * The products "Link to product" offers for one catalog: every product of the catalog with an EAN and a manufacturer
+ * code, what a link needs to recognise an order line and fill its item (a pimId is not required). The pricelist only
+ * carries available products, so a product without supplier stock or added after the last pricelist run would be
+ * missing from it; it supplies the price where it has one, by pimId, or by EAN for a product without one.
  */
 @Controller
 @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -48,17 +51,24 @@ public class LinkOfferProductsController extends BaseController {
                 categoryNames.putIfAbsent(category.getCategoryId(), category.getName());
             }
         }
-        Map<String, Long> prices = new HashMap<>();
+        Map<String, Long> pricesByPimId = new HashMap<>();
+        Map<String, Long> pricesByEan = new HashMap<>();
         for (AvailabilityAndPrice row : pricelistFinder.availabilityAndPrices(storeId, catalogId)) {
             if (row.getPimId() != null) {
-                prices.putIfAbsent(row.getPimId(), row.getPrice());
+                pricesByPimId.putIfAbsent(row.getPimId(), row.getPrice());
+            }
+            if (StringUtils.isNotBlank(row.getEan())) {
+                pricesByEan.putIfAbsent(unifyEan(row.getEan().trim()), row.getPrice());
             }
         }
         return productRepository.findAll(catalog).stream()
-                .filter(product -> StringUtils.isNotBlank(product.getPimId()))
-                .map(product -> new LinkOfferProduct(product.getPimId(), product.getName(), product.getLabel(),
-                        product.getManufacturerCode(), categoryNames.get(product.getCategoryId()),
-                        prices.get(product.getPimId())))
+                .filter(product -> StringUtils.isNotBlank(product.getEan())
+                        && StringUtils.isNotBlank(product.getManufacturerCode()))
+                .map(product -> new LinkOfferProduct(product.getCategoryId(), product.getProductId(), product.getEan(),
+                        product.getName(), product.getLabel(), product.getManufacturerCode(),
+                        categoryNames.get(product.getCategoryId()),
+                        StringUtils.isNotBlank(product.getPimId()) ? pricesByPimId.get(product.getPimId())
+                                : pricesByEan.get(unifyEan(product.getEan().trim()))))
                 .sorted(Comparator.comparing(LinkOfferProduct::name, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
                 .toList();
     }

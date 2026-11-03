@@ -57,16 +57,18 @@ class LinkOfferProductsControllerTest {
     }
 
     @Test
-    void listsEveryCatalogProductWithAPimIdIncludingThoseMissingFromThePricelist() {
+    void listsEveryCatalogProductWithAnEanAndAManufacturerCodeIncludingThoseMissingFromThePricelist() {
         // given
         ProductCatalog catalog = catalog();
         when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
         when(productRepository.findAll(catalog)).thenReturn(List.of(
-                product("pim-kettle", "Czajnik", "DMW-CZ17"),
-                product("pim-flask", "Termos", "DMW-TS10"),
-                product(null, "Bez karty", "DMW-X1")));
+                product("p1", "pim-kettle", "5900000000011", "Czajnik", "DMW-CZ17"),
+                product("p2", "pim-flask", "5900000000028", "Termos", "DMW-TS10"),
+                product("p3", null, "5900000000035", "Bez karty", "DMW-X1"),
+                product("p4", "pim-no-ean", null, "Bez EAN", "DMW-X2"),
+                product("p5", "pim-no-mfn", "5900000000042", "Bez kodu", " ")));
         when(pricelistFinder.availabilityAndPrices(STORE_ID, CATALOG_ID)).thenReturn(List.of(
-                new AvailabilityAndPrice("pim-kettle", "2001", "DMW-CZ17", "Domowik", "Domowik", "Czajnik",
+                new AvailabilityAndPrice("pim-kettle", "5900000000011", "DMW-CZ17", "Domowik", "Domowik", "Czajnik",
                         "Dom i kuchnia", 129, 5, 2, 129, false)));
 
         // when
@@ -74,8 +76,27 @@ class LinkOfferProductsControllerTest {
 
         // then
         assertThat(products).containsExactly(
-                new LinkOfferProduct("pim-kettle", "Czajnik", "Domowik", "DMW-CZ17", "Dom i kuchnia", 129L),
-                new LinkOfferProduct("pim-flask", "Termos", "Domowik", "DMW-TS10", "Dom i kuchnia", null));
+                new LinkOfferProduct("cat-home", "p3", "5900000000035", "Bez karty", "Domowik", "DMW-X1", "Dom i kuchnia", null),
+                new LinkOfferProduct("cat-home", "p1", "5900000000011", "Czajnik", "Domowik", "DMW-CZ17", "Dom i kuchnia", 129L),
+                new LinkOfferProduct("cat-home", "p2", "5900000000028", "Termos", "Domowik", "DMW-TS10", "Dom i kuchnia", null));
+    }
+
+    @Test
+    void aProductWithoutAPimIdTakesThePriceOfThePricelistRowWithItsEan() {
+        // given
+        ProductCatalog catalog = catalog();
+        when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
+        when(productRepository.findAll(catalog)).thenReturn(List.of(
+                product("p1", null, "5900000000011", "Czajnik", "DMW-CZ17")));
+        when(pricelistFinder.availabilityAndPrices(STORE_ID, CATALOG_ID)).thenReturn(List.of(
+                new AvailabilityAndPrice(null, "05900000000011", "DMW-CZ17", "Domowik", "Domowik", "Czajnik",
+                        "Dom i kuchnia", 149, 5, 2, 149, false)));
+
+        // when
+        List<LinkOfferProduct> products = controller.products(CATALOG_ID);
+
+        // then
+        assertThat(products).extracting(LinkOfferProduct::price).containsExactly(149L);
     }
 
     @Test
@@ -100,7 +121,9 @@ class LinkOfferProductsControllerTest {
         return catalog;
     }
 
-    private static Product product(String pimId, String name, String mfn) {
-        return new Product("cat-home", pimId, "2001", mfn, "Domowik", "Domowik", name, "Default");
+    private static Product product(String productId, String pimId, String ean, String name, String mfn) {
+        Product product = new Product("cat-home", pimId, ean, mfn, "Domowik", "Domowik", name, "Default");
+        product.setProductId(productId);
+        return product;
     }
 }

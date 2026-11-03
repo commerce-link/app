@@ -68,14 +68,16 @@
         </form>
     </dialog>
 
-    <!--/* One product of a catalog (every product with a pimId, not only the pricelist's available ones); the post saves
-           the offer link and fills the item and the store's other New items with the same offer. */-->
+    <!--/* One product of a catalog (every product with an EAN and a manufacturer code, not only the pricelist's available
+           ones); the post saves the offer link to its EAN and fills the item and the store's other New items with the
+           same offer. */-->
     <dialog class="cl-dialog is-form is-wide" id="link-offer-dialog" aria-labelledby="link-offer-title">
         <form method="post" th:action="@{/dashboard/orders/{o}/link-offer(o=${page.orderId()})}" data-cl-link-offer>
             <h2 class="cl-dialog-title" id="link-offer-title" th:text="#{order.item.menu.link.offer}"></h2>
             <div class="cl-dialog-body">
                 <input type="hidden" name="itemId" data-cl-item-id>
-                <input type="hidden" name="pimId" data-cl-link-pim>
+                <input type="hidden" name="categoryId" data-cl-link-category-id>
+                <input type="hidden" name="productId" data-cl-link-product-id>
                 <dl class="cl-kv" th:replace="~{orders/details/item-dialogs :: context}"></dl>
                 <dl class="cl-kv">
                     <div><dt th:text="#{order.item.link.offer.key}"></dt><dd><code class="cl-code" data-cl-link-key></code></dd></div>

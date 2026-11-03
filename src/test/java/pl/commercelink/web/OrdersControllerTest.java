@@ -3930,7 +3930,7 @@ class OrdersControllerTest {
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
-            String view = ordersController.linkOffer(ORDER_ID, "i1", "pim-1", redirect, polish);
+            String view = ordersController.linkOffer(ORDER_ID, "i1", "c1", "p1", redirect, polish);
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
@@ -3949,7 +3949,7 @@ class OrdersControllerTest {
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
-            String view = ordersController.linkOffer(ORDER_ID, "i1", "pim-1", redirect, polish);
+            String view = ordersController.linkOffer(ORDER_ID, "i1", "c1", "p1", redirect, polish);
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
@@ -3966,12 +3966,12 @@ class OrdersControllerTest {
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
             fresh.setMarketplaceOfferKey("SILLO-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
-            when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "pim-1", null))
+            when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "c1", "p1", null))
                     .thenReturn(new pl.commercelink.marketplace.links.MarketplaceOfferLinking.LinkResult(3, true));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
-            String view = ordersController.linkOffer(ORDER_ID, "i1", "pim-1", redirect, polish);
+            String view = ordersController.linkOffer(ORDER_ID, "i1", "c1", "p1", redirect, polish);
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
@@ -3986,12 +3986,12 @@ class OrdersControllerTest {
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
             fresh.setMarketplaceOfferKey("SILLO-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
-            when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "pim-1", null))
+            when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "c1", "p1", null))
                     .thenReturn(new pl.commercelink.marketplace.links.MarketplaceOfferLinking.LinkResult(0, false));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
-            String view = ordersController.linkOffer(ORDER_ID, "i1", "pim-1", redirect, polish);
+            String view = ordersController.linkOffer(ORDER_ID, "i1", "c1", "p1", redirect, polish);
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
@@ -4007,12 +4007,12 @@ class OrdersControllerTest {
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
             fresh.setMarketplaceOfferKey("SILLO-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
-            when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "pim-x", null)).thenThrow(
+            when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "c-foreign", "p1", null)).thenThrow(
                     new IllegalArgumentException(pl.commercelink.marketplace.links.MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
-            ordersController.linkOffer(ORDER_ID, "i1", "pim-x", redirect, polish);
+            ordersController.linkOffer(ORDER_ID, "i1", "c-foreign", "p1", redirect, polish);
 
             // then
             assertThat(flash(redirect)).containsEntry("errorMessage",

@@ -11,6 +11,7 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.products.Product;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.time.Clock;
@@ -19,12 +20,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
  * The operator's "Link to product" on an order item whose marketplace offer was not recognised: saves a MANUAL offer
- * link, so later imports resolve the offer, and fills this item and the store's other New items carrying the same offer
- * key. Items already in fulfilment are left to the operator, as with "Assign SKU"; the link is saved regardless.
+ * link to the chosen catalog product's EAN, so later imports resolve the offer, and fills this item and the store's
+ * other New items carrying the same offer key. Items already in fulfilment are left to the operator, as with "Assign SKU"; the link is saved regardless.
  */
 @Slf4j
 @Component
@@ -62,8 +64,13 @@ public class MarketplaceOfferLinking {
         this.clock = clock;
     }
 
-    /** @throws IllegalArgumentException with a message key when the item or the product cannot be linked */
-    public LinkResult link(String storeId, Order order, String itemId, String pimId, String userId) {
+    /**
+     * Links the item's offer key to the EAN of one product of the store's catalogs, named by its category and product
+     * id (an EAN may repeat across products, so it cannot name the operator's choice by itself).
+     *
+     * @throws IllegalArgumentException with a message key when the item or the product cannot be linked
+     */
+    public LinkResult link(String storeId, Order order, String itemId, String categoryId, String productId, String userId) {
         OrderItem chosen = orderItemsRepository.findById(order.getOrderId(), itemId);
         if (chosen == null || StringUtils.isBlank(chosen.getMarketplaceOfferKey())) {
             throw new IllegalArgumentException(NO_OFFER_KEY);
@@ -72,25 +79,32 @@ public class MarketplaceOfferLinking {
         if (marketplace == null) {
             throw new IllegalArgumentException(NOT_A_MARKETPLACE_ORDER);
         }
-        if (StringUtils.isBlank(pimId) || !resolver.isInStoreCatalog(storeId, pimId)) {
-            throw new IllegalArgumentException(PRODUCT_NOT_IN_CATALOG);
-        }
+        MarketplaceOfferResolver.StoreOffers storeOffers = resolver.forStore(storeId);
+        Product product = storeOffers.catalogProducts().stream()
+                .filter(candidate -> Objects.equals(candidate.getCategoryId(), categoryId)
+                        && Objects.equals(candidate.getProductId(), productId))
+                .filter(candidate -> StringUtils.isNotBlank(candidate.getEan()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(PRODUCT_NOT_IN_CATALOG));
         String offerKey = chosen.getMarketplaceOfferKey();
 
         // an existing link for the key is replaced: the operator's choice wins over an earlier one
-        linkRepository.save(MarketplaceOfferLink.of(storeId, marketplace, offerKey, List.of(),
+        linkRepository.save(MarketplaceOfferLink.of(storeId, marketplace, offerKey, List.of(product.getEan()),
                 MarketplaceOfferLinkSource.MANUAL, userId, clock.instant()));
 
         // resolved through the saved link, so the item gets exactly what the next import would give it
-        ResolvedOffer offer = resolver.resolve(storeId, marketplace, offerKey, null).orElse(null);
+        ResolvedOffer offer = storeOffers.resolve(marketplace, offerKey, null)
+                .filter(resolved -> resolved.source() == ResolvedOffer.Source.LINK)
+                .orElse(null);
         if (offer == null) {
-            log.warn("Offer {} of store {} linked to {}, but the product is not in the PIM view or has no manufacturer"
-                    + " code; no item filled", offerKey, storeId, pimId);
+            log.warn("Offer {} of store {} linked to EAN {} of product {}/{}, but the EAN does not lead to one catalog"
+                    + " product with a manufacturer code; no item filled", offerKey, storeId, product.getEan(),
+                    categoryId, productId);
             return LinkResult.productNotRecognised();
         }
         if (StringUtils.isBlank(offer.category())) {
-            log.warn("Offer {} of store {} linked to {}, which has no category in the PIM nor in the store catalog;"
-                    + " the items keep their category", offerKey, storeId, pimId);
+            log.warn("Offer {} of store {} linked to product {}/{}, whose category has no name; the items keep their"
+                    + " category", offerKey, storeId, categoryId, productId);
         }
 
         int updated = 0;
@@ -165,9 +179,9 @@ public class MarketplaceOfferLinking {
     }
 
     /**
-     * @param productRecognised false when the link is saved but the product cannot fill the items yet (its PIM card is
-     *                          unknown to this instance, e.g. created by hand and not refreshed, or it has no
-     *                          manufacturer code): the operator is told so instead of seeing a success with 0 items
+     * @param productRecognised false when the link is saved but does not lead to one product: another product of the
+     *                          store's catalogs has the same EAN with a different manufacturer code, so the items are
+     *                          not filled; the operator is told so instead of seeing a success with 0 items
      */
     public record LinkResult(int updatedItems, boolean productRecognised) {
 

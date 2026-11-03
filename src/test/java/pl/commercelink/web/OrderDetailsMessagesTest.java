@@ -79,6 +79,7 @@ class OrderDetailsMessagesTest {
         for (Properties bundle : List.of(pl, en)) {
             assertThat(keys).allSatisfy(key -> assertThat(bundle.getProperty(key)).as(key).isNotBlank());
             assertThat(bundle.getProperty("order.item.link.offer.done")).contains("{0}");
+            assertThat(bundle.getProperty("order.item.link.offer.unrecognised")).doesNotContain("PIM").contains("EAN");
         }
     }
 

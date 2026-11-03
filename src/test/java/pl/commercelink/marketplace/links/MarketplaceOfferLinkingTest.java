@@ -15,6 +15,7 @@ import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.products.Product;
 import pl.commercelink.taxonomy.Categories;
 
 import java.time.Clock;
@@ -45,13 +46,16 @@ class MarketplaceOfferLinkingTest {
     private static final String EMPIK = "Empik";
     private static final String KEY = "SILLO-84980";
     private static final Instant NOW = Instant.parse("2026-11-02T10:00:00Z");
+    private static final String EAN = "5900000000011";
     private static final ResolvedOffer OFFER =
-            new ResolvedOffer("pim-1", "5900000000011", "ab 123", "Procesory", Source.LINK);
+            new ResolvedOffer(null, EAN, "ab 123", "Procesory", Source.LINK);
 
     @Mock
     private MarketplaceOfferLinkRepository linkRepository;
     @Mock
     private MarketplaceOfferResolver resolver;
+    @Mock
+    private MarketplaceOfferResolver.StoreOffers storeOffers;
     @Mock
     private OrdersRepository ordersRepository;
     @Mock
@@ -64,8 +68,11 @@ class MarketplaceOfferLinkingTest {
     void setUp() {
         linking = new MarketplaceOfferLinking(linkRepository, resolver, ordersRepository, orderItemsRepository,
                 Clock.fixed(NOW, ZoneId.of("Europe/Warsaw")));
-        lenient().when(resolver.isInStoreCatalog(STORE, "pim-1")).thenReturn(true);
-        lenient().when(resolver.resolve(STORE, EMPIK, KEY, null)).thenReturn(Optional.of(OFFER));
+        lenient().when(resolver.forStore(STORE)).thenReturn(storeOffers);
+        lenient().when(storeOffers.catalogProducts()).thenReturn(List.of(
+                catalogProduct("c1", "p1", null, EAN, "ab 123"),
+                catalogProduct("c1", "p2", "pim-2", null, "NO-EAN")));
+        lenient().when(storeOffers.resolve(EMPIK, KEY, null)).thenReturn(Optional.of(OFFER));
         lenient().when(orderItemsRepository.findByOrderIds(anyList())).thenAnswer(invocation -> {
             List<String> ids = invocation.getArgument(0);
             Map<String, List<OrderItem>> found = new LinkedHashMap<>();
@@ -82,7 +89,7 @@ class MarketplaceOfferLinkingTest {
         openOrders(order);
 
         // when
-        MarketplaceOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "pim-1", "user-1");
+        MarketplaceOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1");
 
         // then
         ArgumentCaptor<MarketplaceOfferLink> saved = ArgumentCaptor.forClass(MarketplaceOfferLink.class);
@@ -90,8 +97,7 @@ class MarketplaceOfferLinkingTest {
         assertThat(saved.getValue().getStoreId()).isEqualTo(STORE);
         assertThat(saved.getValue().getMarketplace()).isEqualTo(EMPIK);
         assertThat(saved.getValue().getSellerOfferKey()).isEqualTo(KEY);
-        // eans are filled by the linking task
-        assertThat(saved.getValue().getEans()).isEmpty();
+        assertThat(saved.getValue().getEans()).containsExactly(EAN);
         assertThat(saved.getValue().getSource()).isEqualTo(MarketplaceOfferLinkSource.MANUAL);
         assertThat(saved.getValue().getCreatedBy()).isEqualTo("user-1");
         assertThat(saved.getValue().getCreatedAt()).isEqualTo(NOW);
@@ -112,10 +118,10 @@ class MarketplaceOfferLinkingTest {
         Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
         OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
         when(orderItemsRepository.findById("o1", "i1")).thenReturn(item);
-        when(resolver.resolve(STORE, EMPIK, KEY, null)).thenReturn(Optional.empty());
+        when(storeOffers.resolve(EMPIK, KEY, null)).thenReturn(Optional.empty());
 
         // when
-        MarketplaceOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "pim-1", "user-1");
+        MarketplaceOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1");
 
         // then
         verify(linkRepository).save(any(MarketplaceOfferLink.class));
@@ -133,7 +139,7 @@ class MarketplaceOfferLinkingTest {
         openOrders(order);
 
         // when
-        MarketplaceOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "pim-1", "user-1");
+        MarketplaceOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1");
 
         // then
         assertThat(result.productRecognised()).isTrue();
@@ -156,7 +162,7 @@ class MarketplaceOfferLinkingTest {
         openOrders(order, other, otherMarketplace, tooOld);
 
         // when
-        MarketplaceOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "pim-1", "user-1");
+        MarketplaceOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1");
 
         // then
         assertThat(result.updatedItems()).isEqualTo(3);
@@ -183,7 +189,7 @@ class MarketplaceOfferLinkingTest {
         openOrders(order);
 
         // when
-        MarketplaceOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "pim-1", "user-1");
+        MarketplaceOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1");
 
         // then
         verify(linkRepository).save(any());
@@ -202,14 +208,66 @@ class MarketplaceOfferLinkingTest {
         Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
         OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
         when(orderItemsRepository.findById("o1", "i1")).thenReturn(item);
-        when(resolver.isInStoreCatalog(STORE, "pim-foreign")).thenReturn(false);
 
         // when / then
-        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "pim-foreign", "user-1"))
+        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "other-store-category", "p1", "user-1"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage(MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG);
         verify(linkRepository, never()).save(any());
         verify(orderItemsRepository, never()).save(any());
+    }
+
+    @Test
+    void linkRejectsACatalogProductWithoutAnEan() {
+        // given
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        when(orderItemsRepository.findById("o1", "i1")).thenReturn(item);
+
+        // when / then
+        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", "p2", "user-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG);
+        verify(linkRepository, never()).save(any());
+    }
+
+    @Test
+    void aProductWithoutAPimIdIsLinkedThroughItsEan() {
+        // given
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        openOrders(order);
+
+        // when
+        MarketplaceOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1");
+
+        // then
+        ArgumentCaptor<MarketplaceOfferLink> saved = ArgumentCaptor.forClass(MarketplaceOfferLink.class);
+        verify(linkRepository).save(saved.capture());
+        assertThat(saved.getValue().getEans()).containsExactly(EAN);
+        assertThat(result.productRecognised()).isTrue();
+        assertThat(item.getSku()).isEqualTo("AB123");
+        assertThat(item.getEan()).isEqualTo(EAN);
+    }
+
+    @Test
+    void anotherCatalogProductWithTheSameEanLeavesTheItemsUnfilled() {
+        // given
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        when(orderItemsRepository.findById("o1", "i1")).thenReturn(item);
+        // the link cannot pick one product, so the seller offer key is read as our own pimId instead
+        when(storeOffers.resolve(EMPIK, KEY, null)).thenReturn(Optional.of(
+                new ResolvedOffer(KEY, EAN, "OTHER-1", "Krzesła", Source.OWN_OFFER)));
+
+        // when
+        MarketplaceOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1");
+
+        // then
+        verify(linkRepository).save(any(MarketplaceOfferLink.class));
+        verify(orderItemsRepository, never()).save(any());
+        assertThat(result.productRecognised()).isFalse();
+        assertThat(item.getSku()).isEqualTo("RAW-1");
     }
 
     @Test
@@ -221,7 +279,7 @@ class MarketplaceOfferLinkingTest {
         when(orderItemsRepository.findById("o1", "i1")).thenReturn(legacy);
 
         // when / then
-        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "pim-1", "user-1"))
+        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", "p1", "user-1"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage(MarketplaceOfferLinking.NO_OFFER_KEY);
         verify(linkRepository, never()).save(any());
@@ -235,7 +293,7 @@ class MarketplaceOfferLinkingTest {
         when(orderItemsRepository.findById("o1", "i1")).thenReturn(unlinkedItem("o1", "i1", FulfilmentStatus.New));
 
         // when / then
-        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "pim-1", "user-1"))
+        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", "p1", "user-1"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage(MarketplaceOfferLinking.NOT_A_MARKETPLACE_ORDER);
         verify(linkRepository, never()).save(any());
@@ -249,7 +307,7 @@ class MarketplaceOfferLinkingTest {
         openOrders(order);
 
         // when
-        MarketplaceOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "pim-1", "user-1");
+        MarketplaceOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1");
 
         // then
         assertThat(result.updatedItems()).isEqualTo(1);
@@ -263,6 +321,12 @@ class MarketplaceOfferLinkingTest {
                 lenient().when(orderItemsRepository.findById(order.getOrderId(), item.getItemId())).thenReturn(item);
             }
         }
+    }
+
+    private static Product catalogProduct(String categoryId, String productId, String pimId, String ean, String mfn) {
+        Product product = new Product(categoryId, pimId, ean, mfn, "Brand", "Brand", "Product " + productId, "Default");
+        product.setProductId(productId);
+        return product;
     }
 
     private Order marketplaceOrder(String orderId, String marketplace, OrderStatus status, int daysAgo) {
