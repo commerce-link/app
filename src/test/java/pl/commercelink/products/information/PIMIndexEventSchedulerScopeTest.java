@@ -16,6 +16,7 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
@@ -51,7 +52,8 @@ class PIMIndexEventSchedulerScopeTest {
         PimCatalog pimCatalog = ScopedPimCatalog.of(
                 ScopedPimCatalog.storeEntry("s1-2", "s1", ScopedPimCatalog.STORE_GTIN, "MPN-S1", "GPU"));
         PIMIndexEventScheduler scheduler = new PIMIndexEventScheduler(pimCatalog, productRepository,
-                productCatalogRepository, storesRepository, inventory, recommendationEngine, storeActivity);
+                productCatalogRepository, storesRepository, inventory, recommendationEngine, storeActivity,
+                new BrandMapper(pimCatalog));
         CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
         ProductCatalog catalog = new ProductCatalog("any", "main");
         catalog.addOrUpdateCategoryDefinition(category);

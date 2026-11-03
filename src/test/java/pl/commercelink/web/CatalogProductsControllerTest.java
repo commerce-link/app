@@ -158,7 +158,7 @@ class CatalogProductsControllerTest {
         // The save looks every row up in the inventory; by default nothing is there and the PIM is asked directly.
         lenient().when(emptyInventory.isEmpty()).thenReturn(true);
         lenient().when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        lenient().when(inventoryView.findByInventoryKey(any())).thenReturn(emptyInventory);
+        lenient().when(inventoryView.findByEan(any())).thenReturn(emptyInventory);
         lenient().when(store.getMarketplaces()).thenReturn(List.of());
         lenient().when(store.getEnabledCategories()).thenReturn(List.of());
         lenient().when(pimCategoryOptions.namedOptions(any(), any())).thenReturn(List.of());
@@ -609,7 +609,7 @@ class CatalogProductsControllerTest {
     void saveWithInventoryReturnToRedirectsBackToTheListWithANotice() throws Exception {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
-        when(pimView.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
+        when(pimView.findByGtin("5901234567890")).thenReturn(Optional.empty());
         String returnTo = "/dashboard/inventory?cat=11";
 
         // when / then
@@ -628,7 +628,7 @@ class CatalogProductsControllerTest {
     void saveIgnoresForeignReturnTo() throws Exception {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
-        when(pimView.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
+        when(pimView.findByGtin("5901234567890")).thenReturn(Optional.empty());
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/add/save")
@@ -681,7 +681,7 @@ class CatalogProductsControllerTest {
     void saveToTheInventoryCountsProductsSkippedByTheReview() throws Exception {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
-        when(pimView.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
+        when(pimView.findByGtin("5901234567890")).thenReturn(Optional.empty());
         String returnTo = "/dashboard/inventory?cat=11";
 
         // when
@@ -702,7 +702,7 @@ class CatalogProductsControllerTest {
     void saveToTheInventoryWithNothingSkippedLeavesTheSkippedPartOut() throws Exception {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
-        when(pimView.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
+        when(pimView.findByGtin("5901234567890")).thenReturn(Optional.empty());
         String returnTo = "/dashboard/inventory?cat=11";
 
         // when
@@ -746,7 +746,7 @@ class CatalogProductsControllerTest {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         // Product normalises the identifiers it is given, so the lookup asks with the unified code.
-        when(pimView.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
+        when(pimView.findByGtin("5901234567890")).thenReturn(Optional.empty());
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/add/save")
@@ -773,7 +773,7 @@ class CatalogProductsControllerTest {
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-9");
         when(entry.brand()).thenReturn("msi");
-        when(pimView.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.of(entry));
+        when(pimView.findByGtin("5901234567890")).thenReturn(Optional.of(entry));
         when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
 
         // when
@@ -814,7 +814,7 @@ class CatalogProductsControllerTest {
                 .andExpect(flash().attribute("catalogWarning", "catalog.products.added.none"))
                 .andExpect(flash().attribute("settingsSavedMessage", nullValue()));
         verify(productRepository, never()).save(any(Product.class));
-        verify(pimView, never()).findByGtinOrMpn(any(), any());
+        verify(pimView, never()).findByGtin(any());
     }
 
     /** A selection where only some rows are new: the outcome counts what was added, not what was sent. */
@@ -824,7 +824,7 @@ class CatalogProductsControllerTest {
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
                 new Product(gpu.getCategoryId(), "pim", "5901234567890", "MFN-1", "MSI", "L", "MSI RTX 5070", "Default")));
-        when(pimView.findByGtinOrMpn("5901234567891", "MFN-2")).thenReturn(Optional.empty());
+        when(pimView.findByGtin("5901234567891")).thenReturn(Optional.empty());
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/add/save")
@@ -845,7 +845,7 @@ class CatalogProductsControllerTest {
     void saveLeavesTheProductWithoutAPimIdWhenThePimDoesNotKnowIt() throws Exception {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
-        when(pimView.findByGtinOrMpn("5901234567890", "MFN-X")).thenReturn(Optional.empty());
+        when(pimView.findByGtin("5901234567890")).thenReturn(Optional.empty());
 
         // when
         mvc.perform(post(categoryPath() + "/products/add/save")
@@ -871,7 +871,7 @@ class CatalogProductsControllerTest {
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-9");
         when(entry.brand()).thenReturn("msi");
-        when(pimView.findByGtinOrMpn("5901234567899", "MFN-9")).thenReturn(Optional.of(entry));
+        when(pimView.findByGtin("5901234567899")).thenReturn(Optional.of(entry));
         when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
 
         // when
@@ -918,9 +918,9 @@ class CatalogProductsControllerTest {
     }
 
     /**
-     * The review resolves a proposal through the whole inventory key -- every EAN and product code the suppliers list
+     * The review resolves a proposal through the whole inventory key -- its pim id and every EAN the suppliers list
      * the item under -- and the save must not be narrower, or a product whose PIM entry is known only by a sibling
-     * identifier would be written without a pim id and drop out of the price list.
+     * EAN would be written without a pim id and drop out of the price list.
      */
     @Test
     void saveResolvesThePimEntryThroughTheWholeInventoryKey() throws Exception {
@@ -930,11 +930,11 @@ class CatalogProductsControllerTest {
         MatchedInventory matched = mock(MatchedInventory.class);
         when(matched.isEmpty()).thenReturn(false);
         when(matched.getInventoryKey()).thenReturn(key);
-        when(inventoryView.findByInventoryKey(any())).thenReturn(matched);
+        when(inventoryView.findByEan("5901234567890")).thenReturn(matched);
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-9");
         when(entry.brand()).thenReturn("msi");
-        when(pimView.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes()))
+        when(pimView.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), List.of()))
                 .thenReturn(Optional.of(entry));
         when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
 
@@ -949,31 +949,31 @@ class CatalogProductsControllerTest {
         verify(productRepository).save(saved.capture());
         assertThat(saved.getValue().getPimId()).isEqualTo("pim-9");
         assertThat(saved.getValue().getBrand()).isEqualTo("MSI");
-        verify(pimView, never()).findByGtinOrMpn(any(), any());
+        verify(pimView, never()).findByGtin(any());
     }
 
     /**
-     * The inventory knows the product by its EAN but the catalogue has no entry under that key: the manufacturer code
-     * the operator has just corrected in the review is the last thing left to ask about, so it is asked.
+     * The inventory has the product's EAN but the catalogue has no entry under its group's key: the EAN itself is the
+     * last thing left to ask about, so it is asked.
      */
     @Test
-    void saveStillAsksAboutTheCorrectedCodeWhenTheInventoryKeyResolvesToNothing() throws Exception {
+    void saveStillAsksAboutTheEanWhenItsInventoryKeyResolvesToNothing() throws Exception {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
-        InventoryKey key = new InventoryKey(Set.of("5901234567890"), Set.of());
+        InventoryKey key = new InventoryKey(Set.of("5901234567890"), Set.of("MFN-9"));
         MatchedInventory matched = mock(MatchedInventory.class);
         when(matched.isEmpty()).thenReturn(false);
         when(matched.getInventoryKey()).thenReturn(key);
-        when(inventoryView.findByInventoryKey(any())).thenReturn(matched);
-        when(pimView.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes()))
+        when(inventoryView.findByEan("5901234567899")).thenReturn(matched);
+        when(pimView.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), List.of()))
                 .thenReturn(Optional.empty());
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-5");
-        when(pimView.findByGtinOrMpn("5901234567890", "MFN-9")).thenReturn(Optional.of(entry));
+        when(pimView.findByGtin("5901234567899")).thenReturn(Optional.of(entry));
 
         // when
         mvc.perform(post(categoryPath() + "/products/add/save")
-                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "5901234567890")
+                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "5901234567899")
                         .param("products[0].manufacturerCode", "MFN-9").param("products[0].pricingGroup", "Default"))
                 .andExpect(redirectedUrl(categoryPath()));
 
@@ -983,14 +983,14 @@ class CatalogProductsControllerTest {
         assertThat(saved.getValue().getPimId()).isEqualTo("pim-5");
     }
 
-    /** A product that left the inventory between the review and the save is still asked about by its own two codes. */
+    /** A product that left the inventory between the review and the save is still asked about by its own EAN. */
     @Test
     void saveFallsBackToTheSubmittedIdentifiersWhenTheInventoryNoLongerHasTheProduct() throws Exception {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-7");
-        when(pimView.findByGtinOrMpn("5901234567890", "MFN-1")).thenReturn(Optional.of(entry));
+        when(pimView.findByGtin("5901234567890")).thenReturn(Optional.of(entry));
 
         // when
         mvc.perform(post(categoryPath() + "/products/add/save")
@@ -1010,7 +1010,7 @@ class CatalogProductsControllerTest {
     void saveBindsMoreProductsThanTheDefaultCollectionLimit() throws Exception {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
-        when(pimView.findByGtinOrMpn(any(), any())).thenReturn(Optional.empty());
+        when(pimView.findByGtin(any())).thenReturn(Optional.empty());
         MockHttpServletRequestBuilder request = post(categoryPath() + "/products/add/save");
         for (int index = 0; index < 300; index++) {
             request.param("products[" + index + "].name", "Product " + index)
@@ -1127,11 +1127,12 @@ class CatalogProductsControllerTest {
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
         when(foundInventory.isEmpty()).thenReturn(false);
-        when(foundInventory.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
+        InventoryKey key = new InventoryKey("1", "MFN-1");
+        when(foundInventory.getInventoryKey()).thenReturn(key);
         when(foundInventory.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
         when(foundInventory.getLowestPrice()).thenReturn(Price.fromGross(2749));
         when(inventoryView.findByEan("1")).thenReturn(foundInventory);
-        when(pimView.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+        when(pimView.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), List.of())).thenReturn(Optional.empty());
 
         // when
         var result = mvc.perform(get(categoryPath() + "/products/new").param("ean", "1"))
@@ -1184,7 +1185,7 @@ class CatalogProductsControllerTest {
         when(access.requireProduct(gpu, "p1")).thenReturn(existing);
         PimEntry other = mock(PimEntry.class);
         lenient().when(other.pimId()).thenReturn("pim-2");
-        lenient().when(pimView.findByGtinOrMpn(any(), any())).thenReturn(Optional.of(other));
+        lenient().when(pimView.findByGtin(any())).thenReturn(Optional.of(other));
 
         // when
         mvc.perform(post(categoryPath() + "/products/p1")
@@ -1383,9 +1384,9 @@ class CatalogProductsControllerTest {
         verifyNoInteractions(pimCatalog);
     }
 
-    /** A pending product, its codes corrected, is looked up in the PIM by them and joins the entry it finds. */
+    /** A pending product, its EAN corrected, is looked up in the PIM by it and joins the entry it finds. */
     @Test
-    void savingAPendingProductJoinsThePimEntryItsCodesLeadTo() throws Exception {
+    void savingAPendingProductJoinsThePimEntryItsEanLeadsTo() throws Exception {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         Product pending = new Product(gpu.getCategoryId(), null, "4719331361699", "MFN-1", null, "l", "MSI RTX 5070", "Default");
@@ -1394,7 +1395,7 @@ class CatalogProductsControllerTest {
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-9");
         when(entry.brand()).thenReturn("msi");
-        when(pimView.findByGtinOrMpn("4719331361600", "MFN-1")).thenReturn(Optional.of(entry));
+        when(pimView.findByGtin("4719331361600")).thenReturn(Optional.of(entry));
         when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
 
         // when
@@ -1444,7 +1445,7 @@ class CatalogProductsControllerTest {
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-9");
         when(entry.brand()).thenReturn("msi");
-        when(pimView.findByGtinOrMpn("4719331361600", "MFN-1")).thenReturn(Optional.of(entry));
+        when(pimView.findByGtin("4719331361600")).thenReturn(Optional.of(entry));
         when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
 
         // when
@@ -1477,11 +1478,11 @@ class CatalogProductsControllerTest {
         MatchedInventory matched = mock(MatchedInventory.class);
         when(matched.isEmpty()).thenReturn(false);
         when(matched.getInventoryKey()).thenReturn(key);
-        when(inventoryView.findByInventoryKey(any())).thenReturn(matched);
+        when(inventoryView.findByEan("5901234567890")).thenReturn(matched);
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-9");
         when(entry.brand()).thenReturn("msi");
-        when(pimView.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes()))
+        when(pimView.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), List.of()))
                 .thenReturn(Optional.of(entry));
         when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
 
@@ -1497,7 +1498,7 @@ class CatalogProductsControllerTest {
         verify(productRepository).save(saved.capture());
         assertThat(saved.getValue().getPimId()).isEqualTo("pim-9");
         assertThat(saved.getValue().getBrand()).isEqualTo("MSI");
-        verify(pimView, never()).findByGtinOrMpn(any(), any());
+        verify(pimView, never()).findByGtin(any());
     }
 
     @Test

@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
+import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimIdentifier;
@@ -63,7 +64,7 @@ class ProductWeightOriginComplianceReportServiceTest {
         when(documentRepository.findAllInDateRange(STORE_ID, FROM.atStartOfDay(), TO.atTime(LocalTime.MAX)))
                 .thenReturn(List.of(doc));
         when(itemRepository.findByDocumentId("doc-1")).thenReturn(List.of(item));
-        when(pimView.findByGtinOrMpn("5901234567890", "RTX4070-DUAL"))
+        when(pimView.findByGtin("5901234567890"))
                 .thenReturn(Optional.of(pimEntry("GPU", "ASUS", 2100, 2400)));
 
         List<ProductWeightOriginComplianceReportRow> rows = service.generate(STORE_ID, FROM, TO);
@@ -90,7 +91,7 @@ class ProductWeightOriginComplianceReportServiceTest {
                 .thenReturn(List.of(issue));
         when(itemRepository.findByDocumentId("doc-issue"))
                 .thenReturn(List.of(item("doc-issue", "5901111111111", "MFN-ISSUE", "Widget", 2)));
-        when(pimView.findByGtinOrMpn("5901111111111", "MFN-ISSUE"))
+        when(pimView.findByGtin("5901111111111"))
                 .thenReturn(Optional.of(pimEntry("GPU", "ASUS", 1000, 1200)));
 
         assertThat(service.generate(STORE_ID, FROM, TO)).isEmpty();
@@ -104,7 +105,7 @@ class ProductWeightOriginComplianceReportServiceTest {
                 .thenReturn(List.of(customerReturn));
         when(itemRepository.findByDocumentId("doc-rma"))
                 .thenReturn(List.of(item("doc-rma", "5902222222222", "MFN-RMA", "Returned item", 1)));
-        when(pimView.findByGtinOrMpn("5902222222222", "MFN-RMA"))
+        when(pimView.findByGtin("5902222222222"))
                 .thenReturn(Optional.of(pimEntry("GPU", "ASUS", 500, 600)));
 
         assertThat(service.generate(STORE_ID, FROM, TO)).isEmpty();
@@ -132,7 +133,7 @@ class ProductWeightOriginComplianceReportServiceTest {
                 .thenReturn(List.of(item("doc-1", "5900000000001", "MFN-A", "Name A", 3)));
         when(itemRepository.findByDocumentId("doc-2"))
                 .thenReturn(List.of(item("doc-2", "5900000000001", "MFN-A", "Name A", 2)));
-        when(pimView.findByGtinOrMpn("5900000000001", "MFN-A"))
+        when(pimView.findByGtin("5900000000001"))
                 .thenReturn(Optional.of(pimEntry("GPU", "ASUS", 1000, 1200)));
 
         List<ProductWeightOriginComplianceReportRow> rows = service.generate(STORE_ID, FROM, TO);
@@ -154,7 +155,7 @@ class ProductWeightOriginComplianceReportServiceTest {
                 .thenReturn(List.of(item("doc-1", "5900000000001", "MFN-A", "Name A", 3)));
         when(itemRepository.findByDocumentId("doc-2"))
                 .thenReturn(List.of(item("doc-2", "5900000000001", "MFN-A", "Name A", 2)));
-        when(pimView.findByGtinOrMpn("5900000000001", "MFN-A"))
+        when(pimView.findByGtin("5900000000001"))
                 .thenReturn(Optional.of(pimEntry("GPU", "ASUS", 1000, 1200)));
 
         List<ProductWeightOriginComplianceReportRow> rows = service.generate(STORE_ID, FROM, TO);
@@ -172,7 +173,7 @@ class ProductWeightOriginComplianceReportServiceTest {
                 .thenReturn(List.of(doc));
         when(itemRepository.findByDocumentId("doc-pim-miss"))
                 .thenReturn(List.of(item("doc-pim-miss", "5900000000002", "MFN-MISS", "Mystery", 4)));
-        when(pimView.findByGtinOrMpn("5900000000002", "MFN-MISS")).thenReturn(Optional.empty());
+        when(pimView.findByGtin("5900000000002")).thenReturn(Optional.empty());
 
         List<ProductWeightOriginComplianceReportRow> rows = service.generate(STORE_ID, FROM, TO);
 
@@ -187,13 +188,36 @@ class ProductWeightOriginComplianceReportServiceTest {
     }
 
     @Test
+    void itemTakesNoEntryByCodeAlone() {
+        // given
+        when(documentRepository.findAllInDateRange(STORE_ID, FROM.atStartOfDay(), TO.atTime(LocalTime.MAX)))
+                .thenReturn(List.of(goodsReceiptDoc("doc-1", "Germany")));
+        when(itemRepository.findByDocumentId("doc-1"))
+                .thenReturn(List.of(item("doc-1", "5909999999999", "RTX4070-DUAL", "DUAL RTX 4070", 2)));
+        ProductWeightOriginComplianceReportService report = new ProductWeightOriginComplianceReportService(
+                documentRepository, itemRepository,
+                ScopedPimCatalog.of(ScopedPimCatalog.globalEntry("pim-1", "5900000000001", "RTX4070-DUAL", "GPU")));
+
+        // when
+        List<ProductWeightOriginComplianceReportRow> rows = report.generate(STORE_ID, FROM, TO);
+
+        // then
+        assertThat(rows).singleElement().satisfies(row -> {
+            assertThat(row.category()).isEqualTo("Unknown");
+            assertThat(row.brand()).isNull();
+            assertThat(row.weightNetG()).isNull();
+            assertThat(row.weightGrossG()).isNull();
+        });
+    }
+
+    @Test
     void leavesNetSideEmptyWhenPimEntryHasOnlyGrossWeight() {
         WarehouseDocument doc = goodsReceiptDoc("doc-half", "Germany");
         when(documentRepository.findAllInDateRange(STORE_ID, FROM.atStartOfDay(), TO.atTime(LocalTime.MAX)))
                 .thenReturn(List.of(doc));
         when(itemRepository.findByDocumentId("doc-half"))
                 .thenReturn(List.of(item("doc-half", "5900000000003", "MFN-HALF", "Half", 7)));
-        when(pimView.findByGtinOrMpn("5900000000003", "MFN-HALF"))
+        when(pimView.findByGtin("5900000000003"))
                 .thenReturn(Optional.of(pimEntry("PSU", "Corsair", null, 1500)));
 
         List<ProductWeightOriginComplianceReportRow> rows = service.generate(STORE_ID, FROM, TO);
@@ -215,7 +239,7 @@ class ProductWeightOriginComplianceReportServiceTest {
                 .thenReturn(List.of(doc));
         when(itemRepository.findByDocumentId("doc-no-counter"))
                 .thenReturn(List.of(item("doc-no-counter", "5900000000004", "MFN-X", "X", 1)));
-        when(pimView.findByGtinOrMpn("5900000000004", "MFN-X"))
+        when(pimView.findByGtin("5900000000004"))
                 .thenReturn(Optional.of(pimEntry("GPU", "ASUS", 1000, 1200)));
 
         List<ProductWeightOriginComplianceReportRow> rows = service.generate(STORE_ID, FROM, TO);
@@ -231,7 +255,7 @@ class ProductWeightOriginComplianceReportServiceTest {
                 .thenReturn(List.of(doc));
         when(itemRepository.findByDocumentId("doc-blank-country"))
                 .thenReturn(List.of(item("doc-blank-country", "5900000000005", "MFN-Y", "Y", 1)));
-        when(pimView.findByGtinOrMpn("5900000000005", "MFN-Y"))
+        when(pimView.findByGtin("5900000000005"))
                 .thenReturn(Optional.of(pimEntry("GPU", "ASUS", 500, 600)));
 
         List<ProductWeightOriginComplianceReportRow> rows = service.generate(STORE_ID, FROM, TO);
@@ -254,10 +278,10 @@ class ProductWeightOriginComplianceReportServiceTest {
         when(itemRepository.findByDocumentId("doc-3")).thenReturn(List.of(item("doc-3", "ean-3", "M-AT-GPU", "AT GPU", 1)));
         when(itemRepository.findByDocumentId("doc-4")).thenReturn(List.of(item("doc-4", "ean-4", "M-AT-PSU", "AT PSU", 1)));
 
-        when(pimView.findByGtinOrMpn("ean-1", "M-DE-GPU")).thenReturn(Optional.of(pimEntry("GPU", "ASUS", 1, 1)));
-        when(pimView.findByGtinOrMpn("ean-2", "M-DE-PSU")).thenReturn(Optional.of(pimEntry("PSU", "Corsair", 1, 1)));
-        when(pimView.findByGtinOrMpn("ean-3", "M-AT-GPU")).thenReturn(Optional.of(pimEntry("GPU", "ASUS", 1, 1)));
-        when(pimView.findByGtinOrMpn("ean-4", "M-AT-PSU")).thenReturn(Optional.of(pimEntry("PSU", "Corsair", 1, 1)));
+        when(pimView.findByGtin("ean-1")).thenReturn(Optional.of(pimEntry("GPU", "ASUS", 1, 1)));
+        when(pimView.findByGtin("ean-2")).thenReturn(Optional.of(pimEntry("PSU", "Corsair", 1, 1)));
+        when(pimView.findByGtin("ean-3")).thenReturn(Optional.of(pimEntry("GPU", "ASUS", 1, 1)));
+        when(pimView.findByGtin("ean-4")).thenReturn(Optional.of(pimEntry("PSU", "Corsair", 1, 1)));
 
         List<ProductWeightOriginComplianceReportRow> rows = service.generate(STORE_ID, FROM, TO);
 

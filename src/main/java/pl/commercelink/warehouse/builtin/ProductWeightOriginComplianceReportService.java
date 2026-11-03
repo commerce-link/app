@@ -58,7 +58,7 @@ public class ProductWeightOriginComplianceReportService {
 
     private void accumulate(WarehouseDocumentItem item, String country, PimView pimLookup, Map<AggregateKey, Aggregate> aggregates) {
         if (item.getMfn() == null || item.getMfn().isBlank()) return;
-        Optional<PimEntry> pim = pimLookup.findByGtinOrMpn(item.getEan(), item.getMfn());
+        Optional<PimEntry> pim = pimLookup.findByGtin(item.getEan());
         String category = pim.map(PimEntry::category).orElse(null);
         String brand = pim.map(PimEntry::brand).orElse(null);
         Integer netG = pim.map(PimEntry::netWeightInGrams).orElse(null);
