@@ -119,8 +119,9 @@ public class MarketplaceOrderImporter {
                         if (line.offer() != null && line.offer().source() != ResolvedOffer.Source.MFN) {
                             orderItem.setEan(line.offer().ean());
                         }
-                        // a linked line carries the catalog product's codes, as a manually linked one does;
-                        // the own-offer step is left as it was before offer links
+                        // a linked line stands for a catalog product, so it records that product's manufacturer code
+                        // next to the sku; the own-offer step deliberately keeps its pre-link fields, so its items
+                        // do not change
                         if (line.offer() != null && line.offer().source() == ResolvedOffer.Source.LINK) {
                             orderItem.setManufacturerCode(line.offer().mfn());
                         }

@@ -191,9 +191,9 @@ class MarketplaceOfferResolverTest {
         when(products.findAllByPimId("pim-2")).thenReturn(List.of(foreign));
 
         // when / then
-        assertThat(resolver.isInStoreCatalog(STORE, "pim-1")).isTrue();
-        assertThat(resolver.isInStoreCatalog(STORE, "pim-2")).isFalse();
-        assertThat(resolver.isInStoreCatalog(STORE, "pim-unknown")).isFalse();
+        assertThat(resolver.forStore(STORE).isInStoreCatalog("pim-1")).isTrue();
+        assertThat(resolver.forStore(STORE).isInStoreCatalog("pim-2")).isFalse();
+        assertThat(resolver.forStore(STORE).isInStoreCatalog("pim-unknown")).isFalse();
     }
 
     @Test
@@ -205,7 +205,7 @@ class MarketplaceOfferResolverTest {
         catalogProduct("c1", "p1", "src", null, null);
 
         // when / then
-        assertThat(resolver.isInStoreCatalog(STORE, "clone")).isTrue();
+        assertThat(resolver.forStore(STORE).isInStoreCatalog("clone")).isTrue();
     }
 
     @Test

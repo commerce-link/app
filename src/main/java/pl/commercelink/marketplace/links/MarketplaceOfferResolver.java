@@ -65,11 +65,6 @@ public class MarketplaceOfferResolver {
         return forStore(storeId).resolve(marketplace, sellerOfferKey, manufacturerCode);
     }
 
-    /** Whether a product of the store's catalogs carries this pimId (what an operator may link an offer to). */
-    public boolean isInStoreCatalog(String storeId, String pimId) {
-        return forStore(storeId).isInStoreCatalog(pimId);
-    }
-
     public class StoreOffers {
 
         private final String storeId;
