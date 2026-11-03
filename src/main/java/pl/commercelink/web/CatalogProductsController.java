@@ -350,7 +350,7 @@ public class CatalogProductsController {
                     currentFilter, model, locale);
         }
         InventoryKey key = matched.getInventoryKey();
-        Optional<PimEntry> entry = pimCatalog.withStoreData(storeId()).findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
+        Optional<PimEntry> entry = review.pimEntryOfGroup(storeId(), key);
         Product prefilled = new ProductRecommendation(category, matched, entry).toProduct();
         ProductForm form = ProductForm.from(prefilled);
         // Nothing is saved yet, so there is no identity to protect: the PIM entry is resolved again when it is.

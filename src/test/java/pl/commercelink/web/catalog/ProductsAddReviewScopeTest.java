@@ -2,6 +2,7 @@ package pl.commercelink.web.catalog;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -14,6 +15,9 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.pim.api.PimIdentifier;
+import pl.commercelink.pim.api.PimIdentifierType;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.Product;
@@ -30,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,15 +43,17 @@ class ProductsAddReviewScopeTest {
 
     private static final String EAN = ScopedPimCatalog.STORE_GTIN;
     private static final String MFN = "M-591";
+    private static final String EAN_UNKNOWN_TO_PIM = "5900000000999";
 
     @Mock private ProductRepository productRepository;
     @Mock private Inventory inventory;
     @Mock private InventoryView view;
-    @Mock private BrandMapper brandMapper;
+    @Mock private PimCatalog brandList;
     @Mock private MessageSource messageSource;
     @Mock private CatalogPlacement catalogPlacement;
 
     private ProductsAddReview review(PimCatalog catalog) {
+        BrandMapper brandMapper = new BrandMapper(brandList);
         when(inventory.withEnabledSuppliersOnly(anyString())).thenReturn(view);
         when(productRepository.findAll(anyString())).thenReturn(List.of());
         MatchedInventory matched = mock(MatchedInventory.class);
@@ -101,15 +108,18 @@ class ProductsAddReviewScopeTest {
 
     @Test
     void twoRowsLeadingToOneStoreEntryAddOneProduct() {
-        // given: the second row carries another EAN but the store entry's MPN (bad feed data)
-        ProductsAddReview review = review(catalog());
+        // given: the store entry holds the EANs of both rows
+        String secondEan = "5900000000998";
+        ProductsAddReview review = review(ScopedPimCatalog.of(new PimEntry("s1-2",
+                List.of(new PimIdentifier(EAN, PimIdentifierType.GTIN), new PimIdentifier(secondEan, PimIdentifierType.GTIN)),
+                "Brand", "Store s1-2", "GPU", null, true, 2000, 2200, null, "s1")));
         CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
         MatchedInventory unknown = mock(MatchedInventory.class);
         when(unknown.isEmpty()).thenReturn(true);
         when(view.findByInventoryKey(any())).thenReturn(unknown);
         ProductsBulkAddForm form = ProductsBulkAddForm.of(List.of(
                 new Product(null, null, EAN, "OTHER-1", "Brand", "L", "First", "Default"),
-                new Product(null, null, "5900000000999", MFN, "Brand", "L", "Second", "Default")));
+                new Product(null, null, secondEan, "OTHER-2", "Brand", "L", "Second", "Default")));
 
         // when
         int added = review.save("s1", category, form);
@@ -178,5 +188,83 @@ class ProductsAddReviewScopeTest {
         // when / then
         assertThat(review.aliasesOf("s1", "c1")).containsExactlyInAnyOrder("c1", "g1");
         assertThat(review.aliasesOf("s2", "c1")).containsExactly("c1");
+    }
+
+    @Test
+    void reviewTakesNoEntryMatchingTheGroupByCodeOnly() {
+        // given: the group's EAN is unknown to the PIM, its code is the global entry's
+        ProductsAddReview review = review(ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("g1", ScopedPimCatalog.GLOBAL_GTIN, MFN, "GPU")));
+        CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
+
+        // when
+        ProductsAddReview.Prepared prepared = review.prepare("s1", category, List.of(EAN), null);
+
+        // then
+        assertThat(prepared.form().getProducts()).singleElement().extracting(ProductsBulkAddForm.Row::getName).isEqualTo("Taxonomy name");
+    }
+
+    @Test
+    void saveAttachesNoEntryMatchingTheGroupByCodeOnly() {
+        // given: the group's EAN is unknown to the PIM, its code is the global entry's
+        ProductsAddReview review = review(ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("g1", ScopedPimCatalog.GLOBAL_GTIN, MFN, "GPU")));
+        MatchedInventory group = mock(MatchedInventory.class);
+        when(group.isEmpty()).thenReturn(false);
+        when(group.getInventoryKey()).thenReturn(new InventoryKey(EAN, MFN));
+        when(view.findByInventoryKey(any())).thenReturn(group);
+        CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
+        ProductsBulkAddForm form = ProductsBulkAddForm.of(List.of(new Product(null, null, EAN, MFN, "Brand", "L", "New", "Default")));
+
+        // when
+        review.save("s1", category, form);
+
+        // then
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        assertThat(saved.getValue().getPimId()).isNull();
+    }
+
+    @Test
+    void pimEntryFoundOnlyByCodeIsNotAttached() {
+        // given
+        PimEntry kingston = globalEntryOfBrand("Kingston");
+
+        // when
+        Product saved = saveRow(kingston, EAN_UNKNOWN_TO_PIM, "Kingston");
+
+        // then
+        assertThat(saved.getPimId()).isNull();
+    }
+
+    @Test
+    void pimEntryFoundByEanIsAttached() {
+        // given
+        PimEntry kingston = globalEntryOfBrand("Kingston");
+
+        // when
+        Product saved = saveRow(kingston, ScopedPimCatalog.GLOBAL_GTIN, "Trust");
+
+        // then
+        assertThat(saved.getPimId()).isEqualTo("g1");
+        assertThat(saved.getBrand()).isEqualTo("Kingston");
+    }
+
+    private static PimEntry globalEntryOfBrand(String brand) {
+        return new PimEntry("g1", ScopedPimCatalog.identifiers(ScopedPimCatalog.GLOBAL_GTIN, MFN), brand, "Global g1",
+                "GPU", null, true, 1000, 1200);
+    }
+
+    private Product saveRow(PimEntry entry, String ean, String brand) {
+        ProductsAddReview review = review(ScopedPimCatalog.of(entry));
+        MatchedInventory unknown = mock(MatchedInventory.class);
+        when(unknown.isEmpty()).thenReturn(true);
+        when(view.findByInventoryKey(any())).thenReturn(unknown);
+        CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
+        ProductsBulkAddForm form = ProductsBulkAddForm.of(List.of(new Product(null, null, ean, MFN, brand, "L", "New", "Default")));
+        review.save("s1", category, form);
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        return saved.getValue();
     }
 }
