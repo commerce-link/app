@@ -3,6 +3,8 @@ package pl.commercelink.marketplace.links;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,18 +25,29 @@ class MarketplaceOfferLinkTest {
         Instant now = Instant.parse("2026-11-02T10:15:30Z");
 
         // when
-        MarketplaceOfferLink link = MarketplaceOfferLink.of("store-1", "Empik", "SILLO-84980", "pim-1",
-                MarketplaceOfferLinkSource.MANUAL, "user@x.pl", now);
+        MarketplaceOfferLink link = MarketplaceOfferLink.of("store-1", "Empik", "SILLO-84980",
+                List.of("5901234123457"), MarketplaceOfferLinkSource.MANUAL, "user@x.pl", now);
 
         // then
         assertThat(link.getStoreId()).isEqualTo("store-1");
         assertThat(link.getLinkKey()).isEqualTo("Empik#SILLO-84980");
         assertThat(link.getMarketplace()).isEqualTo("Empik");
         assertThat(link.getSellerOfferKey()).isEqualTo("SILLO-84980");
-        assertThat(link.getPimId()).isEqualTo("pim-1");
+        assertThat(link.getEans()).containsExactly("5901234123457");
         assertThat(link.getSource()).isEqualTo(MarketplaceOfferLinkSource.MANUAL);
         assertThat(link.getCreatedBy()).isEqualTo("user@x.pl");
         assertThat(link.getCreatedAt()).isEqualTo(now);
+    }
+
+    @Test
+    void ofUnifiesEansDropsBlanksAndDuplicatesKeepingTheFirstAppearanceOrder() {
+        // when
+        MarketplaceOfferLink link = MarketplaceOfferLink.of("store-1", "Empik", "K-1",
+                Arrays.asList("05901234123457", " ", null, "5906789000011", "5901234123457", ""),
+                MarketplaceOfferLinkSource.EAN, null, Instant.EPOCH);
+
+        // then
+        assertThat(link.getEans()).containsExactly("5901234123457", "5906789000011");
     }
 
     @Test

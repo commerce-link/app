@@ -1046,7 +1046,7 @@ class MarketplaceOfferExportEventListenerTest {
         listener.handleMessage(request());
 
         // then the link offer matching saved points at the catalog product, so no duplicate offer is published
-        assertThat(matched.getPimId()).isEqualTo("local-seed-0101");
+        assertThat(matched.getEans()).containsExactly("local-seed-0101");
         verify(provider, never()).exportOffers(any(), any(), any());
         assertThat(captureSavedRows()).isEmpty();
     }
@@ -1140,7 +1140,7 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     private MarketplaceOfferLink link(String sellerOfferKey, String pimId) {
-        return MarketplaceOfferLink.of(STORE_ID, MARKETPLACE, sellerOfferKey, pimId, MarketplaceOfferLinkSource.EAN,
+        return MarketplaceOfferLink.of(STORE_ID, MARKETPLACE, sellerOfferKey, List.of(pimId), MarketplaceOfferLinkSource.EAN,
                 "matching", Instant.parse("2026-11-01T10:00:00Z"));
     }
 

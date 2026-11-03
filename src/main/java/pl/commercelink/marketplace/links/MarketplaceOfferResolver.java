@@ -72,13 +72,7 @@ public class MarketplaceOfferResolver {
 
         public Optional<ResolvedOffer> resolve(String marketplace, String sellerOfferKey, String manufacturerCode) {
             if (StringUtils.isNotBlank(sellerOfferKey)) {
-                Optional<ResolvedOffer> linked = linkRepository.find(storeId, marketplace, sellerOfferKey)
-                        .flatMap(link -> pimAliases.effectiveEntry(storeId, link.getPimId()))
-                        .map(entry -> fromEntry(entry, Source.LINK))
-                        .filter(offer -> hasManufacturerCode(offer, sellerOfferKey));
-                if (linked.isPresent()) {
-                    return linked;
-                }
+                // TODO(offer-links task 2): resolve a link through its EANs; until then a link counts as unresolved
                 Optional<ResolvedOffer> own = pimAliases.effectiveEntry(storeId, sellerOfferKey)
                         .map(entry -> fromEntry(entry, Source.OWN_OFFER))
                         .filter(offer -> hasManufacturerCode(offer, sellerOfferKey));

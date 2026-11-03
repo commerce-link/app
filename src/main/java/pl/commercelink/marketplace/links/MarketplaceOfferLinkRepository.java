@@ -6,6 +6,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBSaveExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
+import com.amazonaws.services.dynamodbv2.model.ConditionalOperator;
 import com.amazonaws.services.dynamodbv2.model.ExpectedAttributeValue;
 import org.springframework.stereotype.Component;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
@@ -42,15 +43,21 @@ public class MarketplaceOfferLinkRepository extends DynamoDbRepository<Marketpla
         }
     }
 
-    public List<MarketplaceOfferLink> findByPimId(String storeId, String pimId) {
-        DynamoDBQueryExpression<MarketplaceOfferLink> query = new DynamoDBQueryExpression<MarketplaceOfferLink>()
-                .withIndexName(MarketplaceOfferLink.PIM_ID_INDEX)
-                .withConsistentRead(false)
-                .withKeyConditionExpression("storeId = :s and pimId = :p")
-                .withExpressionAttributeValues(Map.of(
-                        ":s", new AttributeValue(storeId),
-                        ":p", new AttributeValue(pimId)));
-        return dynamoDBMapper.query(MarketplaceOfferLink.class, query);
+    /**
+     * Writes the link unless an operator's (MANUAL) one exists, in one conditional write, so a manual link saved
+     * concurrently is never overwritten by an automatic match.
+     */
+    public boolean saveUnlessManual(MarketplaceOfferLink link) {
+        DynamoDBSaveExpression notManual = new DynamoDBSaveExpression()
+                .withExpectedEntry("linkKey", new ExpectedAttributeValue(false))
+                .withExpectedEntry("source", new ExpectedAttributeValue(new AttributeValue(MarketplaceOfferLinkSource.EAN.name())))
+                .withConditionalOperator(ConditionalOperator.OR);
+        try {
+            dynamoDBMapper.save(link, notManual);
+            return true;
+        } catch (ConditionalCheckFailedException e) {
+            return false;
+        }
     }
 
     public List<MarketplaceOfferLink> findAll(String storeId, String marketplace) {

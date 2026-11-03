@@ -78,7 +78,7 @@ public class MarketplaceOfferLinking {
         String offerKey = chosen.getMarketplaceOfferKey();
 
         // an existing link for the key is replaced: the operator's choice wins over an earlier one
-        linkRepository.save(MarketplaceOfferLink.of(storeId, marketplace, offerKey, pimId,
+        linkRepository.save(MarketplaceOfferLink.of(storeId, marketplace, offerKey, List.of(),
                 MarketplaceOfferLinkSource.MANUAL, userId, clock.instant()));
 
         // resolved through the saved link, so the item gets exactly what the next import would give it

@@ -90,7 +90,8 @@ class MarketplaceOfferLinkingTest {
         assertThat(saved.getValue().getStoreId()).isEqualTo(STORE);
         assertThat(saved.getValue().getMarketplace()).isEqualTo(EMPIK);
         assertThat(saved.getValue().getSellerOfferKey()).isEqualTo(KEY);
-        assertThat(saved.getValue().getPimId()).isEqualTo("pim-1");
+        // eans are filled by the linking task
+        assertThat(saved.getValue().getEans()).isEmpty();
         assertThat(saved.getValue().getSource()).isEqualTo(MarketplaceOfferLinkSource.MANUAL);
         assertThat(saved.getValue().getCreatedBy()).isEqualTo("user-1");
         assertThat(saved.getValue().getCreatedAt()).isEqualTo(NOW);

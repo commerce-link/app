@@ -19,9 +19,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The offer link queries against DynamoDB Local, on the table as V024 creates it. The pimId index is created together
- * with the table, so DynamoDB Local maintains it on every write (unlike an index added to a filled table, which it
- * backfills in the background) and the index read needs no waiting.
+ * The offer link queries against DynamoDB Local, on the table as V024 creates it. 
  */
 @Testcontainers(disabledWithoutDocker = true)
 class MarketplaceOfferLinkRepositoryDynamoDbIntegrationTest {
@@ -48,20 +46,25 @@ class MarketplaceOfferLinkRepositoryDynamoDbIntegrationTest {
         repository = new MarketplaceOfferLinkRepository(client);
     }
 
-    private static MarketplaceOfferLink link(String storeId, String marketplace, String key, String pimId) {
-        return MarketplaceOfferLink.of(storeId, marketplace, key, pimId, MarketplaceOfferLinkSource.MANUAL, "user-1", NOW);
+    private static MarketplaceOfferLink link(String storeId, String marketplace, String key, String ean) {
+        return link(storeId, marketplace, key, ean, MarketplaceOfferLinkSource.MANUAL);
+    }
+
+    private static MarketplaceOfferLink link(String storeId, String marketplace, String key, String ean,
+                                             MarketplaceOfferLinkSource source) {
+        return MarketplaceOfferLink.of(storeId, marketplace, key, List.of(ean), source, "user-1", NOW);
     }
 
     @Test
     void aSavedLinkIsFoundByItsOfferKey() {
         // given
-        repository.save(link("s1", "Empik", "SILLO-84980", "pim-1"));
+        repository.save(link("s1", "Empik", "SILLO-84980", "5900000000001"));
 
         // when
         MarketplaceOfferLink found = repository.find("s1", "Empik", "SILLO-84980").orElseThrow();
 
         // then
-        assertThat(found.getPimId()).isEqualTo("pim-1");
+        assertThat(found.getEans()).containsExactly("5900000000001");
         assertThat(found.getSellerOfferKey()).isEqualTo("SILLO-84980");
         assertThat(found.getSource()).isEqualTo(MarketplaceOfferLinkSource.MANUAL);
         assertThat(found.getCreatedBy()).isEqualTo("user-1");
@@ -74,24 +77,24 @@ class MarketplaceOfferLinkRepositoryDynamoDbIntegrationTest {
     @Test
     void savingTheSameOfferKeyAgainReplacesTheLink() {
         // given
-        repository.save(link("s1", "Empik", "SILLO-84980", "pim-1"));
+        repository.save(link("s1", "Empik", "SILLO-84980", "5900000000001"));
 
         // when
-        repository.save(link("s1", "Empik", "SILLO-84980", "pim-2"));
+        repository.save(link("s1", "Empik", "SILLO-84980", "5900000000002"));
 
         // then
-        assertThat(repository.find("s1", "Empik", "SILLO-84980")).map(MarketplaceOfferLink::getPimId).contains("pim-2");
+        assertThat(repository.find("s1", "Empik", "SILLO-84980")).map(MarketplaceOfferLink::getEans).contains(List.of("5900000000002"));
         assertThat(repository.findAll("s1", "Empik")).hasSize(1);
     }
 
     @Test
     void findAllReturnsOnlyTheStoresLinksOfThatMarketplace() {
         // given
-        repository.save(link("s1", "Empik", "A-1", "pim-1"));
-        repository.save(link("s1", "Empik", "B-2", "pim-2"));
-        repository.save(link("s1", "EmpikX", "C-3", "pim-3"));
-        repository.save(link("s1", "Allegro", "D-4", "pim-4"));
-        repository.save(link("s2", "Empik", "E-5", "pim-5"));
+        repository.save(link("s1", "Empik", "A-1", "5900000000001"));
+        repository.save(link("s1", "Empik", "B-2", "5900000000002"));
+        repository.save(link("s1", "EmpikX", "C-3", "5900000000003"));
+        repository.save(link("s1", "Allegro", "D-4", "5900000000004"));
+        repository.save(link("s2", "Empik", "E-5", "5900000000005"));
 
         // when
         List<MarketplaceOfferLink> links = repository.findAll("s1", "Empik");
@@ -103,38 +106,72 @@ class MarketplaceOfferLinkRepositoryDynamoDbIntegrationTest {
     @Test
     void saveIfAbsentWritesANewLink() {
         // when
-        boolean saved = repository.saveIfAbsent(link("s1", "Empik", "SILLO-84980", "pim-1"));
+        boolean saved = repository.saveIfAbsent(link("s1", "Empik", "SILLO-84980", "5900000000001"));
 
         // then
         assertThat(saved).isTrue();
-        assertThat(repository.find("s1", "Empik", "SILLO-84980")).map(MarketplaceOfferLink::getPimId).contains("pim-1");
+        assertThat(repository.find("s1", "Empik", "SILLO-84980")).map(MarketplaceOfferLink::getEans).contains(List.of("5900000000001"));
     }
 
     @Test
     void saveIfAbsentLeavesAnExistingLinkAlone() {
         // given
-        repository.save(link("s1", "Empik", "SILLO-84980", "pim-manual"));
+        repository.save(link("s1", "Empik", "SILLO-84980", "5900000000008"));
 
         // when
-        boolean saved = repository.saveIfAbsent(link("s1", "Empik", "SILLO-84980", "pim-ean"));
+        boolean saved = repository.saveIfAbsent(link("s1", "Empik", "SILLO-84980", "5900000000009"));
 
         // then
         assertThat(saved).isFalse();
-        assertThat(repository.find("s1", "Empik", "SILLO-84980")).map(MarketplaceOfferLink::getPimId).contains("pim-manual");
+        assertThat(repository.find("s1", "Empik", "SILLO-84980")).map(MarketplaceOfferLink::getEans).contains(List.of("5900000000008"));
     }
 
     @Test
-    void findByPimIdReadsTheStoresLinksThroughTheIndex() {
+    void aMultiEanListRoundTripsInOrder() {
         // given
-        repository.save(link("s1", "Empik", "A-1", "pim-1"));
-        repository.save(link("s1", "Allegro", "B-2", "pim-1"));
-        repository.save(link("s1", "Empik", "C-3", "pim-2"));
-        repository.save(link("s2", "Empik", "D-4", "pim-1"));
+        repository.save(MarketplaceOfferLink.of("s1", "Empik", "K-1", List.of("5900000000009", "5900000000001"),
+                MarketplaceOfferLinkSource.EAN, null, NOW));
 
         // when
-        List<MarketplaceOfferLink> links = repository.findByPimId("s1", "pim-1");
+        MarketplaceOfferLink found = repository.find("s1", "Empik", "K-1").orElseThrow();
 
         // then
-        assertThat(links).extracting(MarketplaceOfferLink::getLinkKey).containsExactlyInAnyOrder("Empik#A-1", "Allegro#B-2");
+        assertThat(found.getEans()).containsExactly("5900000000009", "5900000000001");
+    }
+
+    @Test
+    void saveUnlessManualWritesWhenTheKeyHasNoLink() {
+        // when
+        boolean saved = repository.saveUnlessManual(link("s1", "Empik", "K-1", "5900000000001", MarketplaceOfferLinkSource.EAN));
+
+        // then
+        assertThat(saved).isTrue();
+        assertThat(repository.find("s1", "Empik", "K-1")).map(MarketplaceOfferLink::getEans).contains(List.of("5900000000001"));
+    }
+
+    @Test
+    void saveUnlessManualOverwritesAnEanLink() {
+        // given
+        repository.save(link("s1", "Empik", "K-1", "5900000000001", MarketplaceOfferLinkSource.EAN));
+
+        // when
+        boolean saved = repository.saveUnlessManual(link("s1", "Empik", "K-1", "5900000000002", MarketplaceOfferLinkSource.EAN));
+
+        // then
+        assertThat(saved).isTrue();
+        assertThat(repository.find("s1", "Empik", "K-1")).map(MarketplaceOfferLink::getEans).contains(List.of("5900000000002"));
+    }
+
+    @Test
+    void saveUnlessManualRefusesToTouchAManualLink() {
+        // given
+        repository.save(link("s1", "Empik", "K-1", "5900000000001", MarketplaceOfferLinkSource.MANUAL));
+
+        // when
+        boolean saved = repository.saveUnlessManual(link("s1", "Empik", "K-1", "5900000000002", MarketplaceOfferLinkSource.EAN));
+
+        // then
+        assertThat(saved).isFalse();
+        assertThat(repository.find("s1", "Empik", "K-1")).map(MarketplaceOfferLink::getEans).contains(List.of("5900000000001"));
     }
 }

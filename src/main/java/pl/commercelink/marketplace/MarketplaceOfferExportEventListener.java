@@ -238,23 +238,25 @@ public class MarketplaceOfferExportEventListener {
      */
     private static final class ForeignOffers {
 
-        private final Map<String, Set<String>> offerKeysByPimId = new HashMap<>();
+        private final Map<String, Set<String>> offerKeysByEan = new HashMap<>();
         private int skippedProducts;
 
         ForeignOffers(List<MarketplaceOfferLink> links) {
             for (MarketplaceOfferLink link : links) {
-                offerKeysByPimId.computeIfAbsent(link.getPimId(), pimId -> new HashSet<>()).add(link.getSellerOfferKey());
+                for (String ean : link.getEans() == null ? List.<String>of() : link.getEans()) {
+                    offerKeysByEan.computeIfAbsent(ean, key -> new HashSet<>()).add(link.getSellerOfferKey());
+                }
             }
         }
 
         boolean cover(String storeId, Product product, StorePimAliases aliases) {
-            if (offerKeysByPimId.isEmpty()) {
+            if (offerKeysByEan.isEmpty()) {
                 return false;
             }
             String offerId = aliases.offerIdOf(storeId, product.getPimId());
-            boolean covered = Stream.concat(Stream.of(product.getPimId()),
-                            aliases.aliasesOf(storeId, product.getPimId()).stream())
-                    .flatMap(pimId -> offerKeysByPimId.getOrDefault(pimId, Set.of()).stream())
+            // temporary: keyed by the product's EAN until the export task reworks coverage
+            String ean = product.getEan() == null ? null : UnifiedProductIdentifiers.unifyEan(product.getEan());
+            boolean covered = offerKeysByEan.getOrDefault(ean, Set.of()).stream()
                     .anyMatch(offerKey -> !offerKey.equals(offerId));
             if (covered) {
                 skippedProducts++;

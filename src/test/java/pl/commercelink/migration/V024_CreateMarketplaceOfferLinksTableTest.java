@@ -18,7 +18,7 @@ import static org.mockito.Mockito.when;
 class V024_CreateMarketplaceOfferLinksTableTest {
 
     @Test
-    void createsTheTableWithThePimIdIndex() {
+    void createsTheTableWithoutSecondaryIndexes() {
         // given
         AmazonDynamoDB dynamoDB = mock(AmazonDynamoDB.class);
         when(dynamoDB.describeTable(any(DescribeTableRequest.class)))
@@ -34,10 +34,8 @@ class V024_CreateMarketplaceOfferLinksTableTest {
         assertThat(request.getValue().getTableName()).isEqualTo("MarketplaceOfferLinks");
         assertThat(request.getValue().getKeySchema()).extracting(k -> k.getAttributeName())
                 .containsExactly("storeId", "linkKey");
-        assertThat(request.getValue().getGlobalSecondaryIndexes()).singleElement().satisfies(index -> {
-            assertThat(index.getIndexName()).isEqualTo("StoreIdPimIdIndex");
-            assertThat(index.getKeySchema()).extracting(k -> k.getAttributeName())
-                    .containsExactly("storeId", "pimId");
-        });
+        assertThat(request.getValue().getGlobalSecondaryIndexes()).isNullOrEmpty();
+        assertThat(request.getValue().getAttributeDefinitions()).extracting(a -> a.getAttributeName())
+                .containsExactlyInAnyOrder("storeId", "linkKey");
     }
 }

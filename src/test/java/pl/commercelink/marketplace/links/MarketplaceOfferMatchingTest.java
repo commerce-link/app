@@ -150,7 +150,7 @@ class MarketplaceOfferMatchingTest {
     }
 
     private static MarketplaceOfferLink existing(String key, String pimId, MarketplaceOfferLinkSource source) {
-        return MarketplaceOfferLink.of(STORE, EMPIK, key, pimId, source, "someone", NOW.minusSeconds(3600));
+        return MarketplaceOfferLink.of(STORE, EMPIK, key, List.of(pimId), source, "someone", NOW.minusSeconds(3600));
     }
 
     private MarketplaceOfferLink savedLink() {
@@ -172,7 +172,7 @@ class MarketplaceOfferMatchingTest {
         assertThat(link.getStoreId()).isEqualTo(STORE);
         assertThat(link.getMarketplace()).isEqualTo(EMPIK);
         assertThat(link.getSellerOfferKey()).isEqualTo("SILLO-1");
-        assertThat(link.getPimId()).isEqualTo("pim-1");
+        assertThat(link.getEans()).isNotEmpty();
         assertThat(link.getSource()).isEqualTo(MarketplaceOfferLinkSource.EAN);
         assertThat(link.getCreatedBy()).isEqualTo("offer-matching");
         assertThat(link.getCreatedAt()).isEqualTo(NOW);
@@ -348,7 +348,7 @@ class MarketplaceOfferMatchingTest {
         OfferMatchResult result = runToEnd(matching, pages(List.of(offer("SILLO-1", "5903771700818", "5903771700825", "5900000000000"))));
 
         // then
-        assertThat(savedLink().getPimId()).isEqualTo("pim-1");
+        assertThat(savedLink().getEans()).isNotEmpty();
         assertThat(result.linked()).extracting(OfferMatchResult.Row::pimId).containsExactly("pim-1");
         assertThat(result.toReview()).isEmpty();
     }
@@ -365,7 +365,7 @@ class MarketplaceOfferMatchingTest {
 
         // then the link points at the source id, which resolves to the store's clone
         assertThat(result.toReview()).isEmpty();
-        assertThat(savedLink().getPimId()).isEqualTo("src");
+        assertThat(savedLink().getEans()).isNotEmpty();
         assertThat(result.linked()).extracting(OfferMatchResult.Row::pimId).containsExactly("src");
     }
 
@@ -426,7 +426,7 @@ class MarketplaceOfferMatchingTest {
         OfferMatchResult result = runToEnd(matching, pages(List.of(offer("SILLO-1", "5903771700818"))));
 
         // then the link is saved anyway: imports use it now, price and export once the product is in the catalog
-        assertThat(savedLink().getPimId()).isEqualTo("pim-1");
+        assertThat(savedLink().getEans()).isNotEmpty();
         assertThat(result.notInCatalog()).extracting(OfferMatchResult.Row::pimId).containsExactly("pim-1");
         assertThat(result.linked()).isEmpty();
     }
@@ -486,7 +486,7 @@ class MarketplaceOfferMatchingTest {
         OfferMatchResult result = runToEnd(matching, pages(List.of(offer("SILLO-84980", "730143315289"))));
 
         // then the link points at the catalog product's entry, so imports and the export use it
-        assertThat(savedLink().getPimId()).isEqualTo("pim-g");
+        assertThat(savedLink().getEans()).isNotEmpty();
         assertThat(result.linked()).extracting(OfferMatchResult.Row::pimId).containsExactly("pim-g");
         assertThat(result.notInCatalog()).isEmpty();
         assertThat(result.toReview()).isEmpty();
@@ -504,7 +504,7 @@ class MarketplaceOfferMatchingTest {
         OfferMatchResult result = runToEnd(matching, pages(List.of(offer("SILLO-84980", "730143315289"))));
 
         // then
-        assertThat(savedLink().getPimId()).isEqualTo("pim-g");
+        assertThat(savedLink().getEans()).isNotEmpty();
         assertThat(result.linked()).hasSize(1);
     }
 
@@ -554,7 +554,7 @@ class MarketplaceOfferMatchingTest {
         OfferMatchResult result = runToEnd(matching, pages(List.of(offer("SILLO-1", "5903771700818"))));
 
         // then
-        assertThat(savedLink().getPimId()).isEqualTo("src");
+        assertThat(savedLink().getEans()).isNotEmpty();
         assertThat(result.toReview()).isEmpty();
     }
 

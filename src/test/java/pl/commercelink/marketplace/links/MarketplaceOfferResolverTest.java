@@ -53,7 +53,7 @@ class MarketplaceOfferResolverTest {
 
     private void link(String key, String pimId) {
         when(links.find(STORE, EMPIK, key)).thenReturn(Optional.of(
-                MarketplaceOfferLink.of(STORE, EMPIK, key, pimId, MarketplaceOfferLinkSource.MANUAL, "u", Instant.now())));
+                MarketplaceOfferLink.of(STORE, EMPIK, key, List.of(pimId), MarketplaceOfferLinkSource.MANUAL, "u", Instant.now())));
     }
 
     private void storeSees(String pimId, PimEntry entry) {
