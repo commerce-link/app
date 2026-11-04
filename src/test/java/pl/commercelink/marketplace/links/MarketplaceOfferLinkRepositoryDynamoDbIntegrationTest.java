@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import pl.commercelink.migration.V024_CreateMarketplaceOfferLinksTable;
+import pl.commercelink.migration.V025_CreateMarketplaceOfferLinksTable;
 import pl.commercelink.testsupport.DynamoDbLocalImage;
 
 import java.time.Instant;
@@ -19,7 +19,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The offer link queries and conditional saves against DynamoDB Local, on the table as V024 creates it.
+ * The offer link queries and conditional saves against DynamoDB Local, on the table as V025 creates it.
  */
 @Testcontainers(disabledWithoutDocker = true)
 class MarketplaceOfferLinkRepositoryDynamoDbIntegrationTest {
@@ -33,7 +33,7 @@ class MarketplaceOfferLinkRepositoryDynamoDbIntegrationTest {
     private MarketplaceOfferLinkRepository repository;
 
     @BeforeEach
-    void createTheTableThroughV024() {
+    void createTheTableThroughV025() {
         AmazonDynamoDB client = AmazonDynamoDBClientBuilder.standard()
                 .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(
                         "http://" + DYNAMODB.getHost() + ":" + DYNAMODB.getMappedPort(8000), "eu-central-1"))
@@ -42,7 +42,7 @@ class MarketplaceOfferLinkRepositoryDynamoDbIntegrationTest {
         if (client.listTables().getTableNames().contains(MarketplaceOfferLink.TABLE_NAME)) {
             client.deleteTable(MarketplaceOfferLink.TABLE_NAME);
         }
-        new V024_CreateMarketplaceOfferLinksTable(client).createTable();
+        new V025_CreateMarketplaceOfferLinksTable(client).createTable();
         repository = new MarketplaceOfferLinkRepository(client);
     }
 

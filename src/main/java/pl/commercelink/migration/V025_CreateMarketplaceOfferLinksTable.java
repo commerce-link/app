@@ -15,8 +15,8 @@ import static pl.commercelink.starter.migration.DynamoDbMigrationSupport.rangeKe
 import static pl.commercelink.starter.migration.DynamoDbMigrationSupport.stringAttribute;
 
 @RequiredArgsConstructor
-@ChangeUnit(id = "V024-create-marketplace-offer-links-table", order = "024", author = "commercelink")
-public class V024_CreateMarketplaceOfferLinksTable {
+@ChangeUnit(id = "V025-create-marketplace-offer-links-table", order = "025", author = "commercelink")
+public class V025_CreateMarketplaceOfferLinksTable {
 
     private final AmazonDynamoDB dynamoDB;
 

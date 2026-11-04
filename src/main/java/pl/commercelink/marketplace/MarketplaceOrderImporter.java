@@ -136,7 +136,7 @@ public class MarketplaceOrderImporter {
                         orderItem.setExternalItemId(rawKeysByBasketItemId.get(i.getId()));
                         ResolvedLine line = resolvedByBasketItemId.get(i.getId());
                         orderItem.setMarketplaceOfferKey(line.sellerOfferKey());
-                        // the basket normalises its code as an MFN; fill sets the sku as fulfilment looks it up
+                        // the same fill as "Link to product", so both give a resolved line the same codes
                         if (line.offer() != null) {
                             line.offer().fill(orderItem);
                         }

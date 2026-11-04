@@ -15,7 +15,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class V024_CreateMarketplaceOfferLinksTableTest {
+class V025_CreateMarketplaceOfferLinksTableTest {
 
     @Test
     void createsTheTableWithoutSecondaryIndexes() {
@@ -26,7 +26,7 @@ class V024_CreateMarketplaceOfferLinksTableTest {
                         .withTableName(MarketplaceOfferLink.TABLE_NAME).withTableStatus("ACTIVE")));
 
         // when
-        new V024_CreateMarketplaceOfferLinksTable(dynamoDB).createTable();
+        new V025_CreateMarketplaceOfferLinksTable(dynamoDB).createTable();
 
         // then
         ArgumentCaptor<CreateTableRequest> request = ArgumentCaptor.forClass(CreateTableRequest.class);
