@@ -1350,7 +1350,7 @@ public class DemoStoreSeeder implements StoreSeeder {
     }
 
     private static OrderItem unassignedItem(String orderId, CatalogSeedRow row, int qty, int position) {
-        OrderItem item = new OrderItem(orderId, row.category(), row.name(), qty, row.priceGross(), row.mfn(), false, position);
+        OrderItem item = new OrderItem(orderId, row.category(), row.name(), qty, row.priceGross(), row.ean(), false, position);
         item.setItemId("demo-item-" + position);
         item.setEan(row.ean());
         item.setManufacturerCode(row.mfn());
