@@ -1,6 +1,7 @@
 package pl.commercelink.orders;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
+import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.taxonomy.Categories;
@@ -233,10 +234,15 @@ public class OrderItem extends Item {
         this.marketplaceOfferKey = marketplaceOfferKey;
     }
 
-    /** An imported marketplace line whose seller offer could not be tied to a product yet. */
+    /**
+     * An imported marketplace line whose seller offer could not be tied to goods yet: no category and no EAN. A line of
+     * a linked offer has an EAN but no category (the goods need not be in a catalog); one resolved through the PIM has
+     * a category.
+     */
     @DynamoDBIgnore
     public boolean isUnlinkedMarketplaceItem() {
-        return marketplaceOfferKey != null && Categories.UNCATEGORIZED.equals(getCategory()) && !isService();
+        return marketplaceOfferKey != null && Categories.UNCATEGORIZED.equals(getCategory())
+                && StringUtils.isBlank(getEan()) && !isService();
     }
 
     public int getPosition() {

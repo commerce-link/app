@@ -4,15 +4,36 @@ import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
+import java.util.List;
+
 /**
- * @param ean unified ({@link OfferEans#unify}), null when the product has none
+ * @param ean       unified ({@link OfferEans#unify}), null when the product has none
+ * @param otherEans further unified EANs of the same goods (a link listing several), tried by fulfilment after
+ *                  {@code ean}; empty otherwise
  */
-public record ResolvedOffer(String pimId, String ean, String mfn, String category, Source source) {
+public record ResolvedOffer(String pimId, String ean, String mfn, String category, Source source,
+                            List<String> otherEans) {
+
+    /** The separator fulfilment splits an item's sku on: each part is a code of the same goods. */
+    private static final String ALTERNATIVE_CODES = ":";
+
+    public ResolvedOffer {
+        otherEans = otherEans == null ? List.of() : List.copyOf(otherEans);
+    }
+
+    public ResolvedOffer(String pimId, String ean, String mfn, String category, Source source) {
+        this(pimId, ean, mfn, category, source, List.of());
+    }
+
+    /** A link's unified EANs, in the marketplace's order: the first is the item's EAN, the rest its alternatives. */
+    static ResolvedOffer linked(List<String> eans) {
+        return new ResolvedOffer(null, eans.get(0), null, null, Source.LINK, eans.subList(1, eans.size()));
+    }
 
     public enum Source {
         /**
-         * An explicit link from the seller offer key to EANs, resolved to a product of the store's catalogs;
-         * {@code pimId} is null when that product has none.
+         * An explicit link from the seller offer key to EANs: only the EANs are set, with no pimId, manufacturer code or
+         * category (fulfilment fills the manufacturer code from the offer it picks).
          */
         LINK,
         /** The seller offer key is our own pimId, published by CommerceLink. */
@@ -22,12 +43,14 @@ public record ResolvedOffer(String pimId, String ean, String mfn, String categor
     }
 
     /**
-     * The order item's sku: the EAN, which fulfilment looks goods up by. Only a product without an EAN falls back to
-     * its manufacturer code, which fulfilment still looks up while items keyed by it remain; null without either.
+     * The order item's sku: the EAN, which fulfilment looks goods up by, followed by the other EANs of the same goods
+     * joined with ":" (fulfilment tries each and takes the cheapest offer, as for an item given several codes with
+     * "Assign SKU"). Only a product without an EAN falls back to its manufacturer code, which fulfilment still looks up
+     * while items keyed by it remain; null without either.
      */
     public String sku() {
         if (StringUtils.isNotBlank(ean)) {
-            return ean;
+            return otherEans.isEmpty() ? ean : ean + ALTERNATIVE_CODES + String.join(ALTERNATIVE_CODES, otherEans);
         }
         return StringUtils.isNotBlank(mfn) ? UnifiedProductIdentifiers.unifyMfn(mfn) : null;
     }

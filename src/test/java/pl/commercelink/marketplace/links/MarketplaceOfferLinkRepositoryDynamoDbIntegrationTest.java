@@ -58,32 +58,32 @@ class MarketplaceOfferLinkRepositoryDynamoDbIntegrationTest {
     @Test
     void aSavedLinkIsFoundByItsOfferKey() {
         // given
-        repository.save(link("s1", "Empik", "SILLO-84980", "5900000000001"));
+        repository.save(link("s1", "Empik", "XS-84980", "5900000000001"));
 
         // when
-        MarketplaceOfferLink found = repository.find("s1", "Empik", "SILLO-84980").orElseThrow();
+        MarketplaceOfferLink found = repository.find("s1", "Empik", "XS-84980").orElseThrow();
 
         // then
         assertThat(found.getEans()).containsExactly("5900000000001");
-        assertThat(found.getSellerOfferKey()).isEqualTo("SILLO-84980");
+        assertThat(found.getSellerOfferKey()).isEqualTo("XS-84980");
         assertThat(found.getSource()).isEqualTo(MarketplaceOfferLinkSource.MANUAL);
         assertThat(found.getCreatedBy()).isEqualTo("user-1");
         assertThat(found.getCreatedAt()).isEqualTo(NOW);
-        assertThat(repository.find("s1", "Empik", "sillo-84980")).isEmpty();
-        assertThat(repository.find("s2", "Empik", "SILLO-84980")).isEmpty();
-        assertThat(repository.find("s1", "Allegro", "SILLO-84980")).isEmpty();
+        assertThat(repository.find("s1", "Empik", "xs-84980")).isEmpty();
+        assertThat(repository.find("s2", "Empik", "XS-84980")).isEmpty();
+        assertThat(repository.find("s1", "Allegro", "XS-84980")).isEmpty();
     }
 
     @Test
     void savingTheSameOfferKeyAgainReplacesTheLink() {
         // given
-        repository.save(link("s1", "Empik", "SILLO-84980", "5900000000001"));
+        repository.save(link("s1", "Empik", "XS-84980", "5900000000001"));
 
         // when
-        repository.save(link("s1", "Empik", "SILLO-84980", "5900000000002"));
+        repository.save(link("s1", "Empik", "XS-84980", "5900000000002"));
 
         // then
-        assertThat(repository.find("s1", "Empik", "SILLO-84980")).map(MarketplaceOfferLink::getEans).contains(List.of("5900000000002"));
+        assertThat(repository.find("s1", "Empik", "XS-84980")).map(MarketplaceOfferLink::getEans).contains(List.of("5900000000002"));
         assertThat(repository.findAll("s1", "Empik")).hasSize(1);
     }
 

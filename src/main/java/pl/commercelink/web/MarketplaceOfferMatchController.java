@@ -49,7 +49,7 @@ public class MarketplaceOfferMatchController {
     private static final String BLOCKED_INTEGRATION = "store.marketplaces.offer.matching.blocked.integration";
     private static final String RUNNING = "store.marketplaces.offer.matching.running.refused";
     private static final String MARKETPLACE_PATH = "/{marketplace:[A-Za-z0-9_.-]+}/offer-matching";
-    private static final String GROUP_CSV_PATH = "/{group:linked|notInCatalog|toReview}.csv";
+    private static final String GROUP_CSV_PATH = "/{group:linked|toReview}.csv";
 
     private final StoresRepository storesRepository;
     private final MarketplaceConnections marketplaces;

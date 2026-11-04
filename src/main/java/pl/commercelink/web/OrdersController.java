@@ -1301,8 +1301,11 @@ public class OrdersController extends BaseController {
 
     @PostMapping("/dashboard/orders/{orderId}/link-offer")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String linkOffer(@PathVariable String orderId, @RequestParam String itemId, @RequestParam String categoryId,
-                            @RequestParam String productId, RedirectAttributes redirectAttributes, Locale locale) {
+    public String linkOffer(@PathVariable String orderId, @RequestParam String itemId,
+                            @RequestParam(required = false) String categoryId,
+                            @RequestParam(required = false) String productId,
+                            @RequestParam(required = false) String ean,
+                            RedirectAttributes redirectAttributes, Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
         // the page of a closed order has no item menu; a stale page must not save a link or fill its items either
         if (order.isClosed()) {
@@ -1315,7 +1318,10 @@ public class OrdersController extends BaseController {
         }
         MarketplaceOfferLinking.LinkResult result;
         try {
-            result = marketplaceOfferLinking.link(getStoreId(), order, itemId, categoryId, productId, getUserId());
+            // a typed EAN wins: the dialog clears the product choice when one is typed
+            result = StringUtils.isNotBlank(ean)
+                    ? marketplaceOfferLinking.linkEan(getStoreId(), order, itemId, ean, getUserId())
+                    : marketplaceOfferLinking.link(getStoreId(), order, itemId, categoryId, productId, getUserId());
         } catch (IllegalArgumentException e) {
             return refuse(redirectAttributes, orderId, e.getMessage(), locale);
         }

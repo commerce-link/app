@@ -12,10 +12,7 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.information.StorePimAliases;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -23,13 +20,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeMap;
 
 /**
- * Resolves a marketplace order line to a product: an explicit offer link first (its EANs looked up among the products
- * of the store's catalogs), then the seller offer key taken as our own pimId, then the manufacturer code as MPN (the
- * behaviour before offer links existed). The product's EAN is what fulfilment looks it up by; see
- * {@link ResolvedOffer#sku()}.
+ * Resolves a marketplace order line to the EAN fulfilment looks goods up by: an explicit offer link first (its first EAN,
+ * taken as it is: fulfilment finds the goods in the warehouse and the suppliers' feeds, so the product need not be in a
+ * catalog), then the seller offer key taken as our own pimId, then the manufacturer code as MPN (the behaviour before
+ * offer links existed). See {@link ResolvedOffer#sku()}.
  */
 @Slf4j
 @Component
@@ -68,7 +64,6 @@ public class MarketplaceOfferResolver {
         private final String storeId;
         private Map<String, String> categoryNamesById;
         private List<Product> catalogProducts;
-        private Map<String, List<Integer>> catalogPositionsByEan;
 
         private StoreOffers(String storeId) {
             this.storeId = storeId;
@@ -77,7 +72,7 @@ public class MarketplaceOfferResolver {
         public Optional<ResolvedOffer> resolve(String marketplace, String sellerOfferKey, String manufacturerCode) {
             if (StringUtils.isNotBlank(sellerOfferKey)) {
                 Optional<ResolvedOffer> linked = linkRepository.find(storeId, marketplace, sellerOfferKey)
-                        .flatMap(link -> fromLink(link, sellerOfferKey));
+                        .flatMap(this::fromLink);
                 if (linked.isPresent()) {
                     return linked;
                 }
@@ -111,36 +106,6 @@ public class MarketplaceOfferResolver {
             return catalogProducts;
         }
 
-        /**
-         * Which product of the store's catalogs the EANs stand for. Hits sharing one EAN are one product (the same goods
-         * in several categories, or listed twice), so the first of them in {@link #catalogProducts()} order wins.
-         */
-        public CatalogMatch matchCatalog(Collection<String> eans) {
-            Set<String> unified = new LinkedHashSet<>();
-            if (eans != null) {
-                eans.stream().map(OfferEans::unify).filter(Objects::nonNull).forEach(unified::add);
-            }
-            if (unified.isEmpty()) {
-                return new CatalogMatch.NotInCatalog();
-            }
-            TreeMap<Integer, Product> hitsInCatalogOrder = new TreeMap<>();
-            for (String ean : unified) {
-                for (int position : catalogPositionsByEan().getOrDefault(ean, List.of())) {
-                    hitsInCatalogOrder.put(position, catalogProducts().get(position));
-                }
-            }
-            if (hitsInCatalogOrder.isEmpty()) {
-                return new CatalogMatch.NotInCatalog();
-            }
-            List<Product> hits = List.copyOf(hitsInCatalogOrder.values());
-            long distinctEans = hits.stream().map(product -> OfferEans.unify(product.getEan())).distinct().count();
-            if (distinctEans > 1) {
-                return new CatalogMatch.Ambiguous(hits);
-            }
-            Product first = hits.get(0);
-            return new CatalogMatch.Found(first, categoryNamesById().get(first.getCategoryId()));
-        }
-
         // without a code the item would carry the marketplace's raw code as its sku while looking resolved
         private boolean hasProductCode(ResolvedOffer offer, String sellerOfferKey) {
             if (offer.sku() != null) {
@@ -151,33 +116,18 @@ public class MarketplaceOfferResolver {
             return false;
         }
 
-        private Optional<ResolvedOffer> fromLink(MarketplaceOfferLink link, String sellerOfferKey) {
-            return switch (matchCatalog(link.getEans())) {
-                case CatalogMatch.Found found -> Optional.of(new ResolvedOffer(found.product().getPimId(),
-                        OfferEans.unify(found.product().getEan()), found.product().getManufacturerCode(), found.categoryName(), Source.LINK));
-                case CatalogMatch.Ambiguous ambiguous -> {
-                    log.warn("Offer {} of store {} matches {} catalog products with different EANs; treated as unresolved",
-                            sellerOfferKey, storeId, ambiguous.products().size());
-                    yield Optional.empty();
-                }
-                case CatalogMatch.NotInCatalog notInCatalog -> Optional.empty();
-            };
-        }
-
-        // positions in catalogProducts(), so hits of several EANs can be put back in catalog order
-        private Map<String, List<Integer>> catalogPositionsByEan() {
-            if (catalogPositionsByEan == null) {
-                Map<String, List<Integer>> index = new HashMap<>();
-                List<Product> all = catalogProducts();
-                for (int position = 0; position < all.size(); position++) {
-                    String ean = OfferEans.unify(all.get(position).getEan());
-                    if (ean != null) {
-                        index.computeIfAbsent(ean, key -> new ArrayList<>()).add(position);
-                    }
-                }
-                catalogPositionsByEan = index;
-            }
-            return catalogPositionsByEan;
+        /**
+         * A marketplace offer is one product, so a link listing several EANs lists codes of the same goods (Empik gives
+         * an EAN-13 and its 12-digit UPC form, which unify to one; a product can also carry two codes): all of them go
+         * on the item, so fulfilment finds the goods under whichever code a supplier knows.
+         */
+        private Optional<ResolvedOffer> fromLink(MarketplaceOfferLink link) {
+            List<String> eans = Optional.ofNullable(link.getEans()).orElse(List.of()).stream()
+                    .map(OfferEans::unify)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .toList();
+            return eans.isEmpty() ? Optional.empty() : Optional.of(ResolvedOffer.linked(eans));
         }
 
         private ResolvedOffer fromEntry(PimEntry entry, Source source) {

@@ -2696,17 +2696,17 @@ class OrderDetailsTemplateTest {
         // given
         Order order = order(OrderStatus.New);
         OrderItem unlinked = new OrderItem(order.getOrderId(), pl.commercelink.taxonomy.Categories.UNCATEGORIZED,
-                "Krzesło biurowe Sillo", 1, 499, "1696938202", false, 0);
+                "Krzesło biurowe Ergo", 1, 499, "1696938202", false, 0);
         unlinked.setStatus(FulfilmentStatus.New);
-        unlinked.setMarketplaceOfferKey("SILLO-84980");
+        unlinked.setMarketplaceOfferKey("XS-84980");
 
         // when
         String html = page(render(order, List.of(unlinked), ADMIN, Set.of()));
 
         // then
-        String cell = productCell(html, "Krzesło biurowe Sillo");
+        String cell = productCell(html, "Krzesło biurowe Ergo");
         assertThat(cell).contains("<span class=\"cl-status is-warn\">Niepołączona oferta</span>");
-        assertThat(html).contains("data-cl-dialog-open=\"link-offer-dialog\"").contains("data-offer-key=\"SILLO-84980\"")
+        assertThat(html).contains("data-cl-dialog-open=\"link-offer-dialog\"").contains("data-offer-key=\"XS-84980\"")
                 .containsPattern("data-cl-dialog-open=\"link-offer-dialog\"[^>]*>Połącz z produktem</a>")
                 .contains("id=\"link-offer-dialog\"")
                 .contains("action=\"/dashboard/orders/" + order.getOrderId() + "/link-offer\"")
@@ -2718,9 +2718,9 @@ class OrderDetailsTemplateTest {
     void aLinkedOrLegacyItemHasNeitherTheBadgeNorTheLinkAction() {
         // given
         Order order = order(OrderStatus.New);
-        OrderItem linked = new OrderItem(order.getOrderId(), "Krzesła", "Krzesło biurowe Sillo", 1, 499, "AB123", false, 0);
+        OrderItem linked = new OrderItem(order.getOrderId(), "Krzesła", "Krzesło biurowe Ergo", 1, 499, "AB123", false, 0);
         linked.setStatus(FulfilmentStatus.New);
-        linked.setMarketplaceOfferKey("SILLO-84980");
+        linked.setMarketplaceOfferKey("XS-84980");
         OrderItem legacy = new OrderItem(order.getOrderId(), pl.commercelink.taxonomy.Categories.UNCATEGORIZED,
                 "Stara pozycja", 1, 99, "OLD-1", false, 1);
         legacy.setStatus(FulfilmentStatus.New);
@@ -2738,9 +2738,9 @@ class OrderDetailsTemplateTest {
         // given
         Order order = order(OrderStatus.Assembly);
         OrderItem ordered = new OrderItem(order.getOrderId(), pl.commercelink.taxonomy.Categories.UNCATEGORIZED,
-                "Krzesło biurowe Sillo", 1, 499, "1696938202", false, 0);
+                "Krzesło biurowe Ergo", 1, 499, "1696938202", false, 0);
         ordered.setStatus(FulfilmentStatus.Ordered);
-        ordered.setMarketplaceOfferKey("SILLO-84980");
+        ordered.setMarketplaceOfferKey("XS-84980");
 
         // when
         String html = page(render(order, List.of(ordered), ADMIN, Set.of()));
@@ -2756,9 +2756,9 @@ class OrderDetailsTemplateTest {
         // given
         Order order = order(OrderStatus.Cancelled);
         OrderItem unlinked = new OrderItem(order.getOrderId(), pl.commercelink.taxonomy.Categories.UNCATEGORIZED,
-                "Krzesło biurowe Sillo", 1, 499, "1696938202", false, 0);
+                "Krzesło biurowe Ergo", 1, 499, "1696938202", false, 0);
         unlinked.setStatus(FulfilmentStatus.New);
-        unlinked.setMarketplaceOfferKey("SILLO-84980");
+        unlinked.setMarketplaceOfferKey("XS-84980");
 
         // when
         String html = page(render(order, List.of(unlinked), ADMIN, Set.of()));

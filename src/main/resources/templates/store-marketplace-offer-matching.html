@@ -86,18 +86,6 @@
 
                         <p th:if="${group.count() == 0}" class="cl-list-empty" th:text="#{store.marketplaces.offer.matching.group.empty}"></p>
 
-                        <div th:if="${group.eans() != null}" class="cl-card-body cl-field">
-                            <label class="cl-label" th:for="${'offer-matching-' + group.name() + '-eans'}"
-                                   th:text="#{store.marketplaces.offer.matching.eans.label}"></label>
-                            <textarea class="cl-input cl-textarea" readonly rows="6" spellcheck="false"
-                                      th:id="${'offer-matching-' + group.name() + '-eans'}"
-                                      th:attr="aria-describedby=${'offer-matching-' + group.name() + '-eans-help'}"
-                                      th:text="${group.eans()}"></textarea>
-                            <p class="cl-help" th:id="${'offer-matching-' + group.name() + '-eans-help'}"
-                               th:text="#{store.marketplaces.offer.matching.eans.help}"></p>
-                            <p class="cl-help" th:text="#{store.marketplaces.offer.matching.eans.inactive}"></p>
-                        </div>
-
                         <details th:if="${group.count() > 0}" class="cl-disclosure" th:id="${'offer-matching-' + group.name() + '-rows'}">
                             <summary th:text="#{store.marketplaces.offer.matching.rows.show(${group.count()})}"></summary>
                             <div class="cl-disclosure-body">
@@ -106,10 +94,6 @@
                                     <tr>
                                         <th scope="col" th:text="#{store.marketplaces.offer.matching.column.offer}"></th>
                                         <th scope="col" th:text="#{store.marketplaces.offer.matching.column.eans}"></th>
-                                        <th scope="col" th:if="${group.name() == 'linked'}"
-                                            th:text="#{store.marketplaces.offer.matching.column.product}"></th>
-                                        <th scope="col" th:if="${group.name() == 'notInCatalog'}"
-                                            th:text="#{store.marketplaces.offer.matching.column.catalogEan}"></th>
                                         <th scope="col" th:if="${group.name() == 'toReview'}"
                                             th:text="#{store.marketplaces.offer.matching.column.reason}"></th>
                                     </tr>
@@ -131,19 +115,6 @@
                                             th:classappend="${row.eans().isEmpty()} ? 'is-empty'">
                                             <th:block th:each="ean, it : ${row.eans()}"><span class="cl-table-code" th:text="${ean}"></span><th:block th:unless="${it.last}"> · </th:block></th:block>
                                             <span th:if="${row.eans().isEmpty()}" class="cl-table-empty">—</span>
-                                        </td>
-                                        <td th:if="${group.name() == 'linked'}"
-                                            th:attr="data-label=#{store.marketplaces.offer.matching.column.product}"
-                                            th:classappend="${row.product() == null} ? 'is-empty'">
-                                            <span th:if="${row.product() != null}" th:text="${row.product()}"></span>
-                                            <span th:if="${row.product() == null}" class="cl-table-empty">—</span>
-                                        </td>
-                                        <td th:if="${group.name() == 'notInCatalog'}"
-                                            th:attr="data-label=#{store.marketplaces.offer.matching.column.catalogEan}">
-                                            <span th:if="${row.catalogEan() != null}" class="cl-table-code" th:text="${row.catalogEan()}"></span>
-                                            <span th:if="${row.catalogEan() == null}" class="cl-table-empty">—</span>
-                                            <span th:if="${row.linkedBefore()}" class="cl-status is-info"
-                                                  th:text="#{store.marketplaces.offer.matching.linkedBefore}"></span>
                                         </td>
                                         <td th:if="${group.name() == 'toReview'}"
                                             th:attr="data-label=#{store.marketplaces.offer.matching.column.reason}">

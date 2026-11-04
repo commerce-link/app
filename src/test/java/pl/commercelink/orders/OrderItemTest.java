@@ -273,20 +273,20 @@ class OrderItemTest {
     void splitCopyKeepsTheMarketplaceOfferKey() {
         // given
         OrderItem source = orderItem("MFN-1");
-        source.setMarketplaceOfferKey("SILLO-84980");
+        source.setMarketplaceOfferKey("XS-84980");
 
         // when
         OrderItem split = new OrderItem(ORDER_ID, source, 1);
 
         // then
-        assertThat(split.getMarketplaceOfferKey()).isEqualTo("SILLO-84980");
+        assertThat(split.getMarketplaceOfferKey()).isEqualTo("XS-84980");
     }
 
     @Test
     void updatingANewItemFromAFormWithoutTheOfferKeyKeepsTheStoredKey() {
         // given
         OrderItem stored = orderItem("MFN-1");
-        stored.setMarketplaceOfferKey("SILLO-84980");
+        stored.setMarketplaceOfferKey("XS-84980");
         OrderItem fromForm = orderItem("MFN-2");
 
         // when
@@ -294,7 +294,7 @@ class OrderItemTest {
         stored.update(fromForm);
 
         // then
-        assertThat(stored.getMarketplaceOfferKey()).isEqualTo("SILLO-84980");
+        assertThat(stored.getMarketplaceOfferKey()).isEqualTo("XS-84980");
     }
 
     @Test
@@ -304,9 +304,22 @@ class OrderItemTest {
 
         // when / then
         assertThat(item.isUnlinkedMarketplaceItem()).isFalse();
-        item.setMarketplaceOfferKey("SILLO-84980");
+        item.setMarketplaceOfferKey("XS-84980");
         assertThat(item.isUnlinkedMarketplaceItem()).isTrue();
         item.setService(true);
+        assertThat(item.isUnlinkedMarketplaceItem()).isFalse();
+    }
+
+    @Test
+    void aLineOfALinkedOfferIsLinkedWithoutACategory() {
+        // given the link gave the line an EAN only: its goods need not be in a catalog
+        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, "5900000000011", false);
+        item.setMarketplaceOfferKey("PS-1");
+
+        // when
+        item.setEan("5900000000011");
+
+        // then
         assertThat(item.isUnlinkedMarketplaceItem()).isFalse();
     }
 

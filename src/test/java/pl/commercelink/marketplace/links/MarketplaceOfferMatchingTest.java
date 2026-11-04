@@ -12,7 +12,6 @@ import pl.commercelink.marketplace.api.MarketplaceListedOffer;
 import pl.commercelink.marketplace.api.MarketplaceOffers;
 import pl.commercelink.marketplace.api.MarketplaceOffersPage;
 import pl.commercelink.marketplace.api.MarketplaceRateLimitedException;
-import pl.commercelink.products.Product;
 import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.stores.Store;
@@ -24,7 +23,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -55,52 +53,25 @@ class MarketplaceOfferMatchingTest {
     private static final String STORE = "s1";
     private static final String EMPIK = "Empik";
     private static final Instant NOW = Instant.parse("2026-11-02T10:00:00Z");
-    private static final Product KLOCKI = product("Klocki", "5903771700818", "7041");
 
     @Mock
     private MarketplaceOfferLinkRepository links;
     @Mock
-    private MarketplaceOfferResolver resolver;
-    @Mock
-    private MarketplaceOfferResolver.StoreOffers storeOffers;
-    @Mock
     private StorePimAliases aliases;
 
     private Store store;
-    /** What the store's catalogs say about an EAN; an EAN not listed is in no catalog. */
-    private final Map<String, CatalogMatch> catalog = new HashMap<>();
 
     @BeforeEach
     void setUp() {
         store = new Store();
         store.setStoreId(STORE);
-        when(resolver.forStore(STORE)).thenReturn(storeOffers);
-        when(storeOffers.matchCatalog(any())).thenAnswer(call -> {
-            Collection<String> eans = call.getArgument(0);
-            return eans.stream().map(catalog::get).filter(match -> match != null).findFirst()
-                    .orElse(new CatalogMatch.NotInCatalog());
-        });
         when(aliases.effectiveEntry(anyString(), anyString())).thenReturn(Optional.empty());
         when(links.findAll(STORE, EMPIK)).thenReturn(List.of());
         when(links.saveUnlessManual(any())).thenReturn(true);
     }
 
     private MarketplaceOfferMatching matching() {
-        return new MarketplaceOfferMatching(links, resolver, aliases, Clock.fixed(NOW, ZoneOffset.UTC));
-    }
-
-    private MarketplaceOfferMatching matchingWithKlocki() {
-        inCatalog(KLOCKI);
-        return matching();
-    }
-
-    private void inCatalog(Product product) {
-        catalog.put(product.getEan(), new CatalogMatch.Found(product, "Zabawki"));
-    }
-
-    // a product without a pimId: the catalog alone decides, the PIM is not asked
-    private static Product product(String name, String ean, String mfn) {
-        return new Product("cat-1", null, ean, mfn, "Brand", "Label", name, "default");
+        return new MarketplaceOfferMatching(links, aliases, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private void ownOffer(String key) {
@@ -179,205 +150,143 @@ class MarketplaceOfferMatchingTest {
     }
 
     @Test
-    void linksAnOfferWhoseEanIsOnACatalogProductWithoutPimId() {
+    void linksAnOfferToItsEanWithoutLookingAtTheCatalogs() {
         // given
-        MarketplaceOfferMatching matching = matchingWithKlocki();
+        MarketplaceOfferMatching matching = matching();
 
         // when
-        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("SILLO-1", " 5903771700818 "))));
+        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("PS-1", " 5903771700818 "))));
 
         // then
         MarketplaceOfferLink link = savedLink();
         assertThat(link.getStoreId()).isEqualTo(STORE);
         assertThat(link.getMarketplace()).isEqualTo(EMPIK);
-        assertThat(link.getSellerOfferKey()).isEqualTo("SILLO-1");
+        assertThat(link.getSellerOfferKey()).isEqualTo("PS-1");
         assertThat(link.getEans()).containsExactly("5903771700818");
         assertThat(link.getSource()).isEqualTo(MarketplaceOfferLinkSource.EAN);
         assertThat(link.getCreatedBy()).isEqualTo("offer-matching");
         assertThat(link.getCreatedAt()).isEqualTo(NOW);
-        assertThat(result.linked()).containsExactly(new OfferMatchResult.Row("SILLO-1", "Title SILLO-1",
-                List.of("5903771700818"), "Klocki", null));
+        assertThat(result.linked()).containsExactly(new OfferMatchResult.Row("PS-1", "Title PS-1",
+                List.of("5903771700818"), null, true));
         assertThat(result.total()).isEqualTo(1);
         assertThat(result.finishedAt()).isEqualTo(NOW);
-        assertThat(result.notInCatalog()).isEmpty();
         assertThat(result.toReview()).isEmpty();
         assertThat(result.alreadyLinked()).isZero();
     }
 
     @Test
-    void savesTheLinkOfAnOfferNoCatalogProductHasAndListsItsEanForTheCatalog() {
+    void linksAnOfferWithSeveralEansInTheMarketplacesOrder() {
         // given
-        MarketplaceOfferMatching matching = matchingWithKlocki();
+        MarketplaceOfferMatching matching = matching();
 
         // when
-        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("SILLO-2", "5900000000000", "5900000000017"))));
+        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("PS-2", "5900000000017", "5900000000000"))));
 
-        // then the next orders link on their own once a product with the EAN is added
-        assertThat(savedLink().getEans()).containsExactly("5900000000000", "5900000000017");
-        assertThat(result.notInCatalog()).containsExactly(new OfferMatchResult.Row("SILLO-2", "Title SILLO-2",
-                List.of("5900000000000", "5900000000017"), null, null, true, "5900000000000"));
-        assertThat(result.linked()).isEmpty();
+        // then the first EAN is the one an order item gets
+        assertThat(savedLink().getEans()).containsExactly("5900000000017", "5900000000000");
+        assertThat(result.linked()).extracting(OfferMatchResult.Row::sellerOfferKey).containsExactly("PS-2");
     }
 
     @Test
     void leavesAManualLinkAloneAndCountsIt() {
         // given
-        when(links.findAll(STORE, EMPIK)).thenReturn(List.of(existing("SILLO-1", MarketplaceOfferLinkSource.MANUAL, "5903771700818")));
-        MarketplaceOfferMatching matching = matchingWithKlocki();
+        when(links.findAll(STORE, EMPIK)).thenReturn(List.of(existing("PS-1", MarketplaceOfferLinkSource.MANUAL, "5903771700818")));
+        MarketplaceOfferMatching matching = matching();
 
         // when
-        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("SILLO-1", "5900000000000"))));
+        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("PS-1", "5900000000000"))));
 
-        // then a working manual link is only counted
+        // then
         verify(links, never()).saveUnlessManual(any());
         verify(links, never()).save(any());
         assertThat(result.alreadyLinked()).isEqualTo(1);
         assertThat(result.linked()).isEmpty();
-        assertThat(result.notInCatalog()).isEmpty();
         assertThat(result.toReview()).isEmpty();
-    }
-
-    @Test
-    void listsAManualLinkWhoseEansNoCatalogProductHas() {
-        // given the operator linked the offer to an EAN the catalog does not have yet
-        when(links.findAll(STORE, EMPIK)).thenReturn(List.of(existing("SILLO-1", MarketplaceOfferLinkSource.MANUAL, "5900000000024")));
-        MarketplaceOfferMatching matching = matchingWithKlocki();
-
-        // when
-        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("SILLO-1", "5903771700818"))));
-
-        // then the link's EAN is the one to add, not the offer's
-        verify(links, never()).saveUnlessManual(any());
-        assertThat(result.alreadyLinked()).isEqualTo(1);
-        assertThat(result.notInCatalog()).containsExactly(new OfferMatchResult.Row("SILLO-1", "Title SILLO-1",
-                List.of("5903771700818"), null, "already-linked", true, "5900000000024"));
-    }
-
-    @Test
-    void sendsAManualLinkThatCannotWorkToReview() {
-        // given
-        catalog.put("5900000000031", new CatalogMatch.Ambiguous(List.of(KLOCKI, product("Lalka", "5900000000031", "7042"))));
-        when(links.findAll(STORE, EMPIK)).thenReturn(List.of(
-                existing("AMB", MarketplaceOfferLinkSource.MANUAL, "5900000000031")));
-        MarketplaceOfferMatching matching = matching();
-
-        // when
-        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("AMB"))));
-
-        // then
-        verify(links, never()).saveUnlessManual(any());
-        assertThat(result.alreadyLinked()).isEqualTo(1);
-        assertThat(result.toReview()).extracting(OfferMatchResult.Row::sellerOfferKey, OfferMatchResult.Row::reason)
-                .containsExactly(tuple("AMB", "ambiguous"));
     }
 
     @Test
     void rewritesAnEanLinkWhoseEansChanged() {
         // given an earlier run linked the offer under an EAN the offer no longer carries
-        when(links.findAll(STORE, EMPIK)).thenReturn(List.of(existing("SILLO-1", MarketplaceOfferLinkSource.EAN, "5900000000000")));
-        MarketplaceOfferMatching matching = matchingWithKlocki();
+        when(links.findAll(STORE, EMPIK)).thenReturn(List.of(existing("PS-1", MarketplaceOfferLinkSource.EAN, "5900000000000")));
+        MarketplaceOfferMatching matching = matching();
 
         // when
-        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("SILLO-1", "5903771700818"))));
+        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("PS-1", "5903771700818"))));
 
-        // then it is evaluated like a new one
+        // then
         MarketplaceOfferLink link = savedLink();
         assertThat(link.getEans()).containsExactly("5903771700818");
         assertThat(link.getSource()).isEqualTo(MarketplaceOfferLinkSource.EAN);
         assertThat(result.alreadyLinked()).isZero();
-        assertThat(result.linked()).extracting(OfferMatchResult.Row::sellerOfferKey).containsExactly("SILLO-1");
+        assertThat(result.linked()).extracting(OfferMatchResult.Row::sellerOfferKey).containsExactly("PS-1");
+    }
+
+    @Test
+    void rewritesAnEanLinkWhoseEansChangedOrder() {
+        // given the offer now lists its EANs the other way round, so its items would get another EAN first
+        when(links.findAll(STORE, EMPIK)).thenReturn(List.of(
+                existing("PS-1", MarketplaceOfferLinkSource.EAN, "5900000000000", "5903771700818")));
+        MarketplaceOfferMatching matching = matching();
+
+        // when
+        runToEnd(matching, pages(List.of(offer("PS-1", "5903771700818", "5900000000000"))));
+
+        // then
+        assertThat(savedLink().getEans()).containsExactly("5903771700818", "5900000000000");
     }
 
     @Test
     void doesNotRewriteAnEanLinkWithTheSameEans() {
         // given
         when(links.findAll(STORE, EMPIK)).thenReturn(List.of(
-                existing("SILLO-1", MarketplaceOfferLinkSource.EAN, "5903771700818", "5900000000000"),
-                existing("SILLO-2", MarketplaceOfferLinkSource.EAN, "5900000000017")));
-        MarketplaceOfferMatching matching = matchingWithKlocki();
+                existing("PS-1", MarketplaceOfferLinkSource.EAN, "5903771700818", "5900000000000"),
+                existing("PS-2", MarketplaceOfferLinkSource.EAN, "5900000000017")));
+        MarketplaceOfferMatching matching = matching();
 
         // when
         OfferMatchResult result = runToEnd(matching, pages(List.of(
-                offer("SILLO-1", "5900000000000", "5903771700818"), offer("SILLO-2", "5900000000017"))));
+                offer("PS-1", "5903771700818", "5900000000000"), offer("PS-2", "5900000000017"))));
 
-        // then still reported by what the catalog says now
+        // then still reported as linked
         verify(links, never()).saveUnlessManual(any());
         verify(links, never()).save(any());
         assertThat(result.alreadyLinked()).isZero();
-        assertThat(result.linked()).extracting(OfferMatchResult.Row::sellerOfferKey).containsExactly("SILLO-1");
-        assertThat(result.notInCatalog()).extracting(OfferMatchResult.Row::sellerOfferKey, OfferMatchResult.Row::catalogEan)
-                .containsExactly(tuple("SILLO-2", "5900000000017"));
+        assertThat(result.linked()).extracting(OfferMatchResult.Row::sellerOfferKey).containsExactly("PS-1", "PS-2");
     }
 
     @Test
     void countsAnOfferLinkedByHandMeanwhileAsAlreadyLinked() {
         // given an operator linked the offer after the run read the store's links
         when(links.saveUnlessManual(any())).thenReturn(false);
-        when(links.find(STORE, EMPIK, "SILLO-1")).thenReturn(Optional.of(
-                existing("SILLO-1", MarketplaceOfferLinkSource.MANUAL, "5900000000024")));
-        MarketplaceOfferMatching matching = matchingWithKlocki();
+        MarketplaceOfferMatching matching = matching();
 
         // when
-        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("SILLO-1", "5903771700818"))));
+        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("PS-1", "5903771700818"))));
 
-        // then reported by the operator's link, not by the offer's EAN
+        // then
         assertThat(result.alreadyLinked()).isEqualTo(1);
         assertThat(result.linked()).isEmpty();
-        assertThat(result.notInCatalog()).extracting(OfferMatchResult.Row::reason, OfferMatchResult.Row::catalogEan)
-                .containsExactly(tuple("already-linked", "5900000000024"));
-    }
-
-    @Test
-    void sendsAnOfferWhoseEansPointAtDifferentProductsToReviewWithItsLinkSaved() {
-        // given
-        catalog.put("5903771700825", new CatalogMatch.Ambiguous(List.of(KLOCKI, product("Lalka", "5903771700825", "7042"))));
-        MarketplaceOfferMatching matching = matching();
-
-        // when
-        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("SILLO-1", "5903771700818", "5903771700825"))));
-
-        // then
-        assertThat(savedLink().getEans()).containsExactly("5903771700818", "5903771700825");
-        assertThat(result.toReview()).containsExactly(new OfferMatchResult.Row("SILLO-1", "Title SILLO-1",
-                List.of("5903771700818", "5903771700825"), null, "ambiguous"));
-        assertThat(result.linked()).isEmpty();
-        assertThat(result.notInCatalog()).isEmpty();
-    }
-
-    @Test
-    void anOfferWhoseCatalogProductHasNoManufacturerCodeIsLinked() {
-        // given the product is known by its EAN alone
-        inCatalog(product("Puzzle", "5900000000048", null));
-        MarketplaceOfferMatching matching = matching();
-
-        // when
-        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("SILLO-3", "5900000000048"))));
-
-        // then
-        assertThat(savedLink().getEans()).containsExactly("5900000000048");
-        assertThat(result.linked()).extracting(OfferMatchResult.Row::sellerOfferKey, OfferMatchResult.Row::product)
-                .containsExactly(tuple("SILLO-3", "Puzzle"));
         assertThat(result.toReview()).isEmpty();
     }
 
     @Test
     void sendsOfferWithoutEanToReview() {
         // given
-        MarketplaceOfferMatching matching = matchingWithKlocki();
+        MarketplaceOfferMatching matching = matching();
 
         // when
-        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("SILLO-1"), offer("SILLO-2", " ", null))));
+        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("PS-1"), offer("PS-2", " ", null))));
 
         // then
         verify(links, never()).saveUnlessManual(any());
         assertThat(result.toReview()).extracting(OfferMatchResult.Row::sellerOfferKey, OfferMatchResult.Row::reason)
-                .containsExactly(tuple("SILLO-1", "no-ean"), tuple("SILLO-2", "no-ean"));
+                .containsExactly(tuple("PS-1", "no-ean"), tuple("PS-2", "no-ean"));
     }
 
     @Test
     void sendsOfferWithoutKeyToReview() {
         // given
-        MarketplaceOfferMatching matching = matchingWithKlocki();
+        MarketplaceOfferMatching matching = matching();
 
         // when
         OfferMatchResult result = runToEnd(matching, pages(List.of(offer(" ", "5903771700818"))));
@@ -391,15 +300,15 @@ class MarketplaceOfferMatchingTest {
     void countsOwnOffersWithoutLinkingAndAsksThePimNothingElse() {
         // given
         ownOffer("pim-1");
-        MarketplaceOfferMatching matching = matchingWithKlocki();
+        MarketplaceOfferMatching matching = matching();
 
         // when
-        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("pim-1", "5903771700818"), offer("SILLO-1", "5903771700818"))));
+        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("pim-1", "5903771700818"), offer("PS-1", "5903771700818"))));
 
         // then
         verify(links, times(1)).saveUnlessManual(any());
         assertThat(result.ownOffers()).isEqualTo(1);
-        assertThat(result.linked()).extracting(OfferMatchResult.Row::sellerOfferKey).containsExactly("SILLO-1");
+        assertThat(result.linked()).extracting(OfferMatchResult.Row::sellerOfferKey).containsExactly("PS-1");
         assertThat(result.total()).isEqualTo(2);
         verify(aliases, atLeastOnce()).effectiveEntry(eq(STORE), anyString());
         verifyNoMoreInteractions(aliases);
@@ -416,43 +325,40 @@ class MarketplaceOfferMatchingTest {
         OfferMatchResult result = runToEnd(matching, pages(List.of(inactive, offer("NEW-1", "5900000000001"))));
 
         // then
-        assertThat(result.notInCatalog()).extracting(OfferMatchResult.Row::sellerOfferKey, OfferMatchResult.Row::active)
+        assertThat(result.linked()).extracting(OfferMatchResult.Row::sellerOfferKey, OfferMatchResult.Row::active)
                 .containsExactly(tuple("OLD-1", false), tuple("NEW-1", true));
     }
 
     @Test
     void countsAnOfferRepeatedAcrossPagesOnce() {
         // given the listing shifted between pages and returned the same offer twice
-        MarketplaceOfferMatching matching = matchingWithKlocki();
+        MarketplaceOfferMatching matching = matching();
 
         // when
         OfferMatchResult result = runToEnd(matching, pages(
-                List.of(offer("SILLO-1", "5903771700818")),
-                List.of(offer("SILLO-1", "5903771700818"), offer("SILLO-2", "5900000000000"))));
+                List.of(offer("PS-1", "5903771700818")),
+                List.of(offer("PS-1", "5903771700818"), offer("PS-2", "5900000000000"))));
 
         // then
         verify(links, times(2)).saveUnlessManual(any());
         assertThat(result.total()).isEqualTo(2);
-        assertThat(result.linked()).hasSize(1);
-        assertThat(result.notInCatalog()).hasSize(1);
+        assertThat(result.linked()).extracting(OfferMatchResult.Row::sellerOfferKey).containsExactly("PS-1", "PS-2");
     }
 
     @Test
-    void readsTheStoresLinksAndCatalogsOncePerMessage() {
+    void readsTheStoresLinksOncePerMessage() {
         // given
-        MarketplaceOfferMatching matching = matchingWithKlocki();
+        MarketplaceOfferMatching matching = matching();
 
         // when
         OfferMatchResult result = runToEnd(matching, pages(
-                List.of(offer("SILLO-1", "5903771700818")),
-                List.of(offer("SILLO-2", "5903771700818"), offer("SILLO-3", "5900000000000"))));
+                List.of(offer("PS-1", "5903771700818")),
+                List.of(offer("PS-2", "5903771700818"), offer("PS-3", "5900000000000"))));
 
         // then
-        verify(resolver, times(1)).forStore(STORE);
         verify(links, times(1)).findAll(STORE, EMPIK);
         assertThat(result.total()).isEqualTo(3);
-        assertThat(result.linked()).hasSize(2);
-        assertThat(result.notInCatalog()).hasSize(1);
+        assertThat(result.linked()).hasSize(3);
     }
 
     @Test
@@ -471,8 +377,8 @@ class MarketplaceOfferMatchingTest {
     @Test
     void finishesInOneStepWhenTheListingAllowsIt() {
         // given
-        MarketplaceOfferMatching matching = matchingWithKlocki();
-        ListedPages offers = pages(List.of(offer("SILLO-1", "5903771700818")), List.of(offer("SILLO-2", "5900000000000")));
+        MarketplaceOfferMatching matching = matching();
+        ListedPages offers = pages(List.of(offer("XS-1", "5903771700818")), List.of(offer("XS-2", "5900000000000")));
 
         // when
         MarketplaceOfferMatching.Step step = matching.resume(store, EMPIK, offers, fresh());
@@ -488,9 +394,9 @@ class MarketplaceOfferMatchingTest {
     @Test
     void pausesAtTheRateLimitedPageWithTheMarketplacesDelay() {
         // given
-        MarketplaceOfferMatching matching = matchingWithKlocki();
-        ListedPages offers = pages(List.of(offer("SILLO-1", "5903771700818")), List.of(offer("SILLO-2", "5900000000000")),
-                List.of(offer("SILLO-3", "5900000000001"))).rateLimitedOnceAt(1);
+        MarketplaceOfferMatching matching = matching();
+        ListedPages offers = pages(List.of(offer("XS-1", "5903771700818")), List.of(offer("XS-2", "5900000000000")),
+                List.of(offer("XS-3", "5900000000001"))).rateLimitedOnceAt(1);
 
         // when
         MarketplaceOfferMatching.Step step = matching.resume(store, EMPIK, offers, fresh());
@@ -502,8 +408,8 @@ class MarketplaceOfferMatchingTest {
             assertThat(progress.nextCursor()).isEqualTo("1");
             assertThat(progress.processed()).isEqualTo(1);
             assertThat(progress.total()).isEqualTo(3);
-            assertThat(progress.linked()).extracting(OfferMatchResult.Row::sellerOfferKey).containsExactly("SILLO-1");
-            assertThat(progress.seenKeys()).containsExactly("SILLO-1");
+            assertThat(progress.linked()).extracting(OfferMatchResult.Row::sellerOfferKey).containsExactly("XS-1");
+            assertThat(progress.seenKeys()).containsExactly("XS-1");
             assertThat(progress.runId()).isEqualTo("run-1");
             assertThat(progress.status()).isEqualTo(OfferMatchProgress.Status.RUNNING);
         });
@@ -512,8 +418,8 @@ class MarketplaceOfferMatchingTest {
     @Test
     void continuesFromCursorAfterRateLimit() {
         // given a run paused before page 1
-        MarketplaceOfferMatching matching = matchingWithKlocki();
-        ListedPages offers = pages(List.of(offer("SILLO-1", "5903771700818")), List.of(offer("SILLO-2", "5900000000000")))
+        MarketplaceOfferMatching matching = matching();
+        ListedPages offers = pages(List.of(offer("XS-1", "5903771700818")), List.of(offer("XS-2", "5900000000000")))
                 .rateLimitedOnceAt(1);
         OfferMatchProgress paused = ((MarketplaceOfferMatching.Paused) matching.resume(store, EMPIK, offers, fresh()))
                 .progress();
@@ -526,8 +432,7 @@ class MarketplaceOfferMatchingTest {
         assertThat(offers.requested).containsExactly("1");
         OfferMatchResult result = ((MarketplaceOfferMatching.Finished) step).result();
         assertThat(result.total()).isEqualTo(2);
-        assertThat(result.linked()).extracting(OfferMatchResult.Row::sellerOfferKey).containsExactly("SILLO-1");
-        assertThat(result.notInCatalog()).extracting(OfferMatchResult.Row::sellerOfferKey).containsExactly("SILLO-2");
+        assertThat(result.linked()).extracting(OfferMatchResult.Row::sellerOfferKey).containsExactly("XS-1", "XS-2");
         // page 0 is not matched again: one write per offer
         verify(links, times(2)).saveUnlessManual(any());
     }
@@ -536,7 +441,7 @@ class MarketplaceOfferMatchingTest {
     void pausesAtTheFirstPageWithoutACursor() {
         // given
         MarketplaceOfferMatching matching = matching();
-        ListedPages offers = pages(List.of(offer("SILLO-1", "5900000000000"))).rateLimitedOnceAt(0);
+        ListedPages offers = pages(List.of(offer("XS-1", "5900000000000"))).rateLimitedOnceAt(0);
 
         // when
         MarketplaceOfferMatching.Step step = matching.resume(store, EMPIK, offers, fresh());
@@ -552,7 +457,7 @@ class MarketplaceOfferMatchingTest {
     void continuesWithoutDelayWhenTimeBudgetIsUsed() {
         // given every page takes six minutes, so the ten-minute budget ends after the second
         MutableClock clock = new MutableClock(NOW);
-        MarketplaceOfferMatching matching = new MarketplaceOfferMatching(links, resolver, aliases, clock);
+        MarketplaceOfferMatching matching = new MarketplaceOfferMatching(links, aliases, clock);
         ListedPages offers = pages(List.of(offer("A", "5900000000001")), List.of(offer("B", "5900000000002")),
                 List.of(offer("C", "5900000000003"))).onPage(() -> clock.advance(Duration.ofMinutes(6)));
 
@@ -571,16 +476,16 @@ class MarketplaceOfferMatchingTest {
     @Test
     void countsAnOfferRepeatedAfterAPauseOnce() {
         // given the listing repeats an offer of the page read before the pause
-        MarketplaceOfferMatching matching = matchingWithKlocki();
-        ListedPages offers = pages(List.of(offer("SILLO-1", "5903771700818")),
-                List.of(offer("SILLO-1", "5903771700818"), offer("SILLO-2", "5900000000000"))).rateLimitedOnceAt(1);
+        MarketplaceOfferMatching matching = matching();
+        ListedPages offers = pages(List.of(offer("XS-1", "5903771700818")),
+                List.of(offer("XS-1", "5903771700818"), offer("XS-2", "5900000000000"))).rateLimitedOnceAt(1);
 
         // when
         OfferMatchResult result = runToEnd(matching, offers);
 
         // then
         assertThat(result.total()).isEqualTo(2);
-        assertThat(result.linked()).hasSize(1);
+        assertThat(result.linked()).extracting(OfferMatchResult.Row::sellerOfferKey).containsExactly("XS-1", "XS-2");
         assertThat(result.alreadyLinked()).isZero();
     }
 
@@ -591,7 +496,7 @@ class MarketplaceOfferMatchingTest {
         ListedPages offers = pages(List.of(offer("A", "5900000000001")), List.of(offer("B", "5900000000002")))
                 .rateLimitedOnceAt(1);
         OfferMatchProgress pausedTwice = new OfferMatchProgress("run-1", NOW, NOW, OfferMatchProgress.Status.RUNNING, "1",
-                1, 2, 0, 0, null, null, null, Set.of("A"), 2, null, null);
+                1, 2, 0, 0, null, null, Set.of("A"), 2, null, null);
 
         // when
         MarketplaceOfferMatching.Step step = matching.resume(store, EMPIK, offers, pausedTwice);
@@ -607,7 +512,7 @@ class MarketplaceOfferMatchingTest {
         ListedPages offers = pages(List.of(offer("A", "5900000000001")), List.of(offer("B", "5900000000002")),
                 List.of(offer("C", "5900000000003"))).rateLimitedOnceAt(2);
         OfferMatchProgress pausedOften = new OfferMatchProgress("run-1", NOW, NOW, OfferMatchProgress.Status.RUNNING, "1",
-                1, 3, 0, 0, null, null, null, Set.of("A"), 9, null, null);
+                1, 3, 0, 0, null, null, Set.of("A"), 9, null, null);
 
         // when
         MarketplaceOfferMatching.Step step = matching.resume(store, EMPIK, offers, pausedOften);
@@ -632,9 +537,6 @@ class MarketplaceOfferMatchingTest {
     @Test
     void producesTheSameResultInOneMessageAndInSeveralSplitByTheRateLimit() {
         // given every outcome a run can have, spread over four pages
-        inCatalog(KLOCKI);
-        catalog.put("5903771700825", new CatalogMatch.Ambiguous(List.of(KLOCKI, product("Lalka", "5903771700825", "7042"))));
-        inCatalog(product("Puzzle", "5900000000048", null));
         ownOffer("own-1");
         when(links.findAll(STORE, EMPIK)).thenReturn(List.of(
                 existing("OLD-1", MarketplaceOfferLinkSource.MANUAL, "5903771700832"),
@@ -642,9 +544,9 @@ class MarketplaceOfferMatchingTest {
         MarketplaceListedOffer inactive = new MarketplaceListedOffer("OFF-1", List.of("5900000000009"), "Stara", 0,
                 new BigDecimal("1.00"), false);
         List<List<MarketplaceListedOffer>> listing = List.of(
-                List.of(offer("SILLO-1", "5903771700818"), offer("own-1", "5903771700849"), offer(" ", "5900000000001")),
+                List.of(offer("XS-1", "5903771700818"), offer("own-1", "5903771700849"), offer(" ", "5900000000001")),
                 List.of(offer("OLD-1", "5903771700832"), offer("OLD-2", "5903771700818"), offer("AMB", "5903771700825")),
-                List.of(offer("SILLO-1", "5903771700818"), offer("NOEAN"), inactive),
+                List.of(offer("XS-1", "5903771700818"), offer("NOEAN"), inactive),
                 List.of(offer("NOMFN", "5900000000048"), offer("MISS", "5900000000002")));
         OfferMatchResult inOneMessage = runToEnd(matching(), new ListedPages(listing));
 
@@ -672,11 +574,9 @@ class MarketplaceOfferMatchingTest {
         assertThat(inOneMessage.ownOffers()).isEqualTo(1);
         assertThat(inOneMessage.alreadyLinked()).isEqualTo(1);
         assertThat(inOneMessage.linked()).extracting(OfferMatchResult.Row::sellerOfferKey)
-                .containsExactly("SILLO-1", "OLD-2", "NOMFN");
-        assertThat(inOneMessage.notInCatalog()).extracting(OfferMatchResult.Row::sellerOfferKey)
-                .containsExactly("OLD-1", "OFF-1", "MISS");
+                .containsExactly("XS-1", "OLD-2", "AMB", "OFF-1", "NOMFN", "MISS");
         assertThat(inOneMessage.toReview()).extracting(OfferMatchResult.Row::sellerOfferKey, OfferMatchResult.Row::reason)
-                .containsExactly(tuple(" ", "no-key"), tuple("AMB", "ambiguous"), tuple("NOEAN", "no-ean"));
+                .containsExactly(tuple(" ", "no-key"), tuple("NOEAN", "no-ean"));
     }
 
     private static final class MutableClock extends Clock {

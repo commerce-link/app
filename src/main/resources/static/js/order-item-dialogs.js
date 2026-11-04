@@ -279,8 +279,9 @@
     })();
 
     // --- Link offer to product ------------------------------------------------------------------------------------
-    // One product of the catalog (not only the pricelist's available ones); its category and product id are posted (an EAN
-    // may repeat across products), the server links the offer to its EAN and fills the codes.
+    // One product of the catalog (not only the pricelist's available ones), whose category and product id are posted (an
+    // EAN may repeat across products), or a typed EAN for goods in no catalog; one choice clears the other, and the
+    // server links the offer to the EAN and fills the codes.
     (function () {
         var dialog = document.getElementById('link-offer-dialog');
         if (!dialog) {
@@ -293,6 +294,7 @@
         var rows = dialog.querySelector('[data-cl-link-rows]');
         var categoryId = dialog.querySelector('[data-cl-link-category-id]');
         var productId = dialog.querySelector('[data-cl-link-product-id]');
+        var ean = dialog.querySelector('[data-cl-link-ean]');
         var cache = {};
         var data = [];
 
@@ -343,8 +345,16 @@
         function choose(p) {
             categoryId.value = p ? p.categoryId : '';
             productId.value = p ? p.productId : '';
-            dialog.querySelector('[data-cl-link-submit]').disabled = !p;
-            dialog.querySelector('[data-cl-link-hint]').hidden = !!p;
+            if (p) {
+                ean.value = '';
+            }
+            refreshSubmit();
+        }
+
+        function refreshSubmit() {
+            var ready = !!productId.value || ean.value.trim() !== '';
+            dialog.querySelector('[data-cl-link-submit]').disabled = !ready;
+            dialog.querySelector('[data-cl-link-hint]').hidden = ready;
         }
 
         function renderTable() {
@@ -389,6 +399,7 @@
             fillContext(dialog, trigger);
             dialog.querySelector('[data-cl-link-key]').textContent = trigger.getAttribute('data-offer-key') || '';
             search.value = '';
+            ean.value = '';
             choose(null);
             if (!catalog.value && catalog.options.length === 2) {
                 catalog.selectedIndex = 1;
@@ -401,13 +412,20 @@
         });
         category.addEventListener('change', renderTable);
         search.addEventListener('input', renderTable);
+        ean.addEventListener('input', function () {
+            if (ean.value.trim() !== '' && productId.value) {
+                choose(null);
+                renderTable();
+            }
+            refreshSubmit();
+        });
         search.addEventListener('keydown', function (event) {
             if (event.key === 'Enter') {
                 event.preventDefault();
             }
         });
         form.addEventListener('submit', function (event) {
-            if (!categoryId.value || !productId.value) {
+            if (ean.value.trim() === '' && (!categoryId.value || !productId.value)) {
                 event.preventDefault();
             }
         });

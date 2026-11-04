@@ -3928,12 +3928,12 @@ class OrdersControllerTest {
             Order order = order(OrderStatus.Assembly);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
             OrderItem ordered = item("i1", FulfilmentStatus.Ordered, "RAW-1");
-            ordered.setMarketplaceOfferKey("SILLO-1");
+            ordered.setMarketplaceOfferKey("XS-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(ordered);
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
-            String view = ordersController.linkOffer(ORDER_ID, "i1", "c1", "p1", redirect, polish);
+            String view = ordersController.linkOffer(ORDER_ID, "i1", "c1", "p1", null, redirect, polish);
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
@@ -3947,12 +3947,12 @@ class OrdersControllerTest {
             Order order = order(OrderStatus.Cancelled);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
-            fresh.setMarketplaceOfferKey("SILLO-1");
+            fresh.setMarketplaceOfferKey("XS-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
-            String view = ordersController.linkOffer(ORDER_ID, "i1", "c1", "p1", redirect, polish);
+            String view = ordersController.linkOffer(ORDER_ID, "i1", "c1", "p1", null, redirect, polish);
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
@@ -3967,14 +3967,14 @@ class OrdersControllerTest {
             Order order = order(OrderStatus.New);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
-            fresh.setMarketplaceOfferKey("SILLO-1");
+            fresh.setMarketplaceOfferKey("XS-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
             when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "c1", "p1", null))
                     .thenReturn(new pl.commercelink.marketplace.links.MarketplaceOfferLinking.LinkResult(3));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
-            String view = ordersController.linkOffer(ORDER_ID, "i1", "c1", "p1", redirect, polish);
+            String view = ordersController.linkOffer(ORDER_ID, "i1", "c1", "p1", null, redirect, polish);
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
@@ -3987,18 +3987,58 @@ class OrdersControllerTest {
             Order order = order(OrderStatus.New);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
-            fresh.setMarketplaceOfferKey("SILLO-1");
+            fresh.setMarketplaceOfferKey("XS-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
             when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "c-foreign", "p1", null)).thenThrow(
                     new IllegalArgumentException(pl.commercelink.marketplace.links.MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
-            ordersController.linkOffer(ORDER_ID, "i1", "c-foreign", "p1", redirect, polish);
+            ordersController.linkOffer(ORDER_ID, "i1", "c-foreign", "p1", null, redirect, polish);
 
             // then
             assertThat(flash(redirect)).containsEntry("errorMessage",
                     pl.commercelink.marketplace.links.MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG);
+        }
+
+        @Test
+        void linkOfferLinksATypedEanInsteadOfAProduct() {
+            // given
+            Order order = order(OrderStatus.New);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
+            fresh.setMarketplaceOfferKey("PS-1");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
+            when(marketplaceOfferLinking.linkEan(STORE_ID, order, "i1", "5901234567890", null))
+                    .thenReturn(new pl.commercelink.marketplace.links.MarketplaceOfferLinking.LinkResult(1));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.linkOffer(ORDER_ID, "i1", "", "", "5901234567890", redirect, polish);
+
+            // then
+            assertThat(notice(redirect).text()).isEqualTo("order.item.link.offer.done [1]");
+            verify(marketplaceOfferLinking, never()).link(any(), any(), any(), any(), any(), any());
+        }
+
+        @Test
+        void linkOfferShowsWhyATypedEanCannotBeLinked() {
+            // given
+            Order order = order(OrderStatus.New);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
+            fresh.setMarketplaceOfferKey("PS-1");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
+            when(marketplaceOfferLinking.linkEan(STORE_ID, order, "i1", "12AB", null)).thenThrow(
+                    new IllegalArgumentException(pl.commercelink.marketplace.links.MarketplaceOfferLinking.INVALID_EAN));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.linkOffer(ORDER_ID, "i1", null, null, "12AB", redirect, polish);
+
+            // then
+            assertThat(flash(redirect)).containsEntry("errorMessage",
+                    pl.commercelink.marketplace.links.MarketplaceOfferLinking.INVALID_EAN);
         }
 
         @Test

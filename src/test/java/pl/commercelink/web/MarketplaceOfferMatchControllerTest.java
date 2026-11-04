@@ -109,27 +109,27 @@ class MarketplaceOfferMatchControllerTest {
     @Test
     void downloadsEveryOfferOfAGroupAsCsvWithActiveOffersFirst() throws Exception {
         // given
-        List<Row> missing = new java.util.ArrayList<>();
-        missing.add(new Row("sku-old", "Pled; bawełna", List.of("5901234123460"), null, null, false, null));
+        List<Row> linked = new java.util.ArrayList<>();
+        linked.add(new Row("sku-old", "Pled; bawełna", List.of("5901234123460"), null, false));
         for (int i = 0; i < 150; i++) {
-            missing.add(new Row("sku-" + i, "Oferta " + i, List.of("59012341" + String.format("%05d", i), "5901"), null,
-                    null, true, "59012341" + String.format("%05d", i)));
+            linked.add(new Row("sku-" + i, "Oferta " + i, List.of("59012341" + String.format("%05d", i), "5901"), null,
+                    true));
         }
-        when(resultStore.latest(STORE_ID, EMPIK)).thenReturn(Optional.of(new OfferMatchResult(NOW, 151, List.of(),
-                missing, List.of(new Row("sku-r", "Zestaw", List.of(), null, OfferMatchResult.NO_EAN)), 0, 0)));
+        when(resultStore.latest(STORE_ID, EMPIK)).thenReturn(Optional.of(new OfferMatchResult(NOW, 151, linked,
+                List.of(new Row("sku-r", "Zestaw", List.of(), OfferMatchResult.NO_EAN, true)), 0, 0)));
 
         // when
-        var response = controller.groupCsv(EMPIK, "notInCatalog", PL);
+        var response = controller.groupCsv(EMPIK, "linked", PL);
 
         // then
         byte[] body = response.getBody().getByteArray();
         assertThat(body).startsWith((byte) 0xEF, (byte) 0xBB, (byte) 0xBF);
         List<String> lines = new String(body, 3, body.length - 3, java.nio.charset.StandardCharsets.UTF_8).lines().toList();
         assertThat(lines).hasSize(152);
-        assertThat(lines.get(0)).isEqualTo("\"SKU oferty\";\"Tytuł oferty\";\"EAN\";\"Aktywna\";\"Produkt w katalogu\";\"EAN do katalogu\";\"Powód\"");
-        assertThat(lines.get(1)).isEqualTo("\"sku-0\";\"Oferta 0\";\"5901234100000, 5901\";\"tak\";\"\";\"5901234100000\";\"\"");
-        assertThat(lines.get(151)).isEqualTo("\"sku-old\";\"Pled; bawełna\";\"5901234123460\";\"nie\";\"\";\"\";\"\"");
-        assertThat(response.getHeaders().getContentDisposition().getFilename()).isEqualTo("offer-matching-Empik-notInCatalog.csv");
+        assertThat(lines.get(0)).isEqualTo("\"SKU oferty\";\"Tytuł oferty\";\"EAN\";\"Aktywna\";\"Powód\"");
+        assertThat(lines.get(1)).isEqualTo("\"sku-0\";\"Oferta 0\";\"5901234100000, 5901\";\"tak\";\"\"");
+        assertThat(lines.get(151)).isEqualTo("\"sku-old\";\"Pled; bawełna\";\"5901234123460\";\"nie\";\"\"");
+        assertThat(response.getHeaders().getContentDisposition().getFilename()).isEqualTo("offer-matching-Empik-linked.csv");
         assertThat(response.getHeaders().getContentType().toString()).isEqualTo("text/csv;charset=UTF-8");
     }
 
@@ -138,14 +138,14 @@ class MarketplaceOfferMatchControllerTest {
         // given
         authenticateAs("super", "SUPER_ADMIN");
         when(resultStore.latest("store-2", EMPIK)).thenReturn(Optional.of(new OfferMatchResult(NOW, 1, List.of(),
-                List.of(), List.of(new Row("sku-r", "Zestaw", List.of(), null, OfferMatchResult.NO_EAN)), 0, 0)));
+                List.of(new Row("sku-r", "Zestaw", List.of(), OfferMatchResult.NO_EAN, true)), 0, 0)));
 
         // when
         var response = controller.superAdminGroupCsv("store-2", EMPIK, "toReview", PL);
 
         // then
         String csv = new String(response.getBody().getByteArray(), java.nio.charset.StandardCharsets.UTF_8);
-        assertThat(csv).contains("\"sku-r\";\"Zestaw\";\"\";\"tak\";\"\";\"\";\"Oferta nie ma EAN-u.");
+        assertThat(csv).contains("\"sku-r\";\"Zestaw\";\"\";\"tak\";\"Oferta nie ma EAN-u.");
     }
 
     @Test
@@ -154,19 +154,19 @@ class MarketplaceOfferMatchControllerTest {
         when(resultStore.latest(STORE_ID, EMPIK)).thenReturn(Optional.empty());
 
         // when / then
-        assertThatThrownBy(() -> controller.groupCsv(EMPIK, "notInCatalog", PL))
+        assertThatThrownBy(() -> controller.groupCsv(EMPIK, "linked", PL))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
     }
 
     @Test
-    void theDroppedGroupOfOffersWithoutAPimEntryHasNoCsv() {
+    void theDroppedGroupOfOffersNotInACatalogHasNoCsv() {
         // given
         when(resultStore.latest(STORE_ID, EMPIK)).thenReturn(Optional.of(new OfferMatchResult(NOW, 0, List.of(),
-                List.of(), List.of(), 0, 0)));
+                List.of(), 0, 0)));
 
         // when / then
-        assertThatThrownBy(() -> controller.groupCsv(EMPIK, "noPimEntry", PL))
+        assertThatThrownBy(() -> controller.groupCsv(EMPIK, "notInCatalog", PL))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
     }
@@ -175,12 +175,9 @@ class MarketplaceOfferMatchControllerTest {
     void showsGroupsOfLatestRun() {
         // given
         OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 9,
-                List.of(new Row("sku-1", "Mysz", List.of("5901234123457"), "Mysz M1", null)),
-                List.of(new Row("sku-2", "Klawiatura", List.of("5901234123458"), null, OfferMatchResult.ALREADY_LINKED,
-                                true, "5901234123458"),
-                        new Row("sku-3", "Monitor", List.of("5901234123459", "5901234123460"), null, null, true, "5901234123459"),
-                        new Row("sku-4", "Kabel", List.of("5901234123459"), null, null, true, "5901234123459")),
-                List.of(new Row("sku-5", "Słuchawki", List.of(), null, OfferMatchResult.NO_EAN)),
+                List.of(new Row("sku-1", "Mysz", List.of("5901234123457"), null, true),
+                        new Row("sku-3", "Monitor", List.of("5901234123459", "5901234123460"), null, true)),
+                List.of(new Row("sku-5", "Słuchawki", List.of(), OfferMatchResult.NO_EAN, true)),
                 2, 3);
         when(resultStore.latest(STORE_ID, EMPIK)).thenReturn(Optional.of(result));
         Model model = new ExtendedModelMap();
@@ -194,39 +191,30 @@ class MarketplaceOfferMatchControllerTest {
         assertThat(matching.total()).isEqualTo(9);
         assertThat(matching.ownOffers()).isEqualTo(2);
         assertThat(matching.alreadyLinked()).isEqualTo(3);
-        assertThat(matching.groups()).extracting(OfferMatchingView.Group::name)
-                .containsExactly("linked", "notInCatalog", "toReview");
-        assertThat(matching.groups()).extracting(OfferMatchingView.Group::count).containsExactly(1, 3, 1);
-        assertThat(matching.group("notInCatalog").eans()).isEqualTo("5901234123458\n5901234123459");
-        assertThat(matching.group("linked").rows()).singleElement()
-                .satisfies(row -> assertThat(row.product()).isEqualTo("Mysz M1"));
-        assertThat(matching.group("linked").eans()).isNull();
-        assertThat(matching.group("toReview").eans()).isNull();
+        assertThat(matching.groups()).extracting(OfferMatchingView.Group::name).containsExactly("linked", "toReview");
+        assertThat(matching.groups()).extracting(OfferMatchingView.Group::count).containsExactly(2, 1);
         assertThat(matching.group("toReview").rows()).singleElement()
                 .satisfies(row -> assertThat(row.reasonKey()).isEqualTo("store.marketplaces.offer.matching.reason.no-ean"));
-        assertThat(matching.group("notInCatalog").rows()).extracting(OfferMatchingView.Row::linkedBefore)
-                .containsExactly(true, false, false);
     }
 
     @Test
-    void rendersOnlyTheFirstRowsOfALargeGroupButCopiesEveryEan() {
+    void rendersOnlyTheFirstRowsOfALargeGroup() {
         // given
-        List<Row> missing = java.util.stream.IntStream.range(0, OfferMatchingView.ROW_LIMIT + 50)
-                .mapToObj(index -> new Row("sku-" + index, "Produkt " + index, List.of("59000000" + (10000 + index)), null, null))
+        List<Row> linked = java.util.stream.IntStream.range(0, OfferMatchingView.ROW_LIMIT + 50)
+                .mapToObj(index -> new Row("sku-" + index, "Produkt " + index, List.of("59000000" + (10000 + index)), null, true))
                 .toList();
         when(resultStore.latest(STORE_ID, EMPIK)).thenReturn(Optional.of(
-                new OfferMatchResult(Instant.now(), missing.size(), List.of(), missing, List.of(), 0, 0)));
+                new OfferMatchResult(Instant.now(), linked.size(), linked, List.of(), 0, 0)));
         Model model = new ExtendedModelMap();
 
         // when
         controller.offerMatching(EMPIK, model, PL);
 
         // then
-        OfferMatchingView.Group group = ((OfferMatchingView) model.getAttribute("matching")).group("notInCatalog");
+        OfferMatchingView.Group group = ((OfferMatchingView) model.getAttribute("matching")).group("linked");
         assertThat(group.count()).isEqualTo(OfferMatchingView.ROW_LIMIT + 50);
         assertThat(group.rows()).hasSize(OfferMatchingView.ROW_LIMIT);
         assertThat(group.limited()).isTrue();
-        assertThat(group.eans().split("\n")).hasSize(OfferMatchingView.ROW_LIMIT + 50);
     }
 
     @Test
@@ -350,7 +338,7 @@ class MarketplaceOfferMatchControllerTest {
         // given
         storesRepository.findById(STORE_ID).getMarketplaceIntegration(EMPIK).setLoggedIn(false);
         when(resultStore.latest(STORE_ID, EMPIK)).thenReturn(Optional.of(new OfferMatchResult(Instant.now(), 0,
-                List.of(), List.of(), List.of(), 0, 0)));
+                List.of(), List.of(), 0, 0)));
         Model model = new ExtendedModelMap();
 
         // when
@@ -377,7 +365,7 @@ class MarketplaceOfferMatchControllerTest {
 
     private static OfferMatchProgress running(Instant updatedAt, Integer total) {
         return new OfferMatchProgress("run-1", Instant.parse("2026-11-02T09:50:00Z"), updatedAt,
-                OfferMatchProgress.Status.RUNNING, "400", 400, total, 0, 0, null, null, null, null, 0, null, null);
+                OfferMatchProgress.Status.RUNNING, "400", 400, total, 0, 0, null, null, null, 0, null, null);
     }
 
     @Test
@@ -403,7 +391,7 @@ class MarketplaceOfferMatchControllerTest {
         // given
         when(resultStore.progress(STORE_ID, EMPIK)).thenReturn(Optional.of(running(NOW, 6150)));
         when(resultStore.latest(STORE_ID, EMPIK)).thenReturn(Optional.of(new OfferMatchResult(NOW.minus(Duration.ofDays(1)),
-                0, List.of(), List.of(), List.of(), 0, 0)));
+                0, List.of(), List.of(), 0, 0)));
         Model model = new ExtendedModelMap();
 
         // when

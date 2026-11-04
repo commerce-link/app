@@ -30,16 +30,13 @@ class MarketplaceOfferMatchTemplateTest {
     }
 
     @Test
-    void theLatestRunShowsCountsGroupsReasonsAndEansToCopy() {
+    void theLatestRunShowsCountsGroupsAndReasons() {
         // given
         OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 9,
-                List.of(new Row("sku-1", "Mysz", List.of("5901234123457"), "Mysz bezprzewodowa M1", null)),
-                List.of(new Row("sku-2", "Klawiatura", List.of("5901234123458"), null, OfferMatchResult.ALREADY_LINKED,
-                                true, "5901234123499"),
-                        new Row("sku-3", "Monitor", List.of("5901234123459", "5901234123460"), null, null, true,
-                                "5901234123459")),
-                List.of(new Row("sku-5", null, List.of(), null, OfferMatchResult.NO_EAN),
-                        new Row("sku-6", "Kabel", List.of("5901234123461"), null, OfferMatchResult.AMBIGUOUS)),
+                List.of(new Row("sku-1", "Mysz", List.of("5901234123457"), null, true),
+                        new Row("sku-3", "Monitor", List.of("5901234123459", "5901234123460"), null, true)),
+                List.of(new Row("sku-5", null, List.of(), OfferMatchResult.NO_EAN, true),
+                        new Row("sku-6", "Kabel", List.of("5901234123461"), OfferMatchResult.NO_KEY, true)),
                 2, 3);
 
         // when
@@ -48,59 +45,56 @@ class MarketplaceOfferMatchTemplateTest {
         // then
         assertThat(html).contains("Ostatni przebieg: 02.11.2026 10:15")
                 .contains("cl-stat-grid")
-                .contains("W katalogu")
-                .contains("Brak w katalogu")
+                .contains("Połączone")
                 .contains("Do przejrzenia")
+                .doesNotContain("W katalogu")
+                .doesNotContain("Brak w katalogu")
+                .doesNotContain("<textarea")
                 .doesNotContain("PIM");
-        assertThat(html).contains(">5901234123499\n5901234123459</textarea>");
-        assertThat(html).contains("Oferta nie ma EAN").contains("różne produkty w katalogach")
+        assertThat(html).contains("Oferta nie ma EAN").contains("nie podał klucza oferty")
                 .doesNotContain("kodu producenta");
-        assertThat(html).contains("Połączona ręcznie").contains("Mysz bezprzewodowa M1").contains("sku-5");
+        assertThat(html).contains("5901234123459").contains("sku-5");
         assertThat(html).doesNotContain("??");
     }
 
     @Test
     void everyNonEmptyGroupOffersItsOffersAsCsvAndAnEmptyOneDoesNot() {
         // given
-        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 2,
+        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 1,
                 List.of(),
-                List.of(new Row("sku-3", "Monitor", List.of("5901234123459"), null, null)),
-                List.of(new Row("sku-5", "Pad", List.of(), null, OfferMatchResult.NO_EAN)),
+                List.of(new Row("sku-5", "Pad", List.of(), OfferMatchResult.NO_EAN, true)),
                 0, 0);
 
         // when
         String html = render(OfferMatchingView.of(result), null);
 
         // then
-        assertThat(html).contains("href=\"" + ACTION + "/notInCatalog.csv\"")
-                .contains("href=\"" + ACTION + "/toReview.csv\"")
+        assertThat(html).contains("href=\"" + ACTION + "/toReview.csv\"")
                 .contains("Pobierz CSV")
                 .doesNotContain(ACTION + "/linked.csv")
-                .doesNotContain("noPimEntry");
+                .doesNotContain("notInCatalog");
     }
 
     @Test
-    void inactiveOffersGetAPillAndAreNotOfferedForCopying() {
+    void inactiveOffersGetAPill() {
         // given
-        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 2, List.of(),
-                List.of(new Row("old-1", "Stara", List.of("5901234123457"), null, null, false, null),
-                        new Row("new-1", "Nowa", List.of("5901234123458"), null, null, true, null)),
+        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 2,
+                List.of(new Row("old-1", "Stara", List.of("5901234123457"), null, false),
+                        new Row("new-1", "Nowa", List.of("5901234123458"), null, true)),
                 List.of(), 0, 0);
 
         // when
         String html = render(OfferMatchingView.of(result), null);
 
         // then
-        assertThat(html).contains("nieaktywna").contains(">5901234123458</textarea>")
-                .contains("Nieaktywnych ofert nie ma na liście do skopiowania");
-        assertThat(html).doesNotContain(">5901234123457</textarea>").doesNotContain("??");
+        assertThat(html).contains("nieaktywna").contains("5901234123457").doesNotContain("??");
     }
 
     @Test
     void aRowWithoutKeyAndTitleGetsAPlaceholderAndNoEmptySkuLine() {
         // given
-        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 1, List.of(), List.of(),
-                List.of(new Row(null, null, List.of("5901234123457"), null, OfferMatchResult.NO_KEY)), 0, 0);
+        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 1, List.of(),
+                List.of(new Row(null, null, List.of("5901234123457"), OfferMatchResult.NO_KEY, true)), 0, 0);
 
         // when
         String html = render(OfferMatchingView.of(result), null);
@@ -112,8 +106,8 @@ class MarketplaceOfferMatchTemplateTest {
     @Test
     void aRowWithoutTitleShowsItsSkuOnce() {
         // given
-        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 1, List.of(), List.of(),
-                List.of(new Row("sku-unique", null, List.of(), null, OfferMatchResult.NO_EAN)), 0, 0);
+        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 1, List.of(),
+                List.of(new Row("sku-unique", null, List.of(), OfferMatchResult.NO_EAN, true)), 0, 0);
 
         // when
         String html = render(OfferMatchingView.of(result), null);
@@ -126,8 +120,8 @@ class MarketplaceOfferMatchTemplateTest {
     void statTilesGroupThousandsLikeTheTexts() {
         // given
         List<Row> many = IntStream.range(0, 12345)
-                .mapToObj(index -> new Row("sku-" + index, "P", List.of("59" + index), null, null)).toList();
-        OfferMatchResult result = new OfferMatchResult(Instant.now(), many.size(), List.of(), many, List.of(), 0, 0);
+                .mapToObj(index -> new Row("sku-" + index, "P", List.of("59" + index), null, true)).toList();
+        OfferMatchResult result = new OfferMatchResult(Instant.now(), many.size(), many, List.of(), 0, 0);
 
         // when
         String html = render(OfferMatchingView.of(result), null);
@@ -140,10 +134,10 @@ class MarketplaceOfferMatchTemplateTest {
     @Test
     void aLargeGroupRendersItsFirstRowsAndSaysSo() {
         // given
-        List<Row> missing = IntStream.range(0, OfferMatchingView.ROW_LIMIT + 1)
-                .mapToObj(index -> new Row("sku-" + index, "Produkt " + index, List.of("590000" + (100000 + index)), null, null))
+        List<Row> linked = IntStream.range(0, OfferMatchingView.ROW_LIMIT + 1)
+                .mapToObj(index -> new Row("sku-" + index, "Produkt " + index, List.of("590000" + (100000 + index)), null, true))
                 .toList();
-        OfferMatchResult result = new OfferMatchResult(Instant.now(), missing.size(), List.of(), missing, List.of(), 0, 0);
+        OfferMatchResult result = new OfferMatchResult(Instant.now(), linked.size(), linked, List.of(), 0, 0);
 
         // when
         String html = render(OfferMatchingView.of(result), null);
@@ -151,7 +145,6 @@ class MarketplaceOfferMatchTemplateTest {
         // then
         assertThat(html).contains("Pokazano pierwsze " + OfferMatchingView.ROW_LIMIT + " z " + (OfferMatchingView.ROW_LIMIT + 1));
         assertThat(html).contains("sku-" + (OfferMatchingView.ROW_LIMIT - 1) + "<").doesNotContain("sku-" + OfferMatchingView.ROW_LIMIT + "<");
-        assertThat(html).contains("590000" + (100000 + OfferMatchingView.ROW_LIMIT));
         assertThat(html).contains("Brak ofert w tej grupie.");
     }
 
@@ -217,8 +210,8 @@ class MarketplaceOfferMatchTemplateTest {
     @Test
     void theLatestResultStaysVisibleDuringARun() {
         // given
-        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-01T09:15:00Z"), 1, List.of(),
-                List.of(new Row("sku-3", "Monitor", List.of("5901234123459"), null, null)), List.of(), 0, 0);
+        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-01T09:15:00Z"), 1,
+                List.of(new Row("sku-3", "Monitor", List.of("5901234123459"), null, true)), List.of(), 0, 0);
 
         // when
         String html = render(OfferMatchingView.of(result), null, Map.of("run", run(true, 6150, null)));

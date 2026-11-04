@@ -33,8 +33,8 @@ class OfferMatchResultStoreTest {
     @Test
     void readsAFileSavedBeforeRowsCarriedTheActiveFlagAsActive() {
         // given
-        String old = "{\"finishedAt\":\"2026-11-02T10:00:00Z\",\"total\":1,\"linked\":[],\"notInCatalog\":["
-                + "{\"sellerOfferKey\":\"SILLO-3\",\"title\":\"Puzzle\",\"eans\":[\"5900000000000\"],"
+        String old = "{\"finishedAt\":\"2026-11-02T10:00:00Z\",\"total\":1,\"linked\":["
+                + "{\"sellerOfferKey\":\"PS-3\",\"title\":\"Puzzle\",\"eans\":[\"5900000000000\"],"
                 + "\"reason\":null}],\"toReview\":[],\"ownOffers\":0,\"alreadyLinked\":0}";
         when(fileStorage.canRead(BUCKET, KEY)).thenReturn(true);
         when(fileStorage.getBytes(BUCKET, KEY)).thenReturn(old.getBytes(StandardCharsets.UTF_8));
@@ -44,38 +44,40 @@ class OfferMatchResultStoreTest {
 
         // then
         assertThat(latest).isPresent();
-        assertThat(latest.get().notInCatalog()).extracting(OfferMatchResult.Row::active, OfferMatchResult.Row::catalogEan)
-                .containsExactly(org.assertj.core.api.Assertions.tuple(true, null));
+        assertThat(latest.get().linked()).extracting(OfferMatchResult.Row::active).containsExactly(true);
     }
 
     @Test
-    void readsAFileSavedWhenOffersWereMatchedToPimEntries() {
-        // given a result of the PIM-based matching: rows with a pimId and a group of offers without a PIM entry
-        String old = "{\"finishedAt\":\"2026-11-02T10:00:00Z\",\"total\":2,"
-                + "\"linked\":[{\"sellerOfferKey\":\"SILLO-1\",\"title\":\"Klocki\",\"eans\":[\"5903771700818\"],"
-                + "\"pimId\":\"pim-1\",\"reason\":null,\"active\":true,\"catalogEan\":null}],\"notInCatalog\":[],"
-                + "\"noPimEntry\":[{\"sellerOfferKey\":\"SILLO-3\",\"title\":\"Puzzle\",\"eans\":[\"5900000000000\"],"
-                + "\"pimId\":null,\"reason\":null}],\"toReview\":[],\"ownOffers\":0,\"alreadyLinked\":0}";
+    void readsAFileSavedWhenOffersWereReportedAgainstTheCatalogs() {
+        // given a result of the catalog-based matching: a product per row, a group of offers not in a catalog and the
+        // EAN to add to one
+        String old = "{\"finishedAt\":\"2026-11-02T10:00:00Z\",\"total\":3,"
+                + "\"linked\":[{\"sellerOfferKey\":\"PS-1\",\"title\":\"Klocki\",\"eans\":[\"5903771700818\"],"
+                + "\"product\":\"Klocki Classic\",\"reason\":null,\"active\":true,\"catalogEan\":null}],"
+                + "\"notInCatalog\":[{\"sellerOfferKey\":\"PS-3\",\"title\":\"Puzzle\",\"eans\":[\"5900000000000\"],"
+                + "\"product\":null,\"reason\":null,\"active\":true,\"catalogEan\":\"5900000000000\"}],"
+                + "\"toReview\":[{\"sellerOfferKey\":\"PS-4\",\"title\":\"Gra\",\"eans\":[\"5900000000017\"],"
+                + "\"product\":null,\"reason\":\"ambiguous\",\"active\":true,\"catalogEan\":null}],"
+                + "\"ownOffers\":0,\"alreadyLinked\":0}";
         when(fileStorage.canRead(BUCKET, KEY)).thenReturn(true);
         when(fileStorage.getBytes(BUCKET, KEY)).thenReturn(old.getBytes(StandardCharsets.UTF_8));
 
         // when
         Optional<OfferMatchResult> latest = store().latest("s1", "Empik");
 
-        // then the page still shows it, without the dropped group and ids
+        // then the page still shows it, without the dropped group and fields
         assertThat(latest).isPresent();
-        assertThat(latest.get().total()).isEqualTo(2);
-        assertThat(latest.get().linked()).containsExactly(new OfferMatchResult.Row("SILLO-1", "Klocki",
-                List.of("5903771700818"), null, null));
-        assertThat(latest.get().toReview()).isEmpty();
+        assertThat(latest.get().total()).isEqualTo(3);
+        assertThat(latest.get().linked()).containsExactly(new OfferMatchResult.Row("PS-1", "Klocki",
+                List.of("5903771700818"), null, true));
+        assertThat(latest.get().toReview()).extracting(OfferMatchResult.Row::reason).containsExactly("ambiguous");
     }
 
     private static OfferMatchResult result() {
         return new OfferMatchResult(Instant.parse("2026-11-02T10:00:00Z"), 6,
-                List.of(new OfferMatchResult.Row("SILLO-1", "Klocki", List.of("5903771700818"), "Klocki Classic", null)),
-                List.of(new OfferMatchResult.Row("SILLO-2", "Lalka", List.of("5903771700825"), null, null, true,
-                        "5903771700825")),
-                List.of(new OfferMatchResult.Row("SILLO-4", "Gra", List.of(), null, "no-ean")),
+                List.of(new OfferMatchResult.Row("PS-1", "Klocki", List.of("5903771700818"), null, true),
+                        new OfferMatchResult.Row("PS-2", "Lalka", List.of("5903771700825"), null, false)),
+                List.of(new OfferMatchResult.Row("PS-4", "Gra", List.of(), "no-ean", true)),
                 1, 1);
     }
 
@@ -138,10 +140,9 @@ class OfferMatchResultStoreTest {
     private static OfferMatchProgress progress() {
         return new OfferMatchProgress("run-1", Instant.parse("2026-11-02T10:00:00Z"),
                 Instant.parse("2026-11-02T10:01:00Z"), OfferMatchProgress.Status.RUNNING, "200", 2, 6150, 1, 0,
-                List.of(new OfferMatchResult.Row("SILLO-1", "Klocki", List.of("5903771700818"), "Klocki Classic", null)),
-                List.of(new OfferMatchResult.Row("SILLO-3", "Puzzle", List.of("5900000000000"), null, null,
-                        false, "5900000000000")), List.of(), java.util.Set.of("SILLO-1", "SILLO-3"), 2,
-                null, null);
+                List.of(new OfferMatchResult.Row("PS-1", "Klocki", List.of("5903771700818"), null, true),
+                        new OfferMatchResult.Row("PS-3", "Puzzle", List.of("5900000000000"), null, false)),
+                List.of(), java.util.Set.of("PS-1", "PS-3"), 2, null, null);
     }
 
     @Test

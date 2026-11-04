@@ -21,11 +21,13 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * The operator's "Link to product" on an order item whose marketplace offer was not recognised: saves a MANUAL offer
- * link to the chosen catalog product's EAN, so later imports resolve the offer, and fills this item and the store's
- * other New items carrying the same offer key. Items already in fulfilment are left to the operator, as with
+ * link to an EAN, either a catalog product's or one typed in (the goods need not be in a catalog, fulfilment finds them
+ * by EAN), so later imports resolve the offer, and fills this item and the store's other New items carrying the same
+ * offer key exactly as the next import would. Items already in fulfilment are left to the operator, as with
  * "Assign SKU"; the link is saved regardless.
  */
 @Slf4j
@@ -35,6 +37,10 @@ public class MarketplaceOfferLinking {
     public static final String NO_OFFER_KEY = "order.item.link.offer.no.key";
     public static final String NOT_A_MARKETPLACE_ORDER = "order.item.link.offer.not.marketplace";
     public static final String PRODUCT_NOT_IN_CATALOG = "order.item.link.offer.product.unknown";
+    public static final String INVALID_EAN = "order.item.link.offer.ean.invalid";
+
+    // EAN-8, UPC-A, EAN-13 and GTIN-14; only the form is checked, the code is not looked up anywhere
+    private static final Pattern EAN = Pattern.compile("\\d{8,14}");
 
     // bounds the sweep over other orders (plan decision); an older open order keeps its item for a manual fix
     static final int SWEEP_DAYS = 90;
@@ -71,43 +77,51 @@ public class MarketplaceOfferLinking {
      * @throws IllegalArgumentException with a message key when the item or the product cannot be linked
      */
     public LinkResult link(String storeId, Order order, String itemId, String categoryId, String productId, String userId) {
-        OrderItem chosen = orderItemsRepository.findById(order.getOrderId(), itemId);
-        if (chosen == null || StringUtils.isBlank(chosen.getMarketplaceOfferKey())) {
-            throw new IllegalArgumentException(NO_OFFER_KEY);
-        }
-        String marketplace = marketplaceOf(order);
-        if (marketplace == null) {
-            throw new IllegalArgumentException(NOT_A_MARKETPLACE_ORDER);
-        }
-        MarketplaceOfferResolver.StoreOffers storeOffers = resolver.forStore(storeId);
-        Product product = storeOffers.catalogProducts().stream()
+        OrderItem chosen = linkableItem(order, itemId);
+        Product product = resolver.forStore(storeId).catalogProducts().stream()
                 .filter(candidate -> Objects.equals(candidate.getCategoryId(), categoryId)
                         && Objects.equals(candidate.getProductId(), productId))
                 // same rule as the dialog's list: a link holds EANs, so a product without one cannot be linked
                 .filter(candidate -> OfferEans.unify(candidate.getEan()) != null)
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException(PRODUCT_NOT_IN_CATALOG));
-        String offerKey = chosen.getMarketplaceOfferKey();
+        return save(storeId, order, chosen, OfferEans.unify(product.getEan()), userId);
+    }
 
+    /**
+     * Links the item's offer key to an EAN the operator typed, for goods that are in no catalog.
+     *
+     * @throws IllegalArgumentException with a message key when the item cannot be linked or the EAN is malformed
+     */
+    public LinkResult linkEan(String storeId, Order order, String itemId, String ean, String userId) {
+        OrderItem chosen = linkableItem(order, itemId);
+        String typed = StringUtils.deleteWhitespace(StringUtils.defaultString(ean));
+        if (!EAN.matcher(typed).matches()) {
+            throw new IllegalArgumentException(INVALID_EAN);
+        }
+        return save(storeId, order, chosen, OfferEans.unify(typed), userId);
+    }
+
+    private OrderItem linkableItem(Order order, String itemId) {
+        OrderItem chosen = orderItemsRepository.findById(order.getOrderId(), itemId);
+        if (chosen == null || StringUtils.isBlank(chosen.getMarketplaceOfferKey())) {
+            throw new IllegalArgumentException(NO_OFFER_KEY);
+        }
+        if (marketplaceOf(order) == null) {
+            throw new IllegalArgumentException(NOT_A_MARKETPLACE_ORDER);
+        }
+        return chosen;
+    }
+
+    private LinkResult save(String storeId, Order order, OrderItem chosen, String ean, String userId) {
+        String marketplace = marketplaceOf(order);
+        String offerKey = chosen.getMarketplaceOfferKey();
         // an existing link for the key is replaced: the operator's choice wins over an earlier one
-        linkRepository.save(MarketplaceOfferLink.of(storeId, marketplace, offerKey, List.of(product.getEan()),
+        linkRepository.save(MarketplaceOfferLink.of(storeId, marketplace, offerKey, List.of(ean),
                 MarketplaceOfferLinkSource.MANUAL, userId, clock.instant()));
 
-        // resolved through the saved link, so the item gets exactly what the next import would give it
-        ResolvedOffer offer = storeOffers.resolve(marketplace, offerKey, null)
-                .filter(resolved -> resolved.source() == ResolvedOffer.Source.LINK)
-                .orElse(null);
-        if (offer == null) {
-            // only when the catalog or the link changed since the product was read, e.g. another operator linked meanwhile
-            log.warn("Offer {} of store {} linked to EAN {} of product {}/{}, but the link no longer leads to one"
-                    + " catalog product; no item filled", offerKey, storeId, product.getEan(), categoryId, productId);
-            return new LinkResult(0);
-        }
-        if (StringUtils.isBlank(offer.category())) {
-            log.warn("Offer {} of store {} linked to product {}/{}, whose category has no name; the items keep their"
-                    + " category", offerKey, storeId, categoryId, productId);
-        }
-
+        // what the next import gives a line of this offer, so filled items look like newly imported ones
+        ResolvedOffer offer = ResolvedOffer.linked(List.of(ean));
         int updated = 0;
         for (OrderItem item : itemsWithTheKey(storeId, order, marketplace, offerKey)) {
             if (!item.isNew() || item.isGroup()) {

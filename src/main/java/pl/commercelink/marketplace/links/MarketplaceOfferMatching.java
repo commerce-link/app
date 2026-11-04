@@ -16,7 +16,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -24,11 +23,11 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Links a store's offers on a marketplace, published there by another system, to their EANs, and reports what the
- * store's catalogs make of them. Every offer with an EAN gets its link, also when no catalog product has the EAN yet: an
- * order line finds the product through the link as soon as one is added. A link from an earlier run is replaced when
- * the offer's EANs changed; an operator's (MANUAL) link is never touched. Each link is saved as soon as its offer is
- * read, so a run cut short keeps what it linked.
+ * Links a store's offers on a marketplace, published there by another system, to their EANs. Every offer with an EAN
+ * gets its link, and the next order line of the offer carries that EAN; whether a catalog has the product does not
+ * matter, as fulfilment finds the goods by EAN in the warehouse and the suppliers' feeds. Offers without an EAN or a key
+ * are listed for review. A link from an earlier run is replaced when the offer's EANs changed; an operator's (MANUAL)
+ * link is never touched. Each link is saved as soon as its offer is read, so a run cut short keeps what it linked.
  * <p>
  * A run goes page by page from where its {@link OfferMatchProgress} stopped, and pauses when the marketplace limits
  * requests (Empik answers about ten pages a minute) or the message's time budget is used, so the caller can carry on in
@@ -42,20 +41,16 @@ public class MarketplaceOfferMatching {
     static final Duration TIME_BUDGET = Duration.ofMinutes(10);
 
     private final MarketplaceOfferLinkRepository linkRepository;
-    private final MarketplaceOfferResolver resolver;
     private final StorePimAliases pimAliases;
     private final Clock clock;
 
     @Autowired
-    public MarketplaceOfferMatching(MarketplaceOfferLinkRepository linkRepository, MarketplaceOfferResolver resolver,
-                                    StorePimAliases pimAliases) {
-        this(linkRepository, resolver, pimAliases, Clock.systemUTC());
+    public MarketplaceOfferMatching(MarketplaceOfferLinkRepository linkRepository, StorePimAliases pimAliases) {
+        this(linkRepository, pimAliases, Clock.systemUTC());
     }
 
-    MarketplaceOfferMatching(MarketplaceOfferLinkRepository linkRepository, MarketplaceOfferResolver resolver,
-                             StorePimAliases pimAliases, Clock clock) {
+    MarketplaceOfferMatching(MarketplaceOfferLinkRepository linkRepository, StorePimAliases pimAliases, Clock clock) {
         this.linkRepository = linkRepository;
-        this.resolver = resolver;
         this.pimAliases = pimAliases;
         this.clock = clock;
     }
@@ -110,7 +105,6 @@ public class MarketplaceOfferMatching {
         private final String storeId;
         private final String marketplace;
         private final OfferMatchProgress started;
-        private final MarketplaceOfferResolver.StoreOffers storeOffers;
         private final Map<String, MarketplaceOfferLink> existingLinks = new HashMap<>();
         private final Set<String> seenKeys;
 
@@ -120,7 +114,6 @@ public class MarketplaceOfferMatching {
         private int ownOffers;
         private int alreadyLinked;
         private final List<Row> linked;
-        private final List<Row> notInCatalog;
         private final List<Row> toReview;
 
         Run(String storeId, String marketplace, OfferMatchProgress progress) {
@@ -134,10 +127,7 @@ public class MarketplaceOfferMatching {
             this.ownOffers = progress.ownOffers();
             this.alreadyLinked = progress.alreadyLinked();
             this.linked = new ArrayList<>(progress.linked());
-            this.notInCatalog = new ArrayList<>(progress.notInCatalog());
             this.toReview = new ArrayList<>(progress.toReview());
-            // one scope per message: the store's catalogs are read once, not once per offer or page
-            this.storeOffers = resolver.forStore(storeId);
             linkRepository.findAll(storeId, marketplace)
                     .forEach(link -> existingLinks.put(link.getSellerOfferKey(), link));
         }
@@ -151,7 +141,7 @@ public class MarketplaceOfferMatching {
             total++;
             List<String> eans = eansOf(offer);
             if (StringUtils.isBlank(key)) {
-                toReview.add(row(offer, eans, null, OfferMatchResult.NO_KEY, null));
+                toReview.add(row(offer, eans, OfferMatchResult.NO_KEY));
                 return;
             }
             // the export publishes our offers under the pimId, and a product on a clone under its source's id
@@ -160,51 +150,26 @@ public class MarketplaceOfferMatching {
                 return;
             }
             MarketplaceOfferLink existing = existingLinks.get(key);
+            // an operator's link is the operator's to change, so it is only counted
             if (existing != null && existing.getSource() == MarketplaceOfferLinkSource.MANUAL) {
-                linkedByHand(offer, eans, existing);
+                alreadyLinked++;
                 return;
             }
             MarketplaceOfferLink link = MarketplaceOfferLink.of(storeId, marketplace, key, eans,
                     MarketplaceOfferLinkSource.EAN, CREATED_BY, clock.instant());
             if (link.getEans().isEmpty()) {
-                toReview.add(row(offer, eans, null, OfferMatchResult.NO_EAN, null));
+                toReview.add(row(offer, eans, OfferMatchResult.NO_EAN));
                 return;
             }
-            // an unchanged link is not written again, so a rerun does not rewrite thousands of links
-            boolean unchanged = existing != null && Set.copyOf(link.getEans()).equals(eanSet(existing));
+            // an unchanged link is not written again, so a rerun does not rewrite thousands of links; the order counts,
+            // since an order item's EAN is the first one
+            boolean unchanged = existing != null && link.getEans().equals(existing.getEans());
             if (!unchanged && !linkRepository.saveUnlessManual(link)) {
                 // linked by an operator after this run read the store's links
-                linkRepository.find(storeId, marketplace, key).ifPresentOrElse(
-                        stored -> linkedByHand(offer, eans, stored),
-                        () -> alreadyLinked++);
+                alreadyLinked++;
                 return;
             }
-            classify(offer, eans, link.getEans());
-        }
-
-        private void classify(MarketplaceListedOffer offer, List<String> eans, List<String> linkEans) {
-            switch (storeOffers.matchCatalog(linkEans)) {
-                case CatalogMatch.Found found -> linked.add(row(offer, eans, found.product().getName(), null, null));
-                case CatalogMatch.NotInCatalog none -> notInCatalog.add(row(offer, eans, null, null, linkEans.get(0)));
-                case CatalogMatch.Ambiguous ambiguous -> toReview.add(row(offer, eans, null, OfferMatchResult.AMBIGUOUS, null));
-            }
-        }
-
-        /**
-         * Counted, and listed while the link cannot work, so a rerun keeps the shop's "add to catalog" list. Nothing is
-         * written: an operator's link is the operator's to change.
-         */
-        private void linkedByHand(MarketplaceListedOffer offer, List<String> eans, MarketplaceOfferLink link) {
-            alreadyLinked++;
-            List<String> linkEans = link.getEans() == null ? List.of() : link.getEans();
-            switch (storeOffers.matchCatalog(linkEans)) {
-                case CatalogMatch.Found found -> {
-                    // a working link is only counted
-                }
-                case CatalogMatch.NotInCatalog none -> notInCatalog.add(row(offer, eans, null,
-                        OfferMatchResult.ALREADY_LINKED, linkEans.isEmpty() ? null : linkEans.get(0)));
-                case CatalogMatch.Ambiguous ambiguous -> toReview.add(row(offer, eans, null, OfferMatchResult.AMBIGUOUS, null));
-            }
+            linked.add(row(offer, eans, null));
         }
 
         void total(Integer total) {
@@ -228,12 +193,12 @@ public class MarketplaceOfferMatching {
         OfferMatchProgress progress(String nextCursor) {
             return new OfferMatchProgress(started.runId(), started.startedAt(), clock.instant(),
                     OfferMatchProgress.Status.RUNNING, nextCursor, total, listed, ownOffers, alreadyLinked, linked,
-                    notInCatalog, toReview, seenKeys, idleRateLimitPauses, null, null);
+                    toReview, seenKeys, idleRateLimitPauses, null, null);
         }
 
         OfferMatchResult result() {
-            return new OfferMatchResult(clock.instant(), total, List.copyOf(linked), List.copyOf(notInCatalog),
-                    List.copyOf(toReview), ownOffers, alreadyLinked);
+            return new OfferMatchResult(clock.instant(), total, List.copyOf(linked), List.copyOf(toReview), ownOffers,
+                    alreadyLinked);
         }
     }
 
@@ -249,12 +214,8 @@ public class MarketplaceOfferMatching {
                 .toList();
     }
 
-    private static Set<String> eanSet(MarketplaceOfferLink link) {
-        return link.getEans() == null ? Set.of() : new HashSet<>(link.getEans());
-    }
 
-    private static Row row(MarketplaceListedOffer offer, List<String> eans, String product, String reason,
-                           String catalogEan) {
-        return new Row(offer.sellerOfferKey(), offer.title(), eans, product, reason, offer.active(), catalogEan);
+    private static Row row(MarketplaceListedOffer offer, List<String> eans, String reason) {
+        return new Row(offer.sellerOfferKey(), offer.title(), eans, reason, offer.active());
     }
 }

@@ -69,8 +69,8 @@
         </form>
     </dialog>
 
-    <!--/* One product of a catalog (every product with an EAN, not only the pricelist's available ones); the post saves the offer link to its EAN and fills the item and the store's other New items with the
-           same offer. */-->
+    <!--/* One product of a catalog (every product with an EAN, not only the pricelist's available ones) or a typed EAN for goods in no catalog; the post saves the offer link to that EAN and fills the item and
+           the store's other New items with the same offer. */-->
     <dialog class="cl-dialog is-form is-wide" id="link-offer-dialog" aria-labelledby="link-offer-title">
         <form method="post" th:action="@{/dashboard/orders/{o}/link-offer(o=${page.orderId()})}" data-cl-link-offer>
             <h2 class="cl-dialog-title" id="link-offer-title" th:text="#{order.item.menu.link.offer}"></h2>
@@ -113,6 +113,13 @@
                     <tbody data-cl-link-rows></tbody>
                 </table>
                 <p class="cl-list-empty" data-cl-link-none hidden th:text="#{order.item.assign.sku.no.results}"></p>
+                <div class="cl-field">
+                    <label class="cl-label" for="link-offer-ean" th:text="#{order.item.link.offer.ean}"></label>
+                    <input class="cl-input" id="link-offer-ean" name="ean" type="text" inputmode="numeric" autocomplete="off"
+                           pattern="\s*\d{8,14}\s*" th:title="#{product.error.ean.invalid}" data-cl-link-ean
+                           aria-describedby="link-offer-ean-help">
+                    <p class="cl-help" id="link-offer-ean-help" th:text="#{order.item.link.offer.ean.help}"></p>
+                </div>
                 <p class="cl-dialog-effect" th:text="#{order.item.link.offer.effect}"></p>
             </div>
             <div class="cl-dialog-actions">

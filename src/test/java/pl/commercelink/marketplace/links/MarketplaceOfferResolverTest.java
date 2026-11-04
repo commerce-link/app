@@ -217,40 +217,48 @@ class MarketplaceOfferResolverTest {
     }
 
     @Test
-    void resolvesALinkToTheCatalogProductCarryingItsEanWithoutAskingThePim() {
+    void resolvesALinkToItsEanWithoutReadingTheCatalogsOrAskingThePim() {
         // given
         link("K", "5901234567890");
-        storeCatalogs(catalog("main", category("c1", "Krzesła")));
-        categoryHolds("c1", product("c1", "p1", "pim-1", "5901234567890", "7041"));
 
         // when
         Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", "1696938202");
 
-        // then
-        assertThat(result).contains(new ResolvedOffer("pim-1", "5901234567890", "7041", "Krzesła", Source.LINK));
-        verifyNoInteractions(pimCatalog, aliases);
+        // then the goods need not be in a catalog: fulfilment finds them by the EAN
+        assertThat(result).contains(new ResolvedOffer(null, "5901234567890", null, null, Source.LINK));
+        assertThat(result).map(ResolvedOffer::sku).contains("5901234567890");
+        verifyNoInteractions(pimCatalog, aliases, catalogs, products);
     }
 
     @Test
-    void resolvesALinkToACatalogProductWithoutAPimCard() {
+    void aLinkWithSeveralEansGivesTheFirstAsTheEanAndAllAsAlternativeCodes() {
         // given
-        link("K", "5901234567890");
-        storeCatalogs(catalog("main", category("c1", "Krzesła")));
-        categoryHolds("c1", product("c1", "p1", null, "5901234567890", "7041"));
+        link("K", "5900000000099", "5901234567890");
 
         // when
         Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", null);
 
         // then
-        assertThat(result).contains(new ResolvedOffer(null, "5901234567890", "7041", "Krzesła", Source.LINK));
+        assertThat(result).map(ResolvedOffer::ean).contains("5900000000099");
+        assertThat(result).map(ResolvedOffer::sku).contains("5900000000099:5901234567890");
     }
 
     @Test
-    void aLinkWithoutACatalogProductFallsThroughToTheManufacturerCodeStep() {
+    void anEan13AndItsUpcFormAreOneCode() {
+        // given the marketplace lists the same code with and without the leading zero
+        link("K", "0730143315555", "730143315555");
+
+        // when
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", null);
+
+        // then
+        assertThat(result).map(ResolvedOffer::sku).contains("730143315555");
+    }
+
+    @Test
+    void aLinkWithoutEansFallsThroughToTheManufacturerCodeStep() {
         // given
-        link("K", "5901234567890");
-        storeCatalogs(catalog("main", category("c1", "Krzesła")));
-        categoryHolds("c1", product("c1", "p1", "pim-9", "5909999999999", "9999"));
+        link("K");
         mpnIn("1696938202", globalEntry("pim-2", "5900000000022", "1696938202", "cat-b"));
 
         // when
@@ -258,171 +266,6 @@ class MarketplaceOfferResolverTest {
 
         // then
         assertThat(result).contains(new ResolvedOffer("pim-2", "5900000000022", "1696938202", "cat-b", Source.MFN));
-    }
-
-    @Test
-    void aLinkWithoutACatalogProductFallsThroughToTheOwnOfferStep() {
-        // given
-        link("k7m2xq9pz4", "5901234567890");
-        storeCatalogs(catalog("main", category("c1", "Krzesła")));
-        categoryHolds("c1");
-        storeSees("k7m2xq9pz4", globalEntry("k7m2xq9pz4", "5900000000011", "M1", "cat-a"));
-
-        // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "k7m2xq9pz4", null);
-
-        // then
-        assertThat(result).map(ResolvedOffer::source).contains(Source.OWN_OFFER);
-    }
-
-    @Test
-    void eansHittingProductsWithDifferentEansLeaveTheLineUnresolved() {
-        // given
-        link("K", "5901234567890", "5901234567891");
-        storeCatalogs(catalog("main", category("c1", "Krzesła")));
-        categoryHolds("c1", product("c1", "p1", null, "5901234567890", "7041"),
-                product("c1", "p2", null, "5901234567891", "7042"));
-
-        // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", null);
-
-        // then
-        assertThat(result).isEmpty();
-    }
-
-    @Test
-    void productsSharingTheEanAreOneProductTakenFirstInCatalogOrderWhateverTheirCodes() {
-        // given
-        link("K", "5901234567890");
-        storeCatalogs(catalog("b", category("c3", "Lampy")), catalog("a", category("c2", "Biurka"), category("c1", "Krzesła")));
-        categoryHolds("c1", product("c1", "p0", null, "5901234567890", "7041"));
-        categoryHolds("c2", product("c2", "p2", null, "5901234567890", "OTHER-1"),
-                product("c2", "p1", "pim-1", "05901234567890", "7041"));
-        categoryHolds("c3", product("c3", "p3", null, "5901234567890", null));
-
-        // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", null);
-
-        // then
-        assertThat(result).contains(new ResolvedOffer("pim-1", "5901234567890", "7041", "Biurka", Source.LINK));
-    }
-
-    @Test
-    void aLinkedProductWithoutAManufacturerCodeIsResolvedByItsEan() {
-        // given
-        link("K", "5901234567890");
-        storeCatalogs(catalog("main", category("c1", "Krzesła")));
-        categoryHolds("c1", product("c1", "p1", "pim-3", "5901234567890", null));
-
-        // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", "1696938202");
-
-        // then
-        assertThat(result).contains(new ResolvedOffer("pim-3", "5901234567890", null, "Krzesła", Source.LINK));
-        assertThat(result).map(ResolvedOffer::sku).contains("5901234567890");
-    }
-
-    @Test
-    void aLinkWithSeveralEansResolvesThroughAnyOfThem() {
-        // given
-        link("K", "5900000000099", "5901234567890");
-        storeCatalogs(catalog("main", category("c1", "Krzesła")));
-        categoryHolds("c1", product("c1", "p1", null, "5901234567890", "7041"));
-
-        // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", null);
-
-        // then
-        assertThat(result).map(ResolvedOffer::mfn).contains("7041");
-    }
-
-    @Test
-    void readsTheStoresCatalogsOnceForAllLinesOfOneOrder() {
-        // given
-        link("K1", "5901234567890");
-        link("K2", "5901234567891");
-        storeCatalogs(catalog("main", category("c1", "Krzesła")));
-        categoryHolds("c1", product("c1", "p1", null, "5901234567890", "7041"),
-                product("c1", "p2", null, "5901234567891", "7042"));
-        MarketplaceOfferResolver.StoreOffers offers = resolver.forStore(STORE);
-
-        // when
-        offers.resolve(EMPIK, "K1", null);
-        offers.resolve(EMPIK, "K2", null);
-
-        // then
-        verify(catalogs, times(1)).findAll(STORE);
-        verify(products, times(1)).findAll("c1");
-    }
-
-    @Test
-    void matchCatalogUnifiesTheGivenEansAndIgnoresBlanks() {
-        // given
-        storeCatalogs(catalog("main", category("c1", "Krzesła")));
-        Product chair = product("c1", "p1", null, "5901234567890", "7041");
-        categoryHolds("c1", chair);
-        List<String> eans = new java.util.ArrayList<>(List.of("0005901234567890", " "));
-        eans.add(null);
-
-        // when
-        CatalogMatch match = resolver.forStore(STORE).matchCatalog(eans);
-
-        // then
-        assertThat(match).isEqualTo(new CatalogMatch.Found(chair, "Krzesła"));
-    }
-
-    @Test
-    void matchCatalogWithoutEansIsNotInCatalogWithoutReadingTheCatalogs() {
-        // when
-        CatalogMatch match = resolver.forStore(STORE).matchCatalog(List.of());
-
-        // then
-        assertThat(match).isInstanceOf(CatalogMatch.NotInCatalog.class);
-        verifyNoInteractions(catalogs, products);
-    }
-
-    @Test
-    void matchCatalogWithoutAHitIsNotInCatalog() {
-        // given
-        storeCatalogs(catalog("main", category("c1", "Krzesła")));
-        categoryHolds("c1", product("c1", "p1", null, "5901234567890", "7041"));
-
-        // when
-        CatalogMatch match = resolver.forStore(STORE).matchCatalog(List.of("5900000000099"));
-
-        // then
-        assertThat(match).isInstanceOf(CatalogMatch.NotInCatalog.class);
-    }
-
-    @Test
-    void matchCatalogTakesHitsSharingAnEanAsOneProductWhateverTheirCodes() {
-        // given
-        storeCatalogs(catalog("main", category("c1", "Krzesła")));
-        Product coded = product("c1", "p1", null, "5901234567890", "7041");
-        Product otherCode = product("c1", "p2", null, "5901234567890", "7042");
-        Product uncoded = product("c1", "p3", null, "5901234567890", " ");
-        categoryHolds("c1", coded, otherCode, uncoded);
-
-        // when
-        CatalogMatch match = resolver.forStore(STORE).matchCatalog(List.of("5901234567890"));
-
-        // then
-        assertThat(match).isEqualTo(new CatalogMatch.Found(coded, "Krzesła"));
-    }
-
-    @Test
-    void matchCatalogWithHitsOfDifferentEansIsAmbiguousEvenWithoutCodes() {
-        // given
-        storeCatalogs(catalog("main", category("c1", "Krzesła")));
-        Product first = product("c1", "p1", null, "5901234567890", null);
-        Product second = product("c1", "p2", null, "5901234567891", "");
-        categoryHolds("c1", first, second);
-
-        // when
-        CatalogMatch match = resolver.forStore(STORE).matchCatalog(List.of("5901234567890", "5901234567891"));
-
-        // then
-        assertThat(match).isEqualTo(new CatalogMatch.Ambiguous(List.of(first, second)));
     }
 
     @Test
@@ -536,49 +379,5 @@ class MarketplaceOfferResolverTest {
         assertThat(own).map(ResolvedOffer::mfn).contains("7041");
         assertThat(other).contains(new ResolvedOffer("pim-2", "5900000000022", "M2", "cat-b", Source.OWN_OFFER));
         verify(products, never()).findByProductId("other-store-category", "p2");
-    }
-
-    @Test
-    void anAmbiguousLinkFallsThroughToTheManufacturerCodeStep() {
-        // given
-        link("K", "5901234567890", "5901234567891");
-        storeCatalogs(catalog("main", category("c1", "Krzesła")));
-        categoryHolds("c1", product("c1", "p1", null, "5901234567890", "7041"),
-                product("c1", "p2", null, "5901234567891", "7042"));
-        mpnIn("1696938202", globalEntry("pim-2", "5900000000022", "1696938202", "cat-b"));
-
-        // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", "1696938202");
-
-        // then
-        assertThat(result).contains(new ResolvedOffer("pim-2", "5900000000022", "1696938202", "cat-b", Source.MFN));
-    }
-
-    @Test
-    void matchCatalogTrimsPaddedEansOfTheCatalogProducts() {
-        // given
-        storeCatalogs(catalog("main", category("c1", "Krzesła")));
-        Product chair = product("c1", "p1", null, " 5901234567890 ", "7041");
-        categoryHolds("c1", chair);
-
-        // when
-        CatalogMatch match = resolver.forStore(STORE).matchCatalog(List.of("5901234567890"));
-
-        // then
-        assertThat(match).isEqualTo(new CatalogMatch.Found(chair, "Krzesła"));
-    }
-
-    @Test
-    void aLinkedLineCarriesTheCatalogEanWithoutPaddingOrLeadingZeros() {
-        // given
-        link("K", "5901234567890");
-        storeCatalogs(catalog("main", category("c1", "Krzesła")));
-        categoryHolds("c1", product("c1", "p1", null, " 05901234567890 ", "7041"));
-
-        // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", "1696938202");
-
-        // then
-        assertThat(result).contains(new ResolvedOffer(null, "5901234567890", "7041", "Krzesła", Source.LINK));
     }
 }

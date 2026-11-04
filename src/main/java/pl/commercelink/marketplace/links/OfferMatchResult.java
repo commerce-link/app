@@ -4,36 +4,24 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Outcome of one offer matching run for a store and marketplace, grouped by what the store's catalogs say about each
- * offer's EANs. Offers published under our own pimId are only counted. Offers an operator linked by hand are counted,
- * and also listed while the link cannot work: in {@code notInCatalog} when no catalog product has its EANs, in
- * {@code toReview} when they point at products with different EANs. Every other offer lands in exactly one list.
+ * Outcome of one offer matching run for a store and marketplace. Offers published under our own pimId and offers an
+ * operator linked by hand are only counted; every other offer is either linked to its EANs or left to review (no EAN,
+ * no key). Files of runs saved before the catalog stopped being consulted carry more fields, which are ignored.
  */
-public record OfferMatchResult(Instant finishedAt, int total, List<Row> linked, List<Row> notInCatalog,
-                               List<Row> toReview, int ownOffers, int alreadyLinked) {
+public record OfferMatchResult(Instant finishedAt, int total, List<Row> linked, List<Row> toReview, int ownOffers,
+                               int alreadyLinked) {
 
     public static final String NO_EAN = "no-ean";
     public static final String NO_KEY = "no-key";
-    /** In {@code toReview}: the offer's EANs point at catalog products with different EANs, so different goods. */
-    public static final String AMBIGUOUS = "ambiguous";
-    /** In {@code notInCatalog}: linked by an operator, no catalog product has the link's EANs yet. */
-    public static final String ALREADY_LINKED = "already-linked";
 
     /**
-     * {@code product} is the catalog product's name for a {@code linked} row; {@code reason} is set for an offer left to
-     * review or linked by hand. {@code active} is whether the offer is on sale on the marketplace (null in files saved
-     * before it was kept: such an offer counts as active). {@code catalogEan} is, in {@code notInCatalog}, the EAN to add
-     * to a catalog for the link to work (null in files of older runs).
+     * {@code reason} is set for an offer left to review. {@code active} is whether the offer is on sale on the
+     * marketplace (null in files saved before it was kept: such an offer counts as active).
      */
-    public record Row(String sellerOfferKey, String title, List<String> eans, String product, String reason,
-                      Boolean active, String catalogEan) {
+    public record Row(String sellerOfferKey, String title, List<String> eans, String reason, Boolean active) {
 
         public Row {
             active = active == null ? Boolean.TRUE : active;
-        }
-
-        public Row(String sellerOfferKey, String title, List<String> eans, String product, String reason) {
-            this(sellerOfferKey, title, eans, product, reason, true, null);
         }
     }
 }
