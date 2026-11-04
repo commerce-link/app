@@ -391,7 +391,7 @@ class OfferControllerTest {
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
         verify(basketsRepository).save(basketCaptor.capture());
         List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
-        assertThat(savedItems).extracting(BasketItem::getSku).containsExactly("EAN-1", "MFN-X", "EAN-2");
+        assertThat(savedItems).extracting(BasketItem::getSku).containsExactly("EAN-1", "EAN-X", "EAN-2");
         assertThat(savedItems).extracting(BasketItem::getQty).containsExactly(2L, 1L, 1L);
     }
 
