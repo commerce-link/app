@@ -53,15 +53,28 @@ NORMALIZED=$(jq -c '
       }]
     }' "$FILE")
 
-PROBLEMS=$(jq -r '
+# The keys the app reads (CarrierDictionary): a key of another shape loads fine and is never read, so its carriers
+# would silently go unrecognized. The adapter name is in lower case, as the app builds it.
+KEY_PATTERN='^(global#marketplace#[^#A-Z]+#(import|status)|global#shipping#[^#A-Z]+|[^#]+#supplier#[^#]+)$'
+
+PROBLEMS=$(jq -r --arg pattern "$KEY_PATTERN" '
     (.carriers[] | select(.name == "") | "a carrier without a name"),
     (.dictionaries[] | select(.dictionary == "") | "a dictionary without a key"),
+    (.dictionaries[] | .dictionary | select(. != "" and (test($pattern) | not))
+        | "\(.): not a dictionary key, expected global#marketplace#<adapter>#import|status, global#shipping#<adapter> or <storeId>#supplier#<connection>"),
     (.dictionaries[] | .dictionary as $d | .mappings[]
         | select(.text == "" or .carrier == "") | "\($d): a pair without a text or a carrier"),
     (.dictionaries[] | .dictionary as $d | .mappings
         | group_by([(.text | ascii_upcase), (.carrier | ascii_upcase)])[] | select(length > 1)
         | "\($d): the pair \(.[0].text)=\(.[0].carrier) is there twice")
     ' <<<"$NORMALIZED")
+
+# the file alone is enough to refuse it, before any call to AWS
+if [[ -n "$PROBLEMS" ]]; then
+    printf '%s\n' "$PROBLEMS" >&2
+    echo "Nothing loaded." >&2
+    exit 1
+fi
 
 # only a missing table is "no": an expired session or a wrong region stops the script instead of creating anything
 table_exists() {
@@ -89,8 +102,8 @@ UNKNOWN=$(jq -r --argjson existing "$EXISTING_CARRIERS" '
     | select((.carrier | ascii_downcase) as $c | $known | index($c) | not)
     | "\($d): unknown carrier \(.carrier)"' <<<"$NORMALIZED")
 
-if [[ -n "$PROBLEMS$UNKNOWN" ]]; then
-    printf '%s\n' "$PROBLEMS" "$UNKNOWN" | sed '/^$/d' >&2
+if [[ -n "$UNKNOWN" ]]; then
+    printf '%s\n' "$UNKNOWN" >&2
     echo "Nothing loaded." >&2
     exit 1
 fi

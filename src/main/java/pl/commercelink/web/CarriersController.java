@@ -57,7 +57,7 @@ public class CarriersController {
     @GetMapping(PATH)
     public String carriers(Model model, Locale locale) {
         List<DictionaryRow> dictionaries = sharedDictionaries().stream()
-                .map(d -> new DictionaryRow(d.key(), message(d.purpose(), locale, d.integration()),
+                .map(d -> new DictionaryRow(d.key(), purpose(d, locale),
                         dictionaryRepository.get(d.key()).getMappings().size(), dictionaryHref(d.key())))
                 .toList();
         model.addAttribute("carriers", carriersRepository.findAll());
@@ -80,9 +80,10 @@ public class CarriersController {
     }
 
     @GetMapping(DICTIONARY_PATH)
-    public String dictionary(@RequestParam String dictionary, Model model) {
-        CarrierDictionary entry = dictionaryRepository.get(requireShared(dictionary));
-        return dictionaryPage(model, dictionary, entry.getMappings(), entry.getVersion(), null);
+    public String dictionary(@RequestParam String dictionary, Model model, Locale locale) {
+        SharedDictionary shared = requireShared(dictionary);
+        CarrierDictionary entry = dictionaryRepository.get(dictionary);
+        return dictionaryPage(model, shared, entry.getMappings(), entry.getVersion(), null, locale);
     }
 
     @PostMapping(DICTIONARY_PATH)
@@ -91,23 +92,26 @@ public class CarriersController {
                                  @RequestParam(name = "text", required = false) List<String> texts,
                                  @RequestParam(name = "carrier", required = false) List<String> carriers,
                                  Locale locale, Model model, RedirectAttributes redirectAttributes) {
-        requireShared(dictionary);
+        SharedDictionary shared = requireShared(dictionary);
         List<CarrierMapping> pairs = pairs(texts, carriers);
         try {
             CarrierDictionaryWriter.Result result = dictionaryWriter.save(dictionary, pairs, version);
             if (!result.isSaved()) {
                 String error = message("carriers.dictionary.refused." + result.refusal().name(), locale, result.text());
-                return dictionaryPage(model, dictionary, pairs, version, error);
+                return dictionaryPage(model, shared, pairs, version, error, locale);
             }
         } catch (ConditionalCheckFailedException e) {
-            return dictionaryPage(model, dictionary, pairs, version, message("carriers.dictionary.conflict", locale));
+            return dictionaryPage(model, shared, pairs, version, message("carriers.dictionary.conflict", locale), locale);
         }
         SettingsFlash.onRedirect(redirectAttributes, message("carriers.dictionary.saved", locale, dictionary));
         return "redirect:" + dictionaryHref(dictionary);
     }
 
-    private String dictionaryPage(Model model, String dictionary, List<CarrierMapping> pairs, Long version, String error) {
+    private String dictionaryPage(Model model, SharedDictionary shared, List<CarrierMapping> pairs, Long version,
+                                  String error, Locale locale) {
+        String dictionary = shared.key();
         model.addAttribute("dictionary", dictionary);
+        model.addAttribute("purpose", purpose(shared, locale));
         model.addAttribute("pairs", withEmptyRow(pairs));
         model.addAttribute("version", version);
         model.addAttribute("carrierNames", carriersRepository.names());
@@ -157,11 +161,15 @@ public class CarriersController {
     }
 
     // store dictionaries (supplier connections) are edited by the store, not here
-    private String requireShared(String dictionary) {
-        if (sharedDictionaries().stream().noneMatch(shared -> shared.key().equals(dictionary))) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        }
-        return dictionary;
+    private SharedDictionary requireShared(String dictionary) {
+        return sharedDictionaries().stream()
+                .filter(shared -> shared.key().equals(dictionary))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    private String purpose(SharedDictionary dictionary, Locale locale) {
+        return message(dictionary.purpose(), locale, dictionary.integration());
     }
 
     static String dictionaryHref(String dictionary) {

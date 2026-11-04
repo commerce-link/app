@@ -47,8 +47,8 @@ scripts/carriers/load-carriers.sh carriers.json --profile commercelink --region 
 Everything after the file goes to the `aws` CLI (`--endpoint-url http://localhost:8000` for DynamoDB Local). The
 script needs `jq` and the `aws` CLI. It only adds what is missing: a carrier or dictionary that is already there,
 for example edited on `/dashboard/carriers`, is left as it is, so running it twice changes nothing. Later changes are
-made on the dashboard. The file is checked first (empty values, a pair twice, a carrier nobody defines), and nothing
-is loaded when it has problems.
+made on the dashboard. The file is checked first (a key of another shape than above, empty values, a pair twice, a carrier nobody
+defines), and nothing is loaded when it has problems.
 
 ## Rollout
 
@@ -57,5 +57,10 @@ missing, with the schema of `V024` (which then finds them and does nothing), so 
 from its first request. Loaded only after the deploy, the dictionaries are empty in between: nothing breaks, but
 carriers are not recognised, so Allegro gets `OTHER` with the carrier name and a Ceneo shipped status is refused (it
 needs a carrier code) and retried, ending in the dead-letter queue after three attempts.
+
+After the deploy, compare the keys of the file with the list on `/dashboard/carriers`: the page lists one
+dictionary per installed adapter (and two per marketplace), so a key of the file missing there belongs to an adapter
+named otherwise, and that adapter's dictionaries stay empty, with the effects above. Every listed dictionary the file
+fills should show its number of pairs.
 
 `V016` turns on point-in-time recovery and deletion protection for both tables at the next app start.

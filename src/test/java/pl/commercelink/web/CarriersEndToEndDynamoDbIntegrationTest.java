@@ -297,7 +297,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
                 .containsExactly(ALLEGRO_METHODS, ALLEGRO, CENEO_FORMS, CENEO, EMPIK,
                         CarrierDictionary.marketplaceStatus("Empik"), MORELE, CarrierDictionary.marketplaceStatus("Morele"),
                         WZA, FURGONETKA);
-        assertThat(html).contains("InPost Kurier").contains("Allegro One")
+        assertThat(html).doesNotContain("??").contains("InPost Kurier").contains("Allegro One")
                 .contains("global#marketplace#allegro#import").contains("global#shipping#furgonetka")
                 .contains("Ceneo: teksty przewoźnika w importowanym zamówieniu")
                 .contains("/dashboard/carriers/dictionary?dictionary=global%23marketplace%23ceneo%23import");
@@ -370,6 +370,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         String html = render("carrier-dictionary", result);
 
         // then
+        assertThat(html).doesNotContain("??").contains("Ceneo: kody przewoźnika przy statusie „wysłane” i w zwrotach");
         assertThat(html.indexOf("value=\"4\"")).isGreaterThan(html.indexOf("value=\"1\""));
         assertThat(org.apache.commons.lang3.StringUtils.countMatches(html, "data-carrier-row>"))
                 .isEqualTo(dictionaries.get(CENEO).getMappings().size() + 1);

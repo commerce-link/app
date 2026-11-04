@@ -6,7 +6,7 @@
 <div layout:fragment="content">
     <section class="cl-page">
         <div class="cl-page-body is-form">
-            <div th:replace="~{fragments/settings-header :: subpageWithActions('/dashboard/carriers', #{carriers.title}, ${dictionary}, #{${'carriers.dictionary.purpose.' + dictionary}}, null)}"></div>
+            <div th:replace="~{fragments/settings-header :: subpageWithActions('/dashboard/carriers', #{carriers.title}, ${dictionary}, ${purpose}, null)}"></div>
             <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
 
             <form class="cl-form" th:action="@{/dashboard/carriers/dictionary}" method="post" data-carrier-dictionary>
