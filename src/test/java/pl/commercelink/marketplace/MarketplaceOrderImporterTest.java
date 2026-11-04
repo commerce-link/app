@@ -296,7 +296,8 @@ class MarketplaceOrderImporterTest {
 
         // then
         OrderItem item = productItem();
-        assertEquals("7041", item.getSku());
+        assertEquals("5903771700818", item.getSku());
+        assertEquals("7041", item.getManufacturerCode());
         assertEquals("5903771700818", item.getEan());
         assertEquals("Zabawki", item.getCategory());
         assertEquals("4M-7041", item.getExternalItemId());
@@ -314,7 +315,7 @@ class MarketplaceOrderImporterTest {
 
         // then
         OrderItem item = productItem();
-        assertEquals("AB12", item.getSku());
+        assertEquals("5903771700818", item.getSku());
         assertEquals("AB12", item.getManufacturerCode());
         assertEquals("5903771700818", item.getEan());
         assertEquals("Krzesła", item.getCategory());
@@ -322,12 +323,12 @@ class MarketplaceOrderImporterTest {
     }
 
     @Test
-    void leavesTheManufacturerCodeOfOwnOfferAndManufacturerCodeLinesUnset() {
+    void everyResolvedLineTakesItsEanAsTheSkuAndKeepsItsManufacturerCode() {
         // given
         when(storeOffers.resolve("Empik", "k7m2xq9pz4", "4M-7041"))
                 .thenReturn(Optional.of(new ResolvedOffer("k7m2xq9pz4", "5903771700818", "7041", "Zabawki", ResolvedOffer.Source.OWN_OFFER)));
         when(storeOffers.resolve("Allegro", null, "ab 12"))
-                .thenReturn(Optional.of(new ResolvedOffer("pim-1", "5903771700818", "ab 12", "Monitors", ResolvedOffer.Source.MFN)));
+                .thenReturn(Optional.of(new ResolvedOffer("pim-1", "5903771700825", "ab 12", "Monitors", ResolvedOffer.Source.MFN)));
 
         // when
         importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("4M-7041", "k7m2xq9pz4"));
@@ -339,15 +340,22 @@ class MarketplaceOrderImporterTest {
         List<OrderItem> lines = itemsCaptor.getAllValues().stream()
                 .flatMap(List::stream).filter(i -> !i.isService()).toList();
         assertEquals(2, lines.size());
-        assertNull(lines.get(0).getManufacturerCode());
-        assertNull(lines.get(1).getManufacturerCode());
+        assertEquals("5903771700818", lines.get(0).getSku());
+        assertEquals("5903771700818", lines.get(0).getEan());
+        assertEquals("7041", lines.get(0).getManufacturerCode());
+        assertEquals("5903771700825", lines.get(1).getSku());
+        assertEquals("5903771700825", lines.get(1).getEan());
+        assertEquals("AB12", lines.get(1).getManufacturerCode());
+        assertEquals("ab 12", lines.get(1).getExternalItemId());
+        assertNull(lines.get(1).getMarketplaceOfferKey());
+        assertFalse(lines.get(1).isUnlinkedMarketplaceItem());
     }
 
     @Test
-    void keepsTodaysBehaviourWithoutSellerOfferKey() {
-        // given
+    void aResolvedLineWithoutAnEanKeepsItsManufacturerCodeAsTheSku() {
+        // given the PIM entry the code matched has no GTIN
         when(storeOffers.resolve("Allegro", null, "ab 12"))
-                .thenReturn(Optional.of(new ResolvedOffer("pim-1", "5903771700818", "ab 12", "Monitors", ResolvedOffer.Source.MFN)));
+                .thenReturn(Optional.of(new ResolvedOffer("pim-1", null, "ab 12", "Monitors", ResolvedOffer.Source.MFN)));
 
         // when
         importer.importOrder(storeWithId("store-1"), "Allegro", orderWithProduct("ab 12"));
@@ -357,9 +365,6 @@ class MarketplaceOrderImporterTest {
         assertEquals("AB12", item.getSku());
         assertNull(item.getEan());
         assertEquals("Monitors", item.getCategory());
-        assertEquals("ab 12", item.getExternalItemId());
-        assertNull(item.getMarketplaceOfferKey());
-        assertFalse(item.isUnlinkedMarketplaceItem());
     }
 
     @Test
@@ -394,8 +399,8 @@ class MarketplaceOrderImporterTest {
         // then
         List<OrderItem> products = capturedOrderItems().stream().filter(i -> !i.isService()).toList();
         assertEquals(2, products.size());
-        assertEquals("7041", products.get(0).getSku());
-        assertEquals("7041", products.get(1).getSku());
+        assertEquals("5903771700818", products.get(0).getSku());
+        assertEquals("5903771700818", products.get(1).getSku());
     }
 
     @Test

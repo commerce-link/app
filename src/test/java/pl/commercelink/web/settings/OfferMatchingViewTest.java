@@ -80,21 +80,19 @@ class OfferMatchingViewTest {
     void namesEveryReasonAnOfferIsLeftToReviewFor() {
         // given
         List<Row> rows = List.of(new Row("a", "A", List.of("111"), null, OfferMatchResult.AMBIGUOUS),
-                new Row("b", "B", List.of("222"), null, OfferMatchResult.NO_MFN),
-                new Row("e", "E", List.of("444"), null, OfferMatchResult.DUPLICATED_EAN),
                 new Row("c", "C", List.of(), null, OfferMatchResult.NO_EAN),
+                new Row("b", "B", List.of("222"), null, "no-mfn"),
+                new Row("e", "E", List.of("444"), null, "duplicated-ean"),
                 new Row("d", "D", List.of("333"), null, "stale-link"));
 
         // when
         OfferMatchingView.Group group = view(List.of(), List.of(), rows).group("toReview");
 
-        // then a reason of an older file has no sentence any more
+        // then a reason of an older file (the manufacturer code ones among them) has no sentence any more
         assertThat(group.rows()).extracting(OfferMatchingView.Row::reasonKey).containsExactly(
                 "store.marketplaces.offer.matching.reason.ambiguous",
-                "store.marketplaces.offer.matching.reason.no-mfn",
-                "store.marketplaces.offer.matching.reason.duplicated-ean",
                 "store.marketplaces.offer.matching.reason.no-ean",
-                null);
+                null, null, null);
     }
 
     @Test

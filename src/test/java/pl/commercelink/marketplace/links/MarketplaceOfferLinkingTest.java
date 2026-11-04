@@ -109,7 +109,7 @@ class MarketplaceOfferLinkingTest {
         assertThat(saved.getValue().getSource()).isEqualTo(MarketplaceOfferLinkSource.MANUAL);
         assertThat(saved.getValue().getCreatedBy()).isEqualTo("user-1");
         assertThat(saved.getValue().getCreatedAt()).isEqualTo(NOW);
-        assertThat(item.getSku()).isEqualTo("AB123");
+        assertThat(item.getSku()).isEqualTo(EAN);
         assertThat(item.getManufacturerCode()).isEqualTo("AB123");
         assertThat(item.getEan()).isEqualTo("5900000000011");
         assertThat(item.getCategory()).isEqualTo("Procesory");
@@ -160,7 +160,7 @@ class MarketplaceOfferLinkingTest {
         // then
         assertThat(result.updatedItems()).isEqualTo(3);
         assertThat(List.of(chosen, sameOrderTwin, otherOrderTwin)).allSatisfy(item -> {
-            assertThat(item.getSku()).isEqualTo("AB123");
+            assertThat(item.getSku()).isEqualTo(EAN);
             assertThat(item.getCategory()).isEqualTo("Procesory");
             verify(orderItemsRepository).save(item);
         });
@@ -225,17 +225,24 @@ class MarketplaceOfferLinkingTest {
     }
 
     @Test
-    void linkRejectsACatalogProductWithoutAManufacturerCode() {
+    void aCatalogProductWithoutAManufacturerCodeIsLinkedThroughItsEan() {
         // given
         Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
         OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
-        when(orderItemsRepository.findById("o1", "i1")).thenReturn(item);
+        openOrders(order);
+        when(storeOffers.resolve(EMPIK, KEY, null)).thenReturn(Optional.of(
+                new ResolvedOffer(null, "5909999999999", null, "Procesory", Source.LINK)));
 
-        // when / then
-        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", "p3", "user-1"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage(MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG);
-        verify(linkRepository, never()).save(any());
+        // when
+        MarketplaceOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p3", "user-1");
+
+        // then
+        ArgumentCaptor<MarketplaceOfferLink> saved = ArgumentCaptor.forClass(MarketplaceOfferLink.class);
+        verify(linkRepository).save(saved.capture());
+        assertThat(saved.getValue().getEans()).containsExactly("5909999999999");
+        assertThat(result.updatedItems()).isEqualTo(1);
+        assertThat(item.getSku()).isEqualTo("5909999999999");
+        assertThat(item.getManufacturerCode()).isNull();
     }
 
     @Test
@@ -253,52 +260,12 @@ class MarketplaceOfferLinkingTest {
         verify(linkRepository).save(saved.capture());
         assertThat(saved.getValue().getEans()).containsExactly(EAN);
         assertThat(result.updatedItems()).isEqualTo(1);
-        assertThat(item.getSku()).isEqualTo("AB123");
+        assertThat(item.getSku()).isEqualTo(EAN);
         assertThat(item.getEan()).isEqualTo(EAN);
     }
 
     @Test
-    void aProductWhoseEanAnotherCatalogProductSharesIsRefusedWithoutSavingALink() {
-        // given
-        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
-        OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
-        when(orderItemsRepository.findById("o1", "i1")).thenReturn(item);
-        Product chosen = catalogProduct("c1", "p1", null, EAN, "ab 123");
-        Product twin = catalogProduct("c2", "p9", null, EAN, "OTHER-1");
-        when(storeOffers.matchCatalog(List.of(EAN))).thenReturn(new CatalogMatch.Ambiguous(List.of(chosen, twin)));
-
-        // when / then
-        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", "p1", "user-1"))
-                .isInstanceOf(OfferLinkConflictException.class)
-                .hasMessage(MarketplaceOfferLinking.EAN_CONFLICT)
-                .satisfies(e -> assertThat(((OfferLinkConflictException) e).conflicting()).containsExactly(twin));
-        verify(linkRepository, never()).save(any());
-        verify(orderItemsRepository, never()).save(any());
-        assertThat(item.getSku()).isEqualTo("RAW-1");
-    }
-
-    @Test
-    void aConflictOnlyWithAProductWithoutACodeAsksForTheCodeAndLeavesTheSameGoodsOut() {
-        // given the chosen goods also sit in another category (same code) and a code-less product shares the EAN
-        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
-        OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
-        when(orderItemsRepository.findById("o1", "i1")).thenReturn(item);
-        Product chosen = catalogProduct("c1", "p1", null, EAN, "ab 123");
-        Product sameGoods = catalogProduct("c2", "p1b", null, EAN, "AB123");
-        Product uncoded = catalogProduct("c2", "p7", null, EAN, null);
-        when(storeOffers.matchCatalog(List.of(EAN)))
-                .thenReturn(new CatalogMatch.Ambiguous(List.of(chosen, sameGoods, uncoded)));
-
-        // when / then
-        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", "p1", "user-1"))
-                .isInstanceOf(OfferLinkConflictException.class)
-                .hasMessage(MarketplaceOfferLinking.EAN_CONFLICT_MISSING_CODE)
-                .satisfies(e -> assertThat(((OfferLinkConflictException) e).conflicting()).containsExactly(uncoded));
-        verify(linkRepository, never()).save(any());
-    }
-
-    @Test
-    void theConflictIsFoundInTheRealCatalogAndAnEarlierLinkIsKept() {
+    void aProductWhoseEanAnotherCatalogProductSharesIsLinkedAsTheSameGoods() {
         // given the store's real catalog, read through the resolver: two products share the EAN under different codes
         ProductRepository productRepository = Mockito.mock(ProductRepository.class);
         ProductCatalogRepository catalogRepository = Mockito.mock(ProductCatalogRepository.class);
@@ -312,6 +279,8 @@ class MarketplaceOfferLinkingTest {
         Product white = catalogProduct("c1", "p-white", null, EAN, "PB-B");
         Product grey = catalogProduct("c1", "p-grey", null, " " + EAN + " ", "PB-S");
         when(productRepository.findAll("c1")).thenReturn(List.of(white, grey));
+        when(linkRepository.find(STORE, EMPIK, KEY)).thenReturn(Optional.of(MarketplaceOfferLink.of(STORE, EMPIK, KEY,
+                List.of(EAN), MarketplaceOfferLinkSource.MANUAL, "user-1", NOW)));
         MarketplaceOfferResolver realResolver = new MarketplaceOfferResolver(linkRepository,
                 Mockito.mock(PimCatalog.class), Mockito.mock(StorePimAliases.class), productRepository, catalogRepository);
         MarketplaceOfferLinking realLinking = new MarketplaceOfferLinking(linkRepository, realResolver, ordersRepository,
@@ -320,11 +289,16 @@ class MarketplaceOfferLinkingTest {
         OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
         when(orderItemsRepository.findById("o1", "i1")).thenReturn(item);
 
-        // when / then
-        assertThatThrownBy(() -> realLinking.link(STORE, order, "i1", "c1", "p-white", "user-1"))
-                .isInstanceOf(OfferLinkConflictException.class)
-                .satisfies(e -> assertThat(((OfferLinkConflictException) e).conflicting()).containsExactly(grey));
-        verify(linkRepository, never()).save(any());
+        // when
+        MarketplaceOfferLinking.LinkResult result = realLinking.link(STORE, order, "i1", "c1", "p-white", "user-1");
+
+        // then fulfilment looks the goods up by the EAN, whichever of the two products the item names
+        verify(linkRepository).save(any(MarketplaceOfferLink.class));
+        assertThat(result.updatedItems()).isEqualTo(1);
+        assertThat(item.getSku()).isEqualTo(EAN);
+        assertThat(item.getEan()).isEqualTo(EAN);
+        assertThat(item.getManufacturerCode()).isEqualTo("PB-S");
+        assertThat(item.getCategory()).isEqualTo("Pościel");
     }
 
     @Test

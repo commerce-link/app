@@ -72,18 +72,16 @@ class OrderDetailsMessagesTest {
                 MarketplaceOfferLinking.NO_OFFER_KEY,
                 MarketplaceOfferLinking.NOT_A_MARKETPLACE_ORDER,
                 MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG,
-                MarketplaceOfferLinking.EAN_CONFLICT,
-                "order.item.link.offer.conflict.no.mfn",
-                MarketplaceOfferLinking.EAN_CONFLICT_MISSING_CODE,
-                "order.item.link.offer.conflict.more",
+                "order.item.link.offer.search.placeholder",
                 "order.item.link.offer.done");
 
         // then
         for (Properties bundle : List.of(pl, en)) {
             assertThat(keys).allSatisfy(key -> assertThat(bundle.getProperty(key)).as(key).isNotBlank());
             assertThat(bundle.getProperty("order.item.link.offer.done")).contains("{0}");
-            assertThat(bundle.getProperty(MarketplaceOfferLinking.EAN_CONFLICT)).doesNotContain("PIM").contains("EAN")
-                    .contains("{0}").doesNotContain("'");
+            assertThat(bundle.getProperty("order.item.link.offer.search.placeholder")).contains("EAN");
+            // a link is never refused for an EAN other products share: they are the same goods to fulfilment
+            assertThat(bundle.getProperty("order.item.link.offer.conflict")).isNull();
             assertThat(bundle.getProperty("order.item.link.offer.unrecognised")).isNull();
         }
     }

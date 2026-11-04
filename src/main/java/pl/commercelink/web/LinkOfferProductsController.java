@@ -23,8 +23,8 @@ import java.util.Map;
 
 
 /**
- * The products "Link to product" offers for one catalog: every product of the catalog with an EAN and a manufacturer
- * code, what a link needs to recognise an order line and fill its item (a pimId is not required). The pricelist only
+ * The products "Link to product" offers for one catalog: every product of the catalog with an EAN, which is all a link
+ * needs to recognise an order line and fill its item (neither a manufacturer code nor a pimId is required). The pricelist only
  * carries available products, so a product without supplier stock or added after the last pricelist run would be
  * missing from it; it supplies the price where it has one, by pimId, or by EAN for a product without one.
  */
@@ -62,8 +62,7 @@ public class LinkOfferProductsController extends BaseController {
             }
         }
         return productRepository.findAll(catalog).stream()
-                .filter(product -> StringUtils.isNotBlank(product.getEan())
-                        && StringUtils.isNotBlank(product.getManufacturerCode()))
+                .filter(product -> OfferEans.unify(product.getEan()) != null)
                 .map(product -> new LinkOfferProduct(product.getCategoryId(), product.getProductId(), product.getEan(),
                         product.getName(), product.getLabel(), product.getManufacturerCode(),
                         categoryNames.get(product.getCategoryId()),

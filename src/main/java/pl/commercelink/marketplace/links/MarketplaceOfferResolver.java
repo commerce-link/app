@@ -25,12 +25,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 
-import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
-
 /**
  * Resolves a marketplace order line to a product: an explicit offer link first (its EANs looked up among the products
  * of the store's catalogs), then the seller offer key taken as our own pimId, then the manufacturer code as MPN (the
- * behaviour before offer links existed).
+ * behaviour before offer links existed). The product's EAN is what fulfilment looks it up by; see
+ * {@link ResolvedOffer#sku()}.
  */
 @Slf4j
 @Component
@@ -84,7 +83,7 @@ public class MarketplaceOfferResolver {
                 }
                 Optional<ResolvedOffer> own = pimAliases.effectiveEntry(storeId, sellerOfferKey)
                         .map(entry -> fromEntry(entry, Source.OWN_OFFER))
-                        .filter(offer -> hasManufacturerCode(offer, sellerOfferKey));
+                        .filter(offer -> hasProductCode(offer, sellerOfferKey));
                 if (own.isPresent()) {
                     return own;
                 }
@@ -92,8 +91,8 @@ public class MarketplaceOfferResolver {
 
             if (StringUtils.isNotBlank(manufacturerCode)) {
                 return pimCatalog.withStoreData(storeId).findByMpn(manufacturerCode)
-                        .map(entry -> new ResolvedOffer(entry.pimId(), entry.primaryGtin().orElse(null), manufacturerCode,
-                                entry.category(), Source.MFN));
+                        .map(entry -> new ResolvedOffer(entry.pimId(), OfferEans.unify(entry.primaryGtin().orElse(null)),
+                                manufacturerCode, entry.category(), Source.MFN));
             }
             return Optional.empty();
         }
@@ -113,8 +112,8 @@ public class MarketplaceOfferResolver {
         }
 
         /**
-         * Which product of the store's catalogs the EANs stand for. Hits sharing one manufacturer code are one product
-         * (the same goods in several categories), so the first of them in {@link #catalogProducts()} order wins.
+         * Which product of the store's catalogs the EANs stand for. Hits sharing one EAN are one product (the same goods
+         * in several categories, or listed twice), so the first of them in {@link #catalogProducts()} order wins.
          */
         public CatalogMatch matchCatalog(Collection<String> eans) {
             Set<String> unified = new LinkedHashSet<>();
@@ -134,25 +133,21 @@ public class MarketplaceOfferResolver {
                 return new CatalogMatch.NotInCatalog();
             }
             List<Product> hits = List.copyOf(hitsInCatalogOrder.values());
-            Set<String> codes = new LinkedHashSet<>();
-            hits.forEach(product -> codes.add(StringUtils.defaultString(unifyMfn(product.getManufacturerCode()))));
-            if (codes.size() > 1) {
+            long distinctEans = hits.stream().map(product -> OfferEans.unify(product.getEan())).distinct().count();
+            if (distinctEans > 1) {
                 return new CatalogMatch.Ambiguous(hits);
-            }
-            if (codes.iterator().next().isBlank()) {
-                return new CatalogMatch.NoManufacturerCode(hits);
             }
             Product first = hits.get(0);
             return new CatalogMatch.Found(first, categoryNamesById().get(first.getCategoryId()));
         }
 
-        // without an MFN the item would carry the marketplace's raw code as its sku while looking resolved
-        private boolean hasManufacturerCode(ResolvedOffer offer, String sellerOfferKey) {
-            if (StringUtils.isNotBlank(offer.mfn())) {
+        // without a code the item would carry the marketplace's raw code as its sku while looking resolved
+        private boolean hasProductCode(ResolvedOffer offer, String sellerOfferKey) {
+            if (offer.sku() != null) {
                 return true;
             }
-            log.warn("Offer {} of store {} matches {} ({}), which has no manufacturer code; treated as unresolved",
-                    sellerOfferKey, storeId, offer.pimId(), offer.source());
+            log.warn("Offer {} of store {} matches {} ({}), which has neither an EAN nor a manufacturer code; treated as"
+                    + " unresolved", sellerOfferKey, storeId, offer.pimId(), offer.source());
             return false;
         }
 
@@ -160,13 +155,8 @@ public class MarketplaceOfferResolver {
             return switch (matchCatalog(link.getEans())) {
                 case CatalogMatch.Found found -> Optional.of(new ResolvedOffer(found.product().getPimId(),
                         OfferEans.unify(found.product().getEan()), found.product().getManufacturerCode(), found.categoryName(), Source.LINK));
-                case CatalogMatch.NoManufacturerCode none -> {
-                    log.warn("Offer {} of store {} matches catalog product {}, which has no manufacturer code; treated as unresolved",
-                            sellerOfferKey, storeId, none.products().get(0).getProductId());
-                    yield Optional.empty();
-                }
                 case CatalogMatch.Ambiguous ambiguous -> {
-                    log.warn("Offer {} of store {} matches {} catalog products with different manufacturer codes; treated as unresolved",
+                    log.warn("Offer {} of store {} matches {} catalog products with different EANs; treated as unresolved",
                             sellerOfferKey, storeId, ambiguous.products().size());
                     yield Optional.empty();
                 }
@@ -192,8 +182,8 @@ public class MarketplaceOfferResolver {
 
         private ResolvedOffer fromEntry(PimEntry entry, Source source) {
             Optional<Product> product = catalogProduct(entry.pimId());
-            String ean = product.map(Product::getEan).filter(StringUtils::isNotBlank)
-                    .orElseGet(() -> entry.primaryGtin().orElse(null));
+            String ean = OfferEans.unify(product.map(Product::getEan).filter(StringUtils::isNotBlank)
+                    .orElseGet(() -> entry.primaryGtin().orElse(null)));
             String mfn = product.map(Product::getManufacturerCode).filter(StringUtils::isNotBlank)
                     .orElseGet(() -> entry.primaryMpn().orElse(null));
             // an entry without a PIM category takes the name of its catalog category, as the store's pricelist does

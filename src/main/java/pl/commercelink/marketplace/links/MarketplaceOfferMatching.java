@@ -186,8 +186,7 @@ public class MarketplaceOfferMatching {
             switch (storeOffers.matchCatalog(linkEans)) {
                 case CatalogMatch.Found found -> linked.add(row(offer, eans, found.product().getName(), null, null));
                 case CatalogMatch.NotInCatalog none -> notInCatalog.add(row(offer, eans, null, null, linkEans.get(0)));
-                case CatalogMatch.Ambiguous ambiguous -> toReview.add(row(offer, eans, null, reasonOf(ambiguous), null));
-                case CatalogMatch.NoManufacturerCode noCode -> toReview.add(row(offer, eans, null, OfferMatchResult.NO_MFN, null));
+                case CatalogMatch.Ambiguous ambiguous -> toReview.add(row(offer, eans, null, OfferMatchResult.AMBIGUOUS, null));
             }
         }
 
@@ -204,8 +203,7 @@ public class MarketplaceOfferMatching {
                 }
                 case CatalogMatch.NotInCatalog none -> notInCatalog.add(row(offer, eans, null,
                         OfferMatchResult.ALREADY_LINKED, linkEans.isEmpty() ? null : linkEans.get(0)));
-                case CatalogMatch.Ambiguous ambiguous -> toReview.add(row(offer, eans, null, reasonOf(ambiguous), null));
-                case CatalogMatch.NoManufacturerCode noCode -> toReview.add(row(offer, eans, null, OfferMatchResult.NO_MFN, null));
+                case CatalogMatch.Ambiguous ambiguous -> toReview.add(row(offer, eans, null, OfferMatchResult.AMBIGUOUS, null));
             }
         }
 
@@ -249,17 +247,6 @@ public class MarketplaceOfferMatching {
                 .filter(StringUtils::isNotEmpty)
                 .distinct()
                 .toList();
-    }
-
-    /**
-     * The offer's EANs pointing at different products is settled by linking the right one by hand; one EAN shared by
-     * products with different codes only by fixing the catalog, or by filling the code when that is all that is missing.
-     */
-    private static String reasonOf(CatalogMatch.Ambiguous ambiguous) {
-        if (!ambiguous.sharedEanInCatalog()) {
-            return OfferMatchResult.AMBIGUOUS;
-        }
-        return ambiguous.onlyMissingCodes() ? OfferMatchResult.NO_MFN : OfferMatchResult.DUPLICATED_EAN;
     }
 
     private static Set<String> eanSet(MarketplaceOfferLink link) {

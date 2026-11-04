@@ -29,7 +29,6 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.marketplace.links.MarketplaceOfferLinking;
-import pl.commercelink.marketplace.links.OfferLinkConflictException;
 import pl.commercelink.orders.*;
 import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.exceptions.OrderFilterException;
@@ -1315,36 +1314,12 @@ public class OrdersController extends BaseController {
         MarketplaceOfferLinking.LinkResult result;
         try {
             result = marketplaceOfferLinking.link(getStoreId(), order, itemId, categoryId, productId, getUserId());
-        } catch (OfferLinkConflictException e) {
-            return refuse(redirectAttributes, orderId, e.getMessage(), locale, conflictingProducts(e, locale));
         } catch (IllegalArgumentException e) {
             return refuse(redirectAttributes, orderId, e.getMessage(), locale);
         }
         OrderFlash.saved(redirectAttributes,
                 messageSource.getMessage("order.item.link.offer.done", new Object[]{result.updatedItems()}, locale));
         return details(orderId);
-    }
-
-    // a placeholder EAN shared by hundreds of products must not produce a message of hundreds of names
-    private static final int CONFLICTS_NAMED = 5;
-
-    /**
-     * "Name (MFN), Name (no manufacturer code)" of the products sharing the chosen EAN, for the refusal: each one once
-     * (the same goods may sit in several categories), at most {@link #CONFLICTS_NAMED}, then "and N more".
-     */
-    private String conflictingProducts(OfferLinkConflictException conflict, Locale locale) {
-        String noCode = messageSource.getMessage("order.item.link.offer.conflict.no.mfn", null, locale);
-        List<String> names = conflict.conflicting().stream()
-                .map(product -> "%s (%s)".formatted(product.getName(),
-                        StringUtils.isNotBlank(product.getManufacturerCode()) ? product.getManufacturerCode() : noCode))
-                .distinct()
-                .toList();
-        String named = String.join(", ", names.subList(0, Math.min(names.size(), CONFLICTS_NAMED)));
-        if (names.size() <= CONFLICTS_NAMED) {
-            return named;
-        }
-        return named + " " + messageSource.getMessage("order.item.link.offer.conflict.more",
-                new Object[]{names.size() - CONFLICTS_NAMED}, locale);
     }
 
     @PostMapping("/dashboard/orders/{orderId}/assign-warehouse")

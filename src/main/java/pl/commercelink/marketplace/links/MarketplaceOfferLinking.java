@@ -12,7 +12,6 @@ import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.products.Product;
-import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -36,8 +35,6 @@ public class MarketplaceOfferLinking {
     public static final String NO_OFFER_KEY = "order.item.link.offer.no.key";
     public static final String NOT_A_MARKETPLACE_ORDER = "order.item.link.offer.not.marketplace";
     public static final String PRODUCT_NOT_IN_CATALOG = "order.item.link.offer.product.unknown";
-    public static final String EAN_CONFLICT = "order.item.link.offer.conflict";
-    public static final String EAN_CONFLICT_MISSING_CODE = "order.item.link.offer.conflict.missing.code";
 
     // bounds the sweep over other orders (plan decision); an older open order keeps its item for a manual fix
     static final int SWEEP_DAYS = 90;
@@ -69,10 +66,8 @@ public class MarketplaceOfferLinking {
 
     /**
      * Links the item's offer key to the EAN of one product of the store's catalogs, named by its category and product
-     * id (an EAN may repeat across products, so it cannot name the operator's choice by itself).
+     * id. Other products with the same EAN are the same goods to fulfilment, so the link needs nothing else.
      *
-     * @throws OfferLinkConflictException when other catalog products carry the product's EAN under another
-     *                                    manufacturer code; nothing is saved, so an earlier link stays
      * @throws IllegalArgumentException with a message key when the item or the product cannot be linked
      */
     public LinkResult link(String storeId, Order order, String itemId, String categoryId, String productId, String userId) {
@@ -88,21 +83,10 @@ public class MarketplaceOfferLinking {
         Product product = storeOffers.catalogProducts().stream()
                 .filter(candidate -> Objects.equals(candidate.getCategoryId(), categoryId)
                         && Objects.equals(candidate.getProductId(), productId))
-                // same rule as the dialog's list: a product without an EAN or a manufacturer code cannot be linked
-                .filter(candidate -> StringUtils.isNotBlank(candidate.getEan())
-                        && StringUtils.isNotBlank(candidate.getManufacturerCode()))
+                // same rule as the dialog's list: a link holds EANs, so a product without one cannot be linked
+                .filter(candidate -> OfferEans.unify(candidate.getEan()) != null)
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException(PRODUCT_NOT_IN_CATALOG));
-        // a link holds EANs only, so a shared EAN would leave this and every later order unfilled; refused before
-        // saving, so a working earlier link is not replaced by one that recognises nothing
-        if (storeOffers.matchCatalog(List.of(product.getEan())) instanceof CatalogMatch.Ambiguous ambiguous) {
-            // the same goods in another category share the chosen code and are no part of the conflict
-            String chosenCode = UnifiedProductIdentifiers.unifyMfn(product.getManufacturerCode());
-            throw new OfferLinkConflictException(ambiguous.products().stream()
-                    .filter(other -> !Objects.equals(UnifiedProductIdentifiers.unifyMfn(other.getManufacturerCode()),
-                            chosenCode))
-                    .toList(), ambiguous.onlyMissingCodes());
-        }
         String offerKey = chosen.getMarketplaceOfferKey();
 
         // an existing link for the key is replaced: the operator's choice wins over an earlier one
@@ -114,7 +98,7 @@ public class MarketplaceOfferLinking {
                 .filter(resolved -> resolved.source() == ResolvedOffer.Source.LINK)
                 .orElse(null);
         if (offer == null) {
-            // only when the catalog or the link changed since the check above, e.g. another operator linked meanwhile
+            // only when the catalog or the link changed since the product was read, e.g. another operator linked meanwhile
             log.warn("Offer {} of store {} linked to EAN {} of product {}/{}, but the link no longer leads to one"
                     + " catalog product; no item filled", offerKey, storeId, product.getEan(), categoryId, productId);
             return new LinkResult(0);
@@ -129,7 +113,7 @@ public class MarketplaceOfferLinking {
             if (!item.isNew() || item.isGroup()) {
                 continue;
             }
-            fill(item, offer);
+            offer.fill(item);
             if (item.getItemId().equals(chosen.getItemId())) {
                 orderItemsRepository.save(item);
                 updated++;
@@ -167,20 +151,6 @@ public class MarketplaceOfferLinking {
                 .filter(item -> offerKey.equals(item.getMarketplaceOfferKey()))
                 .forEach(items::add);
         return items;
-    }
-
-    /** As the importer fills a resolved line; externalItemId stays the marketplace's key (returns match on it). */
-    private static void fill(OrderItem item, ResolvedOffer offer) {
-        if (StringUtils.isNotBlank(offer.mfn())) {
-            item.setSku(UnifiedProductIdentifiers.unifyMfn(offer.mfn()));
-            item.setManufacturerCode(offer.mfn());
-        }
-        if (StringUtils.isNotBlank(offer.ean())) {
-            item.setEan(offer.ean());
-        }
-        if (StringUtils.isNotBlank(offer.category())) {
-            item.setCategory(offer.category());
-        }
     }
 
     // another order's item changed meanwhile: it is skipped rather than failing the operator's link

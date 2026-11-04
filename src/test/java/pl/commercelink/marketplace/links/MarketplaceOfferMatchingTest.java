@@ -257,20 +257,18 @@ class MarketplaceOfferMatchingTest {
     void sendsAManualLinkThatCannotWorkToReview() {
         // given
         catalog.put("5900000000031", new CatalogMatch.Ambiguous(List.of(KLOCKI, product("Lalka", "5900000000031", "7042"))));
-        catalog.put("5900000000048", new CatalogMatch.NoManufacturerCode(List.of(product("Puzzle", "5900000000048", null))));
         when(links.findAll(STORE, EMPIK)).thenReturn(List.of(
-                existing("AMB", MarketplaceOfferLinkSource.MANUAL, "5900000000031"),
-                existing("NOMFN", MarketplaceOfferLinkSource.MANUAL, "5900000000048")));
+                existing("AMB", MarketplaceOfferLinkSource.MANUAL, "5900000000031")));
         MarketplaceOfferMatching matching = matching();
 
         // when
-        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("AMB"), offer("NOMFN", "5900000000048"))));
+        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("AMB"))));
 
         // then
         verify(links, never()).saveUnlessManual(any());
-        assertThat(result.alreadyLinked()).isEqualTo(2);
+        assertThat(result.alreadyLinked()).isEqualTo(1);
         assertThat(result.toReview()).extracting(OfferMatchResult.Row::sellerOfferKey, OfferMatchResult.Row::reason)
-                .containsExactly(tuple("AMB", "ambiguous"), tuple("NOMFN", "no-mfn"));
+                .containsExactly(tuple("AMB", "ambiguous"));
     }
 
     @Test
@@ -347,9 +345,9 @@ class MarketplaceOfferMatchingTest {
     }
 
     @Test
-    void sendsAnOfferWhoseCatalogProductHasNoManufacturerCodeToReview() {
-        // given
-        catalog.put("5900000000048", new CatalogMatch.NoManufacturerCode(List.of(product("Puzzle", "5900000000048", null))));
+    void anOfferWhoseCatalogProductHasNoManufacturerCodeIsLinked() {
+        // given the product is known by its EAN alone
+        inCatalog(product("Puzzle", "5900000000048", null));
         MarketplaceOfferMatching matching = matching();
 
         // when
@@ -357,38 +355,9 @@ class MarketplaceOfferMatchingTest {
 
         // then
         assertThat(savedLink().getEans()).containsExactly("5900000000048");
-        assertThat(result.toReview()).extracting(OfferMatchResult.Row::sellerOfferKey, OfferMatchResult.Row::reason)
-                .containsExactly(tuple("SILLO-3", "no-mfn"));
-    }
-
-    @Test
-    void anEanSharedByCatalogProductsWithDifferentCodesIsReviewedAsADuplicatedEan() {
-        // given two catalog products carry the offer's one EAN under different codes: only a catalog fix helps
-        catalog.put("5900000000062", new CatalogMatch.Ambiguous(List.of(
-                product("Pościel biała", "5900000000062", "PB-B"), product("Pościel szara", "5900000000062", "PB-S"))));
-        MarketplaceOfferMatching matching = matching();
-
-        // when
-        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("SILLO-5", "5900000000062"))));
-
-        // then
-        assertThat(result.toReview()).extracting(OfferMatchResult.Row::sellerOfferKey, OfferMatchResult.Row::reason)
-                .containsExactly(tuple("SILLO-5", "duplicated-ean"));
-    }
-
-    @Test
-    void anOfferWhoseOnlyConflictIsAProductWithoutACodeIsReviewedForTheMissingCode() {
-        // given one product with a code and one without share the EAN: filling the code resolves it
-        catalog.put("5900000000055", new CatalogMatch.Ambiguous(List.of(
-                product("Zegar", "5900000000055", "ZG-1"), product("Zegar bez kodu", "5900000000055", null))));
-        MarketplaceOfferMatching matching = matching();
-
-        // when
-        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("SILLO-4", "5900000000055"))));
-
-        // then
-        assertThat(result.toReview()).extracting(OfferMatchResult.Row::sellerOfferKey, OfferMatchResult.Row::reason)
-                .containsExactly(tuple("SILLO-4", "no-mfn"));
+        assertThat(result.linked()).extracting(OfferMatchResult.Row::sellerOfferKey, OfferMatchResult.Row::product)
+                .containsExactly(tuple("SILLO-3", "Puzzle"));
+        assertThat(result.toReview()).isEmpty();
     }
 
     @Test
@@ -665,7 +634,7 @@ class MarketplaceOfferMatchingTest {
         // given every outcome a run can have, spread over four pages
         inCatalog(KLOCKI);
         catalog.put("5903771700825", new CatalogMatch.Ambiguous(List.of(KLOCKI, product("Lalka", "5903771700825", "7042"))));
-        catalog.put("5900000000048", new CatalogMatch.NoManufacturerCode(List.of(product("Puzzle", "5900000000048", null))));
+        inCatalog(product("Puzzle", "5900000000048", null));
         ownOffer("own-1");
         when(links.findAll(STORE, EMPIK)).thenReturn(List.of(
                 existing("OLD-1", MarketplaceOfferLinkSource.MANUAL, "5903771700832"),
@@ -702,12 +671,12 @@ class MarketplaceOfferMatchingTest {
         assertThat(inOneMessage.total()).isEqualTo(10);
         assertThat(inOneMessage.ownOffers()).isEqualTo(1);
         assertThat(inOneMessage.alreadyLinked()).isEqualTo(1);
-        assertThat(inOneMessage.linked()).extracting(OfferMatchResult.Row::sellerOfferKey).containsExactly("SILLO-1", "OLD-2");
+        assertThat(inOneMessage.linked()).extracting(OfferMatchResult.Row::sellerOfferKey)
+                .containsExactly("SILLO-1", "OLD-2", "NOMFN");
         assertThat(inOneMessage.notInCatalog()).extracting(OfferMatchResult.Row::sellerOfferKey)
                 .containsExactly("OLD-1", "OFF-1", "MISS");
         assertThat(inOneMessage.toReview()).extracting(OfferMatchResult.Row::sellerOfferKey, OfferMatchResult.Row::reason)
-                .containsExactly(tuple(" ", "no-key"), tuple("AMB", "ambiguous"), tuple("NOEAN", "no-ean"),
-                        tuple("NOMFN", "no-mfn"));
+                .containsExactly(tuple(" ", "no-key"), tuple("AMB", "ambiguous"), tuple("NOEAN", "no-ean"));
     }
 
     private static final class MutableClock extends Clock {

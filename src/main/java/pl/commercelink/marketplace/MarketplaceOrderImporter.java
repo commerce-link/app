@@ -87,7 +87,7 @@ public class MarketplaceOrderImporter {
             basketItems.add(new BasketItem(
                     basketItemId,
                     product.name(),
-                    resolved.map(ResolvedOffer::mfn).filter(StringUtils::isNotBlank).orElse(product.manufacturerCode()),
+                    resolved.map(ResolvedOffer::sku).orElse(product.manufacturerCode()),
                     resolved.map(ResolvedOffer::category).orElse(Categories.UNCATEGORIZED),
                     product.priceGross().doubleValue(),
                     0,
@@ -136,15 +136,9 @@ public class MarketplaceOrderImporter {
                         orderItem.setExternalItemId(rawKeysByBasketItemId.get(i.getId()));
                         ResolvedLine line = resolvedByBasketItemId.get(i.getId());
                         orderItem.setMarketplaceOfferKey(line.sellerOfferKey());
-                        // the MFN step reproduces the pre-link behaviour, which never filled the ean
-                        if (line.offer() != null && line.offer().source() != ResolvedOffer.Source.MFN) {
-                            orderItem.setEan(line.offer().ean());
-                        }
-                        // a linked line stands for a catalog product, so it records that product's manufacturer code
-                        // next to the sku; the own-offer step deliberately keeps its pre-link fields, so its items
-                        // do not change
-                        if (line.offer() != null && line.offer().source() == ResolvedOffer.Source.LINK) {
-                            orderItem.setManufacturerCode(line.offer().mfn());
+                        // the basket normalises its code as an MFN; fill sets the sku as fulfilment looks it up
+                        if (line.offer() != null) {
+                            line.offer().fill(orderItem);
                         }
                     }
                     return orderItem;

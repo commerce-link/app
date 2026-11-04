@@ -68,8 +68,7 @@
         </form>
     </dialog>
 
-    <!--/* One product of a catalog (every product with an EAN and a manufacturer code, not only the pricelist's available
-           ones); the post saves the offer link to its EAN and fills the item and the store's other New items with the
+    <!--/* One product of a catalog (every product with an EAN, not only the pricelist's available ones); the post saves the offer link to its EAN and fills the item and the store's other New items with the
            same offer. */-->
     <dialog class="cl-dialog is-form is-wide" id="link-offer-dialog" aria-labelledby="link-offer-title">
         <form method="post" th:action="@{/dashboard/orders/{o}/link-offer(o=${page.orderId()})}" data-cl-link-offer>
@@ -97,7 +96,7 @@
                     <div class="cl-span-2 cl-field">
                         <label class="cl-label" for="link-offer-search" th:text="#{general.search}"></label>
                         <input class="cl-input" id="link-offer-search" type="search" data-cl-link-search
-                               th:placeholder="#{order.item.assign.sku.search.placeholder}">
+                               th:placeholder="#{order.item.link.offer.search.placeholder}">
                     </div>
                 </div>
                 <table class="cl-table is-compact">
@@ -106,7 +105,8 @@
                         <th scope="col" class="cl-table-check"><span class="cl-visually-hidden" th:text="#{order.item.assign.sku.pick}"></span></th>
                         <th scope="col" th:text="#{order.item.name}"></th>
                         <th scope="col" th:text="#{order.item.assign.sku.label}"></th>
-                        <th scope="col" th:text="#{order.item.sku}"></th>
+                        <th scope="col" th:text="#{general.ean}"></th>
+                        <th scope="col" th:text="#{general.manufacturer.code}"></th>
                         <th scope="col" class="is-numeric" th:text="#{order.item.price}"></th>
                     </tr></thead>
                     <tbody data-cl-link-rows></tbody>

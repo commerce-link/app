@@ -39,8 +39,7 @@ class MarketplaceOfferMatchTemplateTest {
                         new Row("sku-3", "Monitor", List.of("5901234123459", "5901234123460"), null, null, true,
                                 "5901234123459")),
                 List.of(new Row("sku-5", null, List.of(), null, OfferMatchResult.NO_EAN),
-                        new Row("sku-6", "Kabel", List.of("5901234123461"), null, OfferMatchResult.AMBIGUOUS),
-                        new Row("sku-7", "Pad", List.of("5901234123462"), null, OfferMatchResult.NO_MFN)),
+                        new Row("sku-6", "Kabel", List.of("5901234123461"), null, OfferMatchResult.AMBIGUOUS)),
                 2, 3);
 
         // when
@@ -55,7 +54,7 @@ class MarketplaceOfferMatchTemplateTest {
                 .doesNotContain("PIM");
         assertThat(html).contains(">5901234123499\n5901234123459</textarea>");
         assertThat(html).contains("Oferta nie ma EAN").contains("różne produkty w katalogach")
-                .contains("nie ma kodu producenta");
+                .doesNotContain("kodu producenta");
         assertThat(html).contains("Połączona ręcznie").contains("Mysz bezprzewodowa M1").contains("sku-5");
         assertThat(html).doesNotContain("??");
     }

@@ -57,7 +57,7 @@ class LinkOfferProductsControllerTest {
     }
 
     @Test
-    void listsEveryCatalogProductWithAnEanAndAManufacturerCodeIncludingThoseMissingFromThePricelist() {
+    void listsEveryCatalogProductWithAnEanIncludingThoseWithoutACodeOrMissingFromThePricelist() {
         // given
         ProductCatalog catalog = catalog();
         when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
@@ -77,6 +77,7 @@ class LinkOfferProductsControllerTest {
         // then
         assertThat(products).containsExactly(
                 new LinkOfferProduct("cat-home", "p3", "5900000000035", "Bez karty", "Domowik", "DMW-X1", "Dom i kuchnia", null),
+                new LinkOfferProduct("cat-home", "p5", "5900000000042", "Bez kodu", "Domowik", "", "Dom i kuchnia", null),
                 new LinkOfferProduct("cat-home", "p1", "5900000000011", "Czajnik", "Domowik", "DMW-CZ17", "Dom i kuchnia", 129L),
                 new LinkOfferProduct("cat-home", "p2", "5900000000028", "Termos", "Domowik", "DMW-TS10", "Dom i kuchnia", null));
     }

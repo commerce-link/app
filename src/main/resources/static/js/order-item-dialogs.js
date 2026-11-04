@@ -1,8 +1,7 @@
 // Dialogs of the order's items (orders details), opened by dialog.js from the row menu: the menu entry's data
 // attributes (item id, name, sku, category, qty, price, tax) fill the dialog on cl:dialog-open. Assign SKU picks codes
 // from a catalog's pricelist (fetched once per catalog) or typed by hand and joins them with ":"; Link to product picks
-// one product of the catalog (every product with an EAN and a manufacturer code, the price where the pricelist has
-// one) and posts its category and product id; Assign supplier offers the item's own codes and turns a gross price net
+// one product of the catalog (every product with an EAN, the price where the pricelist has one) and posts its category and product id; Assign supplier offers the item's own codes and turns a gross price net
 // with the item's VAT for the hint (the server converts it); Assign from warehouse lists the stock of the item's
 // category; Split bundle keeps the rows numbered rows[0..n] and the total balanced; Serial numbers never submit on
 // Enter; Move previews the target order.
@@ -346,7 +345,9 @@
             var term = search.value.trim().toLowerCase();
             var shown = data.filter(function (p) {
                 return (!category.value || p.category === category.value)
-                    && (!term || (p.name || '').toLowerCase().indexOf(term) >= 0 || (p.mfn || '').toLowerCase().indexOf(term) >= 0);
+                    && (!term || [p.name, p.ean, p.mfn].some(function (value) {
+                        return (value || '').toLowerCase().indexOf(term) >= 0;
+                    }));
             });
             rows.replaceChildren();
             shown.forEach(function (p) {
@@ -359,11 +360,12 @@
                 radio.name = 'link-offer-product';
                 radio.className = 'cl-check-input';
                 radio.checked = isChosen(p);
-                radio.setAttribute('aria-label', p.name || p.mfn || p.ean);
+                radio.setAttribute('aria-label', p.name || p.ean);
                 check.appendChild(radio);
                 row.appendChild(check);
                 cell(row, p.name);
                 cell(row, p.label);
+                cell(row, p.ean, 'cl-table-code');
                 cell(row, p.mfn, 'cl-table-code');
                 // a product the newest pricelist does not carry has no price, not a price of zero
                 cell(row, p.price == null ? '—' : format(p.price), 'is-numeric');
