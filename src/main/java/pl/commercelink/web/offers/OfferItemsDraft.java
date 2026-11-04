@@ -70,13 +70,12 @@ public class OfferItemsDraft {
     }
 
     /**
-     * Without offers BasketItem.of makes a "missing product" item named by the manufacturer code, as it always did; an
-     * entry known only by its EAN has no code to name it by: the item would have a blank code, which the next table
-     * save drops anyway.
+     * Without offers BasketItem.of makes a "missing product" item carrying the typed EAN; an entry typed only by its
+     * manufacturer code has no EAN for it: the item would have a blank SKU, which the next table save drops anyway.
      */
     private static boolean addable(MatchedInventory matched) {
         return matched != null && (matched.hasAnyOffers()
-                || matched.getInventoryKey().getProductCodes().stream().anyMatch(StringUtils::isNotBlank));
+                || matched.getInventoryKey().getProductEans().stream().anyMatch(StringUtils::isNotBlank));
     }
 
     private Map<String, Integer> categorySequenceNumbers(String storeId, String catalogId) {

@@ -287,7 +287,7 @@ class OrdersControllerTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<OrderItemDraft>> drafts = ArgumentCaptor.forClass(List.class);
         verify(ordersManager).addOrderItems(eq(store), eq(order), drafts.capture());
-        assertThat(drafts.getValue()).extracting(OrderItemDraft::sku).containsExactly("MFN-1", "MFN-X");
+        assertThat(drafts.getValue()).extracting(OrderItemDraft::sku).containsExactly("EAN-1", "EAN-X");
         assertThat(drafts.getValue()).extracting(OrderItemDraft::qty).containsExactly(2, 1);
     }
 

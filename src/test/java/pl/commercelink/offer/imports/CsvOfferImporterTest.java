@@ -75,7 +75,7 @@ class CsvOfferImporterTest {
         assertThat(items.get(0).getQty()).isEqualTo(2);
         assertThat(items.get(0).getUnitPrice()).isEqualTo(2899);
         assertThat(items.get(0).getUnitCost()).isEqualTo(2410.50);
-        assertThat(items.get(0).getSku()).isEqualTo("GV-N5070EAGLE");
+        assertThat(items.get(0).getSku()).isEqualTo("4719331316551");
         assertThat(items.get(1).getName()).isEqualTo("Montaż zestawu");
         assertThat(items.get(1).isService()).isTrue();
         assertThat(items.get(1).getSku()).isEqualTo("MONTAZ-PC");
@@ -83,8 +83,8 @@ class CsvOfferImporterTest {
 
     @Test
     void keepsAndDropsRowsTheWayTheNewOfferPageDescribesTheFormat() throws IOException {
-        // given: the page says an empty category is fine and a row without a name, a manufacturer code or quantity is left out
-        String csv = "kategoria;nazwa;ilosc;cena;koszt;kod;usluga\n"
+        // given: the page says an empty category is fine and a row without a name, an SKU or quantity is left out
+        String csv = "kategoria;nazwa;ilosc;cena;koszt;sku;usluga\n"
                 + ";Bez kategorii;1;100;80;KOD-1;false\n"
                 + "Dyski;Bez kodu;1;100;80;;false\n"
                 + "Dyski;Zero sztuk;0;100;80;KOD-2;false\n"

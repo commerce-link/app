@@ -120,7 +120,7 @@ public class OrdersManager {
         }
 
         OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
-        orderItem.setSku(warehouseItem.getMfn());
+        orderItem.setSku(warehouseItem.getEan());
         orderItemsRepository.save(orderItem);
 
         manualWarehouseItemFulfilment.run(storeId, orderItem, warehouseItem);

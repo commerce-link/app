@@ -34,12 +34,16 @@ class InventoryAutoDiscovery {
 
     /** @param pim the PIM view to match known entries in: a store's own inventory uses that store's view */
     Collection<MatchedInventory> run(List<InventoryItem> inventoryItems, PimView pim) {
+        SharedManufacturerCodes sharedCodes = SharedManufacturerCodes.of(inventoryItems);
+
         // Build a mapping of EANs and product codes to inventory items for quick lookup
         Map<String, List<InventoryItem>> mappedByEan = new HashMap<>();
         Map<String, List<InventoryItem>> mappedByProductCode = new HashMap<>();
         for (InventoryItem inventoryItem : inventoryItems) {
             mappedByEan.computeIfAbsent(inventoryItem.ean(), k -> new LinkedList<>()).add(inventoryItem);
-            mappedByProductCode.computeIfAbsent(inventoryItem.mfn(), k -> new LinkedList<>()).add(inventoryItem);
+            if (!sharedCodes.isShared(inventoryItem)) {
+                mappedByProductCode.computeIfAbsent(inventoryItem.mfn(), k -> new LinkedList<>()).add(inventoryItem);
+            }
         }
 
         // Resolve already known mappings based on the PIM index
@@ -49,7 +53,7 @@ class InventoryAutoDiscovery {
 
             Collection<InventoryItem> matchingItems = new LinkedHashSet<>();
             matchingItems.addAll(findItemsByKeysModifyingCollection(inventoryKey.getProductEans(), mappedByEan));
-            matchingItems.addAll(findItemsByKeysModifyingCollection(inventoryKey.getProductCodes(), mappedByProductCode));
+            matchingItems.addAll(takeItemsOfBrandModifyingCollection(inventoryKey.getProductCodes(), mappedByProductCode, pimEntry.brand()));
 
             MatchedInventory matchedInventory = new MatchedInventory(inventoryKey, matchingItems, taxonomyCache, supplierRegistry);
 
@@ -64,7 +68,12 @@ class InventoryAutoDiscovery {
 
             for (InventoryItem itemByEan : items) {
                 matchingItems.add(itemByEan);
-                matchingItems.addAll(mappedByProductCode.getOrDefault(itemByEan.mfn(), Collections.emptyList()));
+                if (sharedCodes.isShared(itemByEan)) {
+                    continue;
+                }
+                mappedByProductCode.getOrDefault(itemByEan.mfn(), Collections.emptyList()).stream()
+                        .filter(itemByMfn -> itemByMfn.isOfBrand(itemByEan.brand()))
+                        .forEach(matchingItems::add);
             }
 
             Set<String> eans = matchingItems.stream().map(InventoryItem::ean).collect(Collectors.toSet());
@@ -108,6 +117,23 @@ class InventoryAutoDiscovery {
             return l;
         }
         return new HashSet<>();
+    }
+
+    private static Collection<InventoryItem> takeItemsOfBrandModifyingCollection(Collection<String> codes, Map<String, List<InventoryItem>> col, String brand) {
+        List<InventoryItem> taken = new ArrayList<>();
+        for (String code : codes) {
+            List<InventoryItem> items = col.get(code);
+            if (items == null) {
+                continue;
+            }
+            List<InventoryItem> ofBrand = items.stream().filter(item -> item.isOfBrand(brand)).toList();
+            items.removeAll(ofBrand);
+            if (items.isEmpty()) {
+                col.remove(code);
+            }
+            taken.addAll(ofBrand);
+        }
+        return taken;
     }
 
     private Collection<MatchedInventory> processMatchedInventoryCandidates(Collection<MatchedInventory> matchedInventory) {

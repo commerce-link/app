@@ -3,6 +3,7 @@ package pl.commercelink.warehouse.builtin;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -13,16 +14,21 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import pl.commercelink.inventory.deliveries.DeliveredPredicate;
+import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.inventory.supplier.SupplierLabels;
+import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.fulfilment.FulfilmentForm;
 import pl.commercelink.orders.fulfilment.ManualWarehouseFulfilment;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.RestockScope;
+import pl.commercelink.warehouse.RestockSuggestion;
 import pl.commercelink.warehouse.RestockSuggestionService;
+import pl.commercelink.warehouse.StockProductLevel;
 import pl.commercelink.web.fulfilment.FulfilmentSelectPageFactory;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -94,6 +100,31 @@ class WarehouseControllerTest {
             assertThat(view).isEqualTo("fulfilment");
             assertThat(model.getAttribute("supplierLabels")).isSameAs(labels);
             verify(fulfilmentSelectPageFactory).forRestock(any(), eq(labels), eq(false), any());
+        }
+    }
+
+    @Test
+    void restockSuggestionGoesToTheFulfilmentScreenWithTheEanOfItsOffer() {
+        // given
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            StockProductLevel level = new StockProductLevel("GPU", "MFN-1", "RTX 5070", 0, 0, 1);
+            InventoryItem offer = new InventoryItem("5901234123457", "MFN-1", 1000.0, "PLN", 5, 1, "Action");
+            when(restockSuggestionService.suggestForRestock(eq(STORE_ID), eq("catalog-1"), isNull(),
+                    eq(RestockScope.WholeCatalog), eq(false), isNull()))
+                    .thenReturn(List.of(new RestockSuggestion(level, offer, null)));
+            when(manualWarehouseFulfilment.init(eq(STORE_ID), anyList())).thenReturn(new FulfilmentForm());
+            when(supplierLabels.forStoreId(STORE_ID)).thenReturn(new SupplierLabels(mock(StoresRepository.class)).forStore(null));
+
+            // when
+            warehouseController.restock("catalog-1", null, RestockScope.WholeCatalog, null, false,
+                    new ConcurrentModel(), Locale.ENGLISH, new MockHttpServletResponse());
+
+            // then
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<List<OrderItem>> items = ArgumentCaptor.forClass(List.class);
+            verify(manualWarehouseFulfilment).init(eq(STORE_ID), items.capture());
+            assertThat(items.getValue()).extracting(OrderItem::getSku).containsExactly("5901234123457");
         }
     }
 

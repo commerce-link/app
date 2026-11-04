@@ -57,7 +57,7 @@ class RedisStoreInventoryCacheTest {
     void getReturnsEmptyOnMiss() {
         // given
         RedisStoreInventoryCache cache = cache();
-        when(valueOps.get("store-inventory:s1")).thenReturn(null);
+        when(valueOps.get("store-inventory:v2:s1")).thenReturn(null);
 
         // when / then
         assertTrue(cache.get("s1").isEmpty());
@@ -69,8 +69,8 @@ class RedisStoreInventoryCacheTest {
         RedisStoreInventoryCache cache = cache();
         ArgumentCaptor<String> stored = ArgumentCaptor.forClass(String.class);
         cache.put("s1", sampleInventory(), Duration.ofMinutes(60));
-        verify(valueOps).set(eq("store-inventory:s1"), stored.capture(), eq(Duration.ofMinutes(60)));
-        when(valueOps.get("store-inventory:s1")).thenReturn(stored.getValue());
+        verify(valueOps).set(eq("store-inventory:v2:s1"), stored.capture(), eq(Duration.ofMinutes(60)));
+        when(valueOps.get("store-inventory:v2:s1")).thenReturn(stored.getValue());
 
         // when
         Optional<StoreInventory> result = cache.get("s1");
@@ -91,14 +91,14 @@ class RedisStoreInventoryCacheTest {
         cache.put("store-1", inventory, Duration.ofMinutes(15));
 
         // then
-        verify(valueOps).set(eq("store-inventory:store-1"), anyString(), eq(Duration.ofMinutes(15)));
+        verify(valueOps).set(eq("store-inventory:v2:store-1"), anyString(), eq(Duration.ofMinutes(15)));
     }
 
     @Test
     void getDegradesToMissWhenRedisFails() {
         // given
         RedisStoreInventoryCache cache = cache();
-        when(valueOps.get("store-inventory:s1")).thenThrow(new RuntimeException("redis down"));
+        when(valueOps.get("store-inventory:v2:s1")).thenThrow(new RuntimeException("redis down"));
 
         // when / then
         assertTrue(cache.get("s1").isEmpty());
@@ -109,7 +109,7 @@ class RedisStoreInventoryCacheTest {
         // given
         RedisStoreInventoryCache cache = cache();
         doThrow(new RuntimeException("redis down")).when(valueOps)
-                .set(eq("store-inventory:s1"), anyString(), eq(Duration.ofMinutes(60)));
+                .set(eq("store-inventory:v2:s1"), anyString(), eq(Duration.ofMinutes(60)));
 
         // when / then
         assertDoesNotThrow(() -> cache.put("s1", sampleInventory(), Duration.ofMinutes(60)));
@@ -127,7 +127,7 @@ class RedisStoreInventoryCacheTest {
         cache.put("s1", inventory, Duration.ofMinutes(60));
 
         // then
-        verify(valueOps).set(eq("store-inventory:s1"), stored.capture(), eq(Duration.ofMinutes(60)));
+        verify(valueOps).set(eq("store-inventory:v2:s1"), stored.capture(), eq(Duration.ofMinutes(60)));
         assertTrue(stored.getValue().length() < rawJson.length());
     }
 

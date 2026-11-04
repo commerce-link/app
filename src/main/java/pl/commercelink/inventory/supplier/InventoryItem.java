@@ -83,6 +83,10 @@ public record InventoryItem(
         return supplier.equals(other);
     }
 
+    public boolean isOfBrand(String other) {
+        return brand != null && !brand.isBlank() && other != null && brand.trim().equalsIgnoreCase(other.trim());
+    }
+
     public boolean isSellable() {
         return hasEan() && hasMfn() && hasQty() && sellable;
     }
