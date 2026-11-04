@@ -58,6 +58,7 @@ class OfferItemReloaderTest {
     @BeforeEach
     void setupInventory() {
         when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.PRICING)).thenReturn(inventoryView);
+        when(inventoryView.findByEan(any())).thenReturn(MatchedInventory.empty(new InventoryKey()));
         when(inventoryView.findByProductCode(any())).thenReturn(MatchedInventory.empty(new InventoryKey()));
     }
 
