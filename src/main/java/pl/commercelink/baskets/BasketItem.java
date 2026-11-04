@@ -3,7 +3,6 @@ package pl.commercelink.baskets;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
@@ -11,7 +10,6 @@ import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 import pl.commercelink.taxonomy.Taxonomy;
 
-import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @DynamoDBDocument
@@ -114,26 +112,6 @@ public class BasketItem {
 
     public void setSku(String sku) {
         this.sku = sku;
-    }
-
-    // Until no instance of the version before V024 runs: a basket it stored, or an offer page it served, still says mfn.
-    @Deprecated(forRemoval = true)
-    @DynamoDBAttribute(attributeName = "mfn")
-    @JsonIgnore
-    public String getLegacyMfn() {
-        return null;
-    }
-
-    @Deprecated(forRemoval = true)
-    public void setLegacyMfn(String mfn) {
-        if (isBlank(sku)) {
-            sku = mfn;
-        }
-    }
-
-    @Deprecated(forRemoval = true)
-    public void setMfn(String mfn) {
-        setLegacyMfn(mfn);
     }
 
     public String getCatalogId() {

@@ -32,23 +32,6 @@ class BasketItemPersistenceTest {
         assertThat(item).doesNotContainKey("mfn");
     }
 
-    @Test
-    void itemStoredBeforeTheRenameReadsItsMfnAsSku() {
-        // given: a basket written by an instance of the previous version
-        Map<String, AttributeValue> attributes = Map.of(
-                "storeId", new AttributeValue("store-1"),
-                "basketId", new AttributeValue("basket-1"),
-                "basketItems", new AttributeValue().withL(new AttributeValue().withM(Map.of(
-                        "name", new AttributeValue("Dysk"),
-                        "mfn", new AttributeValue("MZ-V9P1T0BW")))));
-
-        // when
-        Basket basket = basketModel().unconvert(attributes);
-
-        // then
-        assertThat(basket.getBasketItems()).extracting(BasketItem::getSku).containsExactly("MZ-V9P1T0BW");
-    }
-
     private static DynamoDBMapperTableModel<Basket> basketModel() {
         DynamoDBMapper mapper = new DynamoDBMapper(mock(AmazonDynamoDB.class));
         return mapper.getTableModel(Basket.class, DynamoDBMapperConfig.DEFAULT);

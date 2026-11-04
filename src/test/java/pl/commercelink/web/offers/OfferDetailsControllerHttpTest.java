@@ -154,22 +154,6 @@ class OfferDetailsControllerHttpTest {
     }
 
     @Test
-    void tableOpenedBeforeTheSkuRenameKeepsItsItems() throws Exception {
-        // given
-        storedOffer();
-
-        // when
-        mvc.perform(post("/dashboard/offer/" + OFFER_ID)
-                        .param("basketItems[0].name", "CPU").param("basketItems[0].mfn", "M-1")
-                        .param("basketItems[0].category", "CPU").param("basketItems[0].qty", "1")
-                        .param("basketItems[0].unitPrice", "10"))
-                .andExpect(status().isFound());
-
-        // then
-        assertThat(saved().getBasketItems()).extracting(BasketItem::getSku).containsExactly("M-1");
-    }
-
-    @Test
     void itemsSaveIgnoresTheFieldsOfTheDialogsPostedAlongside() throws Exception {
         // given
         storedOffer();
