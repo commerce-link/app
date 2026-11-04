@@ -19,7 +19,7 @@
                     <table class="cl-table is-compact">
                         <thead>
                         <tr>
-                            <th scope="col" th:text="#{carriers.dictionary.column.text}"></th>
+                            <th scope="col" th:text="#{carriers.dictionary.column.externalText}"></th>
                             <th scope="col" th:text="#{carriers.dictionary.column.carrier}"></th>
                             <th scope="col"><span class="cl-visually-hidden" th:text="#{carriers.dictionary.column.actions}"></span></th>
                         </tr>
@@ -27,9 +27,9 @@
                         <tbody data-carrier-rows>
                         <tr th:each="pair : ${pairs}" data-carrier-row>
                             <td>
-                                <input class="cl-input" type="text" name="text" maxlength="200" autocomplete="off"
-                                       th:value="${pair.text}"
-                                       th:attr="aria-label=#{carriers.dictionary.column.text}"/>
+                                <input class="cl-input" type="text" name="externalText" maxlength="200" autocomplete="off"
+                                       th:value="${pair.externalText}"
+                                       th:attr="aria-label=#{carriers.dictionary.column.externalText}"/>
                             </td>
                             <td>
                                 <select class="cl-select" name="carrier" th:attr="aria-label=#{carriers.dictionary.column.carrier}">

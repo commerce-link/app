@@ -89,15 +89,16 @@ public class CarriersController {
     @PostMapping(DICTIONARY_PATH)
     public String saveDictionary(@RequestParam String dictionary,
                                  @RequestParam(required = false) Long version,
-                                 @RequestParam(name = "text", required = false) List<String> texts,
+                                 @RequestParam(name = "externalText", required = false) List<String> externalTexts,
                                  @RequestParam(name = "carrier", required = false) List<String> carriers,
                                  Locale locale, Model model, RedirectAttributes redirectAttributes) {
         SharedDictionary shared = requireShared(dictionary);
-        List<CarrierMapping> pairs = pairs(texts, carriers);
+        List<CarrierMapping> pairs = pairs(externalTexts, carriers);
         try {
             CarrierDictionaryWriter.Result result = dictionaryWriter.save(dictionary, pairs, version);
             if (!result.isSaved()) {
-                String error = message("carriers.dictionary.refused." + result.refusal().name(), locale, result.text());
+                String error = message("carriers.dictionary.refused." + result.refusal().name(), locale,
+                        result.externalText());
                 return dictionaryPage(model, shared, pairs, version, error, locale);
             }
         } catch (ConditionalCheckFailedException e) {
@@ -124,7 +125,7 @@ public class CarriersController {
     private static List<CarrierMapping> withEmptyRow(List<CarrierMapping> pairs) {
         List<CarrierMapping> rows = new ArrayList<>(pairs);
         CarrierMapping last = rows.isEmpty() ? null : rows.get(rows.size() - 1);
-        if (last == null || StringUtils.isNotBlank(last.getText()) || StringUtils.isNotBlank(last.getCarrier())) {
+        if (last == null || StringUtils.isNotBlank(last.getExternalText()) || StringUtils.isNotBlank(last.getCarrier())) {
             rows.add(new CarrierMapping());
         }
         return rows;
@@ -134,13 +135,13 @@ public class CarriersController {
     private List<SharedDictionary> sharedDictionaries() {
         List<SharedDictionary> dictionaries = new ArrayList<>();
         for (ProviderDescriptor<?> marketplace : sorted(marketplaces.availableProviders())) {
-            dictionaries.add(new SharedDictionary(CarrierDictionary.marketplaceImport(marketplace.name()),
+            dictionaries.add(new SharedDictionary(CarrierDictionary.marketplaceOrderCarrierTexts(marketplace.name()),
                     "carriers.dictionary.purpose.import", marketplace.displayName()));
-            dictionaries.add(new SharedDictionary(CarrierDictionary.marketplaceStatus(marketplace.name()),
+            dictionaries.add(new SharedDictionary(CarrierDictionary.marketplaceStatusCarrierCodes(marketplace.name()),
                     "carriers.dictionary.purpose.status", marketplace.displayName()));
         }
         for (ProviderDescriptor<?> integration : sorted(shipping.availableProviders())) {
-            dictionaries.add(new SharedDictionary(CarrierDictionary.shipping(integration.name()),
+            dictionaries.add(new SharedDictionary(CarrierDictionary.shippingLabelCarrierCodes(integration.name()),
                     "carriers.dictionary.purpose.shipping", integration.displayName()));
         }
         return dictionaries;
@@ -150,12 +151,12 @@ public class CarriersController {
         return descriptors.stream().sorted(Comparator.comparing((Function<D, String>) ProviderDescriptor::name)).toList();
     }
 
-    private static List<CarrierMapping> pairs(List<String> texts, List<String> carriers) {
-        List<String> t = texts == null ? List.of() : texts;
-        List<String> c = carriers == null ? List.of() : carriers;
+    private static List<CarrierMapping> pairs(List<String> externalTexts, List<String> carriers) {
+        List<String> texts = externalTexts == null ? List.of() : externalTexts;
+        List<String> names = carriers == null ? List.of() : carriers;
         List<CarrierMapping> pairs = new ArrayList<>();
-        for (int i = 0; i < Math.max(t.size(), c.size()); i++) {
-            pairs.add(new CarrierMapping(i < t.size() ? t.get(i) : null, i < c.size() ? c.get(i) : null));
+        for (int i = 0; i < Math.max(texts.size(), names.size()); i++) {
+            pairs.add(new CarrierMapping(i < texts.size() ? texts.get(i) : null, i < names.size() ? names.get(i) : null));
         }
         return pairs;
     }

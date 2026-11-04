@@ -241,7 +241,7 @@ public class MarketplaceReturnImporter {
 
     /** Returns carry the marketplace's carrier ids, the vocabulary of its shipment status. */
     private List<Shipment> toShipments(String marketplace, MarketplaceReturn ret) {
-        String dictionary = CarrierDictionary.marketplaceStatus(marketplace);
+        String dictionary = CarrierDictionary.marketplaceStatusCarrierCodes(marketplace);
         List<Shipment> shipments = new ArrayList<>();
         for (MarketplaceReturn.Parcel parcel : ret.parcels()) {
             Shipment shipment = new Shipment(ShipmentType.Courier);

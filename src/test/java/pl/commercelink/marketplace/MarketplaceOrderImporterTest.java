@@ -45,7 +45,7 @@ class MarketplaceOrderImporterTest {
 
     @Spy
     private CarrierTranslator carrierTranslator = new InMemoryCarrierDictionaries()
-            .with(CarrierDictionary.marketplaceImport("Morele"), "2=InPost", "6=Zabka", "4=Orlen")
+            .with(CarrierDictionary.marketplaceOrderCarrierTexts("Morele"), "2=InPost", "6=Zabka", "4=Orlen")
             .translator();
 
     @Mock

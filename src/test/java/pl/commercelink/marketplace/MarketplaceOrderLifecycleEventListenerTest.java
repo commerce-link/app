@@ -55,9 +55,9 @@ class MarketplaceOrderLifecycleEventListenerTest {
     @Mock private OrdersRepository ordersRepository;
     @Mock private MarketplaceProviderFactory providerFactory;
     @Spy private CarrierTranslator carrierTranslator = new InMemoryCarrierDictionaries()
-            .with(CarrierDictionary.marketplaceStatus("Allegro"), "INPOST=InPost", "INPOST=InPost Kurier", "DPD=DPD")
-            .with(CarrierDictionary.shipping("furgonetka"), "inpost=InPost", "inpost_courier=InPost Kurier")
-            .with(CarrierDictionary.marketplaceImport("Empik"), "DPD=DPD")
+            .with(CarrierDictionary.marketplaceStatusCarrierCodes("Allegro"), "INPOST=InPost", "INPOST=InPost Kurier", "DPD=DPD")
+            .with(CarrierDictionary.shippingLabelCarrierCodes("furgonetka"), "inpost=InPost", "inpost_courier=InPost Kurier")
+            .with(CarrierDictionary.marketplaceOrderCarrierTexts("Empik"), "DPD=DPD")
             .translator();
 
     @Mock private Store store;

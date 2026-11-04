@@ -117,7 +117,7 @@ public class MarketplaceOrderLifecycleEventListener {
                 .filter(s -> !attachedByMarketplace(s, marketplace))
                 .findFirst()
                 .map(s -> new ShipmentUpdate(s.getTrackingNo(),
-                        carrierIdFor(s, store, marketplace),
+                        marketplaceCarrierCodeFor(s, store, marketplace),
                         s.getCarrier(),
                         s.getTrackingUrl()));
 
@@ -136,18 +136,15 @@ public class MarketplaceOrderLifecycleEventListener {
         return Optional.empty();
     }
 
-    /**
-     * Newer shipments hold our carrier name; older ones a label code ("dhl") of their integration (the store's default
-     * one when the shipment names none) or the marketplace's own text, which are turned into a carrier first.
-     */
-    private String carrierIdFor(Shipment shipment, Store store, String marketplace) {
+    private String marketplaceCarrierCodeFor(Shipment shipment, Store store, String marketplace) {
         String integration = shipment.getProvider() != null
                 ? shipment.getProvider()
                 : store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
         List<String> sources = integration != null
-                ? List.of(CarrierDictionary.shipping(integration), CarrierDictionary.marketplaceImport(marketplace))
-                : List.of(CarrierDictionary.marketplaceImport(marketplace));
-        return carrierTranslator.textFor(CarrierDictionary.marketplaceStatus(marketplace), shipment.getCarrier(), sources)
+                ? List.of(CarrierDictionary.shippingLabelCarrierCodes(integration), CarrierDictionary.marketplaceOrderCarrierTexts(marketplace))
+                : List.of(CarrierDictionary.marketplaceOrderCarrierTexts(marketplace));
+        return carrierTranslator.externalTextForShipmentCarrier(CarrierDictionary.marketplaceStatusCarrierCodes(marketplace),
+                shipment.getCarrier(), sources)
                 .orElse(null);
     }
 

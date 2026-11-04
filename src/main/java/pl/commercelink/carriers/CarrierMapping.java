@@ -7,7 +7,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** One pair of a dictionary: the text of the external system and the name of our carrier it stands for. */
 @DynamoDBDocument
 @Getter
 @Setter
@@ -15,8 +14,8 @@ import lombok.Setter;
 @AllArgsConstructor
 public class CarrierMapping {
 
-    @DynamoDBAttribute(attributeName = "text")
-    private String text;
+    @DynamoDBAttribute(attributeName = "externalText")
+    private String externalText;
     @DynamoDBAttribute(attributeName = "carrier")
     private String carrier;
 }

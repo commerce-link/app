@@ -27,7 +27,7 @@ public class CarrierDictionaryWriter {
         EMPTY_PAIR, DUPLICATE_PAIR, AMBIGUOUS_SUPPLIER_TEXT
     }
 
-    public record Result(Refusal refusal, String text) {
+    public record Result(Refusal refusal, String externalText) {
 
         static Result saved() {
             return new Result(null, null);
@@ -42,15 +42,15 @@ public class CarrierDictionaryWriter {
     public Result save(String dictionary, List<CarrierMapping> pairs, Long version) {
         List<CarrierMapping> normalized = new ArrayList<>();
         for (CarrierMapping pair : pairs) {
-            String text = CarrierDictionary.normalize(pair.getText());
+            String externalText = CarrierDictionary.normalize(pair.getExternalText());
             String carrier = StringUtils.trimToNull(pair.getCarrier());
-            if (text == null && carrier == null) {
+            if (externalText == null && carrier == null) {
                 continue;
             }
-            if (text == null || carrier == null) {
-                return new Result(Refusal.EMPTY_PAIR, StringUtils.defaultString(text));
+            if (externalText == null || carrier == null) {
+                return new Result(Refusal.EMPTY_PAIR, StringUtils.defaultString(externalText));
             }
-            normalized.add(new CarrierMapping(text, carrier));
+            normalized.add(new CarrierMapping(externalText, carrier));
         }
         Optional<Result> refusal = validate(dictionary, normalized);
         if (refusal.isPresent()) {
@@ -65,16 +65,16 @@ public class CarrierDictionaryWriter {
     private static Optional<Result> validate(String dictionary, List<CarrierMapping> pairs) {
         boolean supplier = CarrierDictionary.isSupplier(dictionary);
         Set<String> seenPairs = new HashSet<>();
-        Map<String, String> carrierByText = new HashMap<>();
+        Map<String, String> carrierByExternalText = new HashMap<>();
         for (CarrierMapping pair : pairs) {
-            String text = pair.getText().toUpperCase(Locale.ROOT);
-            if (!seenPairs.add(text + "\n" + pair.getCarrier().toUpperCase(Locale.ROOT))) {
-                return Optional.of(new Result(Refusal.DUPLICATE_PAIR, pair.getText()));
+            String externalText = pair.getExternalText().toUpperCase(Locale.ROOT);
+            if (!seenPairs.add(externalText + "\n" + pair.getCarrier().toUpperCase(Locale.ROOT))) {
+                return Optional.of(new Result(Refusal.DUPLICATE_PAIR, pair.getExternalText()));
             }
             // a supplier's method has to name one carrier, otherwise its parcels could not be told apart
-            String other = carrierByText.putIfAbsent(text, pair.getCarrier());
+            String other = carrierByExternalText.putIfAbsent(externalText, pair.getCarrier());
             if (supplier && other != null && !other.equalsIgnoreCase(pair.getCarrier())) {
-                return Optional.of(new Result(Refusal.AMBIGUOUS_SUPPLIER_TEXT, pair.getText()));
+                return Optional.of(new Result(Refusal.AMBIGUOUS_SUPPLIER_TEXT, pair.getExternalText()));
             }
         }
         return Optional.empty();

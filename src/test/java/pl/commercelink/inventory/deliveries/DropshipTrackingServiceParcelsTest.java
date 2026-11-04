@@ -78,7 +78,7 @@ class DropshipTrackingServiceParcelsTest {
     void setUp() {
         service = new DropshipTrackingService(deliveriesQueryService, deliveriesRepository, ordersRepository,
                 providerResolver, completion, DropshipTrackingProperties.defaults(),
-                new InMemoryCarrierDictionaries().with(CarrierDictionary.supplier(STORE_ID, "Acme"), "5=DPD").translator(),
+                new InMemoryCarrierDictionaries().with(CarrierDictionary.supplierDeliveryMethods(STORE_ID, "Acme"), "5=DPD").translator(),
                 Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE));
         order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);

@@ -67,7 +67,7 @@ class MarketplaceReturnImporterTest {
     @Mock private OrderItemFamily orderItemFamily;
     @Mock private OpenRmaCoverage openRmaCoverage;
     @Spy private CarrierTranslator carrierTranslator = new InMemoryCarrierDictionaries()
-            .with(CarrierDictionary.marketplaceStatus("Allegro"), "INPOST=InPost", "INPOST=InPost Kurier")
+            .with(CarrierDictionary.marketplaceStatusCarrierCodes("Allegro"), "INPOST=InPost", "INPOST=InPost Kurier")
             .translator();
     @Mock private Order order;
     @Mock private OrderItem orderItem;

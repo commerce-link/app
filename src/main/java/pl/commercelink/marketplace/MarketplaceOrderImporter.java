@@ -110,8 +110,8 @@ public class MarketplaceOrderImporter {
         return ordersManager.saveWithFulfilment(order, orderItems);
     }
 
-    String carrierFor(String marketplaceName, String shippingCarrier) {
-        return carrierTranslator.carrierFor(CarrierDictionary.marketplaceImport(marketplaceName), shippingCarrier);
+    String carrierFor(String marketplaceName, String orderCarrierText) {
+        return carrierTranslator.carrierFor(CarrierDictionary.marketplaceOrderCarrierTexts(marketplaceName), orderCarrierText);
     }
 
     static String toCollectionPointCode(PickupPoint pickupPoint) {

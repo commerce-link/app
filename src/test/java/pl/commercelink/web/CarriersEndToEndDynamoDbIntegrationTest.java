@@ -59,14 +59,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CarriersEndToEndDynamoDbIntegrationTest {
 
     private static final Locale PL = Locale.forLanguageTag("pl");
-    private static final String ALLEGRO_METHODS = CarrierDictionary.marketplaceImport("Allegro");
-    private static final String ALLEGRO = CarrierDictionary.marketplaceStatus("Allegro");
-    private static final String CENEO_FORMS = CarrierDictionary.marketplaceImport("Ceneo");
-    private static final String CENEO = CarrierDictionary.marketplaceStatus("Ceneo");
-    private static final String EMPIK = CarrierDictionary.marketplaceImport("Empik");
-    private static final String MORELE = CarrierDictionary.marketplaceImport("Morele");
-    private static final String FURGONETKA = CarrierDictionary.shipping("furgonetka");
-    private static final String WZA = CarrierDictionary.shipping("allegro");
+    private static final String ALLEGRO_METHODS = CarrierDictionary.marketplaceOrderCarrierTexts("Allegro");
+    private static final String ALLEGRO = CarrierDictionary.marketplaceStatusCarrierCodes("Allegro");
+    private static final String CENEO_FORMS = CarrierDictionary.marketplaceOrderCarrierTexts("Ceneo");
+    private static final String CENEO = CarrierDictionary.marketplaceStatusCarrierCodes("Ceneo");
+    private static final String EMPIK = CarrierDictionary.marketplaceOrderCarrierTexts("Empik");
+    private static final String MORELE = CarrierDictionary.marketplaceOrderCarrierTexts("Morele");
+    private static final String FURGONETKA = CarrierDictionary.shippingLabelCarrierCodes("furgonetka");
+    private static final String WZA = CarrierDictionary.shippingLabelCarrierCodes("allegro");
 
     @Container
     static final GenericContainer<?> DYNAMODB =
@@ -155,8 +155,8 @@ class CarriersEndToEndDynamoDbIntegrationTest {
     void anAllegroParcelLockerOrderTravelsThroughItsDictionaries() {
         // when: import, quote at Furgonetka, shipped status back to Allegro
         String carrier = translator.carrierFor(ALLEGRO_METHODS, "Allegro Paczkomaty InPost 24/7");
-        String service = translator.textFor(FURGONETKA, carrier, List.of(FURGONETKA)).orElseThrow();
-        String status = translator.textFor(ALLEGRO, carrier, List.of(FURGONETKA, ALLEGRO_METHODS)).orElseThrow();
+        String service = translator.externalTextForShipmentCarrier(FURGONETKA, carrier, List.of(FURGONETKA)).orElseThrow();
+        String status = translator.externalTextForShipmentCarrier(ALLEGRO, carrier, List.of(FURGONETKA, ALLEGRO_METHODS)).orElseThrow();
 
         // then
         assertThat(carrier).isEqualTo("InPost");
@@ -171,9 +171,9 @@ class CarriersEndToEndDynamoDbIntegrationTest {
 
         // then
         assertThat(carrier).isEqualTo("InPost Kurier");
-        assertThat(translator.textFor(ALLEGRO, carrier)).contains("INPOST");
-        assertThat(translator.textFor(CENEO, carrier)).contains("1");
-        assertThat(translator.textFor(FURGONETKA, carrier)).contains("inpost_courier");
+        assertThat(translator.externalTextFor(ALLEGRO, carrier)).contains("INPOST");
+        assertThat(translator.externalTextFor(CENEO, carrier)).contains("1");
+        assertThat(translator.externalTextFor(FURGONETKA, carrier)).contains("inpost_courier");
     }
 
     @Test
@@ -182,8 +182,8 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         List<String> sources = List.of(FURGONETKA, CENEO_FORMS);
 
         // then
-        assertThat(translator.textFor(CENEO, "dhl", sources)).contains("2");
-        assertThat(translator.textFor(CENEO, "my", sources)).isEmpty();
+        assertThat(translator.externalTextForShipmentCarrier(CENEO, "dhl", sources)).contains("2");
+        assertThat(translator.externalTextForShipmentCarrier(CENEO, "my", sources)).isEmpty();
     }
 
     @Test
@@ -193,7 +193,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
 
         // then
         assertThat(carrier).isEqualTo("Poczta Polska");
-        assertThat(translator.textFor(CENEO, carrier)).contains("4");
+        assertThat(translator.externalTextFor(CENEO, carrier)).contains("4");
     }
 
     @Test
@@ -211,22 +211,22 @@ class CarriersEndToEndDynamoDbIntegrationTest {
 
         // then
         assertThat(carrier).isEqualTo("Allegro One");
-        assertThat(translator.textFor(ALLEGRO, carrier)).contains("ALLEGRO");
+        assertThat(translator.externalTextFor(ALLEGRO, carrier)).contains("ALLEGRO");
     }
 
     @Test
     void anUnknownCarrierTextPassesEveryPathUnchangedAndWithoutACode() {
-        // given: texts typed by hand or sent by a seller, as found on orders
-        List<String> texts = List.of("my", "me", "Odbiór osobisty w sklepie", "Kurier własny 24h", "123");
+        // given
+        List<String> handTypedOrSellerTexts = List.of("my", "me", "Odbiór osobisty w sklepie", "Kurier własny 24h", "123");
 
         // when / then
-        for (String text : texts) {
-            assertThat(translator.carrierFor(ALLEGRO_METHODS, text)).isEqualTo(text);
-            assertThat(translator.carrierFor(MORELE, text)).isEqualTo(text);
-            assertThat(translator.carrierFor(FURGONETKA, text)).isEqualTo(text);
-            assertThat(translator.textFor(FURGONETKA, text, List.of(FURGONETKA))).isEmpty();
-            assertThat(translator.textFor(ALLEGRO, text, List.of(FURGONETKA, ALLEGRO_METHODS))).isEmpty();
-            assertThat(translator.textFor(CENEO, text, List.of(FURGONETKA, CENEO_FORMS))).isEmpty();
+        for (String unknownText : handTypedOrSellerTexts) {
+            assertThat(translator.carrierFor(ALLEGRO_METHODS, unknownText)).isEqualTo(unknownText);
+            assertThat(translator.carrierFor(MORELE, unknownText)).isEqualTo(unknownText);
+            assertThat(translator.carrierFor(FURGONETKA, unknownText)).isEqualTo(unknownText);
+            assertThat(translator.externalTextForShipmentCarrier(FURGONETKA, unknownText, List.of(FURGONETKA))).isEmpty();
+            assertThat(translator.externalTextForShipmentCarrier(ALLEGRO, unknownText, List.of(FURGONETKA, ALLEGRO_METHODS))).isEmpty();
+            assertThat(translator.externalTextForShipmentCarrier(CENEO, unknownText, List.of(FURGONETKA, CENEO_FORMS))).isEmpty();
         }
     }
 
@@ -237,8 +237,8 @@ class CarriersEndToEndDynamoDbIntegrationTest {
 
         // when / then
         for (String source : sources) {
-            assertThat(translator.carrierFor(CarrierDictionary.marketplaceImport(source), "DPD")).isEqualTo("DPD");
-            assertThat(translator.textFor(CarrierDictionary.marketplaceStatus(source), "DPD")).isEmpty();
+            assertThat(translator.carrierFor(CarrierDictionary.marketplaceOrderCarrierTexts(source), "DPD")).isEqualTo("DPD");
+            assertThat(translator.externalTextFor(CarrierDictionary.marketplaceStatusCarrierCodes(source), "DPD")).isEmpty();
         }
     }
 
@@ -280,7 +280,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
                 .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.list(CarriersController.DictionaryRow.class))
                 .extracting(CarriersController.DictionaryRow::key)
                 .containsExactly(ALLEGRO_METHODS, ALLEGRO, CENEO_FORMS, CENEO, EMPIK,
-                        CarrierDictionary.marketplaceStatus("Empik"), MORELE, CarrierDictionary.marketplaceStatus("Morele"),
+                        CarrierDictionary.marketplaceStatusCarrierCodes("Empik"), MORELE, CarrierDictionary.marketplaceStatusCarrierCodes("Morele"),
                         WZA, FURGONETKA);
         assertThat(html).doesNotContain("??").contains("InPost Kurier").contains("Allegro One")
                 .contains("global#marketplace#allegro#import").contains("global#shipping#furgonetka")
@@ -292,7 +292,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
     void anAdapterThatIsNotInstalledHasNoDictionaryPage() throws Exception {
         // when / then
         mvc.perform(get(CarriersController.DICTIONARY_PATH)
-                        .param("dictionary", CarrierDictionary.marketplaceImport("Erli")))
+                        .param("dictionary", CarrierDictionary.marketplaceOrderCarrierTexts("Erli")))
                 .andExpect(status().isNotFound());
     }
 
@@ -309,7 +309,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         // then
         CarrierDictionary after = dictionaries.get(MORELE);
         assertThat(after.getVersion()).isEqualTo(before.getVersion() + 1);
-        assertThat(after.getMappings()).extracting(m -> m.getText() + "=" + m.getCarrier())
+        assertThat(after.getMappings()).extracting(m -> m.getExternalText() + "=" + m.getCarrier())
                 .containsExactly("4=Orlen", "2=InPost", "5=Orlen", "6=Zabka", "7=Poczta Polska", "8=DPD");
         assertThat(translator.carrierFor(MORELE, "8")).isEqualTo("DPD");
     }
@@ -326,7 +326,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         // then
         assertThat(stale.getModelAndView().getModel().get("settingsErrorMessage"))
                 .isEqualTo("Ktoś zapisał ten słownik w międzyczasie. Odśwież stronę i wprowadź zmiany jeszcze raz.");
-        assertThat(dictionaries.get(WZA).getMappings()).extracting(CarrierMapping::getText).containsExactly("DPD", "ALLEGRO");
+        assertThat(dictionaries.get(WZA).getMappings()).extracting(CarrierMapping::getExternalText).containsExactly("DPD", "ALLEGRO");
         assertThat(render("carrier-dictionary", stale)).contains("value=\"DHL\"");
     }
 
@@ -366,7 +366,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
     void onlyTheSharedDictionariesAreEditedHere() throws Exception {
         // when / then
         mvc.perform(get(CarriersController.DICTIONARY_PATH)
-                        .param("dictionary", CarrierDictionary.supplier("store-1", "Shoper-1")))
+                        .param("dictionary", CarrierDictionary.supplierDeliveryMethods("store-1", "Shoper-1")))
                 .andExpect(status().isNotFound());
     }
 
@@ -403,7 +403,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
                 .locale(PL);
         for (String pair : pairs) {
             String[] parts = pair.split("=", -1);
-            request.param("text", parts[0]).param("carrier", parts[1]);
+            request.param("externalText", parts[0]).param("carrier", parts[1]);
         }
         return request;
     }

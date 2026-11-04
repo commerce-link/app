@@ -199,7 +199,7 @@ public class DropshipTrackingService {
             String collectionPointCode = pickup != null ? pickup.getCollectionPointCode() : null;
             LocalDateTime shippedAt = parcel.shippedAt() != null ? parcel.shippedAt() : now;
             String carrier = carrierTranslator.carrierFor(
-                    CarrierDictionary.supplier(storeId, delivery.getProvider()), parcel.carrier());
+                    CarrierDictionary.supplierDeliveryMethods(storeId, delivery.getProvider()), parcel.carrier());
             DropshipShipment shipment = new DropshipShipment(type, carrier, parcel.trackingNo(),
                     collectionPointCode, shippedAt, parcel.trackingUrl());
             String invalidShipment = shipment.validationError();

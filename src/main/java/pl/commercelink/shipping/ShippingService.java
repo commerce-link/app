@@ -272,8 +272,8 @@ public class ShippingService {
         if (integration == null || StringUtils.isBlank(deliveryTarget.carrier())) {
             return Optional.empty();
         }
-        String dictionary = CarrierDictionary.shipping(integration);
-        return carrierTranslator.textFor(dictionary, deliveryTarget.carrier(), List.of(dictionary));
+        String dictionary = CarrierDictionary.shippingLabelCarrierCodes(integration);
+        return carrierTranslator.externalTextForShipmentCarrier(dictionary, deliveryTarget.carrier(), List.of(dictionary));
     }
 
     /** The services of the code, or every service the store ticked when there is no code or none of them has it. */

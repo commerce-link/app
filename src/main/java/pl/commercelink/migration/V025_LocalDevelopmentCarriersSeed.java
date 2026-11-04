@@ -34,17 +34,17 @@ public class V025_LocalDevelopmentCarriersSeed {
     public void seed() {
         DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
         CARRIERS.forEach(name -> mapper.save(new Carrier(name, null)));
-        mapper.save(dictionary(CarrierDictionary.marketplaceImport("allegro"),
+        mapper.save(dictionary(CarrierDictionary.marketplaceOrderCarrierTexts("allegro"),
                 "Paczkomat=InPost", "InPost=InPost", "Pocztex=Poczta Polska", "Poczta=Poczta Polska", "Orlen=Orlen",
                 "DHL=DHL", "DPD=DPD", "UPS=UPS", "GLS=GLS", "FedEx=FedEx", "Schenker=DB Schenker", "Allegro One=Allegro One"));
-        mapper.save(dictionary(CarrierDictionary.marketplaceStatus("allegro"),
+        mapper.save(dictionary(CarrierDictionary.marketplaceStatusCarrierCodes("allegro"),
                 "INPOST=InPost", "INPOST=InPost Kurier", "DHL=DHL", "DPD=DPD", "POCZTA_POLSKA=Poczta Polska",
                 "ORLEN=Orlen", "UPS=UPS", "GLS=GLS", "FEDEX=FedEx", "DB_SCHENKER=DB Schenker", "ALLEGRO=Allegro One",
                 "RABEN=Raben", "MEEST=Meest", "AMBRO_EXPRESS=Ambro Express"));
-        mapper.save(dictionary(CarrierDictionary.shipping("furgonetka"),
+        mapper.save(dictionary(CarrierDictionary.shippingLabelCarrierCodes("furgonetka"),
                 "inpost=InPost", "dpd=DPD", "dhl=DHL", "poczta=Poczta Polska", "orlen=Orlen", "ups=UPS", "gls=GLS",
                 "fedex=FedEx", "meest=Meest", "ambroexpress=Ambro Express", "xpress=X-press"));
-        mapper.save(dictionary(CarrierDictionary.shipping("allegro"),
+        mapper.save(dictionary(CarrierDictionary.shippingLabelCarrierCodes("allegro"),
                 "INPOST=InPost", "DHL=DHL", "DPD=DPD", "POCZTA_POLSKA=Poczta Polska", "ORLEN=Orlen", "UPS=UPS",
                 "GLS=GLS", "FEDEX=FedEx", "DB_SCHENKER=DB Schenker", "ALLEGRO=Allegro One", "RABEN=Raben",
                 "MEEST=Meest", "AMBRO_EXPRESS=Ambro Express"));

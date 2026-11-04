@@ -9,11 +9,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CarrierTranslatorTest {
 
-    private static final String ALLEGRO_METHODS = CarrierDictionary.marketplaceImport("Allegro");
-    private static final String ALLEGRO = CarrierDictionary.marketplaceStatus("Allegro");
-    private static final String MORELE = CarrierDictionary.marketplaceImport("Morele");
-    private static final String FURGONETKA = CarrierDictionary.shipping("furgonetka");
-    private static final String SHOPER = CarrierDictionary.supplier("store-1", "Shoper-k7f3a9c2");
+    private static final String ALLEGRO_METHODS = CarrierDictionary.marketplaceOrderCarrierTexts("Allegro");
+    private static final String ALLEGRO = CarrierDictionary.marketplaceStatusCarrierCodes("Allegro");
+    private static final String MORELE = CarrierDictionary.marketplaceOrderCarrierTexts("Morele");
+    private static final String FURGONETKA = CarrierDictionary.shippingLabelCarrierCodes("furgonetka");
+    private static final String SHOPER = CarrierDictionary.supplierDeliveryMethods("store-1", "Shoper-k7f3a9c2");
 
     private final CarrierTranslator translator = new InMemoryCarrierDictionaries()
             .with(ALLEGRO_METHODS, "Paczkomat=InPost", "Kurier24 InPost=InPost Kurier", "InPost=InPost", "DPD=DPD")
@@ -54,8 +54,8 @@ class CarrierTranslatorTest {
     void firstPairDecidesInBothDirections() {
         // when / then
         assertThat(translator.carrierFor(ALLEGRO, "INPOST")).isEqualTo("InPost");
-        assertThat(translator.textFor(ALLEGRO, "InPost Kurier")).contains("INPOST");
-        assertThat(translator.textFor(SHOPER, "DPD")).contains("5");
+        assertThat(translator.externalTextFor(ALLEGRO, "InPost Kurier")).contains("INPOST");
+        assertThat(translator.externalTextFor(SHOPER, "DPD")).contains("5");
     }
 
     @Test
@@ -68,7 +68,7 @@ class CarrierTranslatorTest {
     @Test
     void readsAnOlderLabelCodeThroughTheGivenDictionaries() {
         // when
-        Optional<String> code = translator.textFor(ALLEGRO, "inpost_courier", List.of(FURGONETKA));
+        Optional<String> code = translator.externalTextForShipmentCarrier(ALLEGRO, "inpost_courier", List.of(FURGONETKA));
 
         // then
         assertThat(code).contains("INPOST");
@@ -77,7 +77,7 @@ class CarrierTranslatorTest {
     @Test
     void missingDictionaryRecognizesNothing() {
         // when / then
-        assertThat(translator.carrierFor(CarrierDictionary.shipping("apaczka"), "inpost")).isEqualTo("inpost");
-        assertThat(translator.textFor(CarrierDictionary.shipping("apaczka"), "InPost")).isEmpty();
+        assertThat(translator.carrierFor(CarrierDictionary.shippingLabelCarrierCodes("apaczka"), "inpost")).isEqualTo("inpost");
+        assertThat(translator.externalTextFor(CarrierDictionary.shippingLabelCarrierCodes("apaczka"), "InPost")).isEmpty();
     }
 }

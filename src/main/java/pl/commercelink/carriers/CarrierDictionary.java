@@ -16,13 +16,13 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * One set of names or codes of an external system, as an ordered list of {text, carrier} pairs. Within a dictionary
- * the mapping works both ways, and the order settles both ambiguities: of several texts of one carrier the first goes
- * out, of several carriers of one text the first comes in.
+ * One set of names or codes of an external system, as an ordered list of {externalText, carrier} pairs. Within a
+ * dictionary the mapping works both ways, and the order settles both ambiguities: of several external texts of one
+ * carrier the first goes out, of several carriers of one external text the first comes in.
  * <p>
- * The key is {scope}#{type}#{name}. The caller always knows where a text came from, so it names the dictionary;
- * there is no fallback from a store to the global scope. The separator is '#' because supplier connection ids
- * contain '-'.
+ * The key is {scope}#{type}#{name}. The caller always knows where an external text came from, so it names the
+ * dictionary; there is no fallback from a store to the global scope. The separator is '#' because supplier
+ * connection ids contain '-'.
  */
 @DynamoDBTable(tableName = CarrierDictionary.TABLE_NAME)
 @Getter
@@ -54,21 +54,20 @@ public class CarrierDictionary {
         return new CarrierDictionary(dictionary, List.of());
     }
 
-    /** The carrier text an imported order of the marketplace brings (Allegro: delivery method names). */
-    public static String marketplaceImport(String marketplace) {
+    public static String marketplaceOrderCarrierTexts(String marketplace) {
         return key(GLOBAL, MARKETPLACE, lower(marketplace) + SEPARATOR + "import");
     }
 
-    /** The carrier code sent with the shipment status and received with returns; empty for a marketplace that takes none. */
-    public static String marketplaceStatus(String marketplace) {
+    // also read for returns; left empty for a marketplace whose status takes no carrier code
+    public static String marketplaceStatusCarrierCodes(String marketplace) {
         return key(GLOBAL, MARKETPLACE, lower(marketplace) + SEPARATOR + "status");
     }
 
-    public static String shipping(String integration) {
+    public static String shippingLabelCarrierCodes(String integration) {
         return key(GLOBAL, SHIPPING, lower(integration));
     }
 
-    public static String supplier(String storeId, String connection) {
+    public static String supplierDeliveryMethods(String storeId, String connection) {
         return key(storeId, SUPPLIER, connection);
     }
 
@@ -81,42 +80,44 @@ public class CarrierDictionary {
         return type(dictionary).filter(SUPPLIER::equals).isPresent();
     }
 
-    public Optional<String> carrierFor(String text) {
-        String normalized = normalize(text);
+    public Optional<String> carrierFor(String externalText) {
+        String normalized = normalize(externalText);
         if (normalized == null) {
             return Optional.empty();
         }
         return mappings().stream()
-                .filter(mapping -> normalized.equalsIgnoreCase(mapping.getText()))
+                .filter(mapping -> normalized.equalsIgnoreCase(mapping.getExternalText()))
                 .map(CarrierMapping::getCarrier)
                 .findFirst();
     }
 
     /**
-     * The carrier of the longest text of the list contained in the given one, for systems that send whole names
-     * ("Allegro Paczkomaty InPost 24/7"). A text made of digits only matches exactly, so Morele's "14" is not "4".
+     * The carrier of the longest external text of the list contained in the given one, for systems that send whole
+     * names ("Allegro Paczkomaty InPost 24/7"). An external text made of digits only matches exactly, so Morele's "14"
+     * is not "4".
      */
-    public Optional<String> carrierByFragmentFor(String text) {
-        String normalized = normalize(text);
+    public Optional<String> carrierByFragmentFor(String externalText) {
+        String normalized = normalize(externalText);
         if (normalized == null) {
             return Optional.empty();
         }
         String upper = normalized.toUpperCase(Locale.ROOT);
         return mappings().stream()
-                .filter(mapping -> mapping.getText() != null && !StringUtils.isNumeric(mapping.getText()))
-                .filter(mapping -> upper.contains(mapping.getText().toUpperCase(Locale.ROOT)))
-                .max(Comparator.comparingInt(mapping -> mapping.getText().length()))
+                .filter(mapping -> mapping.getExternalText() != null)
+                .filter(mapping -> !StringUtils.isNumeric(mapping.getExternalText()))
+                .filter(mapping -> upper.contains(mapping.getExternalText().toUpperCase(Locale.ROOT)))
+                .max(Comparator.comparingInt(mapping -> mapping.getExternalText().length()))
                 .map(CarrierMapping::getCarrier);
     }
 
-    public Optional<String> textFor(String carrier) {
+    public Optional<String> externalTextFor(String carrier) {
         if (StringUtils.isBlank(carrier)) {
             return Optional.empty();
         }
         String name = carrier.trim();
         return mappings().stream()
                 .filter(mapping -> name.equalsIgnoreCase(mapping.getCarrier()))
-                .map(CarrierMapping::getText)
+                .map(CarrierMapping::getExternalText)
                 .findFirst();
     }
 

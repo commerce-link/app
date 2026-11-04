@@ -8,8 +8,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CarrierDictionaryWriterTest {
 
-    private static final String MORELE = CarrierDictionary.marketplaceImport("Morele");
-    private static final String SHOPER = CarrierDictionary.supplier("store-1", "Shoper-1");
+    private static final String MORELE = CarrierDictionary.marketplaceOrderCarrierTexts("Morele");
+    private static final String SHOPER = CarrierDictionary.supplierDeliveryMethods("store-1", "Shoper-1");
 
     private final InMemoryCarrierDictionaries repository = new InMemoryCarrierDictionaries();
     private final CarrierDictionaryWriter writer = new CarrierDictionaryWriter(repository);
@@ -25,7 +25,7 @@ class CarrierDictionaryWriterTest {
         // then
         assertThat(result.isSaved()).isTrue();
         assertThat(repository.get(MORELE).getMappings())
-                .extracting(CarrierMapping::getText, CarrierMapping::getCarrier)
+                .extracting(CarrierMapping::getExternalText, CarrierMapping::getCarrier)
                 .containsExactly(org.assertj.core.groups.Tuple.tuple("7", "Poczta Polska"),
                         org.assertj.core.groups.Tuple.tuple("Kurier DPD", "DPD"));
     }
@@ -68,6 +68,6 @@ class CarrierDictionaryWriterTest {
 
         // then
         assertThat(result.refusal()).isEqualTo(CarrierDictionaryWriter.Refusal.AMBIGUOUS_SUPPLIER_TEXT);
-        assertThat(result.text()).isEqualTo("5");
+        assertThat(result.externalText()).isEqualTo("5");
     }
 }

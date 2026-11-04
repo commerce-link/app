@@ -26,7 +26,7 @@ public class ShipmentCreationSettler {
 
     public void succeeded(ShipmentCreationCheckRequest request, ShipmentResult result) {
         List<Shipment> created = ShipmentResults.toShipments(result, request.getProvider(), request.getPickUpAddressId());
-        nameCarriers(request.getProvider(), created);
+        replaceLabelCodesWithCarriers(request.getProvider(), created);
         if (!owners.get(request.getOwnerType()).succeeded(request, created)) {
             log.warn("Creation result dropped, nothing waits for it: store={} owner={} {} command={}",
                     request.getStoreId(), request.getOwnerType(), request.getOwnerId(), request.getCommandId());
@@ -37,12 +37,11 @@ public class ShipmentCreationSettler {
         }
     }
 
-    /** The label's code becomes our carrier's name (inpost_courier: InPost Kurier); an unknown code stays as it came. */
-    private void nameCarriers(String provider, List<Shipment> created) {
+    private void replaceLabelCodesWithCarriers(String provider, List<Shipment> created) {
         if (provider == null) {
             return;
         }
-        String dictionary = CarrierDictionary.shipping(provider);
+        String dictionary = CarrierDictionary.shippingLabelCarrierCodes(provider);
         created.forEach(shipment -> shipment.setCarrier(carrierTranslator.carrierFor(dictionary, shipment.getCarrier())));
     }
 
