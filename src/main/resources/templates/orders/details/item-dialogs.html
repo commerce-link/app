@@ -36,12 +36,13 @@
                     <div class="cl-span-4 cl-field">
                         <label class="cl-label" for="assign-sku-search" th:text="#{general.search}"></label>
                         <input class="cl-input" id="assign-sku-search" type="search" data-cl-sku-search
-                               th:placeholder="#{order.item.assign.sku.search.placeholder}">
+                               th:placeholder="#{order.item.assign.sku.search.codes}">
                     </div>
                     <div class="cl-span-2 cl-field">
                         <label class="cl-label" for="assign-sku-manual" th:text="#{order.item.assign.sku.manual.placeholder}"></label>
                         <div class="cl-input-row">
-                            <input class="cl-input" id="assign-sku-manual" type="text" data-cl-sku-manual autocomplete="off">
+                            <input class="cl-input" id="assign-sku-manual" type="text" inputmode="numeric" data-cl-sku-manual autocomplete="off"
+                                   pattern="\s*\d{8,14}\s*" th:title="#{product.error.ean.invalid}">
                             <button type="button" class="cl-button" data-cl-sku-add th:text="#{general.add}"></button>
                         </div>
                     </div>
@@ -52,7 +53,8 @@
                         <th scope="col" class="cl-table-check"><span class="cl-visually-hidden" th:text="#{order.item.assign.sku.pick}"></span></th>
                         <th scope="col" th:text="#{order.item.name}"></th>
                         <th scope="col" th:text="#{order.item.assign.sku.label}"></th>
-                        <th scope="col" th:text="#{order.item.sku}"></th>
+                        <th scope="col" th:text="#{general.ean}"></th>
+                        <th scope="col" th:text="#{general.manufacturer.code}"></th>
                         <th scope="col" class="is-numeric" th:text="#{order.item.price}"></th>
                         <th scope="col" class="is-numeric" th:text="#{order.item.assign.sku.availability}"></th>
                     </tr></thead>
@@ -236,18 +238,19 @@
         <input type="hidden" name="itemId" data-cl-item-id th:value="${supplierForm?.itemId}">
         <div class="cl-form-grid">
             <div class="cl-span-6 cl-field">
-                <label class="cl-label" for="assign-supplier-mfn" th:text="#{general.manufacturer.code}"></label>
-                <input class="cl-input" id="assign-supplier-mfn" name="manufacturerCode" type="text" required autocomplete="off"
-                       th:value="${supplierForm?.manufacturerCode}" th:placeholder="#{inventory.product.code.placeholder}">
-                <ul class="cl-chip-list" data-cl-mfn-options></ul>
-            </div>
-            <!--/* only after the manufacturer code missed the taxonomy; order-item-dialogs.js drops it when the dialog reopens */-->
-            <div class="cl-span-6 cl-field" data-cl-ean-field th:if="${supplierEanField != null and supplierEanField}">
                 <label class="cl-label" for="assign-supplier-ean" th:text="#{general.ean}"></label>
-                <input class="cl-input" id="assign-supplier-ean" name="ean" type="text" inputmode="numeric" autocomplete="off"
+                <input class="cl-input" id="assign-supplier-ean" name="ean" type="text" inputmode="numeric" required autocomplete="off"
                        pattern="\s*\d{8,14}\s*" th:value="${supplierForm?.ean}" th:title="#{product.error.ean.invalid}"
                        aria-describedby="assign-supplier-ean-hint">
+                <ul class="cl-chip-list" data-cl-ean-options></ul>
                 <p class="cl-help" id="assign-supplier-ean-hint" th:text="#{order.item.supplier.ean.hint}"></p>
+            </div>
+            <!--/* only after the EAN missed the taxonomy; order-item-dialogs.js drops it when the dialog reopens */-->
+            <div class="cl-span-6 cl-field" data-cl-mfn-field th:if="${supplierMfnField != null and supplierMfnField}">
+                <label class="cl-label" for="assign-supplier-mfn" th:text="#{general.manufacturer.code}"></label>
+                <input class="cl-input" id="assign-supplier-mfn" name="manufacturerCode" type="text" autocomplete="off"
+                       th:value="${supplierForm?.manufacturerCode}" aria-describedby="assign-supplier-mfn-hint">
+                <p class="cl-help" id="assign-supplier-mfn-hint" th:text="#{order.item.supplier.mfn.hint}"></p>
             </div>
             <div class="cl-span-6 cl-field">
                 <label class="cl-label" for="assign-supplier-cost" th:text="#{order.item.price.purchase}"></label>

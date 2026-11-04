@@ -156,6 +156,7 @@ class OrdersControllerTest {
 
     private static final String STORE_ID = "store-1";
     private static final String ORDER_ID = "order-1";
+    private static final String SUPPLIER_EAN = "5901234567890";
 
     @Mock
     private OrdersRepository ordersRepository;
@@ -2363,7 +2364,7 @@ class OrdersControllerTest {
                 .thenReturn("blocked");
 
         // when
-        String view = ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "MFN-2", "50", "net", "d-2", null), null,
+        String view = ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "5901234123457", "50", "net", "d-2", null), null,
                 new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(), redirectAttributes, Locale.ENGLISH);
 
         // then
@@ -2410,7 +2411,7 @@ class OrdersControllerTest {
                 .thenReturn("routed");
 
         // when
-        String view = ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "MFN-2", "50", "net", "Bravo", null), null,
+        String view = ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "5901234123457", "50", "net", "Bravo", null), null,
                 new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(), redirectAttributes, Locale.ENGLISH);
 
         // then
@@ -2428,16 +2429,17 @@ class OrdersControllerTest {
         when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routedOrder("2"));
         when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
-        when(taxonomyCache.findByMfn("MFN-2")).thenReturn(
+        when(taxonomyCache.findByEan("5901234123457")).thenReturn(
                 new Taxonomy("5901234123457", "MFN-2", "Brand", "Name", "Laptopy", 5, null, null, "raw"));
 
         // when
-        String view = ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "MFN-2", "50", "net", "Acme", null), null,
+        String view = ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "5901234123457", "50", "net", "Acme", null), null,
                 new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(), redirectAttributes, Locale.ENGLISH);
 
         // then
         assertThat(item.getDeliveryId()).isEqualTo("Acme");
         assertThat(item.getEan()).isEqualTo("5901234123457");
+        assertThat(item.getManufacturerCode()).isEqualTo("MFN-2");
         verify(orderItemsRepository).save(item);
         verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
@@ -2454,7 +2456,7 @@ class OrdersControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "MFN-1", "10", "net", "Bravo-k7f3a9c2", null), null,
+        ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "5901234567890", "10", "net", "Bravo-k7f3a9c2", null), null,
                 new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
 
         // then
@@ -2476,7 +2478,7 @@ class OrdersControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "MFN-1", "10", "net", "Acme", null), null,
+        ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "5901234567890", "10", "net", "Acme", null), null,
                 new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
 
         // then
@@ -2492,12 +2494,12 @@ class OrdersControllerTest {
         when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routedOrder(null));
         when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
-        when(taxonomyCache.findByMfn("MFN-2")).thenReturn(
+        when(taxonomyCache.findByEan("5901234123457")).thenReturn(
                 new Taxonomy("5901234123457", "MFN-2", "Brand", "Name", "Laptopy", 5, null, null, "raw"));
 
         // when
         String view = ordersController.assignSupplier(ORDER_ID,
-                AssignSupplierForm.of(item.getItemId(), "MFN-2", "50", "net", SupplierChoice.CUSTOM, "  HURT-ABC "), null,
+                AssignSupplierForm.of(item.getItemId(), "5901234123457", "50", "net", SupplierChoice.CUSTOM, "  HURT-ABC "), null,
                 new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(), redirectAttributes, Locale.ENGLISH);
 
         // then
@@ -2519,7 +2521,7 @@ class OrdersControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "MFN-1", "10", "net", SupplierChoice.CUSTOM, "Stub"), null,
+        ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "5901234567890", "10", "net", SupplierChoice.CUSTOM, "Stub"), null,
                 new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
 
         // then
@@ -5133,10 +5135,47 @@ class OrdersControllerTest {
         }
 
         @Test
-        void aMissingEanKeepsTheOperatorInTheDialogWithTheReason() {
+        void theCodeIsTakenFromTheTaxonomyByTheEanOfTheDialog() {
+            // given
+            OrderItem item = supplierItem(1.23);
+            when(taxonomyCache.findByEan(SUPPLIER_EAN)).thenReturn(
+                    new Taxonomy(SUPPLIER_EAN, "SM-G991B", "Samsung", "Galaxy S21", "Smartfony", 1, null, null, "raw"));
+
+            // when
+            String view = ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net"), null,
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(),
+                    new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(item.getEan()).isEqualTo(SUPPLIER_EAN);
+            assertThat(item.getManufacturerCode()).isEqualTo("SM-G991B");
+            assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+            verify(orderItemsRepository).save(item);
+        }
+
+        @Test
+        void anEanWithALeadingZeroIsLookedUpAndStoredUnified() {
+            // given
+            OrderItem item = supplierItem(1.23);
+            when(taxonomyCache.findByEan(SUPPLIER_EAN)).thenReturn(
+                    new Taxonomy(SUPPLIER_EAN, "SM-G991B", "Samsung", "Galaxy S21", "Smartfony", 1, null, null, "raw"));
+
+            // when
+            ordersController.assignSupplier(ORDER_ID, supplierForm(" 0" + SUPPLIER_EAN + " ", "100", "net", null), null,
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(),
+                    new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(item.getEan()).isEqualTo(SUPPLIER_EAN);
+            assertThat(item.getManufacturerCode()).isEqualTo("SM-G991B");
+        }
+
+        @Test
+        void anEanTheTaxonomyDoesNotKnowKeepsTheOperatorInTheDialogAskingForTheCode() {
             // given
             supplierItem(1.23);
-            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
+            when(taxonomyCache.findByEan(SUPPLIER_EAN)).thenReturn(null);
             MockHttpServletResponse response = new MockHttpServletResponse();
             ExtendedModelMap model = new ExtendedModelMap();
 
@@ -5147,54 +5186,55 @@ class OrdersControllerTest {
             // then
             assertThat(view).isEqualTo("orders/details/item-dialogs :: supplierForm");
             assertThat(response.getStatus()).isEqualTo(422);
-            assertThat(model.get("supplierError")).isEqualTo("order.item.ean.not.found");
-            assertThat(model.get("supplierEanField")).isEqualTo(true);
+            assertThat(model.get("supplierError")).isEqualTo("order.item.mfn.not.found");
+            assertThat(model.get("supplierMfnField")).isEqualTo(true);
             assertThat(model).containsKeys("orderId", "supplierForm", "suppliers");
             verify(orderItemsRepository, never()).save(any());
         }
 
         @Test
-        void aTypedEanAssignsTheSupplierWhenTheTaxonomyDoesNotKnowTheProduct() {
+        void aTypedCodeAssignsTheSupplierWhenTheTaxonomyDoesNotKnowTheEan() {
             // given
             OrderItem item = supplierItem(1.23);
-            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
+            when(taxonomyCache.findByEan(SUPPLIER_EAN)).thenReturn(null);
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
-            String view = ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net", " 5901234567890 "), null,
+            String view = ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net", " sm-g991b "), null,
                     new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(), redirect, polish);
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-            assertThat(item.getEan()).isEqualTo("5901234567890");
+            assertThat(item.getEan()).isEqualTo(SUPPLIER_EAN);
+            assertThat(item.getManufacturerCode()).isEqualTo("SM-G991B");
             assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
             verify(orderItemsRepository).save(item);
         }
 
         @Test
-        void aTypedEanDoesNotOverrideTheTaxonomy() {
+        void aTypedCodeDoesNotOverrideTheTaxonomy() {
             // given
             OrderItem item = supplierItem(1.23);
-            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(
-                    new Taxonomy("5901234567890", "MFN-1", "Brand", "name", "CPU", 1, null, null, "raw"));
+            when(taxonomyCache.findByEan(SUPPLIER_EAN)).thenReturn(
+                    new Taxonomy(SUPPLIER_EAN, "SM-G991B", "Samsung", "Galaxy S21", "Smartfony", 1, null, null, "raw"));
 
             // when
-            ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net", "4006381333931"), null,
+            ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net", "OTHER-CODE"), null,
                     new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(),
                     new RedirectAttributesModelMap(), polish);
 
             // then
-            assertThat(item.getEan()).isEqualTo("5901234567890");
+            assertThat(item.getManufacturerCode()).isEqualTo("SM-G991B");
             assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
         }
 
         @Test
-        void theItemsOwnEanIsKeptWhenTheProductCodeIsUnchanged() {
-            // given: the EAN was typed earlier on the item's edit page
+        void theItemsOwnCodeIsKeptWhenTheEanIsUnchanged() {
+            // given: the code was given earlier, for the same EAN
             OrderItem item = supplierItem(1.23);
-            item.setManufacturerCode("MFN-1");
-            item.setEan("5901234567890");
-            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
+            item.setEan(SUPPLIER_EAN);
+            item.setManufacturerCode("MFN-OWN");
+            when(taxonomyCache.findByEan(SUPPLIER_EAN)).thenReturn(null);
 
             // when
             ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net"), null,
@@ -5202,17 +5242,17 @@ class OrdersControllerTest {
                     new RedirectAttributesModelMap(), polish);
 
             // then
-            assertThat(item.getEan()).isEqualTo("5901234567890");
+            assertThat(item.getManufacturerCode()).isEqualTo("MFN-OWN");
             assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
         }
 
         @Test
-        void theItemsOwnEanIsNotCarriedOverToAnotherProductCode() {
+        void theItemsOwnCodeIsNotCarriedOverToAnotherEan() {
             // given
             OrderItem item = supplierItem(1.23);
-            item.setManufacturerCode("MFN-OLD");
-            item.setEan("5901234567890");
-            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
+            item.setEan("4006381333931");
+            item.setManufacturerCode("MFN-OWN");
+            when(taxonomyCache.findByEan(SUPPLIER_EAN)).thenReturn(null);
             ExtendedModelMap model = new ExtendedModelMap();
 
             // when
@@ -5221,43 +5261,41 @@ class OrdersControllerTest {
                     new RedirectAttributesModelMap(), polish);
 
             // then
-            assertThat(model.get("supplierError")).isEqualTo("order.item.ean.not.found");
+            assertThat(model.get("supplierError")).isEqualTo("order.item.mfn.not.found");
             verify(orderItemsRepository, never()).save(any());
         }
 
         @Test
-        void aMalformedTypedEanIsRefusedWithTheEanFieldStillShown() {
+        void aMalformedEanIsRefusedWithTheTypedCodeStillShown() {
             // given
             supplierItem(1.23);
-            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
             MockHttpServletResponse response = new MockHttpServletResponse();
             ExtendedModelMap model = new ExtendedModelMap();
 
             // when
-            ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net", "590-12AB"), "fetch",
+            ordersController.assignSupplier(ORDER_ID, supplierForm("590-12AB", "100", "net", "SM-G991B"), "fetch",
                     new MockHttpServletRequest(), response, model, new RedirectAttributesModelMap(), polish);
 
             // then
             assertThat(response.getStatus()).isEqualTo(422);
             assertThat(model.get("supplierError")).isEqualTo("product.error.ean.invalid");
-            assertThat(model.get("supplierEanField")).isEqualTo(true);
+            assertThat(model.get("supplierMfnField")).isEqualTo(true);
+            verify(taxonomyCache, never()).findByEan(any());
             verify(orderItemsRepository, never()).save(any());
         }
 
         @Test
-        void aBlankManufacturerCodeIsRefusedEvenWithATypedEan() {
+        void aBlankEanIsRefusedEvenWithATypedCode() {
             // given: the dialog marks the field required, a hand-made post does not have to
             OrderItem item = supplierItem(1.23);
-            AssignSupplierForm form = AssignSupplierForm.of("i1", " ", "100", "net", SupplierChoice.CUSTOM, "HURT-ABC");
-            form.setEan("5901234567890");
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
-            ordersController.assignSupplier(ORDER_ID, form, null, new MockHttpServletRequest(),
-                    new MockHttpServletResponse(), new ExtendedModelMap(), redirect, polish);
+            ordersController.assignSupplier(ORDER_ID, supplierForm(" ", "100", "net", "SM-G991B"), null,
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(), redirect, polish);
 
             // then
-            assertThat(flash(redirect)).containsEntry("errorMessage", "order.item.assign.mfn.required");
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.item.assign.ean.required");
             assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.New);
             verify(orderItemsRepository, never()).save(any());
         }
@@ -5266,8 +5304,8 @@ class OrdersControllerTest {
         void aGrossPurchasePriceIsStoredNetWithTheItemsVat() {
             // given
             OrderItem item = supplierItem(1.23);
-            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(
-                    new Taxonomy("5901234567890", "MFN-1", "Brand", "name", "CPU", 1, null, null, "raw"));
+            when(taxonomyCache.findByEan(SUPPLIER_EAN)).thenReturn(
+                    new Taxonomy(SUPPLIER_EAN, "MFN-1", "Brand", "name", "CPU", 1, null, null, "raw"));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
@@ -5304,8 +5342,8 @@ class OrdersControllerTest {
         void anAsyncSupplierSaveAnswersWithTheFragmentAndQueuesTheNoticeForTheRedirect() {
             // given
             OrderItem item = supplierItem(1.0);
-            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(
-                    new Taxonomy("5901234567890", "MFN-1", "Brand", "name", "CPU", 1, null, null, "raw"));
+            when(taxonomyCache.findByEan(SUPPLIER_EAN)).thenReturn(
+                    new Taxonomy(SUPPLIER_EAN, "MFN-1", "Brand", "name", "CPU", 1, null, null, "raw"));
             MockHttpServletRequest request = new MockHttpServletRequest();
             FlashMap flashMap = new FlashMap();
             request.setAttribute(DispatcherServlet.OUTPUT_FLASH_MAP_ATTRIBUTE, flashMap);
@@ -5321,7 +5359,7 @@ class OrdersControllerTest {
             assertThat(view).isEqualTo("orders/details/item-dialogs :: supplierForm");
             assertThat(response.getStatus()).isEqualTo(200);
             assertThat(model.get("supplierError")).isNull();
-            assertThat(model.get("supplierEanField")).isNull();
+            assertThat(model.get("supplierMfnField")).isNull();
             assertThat(model.get("supplierRedirect")).isEqualTo("/dashboard/orders/" + ORDER_ID);
             assertThat(((OrderNotice) flashMap.get(OrderFlash.ATTRIBUTE)).text()).isEqualTo("order.item.supplier.assigned");
             verify(orderItemsRepository).save(item);
@@ -5332,9 +5370,13 @@ class OrdersControllerTest {
             return supplierForm(cost, priceType, null);
         }
 
-        private AssignSupplierForm supplierForm(String cost, String priceType, String ean) {
-            AssignSupplierForm form = AssignSupplierForm.of("i1", "MFN-1", cost, priceType, SupplierChoice.CUSTOM, "HURT-ABC");
-            form.setEan(ean);
+        private AssignSupplierForm supplierForm(String cost, String priceType, String manufacturerCode) {
+            return supplierForm(SUPPLIER_EAN, cost, priceType, manufacturerCode);
+        }
+
+        private AssignSupplierForm supplierForm(String ean, String cost, String priceType, String manufacturerCode) {
+            AssignSupplierForm form = AssignSupplierForm.of("i1", ean, cost, priceType, SupplierChoice.CUSTOM, "HURT-ABC");
+            form.setManufacturerCode(manufacturerCode);
             return form;
         }
 

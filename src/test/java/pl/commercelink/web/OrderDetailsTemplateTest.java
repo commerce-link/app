@@ -1197,6 +1197,17 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void theSkuDialogPicksPricelistProductsByTheirEan() {
+        // when
+        String html = page(render(order(OrderStatus.New), ADMIN));
+
+        // then
+        String dialog = html.substring(html.indexOf("id=\"assign-sku-dialog\""), html.indexOf("id=\"assign-warehouse-dialog\""));
+        assertThat(dialog).contains("<th scope=\"col\">EAN</th>").contains("<th scope=\"col\">Kod producenta</th>")
+                .contains("Dodaj EAN ręcznie").contains("Szukaj po nazwie, EAN-ie lub kodzie");
+    }
+
+    @Test
     void theItemDialogsAreOnThePageAndTheMoveFieldBelongsToTheItemsForm() {
         // when
         String html = page(render(order(OrderStatus.New), ADMIN));
@@ -2235,44 +2246,45 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void theSupplierDialogAsksForNoEanUpFrontAndNamesTheCounterpartyField() {
+    void theSupplierDialogAsksForTheEanUpFrontAndNamesTheCounterpartyField() {
         // when
         String html = page(render(order(OrderStatus.New), ADMIN));
 
         // then
-        assertThat(html).contains("id=\"assign-supplier-dialog\"").doesNotContain("name=\"ean\"")
+        assertThat(html).contains("id=\"assign-supplier-dialog\"").contains("id=\"assign-supplier-ean\"")
+                .contains("name=\"ean\"").doesNotContain("name=\"manufacturerCode\"")
                 .contains(">Skrót kontrahenta w systemie fakturowym<").doesNotContain(">np. HURT-ABC<");
     }
 
     @Test
-    void theSupplierDialogOffersTheEanFieldOnceTheTaxonomyMissedTheCode() {
+    void theSupplierDialogOffersTheCodeFieldOnceTheTaxonomyMissedTheEan() {
         // given
-        AssignSupplierForm form = AssignSupplierForm.of("i1", "MFN-X", "100", "net", SupplierChoice.CUSTOM, "HURT-ABC");
-        form.setEan("5901234567890");
+        AssignSupplierForm form = AssignSupplierForm.of("i1", "5901234567890", "100", "net", SupplierChoice.CUSTOM, "HURT-ABC");
+        form.setManufacturerCode("SM-G991B");
         Map<String, Object> variables = new HashMap<>();
         variables.put("orderId", "o1");
         variables.put("supplierForm", form);
-        variables.put("supplierError", "Tego kodu producenta nie ma w bazie produktów");
+        variables.put("supplierError", "Tego EAN-u nie ma w bazie produktów");
         variables.put("suppliers", List.of());
-        variables.put("supplierEanField", true);
+        variables.put("supplierMfnField", true);
 
         // when
         String html = SettingsTemplateRenderer.render(
                 "<div th:replace=\"~{orders/details/item-dialogs :: supplierForm}\"></div>", variables);
 
-        // then: the typed value survives the refusal
-        assertThat(html).contains("id=\"assign-supplier-ean\"").contains("name=\"ean\"")
-                .contains("value=\"5901234567890\"").contains("data-cl-ean-field");
+        // then: both typed values survive the refusal
+        assertThat(html).contains("id=\"assign-supplier-mfn\"").contains("name=\"manufacturerCode\"")
+                .contains("value=\"SM-G991B\"").contains("data-cl-mfn-field").contains("value=\"5901234567890\"");
     }
 
     @Test
     void aRefusedSupplierDialogKeepsTheChosenConnection() {
         // given: the hidden counterparty field is always posted, so a connection arrives with an empty custom name
-        AssignSupplierForm form = AssignSupplierForm.of("i1", "MFN-X", "100", "net", "Acme", "");
+        AssignSupplierForm form = AssignSupplierForm.of("i1", "5901234567890", "100", "net", "Acme", "");
         Map<String, Object> variables = new HashMap<>();
         variables.put("orderId", "o1");
         variables.put("supplierForm", form);
-        variables.put("supplierError", "Tego kodu producenta nie ma w bazie produktów");
+        variables.put("supplierError", "Tego EAN-u nie ma w bazie produktów");
         variables.put("suppliers", List.of(new SupplierLabelMap.Option("Acme", "Acme")));
 
         // when
@@ -2287,11 +2299,11 @@ class OrderDetailsTemplateTest {
     @Test
     void aRefusedSupplierDialogKeepsATypedSupplierName() {
         // given
-        AssignSupplierForm form = AssignSupplierForm.of("i1", "MFN-X", "100", "net", SupplierChoice.CUSTOM, "HURT-ABC");
+        AssignSupplierForm form = AssignSupplierForm.of("i1", "5901234567890", "100", "net", SupplierChoice.CUSTOM, "HURT-ABC");
         Map<String, Object> variables = new HashMap<>();
         variables.put("orderId", "o1");
         variables.put("supplierForm", form);
-        variables.put("supplierError", "Tego kodu producenta nie ma w bazie produktów");
+        variables.put("supplierError", "Tego EAN-u nie ma w bazie produktów");
         variables.put("suppliers", List.of(new SupplierLabelMap.Option("Acme", "Acme")));
 
         // when
