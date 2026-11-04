@@ -11,6 +11,7 @@ import org.springframework.boot.autoconfigure.http.HttpMessageConvertersAutoConf
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration;
 import org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.embedded.EmbeddedWebServerFactoryCustomizerAutoConfiguration;
 import org.springframework.boot.autoconfigure.web.servlet.DispatcherServletAutoConfiguration;
 import org.springframework.boot.autoconfigure.web.servlet.MultipartAutoConfiguration;
 import org.springframework.boot.autoconfigure.web.servlet.ServletWebServerFactoryAutoConfiguration;
@@ -120,11 +121,20 @@ class DashboardCsrfServerTest {
         }
 
         HttpResponse<String> postUpload(String token) throws Exception {
+            return postUpload(token, 0);
+        }
+
+        HttpResponse<String> postUpload(String token, int extraFields) throws Exception {
             StringBuilder body = new StringBuilder();
             body.append("--").append(BOUNDARY).append("\r\n")
                     .append("Content-Disposition: form-data; name=\"file\"; filename=\"products.csv\"\r\n")
                     .append("Content-Type: text/csv\r\n\r\n")
                     .append("ean;qty\r\n5901234123457;3\r\n");
+            for (int index = 0; index < extraFields; index++) {
+                body.append("--").append(BOUNDARY).append("\r\n")
+                        .append("Content-Disposition: form-data; name=\"field").append(index).append("\"\r\n\r\n")
+                        .append("value\r\n");
+            }
             if (token != null) {
                 body.append("--").append(BOUNDARY).append("\r\n")
                         .append("Content-Disposition: form-data; name=\"_csrf\"\r\n\r\n")
@@ -226,6 +236,20 @@ class DashboardCsrfServerTest {
 
         // when
         HttpResponse<String> response = browser.postUpload(formToken(page, "upload"));
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).startsWith("ok ");
+    }
+
+    @Test
+    void uploadWithAsManyFieldsAsTheStatementFormatFormWithManyPayerRowsIsSaved() throws Exception {
+        // given the bank statement format form: a sample file, about 20 fields and 6 per payer row, here 30 rows
+        Browser browser = signedIn();
+        HttpResponse<String> page = browser.get("/dashboard/page");
+
+        // when
+        HttpResponse<String> response = browser.postUpload(formToken(page, "upload"), 20 + 6 * 30);
 
         // then
         assertThat(response.statusCode()).isEqualTo(200);
@@ -348,7 +372,8 @@ class DashboardCsrfServerTest {
     }
 
     @SpringBootConfiguration
-    @ImportAutoConfiguration({ServletWebServerFactoryAutoConfiguration.class, DispatcherServletAutoConfiguration.class,
+    @ImportAutoConfiguration({ServletWebServerFactoryAutoConfiguration.class,
+            EmbeddedWebServerFactoryCustomizerAutoConfiguration.class, DispatcherServletAutoConfiguration.class,
             WebMvcAutoConfiguration.class, HttpMessageConvertersAutoConfiguration.class,
             MultipartAutoConfiguration.class, ThymeleafAutoConfiguration.class, SecurityAutoConfiguration.class,
             SecurityFilterAutoConfiguration.class})
