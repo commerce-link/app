@@ -367,7 +367,9 @@
             categoryId.value = p ? p.categoryId : '';
             productId.value = p ? p.productId : '';
             if (p) {
+                // the product replaces a typed EAN, so a complaint about that EAN must not block the form
                 ean.value = '';
+                ean.setCustomValidity('');
             }
             refreshSubmit();
         }

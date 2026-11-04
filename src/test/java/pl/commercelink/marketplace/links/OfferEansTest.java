@@ -101,4 +101,24 @@ class OfferEansTest {
         // then
         assertThat(eans).isEmpty();
     }
+
+    @Test
+    void unifyValidGivesTheUnifiedFormOfAValidEan() {
+        // when
+        String unified = OfferEans.unifyValid(" 02000000001012 ");
+
+        // then
+        assertThat(unified).isEqualTo("2000000001012");
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"brak kodu", "N/A", "123:456", "20070000001A"})
+    void unifyValidGivesNullForAnythingThatIsNotAnEan(String raw) {
+        // when
+        String unified = OfferEans.unifyValid(raw);
+
+        // then
+        assertThat(unified).isNull();
+    }
 }

@@ -26,10 +26,11 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Resolves a marketplace order line to the EAN fulfilment looks goods up by: an explicit offer link first (its EANs,
- * taken as they are: fulfilment finds the goods in the warehouse and the suppliers' feeds, so the product need not be in
- * a catalog; the category comes from the taxonomy, as for a warehouse item), then the seller offer key taken as our own
- * pimId, then the manufacturer code as MPN (the behaviour before offer links existed). See {@link ResolvedOffer#sku()}.
+ * Resolves a marketplace order line to the EAN fulfilment looks goods up by: first the seller offer key taken as our own
+ * pimId (an offer CommerceLink published, for which no link is ever read), then for any other key an explicit offer link
+ * (its EANs, taken as they are: fulfilment finds the goods in the warehouse and the suppliers' feeds, so the product need
+ * not be in a catalog; the category comes from the taxonomy), then the manufacturer code as MPN. See
+ * {@link ResolvedOffer#sku()}.
  */
 @Slf4j
 @Component
@@ -95,7 +96,8 @@ public class MarketplaceOfferResolver {
 
         public Optional<ResolvedOffer> resolve(String marketplace, String sellerOfferKey, String manufacturerCode) {
             if (isOwnOffer(storeId, sellerOfferKey)) {
-                // an offer CommerceLink published is resolved as before offer links existed: a link never applies to it
+                // an offer CommerceLink published is resolved by its pimId and a link never applies to it; one whose entry
+                // has no code goes on to the manufacturer code, not to a link
                 Optional<ResolvedOffer> own = pimAliases.effectiveEntry(storeId, sellerOfferKey)
                         .map(entry -> fromEntry(entry, Source.OWN_OFFER))
                         .filter(offer -> hasProductCode(offer, sellerOfferKey));

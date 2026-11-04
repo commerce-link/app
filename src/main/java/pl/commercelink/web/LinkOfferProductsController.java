@@ -62,7 +62,8 @@ public class LinkOfferProductsController extends BaseController {
             }
         }
         return productRepository.findAll(catalog).stream()
-                .filter(product -> OfferEans.unify(product.getEan()) != null)
+                // a product without a valid EAN would give a link the import skips
+                .filter(product -> OfferEans.unifyValid(product.getEan()) != null)
                 .map(product -> new LinkOfferProduct(product.getCategoryId(), product.getProductId(), product.getEan(),
                         product.getName(), product.getLabel(), product.getManufacturerCode(),
                         categoryNames.get(product.getCategoryId()),

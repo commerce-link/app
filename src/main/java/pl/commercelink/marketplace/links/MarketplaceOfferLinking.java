@@ -105,10 +105,11 @@ public class MarketplaceOfferLinking {
     public LinkResult link(String storeId, Order order, String itemId, String categoryId, String productId, String userId) {
         OrderItem chosen = linkableItem(storeId, order, itemId);
         Product product = resolver.forStore(storeId).catalogProduct(categoryId, productId)
-                // same rule as the dialog's list: a link holds EANs, so a product without one cannot be linked
-                .filter(candidate -> OfferEans.unify(candidate.getEan()) != null)
+                // same rule as the dialog's list: a link holds EANs, and the import skips a value without the format
+                // of one, so a product without a valid EAN cannot be linked
+                .filter(candidate -> OfferEans.unifyValid(candidate.getEan()) != null)
                 .orElseThrow(() -> new IllegalArgumentException(PRODUCT_NOT_IN_CATALOG));
-        return save(storeId, order, chosen, OfferEans.unify(product.getEan()), userId);
+        return save(storeId, order, chosen, OfferEans.unifyValid(product.getEan()), userId);
     }
 
     /**

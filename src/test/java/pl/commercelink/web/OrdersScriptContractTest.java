@@ -115,6 +115,24 @@ class OrdersScriptContractTest {
                 .isLessThan(paymentFragment.indexOf("/js/add-payment-dialog.js"));
     }
 
+    /**
+     * A typed EAN with a wrong check digit leaves a custom validity message on the field; choosing a catalog product
+     * then empties the field, and a message left on it would block the dialog with a complaint about nothing.
+     */
+    @Test
+    void choosingAProductClearsTheComplaintAboutATypedEan() throws Exception {
+        // given
+        String itemDialogs = read("src/main/resources/static/js/order-item-dialogs.js");
+
+        // when
+        String choose = itemDialogs.substring(itemDialogs.indexOf("function choose(p)"),
+                itemDialogs.indexOf("function refreshSubmit()"));
+
+        // then
+        assertThat(choose).contains("ean.value = '';").contains("ean.setCustomValidity('');");
+        assertThat(choose.indexOf("ean.setCustomValidity('');")).isGreaterThan(choose.indexOf("if (p) {"));
+    }
+
     /** The body of the first {@code @media} block that starts with {@code query}. */
     private static String media(String css, String query) {
         int start = css.indexOf(query + " {");

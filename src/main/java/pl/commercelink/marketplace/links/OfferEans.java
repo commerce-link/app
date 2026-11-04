@@ -41,6 +41,12 @@ public final class OfferEans {
         return unified != null && VALID_UNIFIED.matcher(unified).matches();
     }
 
+    /** The EAN unified, or null when it has not the {@linkplain #isValid format} of one. */
+    public static String unifyValid(String ean) {
+        String unified = unify(ean);
+        return isValid(unified) ? unified : null;
+    }
+
     /** The EANs unified, without the ones that are not {@linkplain #isValid valid}, each once, in their order. */
     public static List<String> validUnified(Collection<String> eans) {
         if (eans == null) {

@@ -101,6 +101,24 @@ class LinkOfferProductsControllerTest {
     }
 
     @Test
+    void leavesOutAProductWhoseEanHasNotTheFormatOfOne() {
+        // given
+        ProductCatalog catalog = catalog();
+        when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
+        when(productRepository.findAll(catalog)).thenReturn(List.of(
+                product("p1", null, "2001000000012", "Czajnik", "DMW-CZ17"),
+                product("p2", null, "brak kodu", "Kubek", "DMW-KB1"),
+                product("p3", null, "2001000000029:2001000000036", "Lampka", "DMW-LN1")));
+        when(pricelistFinder.availabilityAndPrices(STORE_ID, CATALOG_ID)).thenReturn(List.of());
+
+        // when
+        List<LinkOfferProduct> products = controller.products(CATALOG_ID);
+
+        // then
+        assertThat(products).extracting(LinkOfferProduct::productId).containsExactly("p1");
+    }
+
+    @Test
     void anUnknownCatalogOfTheStoreListsNothing() {
         // given
         when(productCatalogRepository.findById(STORE_ID, "other")).thenReturn(null);

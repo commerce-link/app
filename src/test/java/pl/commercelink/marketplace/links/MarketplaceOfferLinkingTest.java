@@ -3,6 +3,8 @@ package pl.commercelink.marketplace.links;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -73,7 +75,9 @@ class MarketplaceOfferLinkingTest {
                 catalogProduct("c1", "p1", null, EAN, "ab 123"),
                 catalogProduct("c1", "p2", "pim-2", null, "NO-EAN"),
                 catalogProduct("c1", "p3", null, "2001000000036", " "),
-                catalogProduct("c1", "p4", null, " 02001000000029 ", "CD-4"))) {
+                catalogProduct("c1", "p4", null, " 02001000000029 ", "CD-4"),
+                catalogProduct("c1", "p5", null, "brak kodu", "EF-5"),
+                catalogProduct("c1", "p6", null, "2001000000043:2001000000050", "GH-6"))) {
             lenient().when(storeOffers.catalogProduct("c1", product.getProductId())).thenReturn(Optional.of(product));
         }
         lenient().when(storeOffers.catalogProduct("other-store-category", "p1")).thenReturn(Optional.empty());
@@ -185,6 +189,22 @@ class MarketplaceOfferLinkingTest {
 
         // when / then
         assertThatThrownBy(() -> linking.link(STORE, order, "i1", "other-store-category", "p1", "user-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG);
+        verify(linkRepository, never()).save(any());
+        verify(orderItemsRepository, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"p5", "p6"})
+    void linkRejectsACatalogProductWhoseEanHasNotTheFormatOfOne(String productId) {
+        // given
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        when(orderItemsRepository.findById("o1", "i1")).thenReturn(item);
+
+        // when / then
+        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", productId, "user-1"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage(MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG);
         verify(linkRepository, never()).save(any());
