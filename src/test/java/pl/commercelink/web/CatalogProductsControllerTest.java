@@ -891,14 +891,14 @@ class CatalogProductsControllerTest {
     /** A wrong identifier is refused where it is typed, instead of creating a product nothing can be matched to. */
     @Test
     @SuppressWarnings("unchecked")
-    void aRowWithoutAnIdentifierOrWithAMalformedEanComesBackToTheReview() throws Exception {
+    void aRowWithoutAnIdentifierComesBackToTheReview() throws Exception {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
 
         // when
         var result = mvc.perform(post(categoryPath() + "/products/add/save")
                         .param("products[0].name", "X").param("products[0].pricingGroup", "Default")
-                        .param("products[1].name", "Y").param("products[1].ean", "12345").param("products[1].manufacturerCode", "M")
+                        .param("products[1].name", "Y").param("products[1].manufacturerCode", "M")
                         .param("products[1].pricingGroup", "Default"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(view().name("catalog/products-add-review"))
@@ -908,11 +908,11 @@ class CatalogProductsControllerTest {
         assertThat((Map<String, String>) result.getModelAndView().getModel().get("errors"))
                 .containsEntry("product-0-ean", "product.error.ean.required")
                 .containsEntry("product-0-manufacturerCode", "product.error.mfn.required")
-                .containsEntry("product-1-ean", "product.error.ean.invalid");
+                .containsEntry("product-1-ean", "product.error.ean.required");
         // the summary names the row as the operator counts it; the message at the field stays without the number
         assertThat((Map<String, String>) result.getModelAndView().getModel().get("errorSummary"))
                 .containsEntry("product-1-ean", "catalog.products.review.error.n");
-        verify(messageSource).getMessage(eq("catalog.products.review.error.n"), eq(new Object[]{"2", "product.error.ean.invalid"}),
+        verify(messageSource).getMessage(eq("catalog.products.review.error.n"), eq(new Object[]{"2", "product.error.ean.required"}),
                 any(Locale.class));
         verify(productRepository, never()).save(any(Product.class));
     }

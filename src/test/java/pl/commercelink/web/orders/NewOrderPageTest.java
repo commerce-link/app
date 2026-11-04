@@ -298,7 +298,7 @@ class NewOrderPageTest {
     private static Basket basket(BasketType type, String deliveryOptionId) {
         BasketItem item = new BasketItem();
         item.setName("Laptop");
-        item.setMfn("L-1");
+        item.setSku("L-1");
         item.setQty(1);
         item.setUnitPrice(100.0);
         Basket basket = new Basket.Builder("store-1")

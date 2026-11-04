@@ -78,7 +78,7 @@ class BasketViewPageFactoryTest {
     private static BasketItem item(String name, String mfn, long qty, double unitPrice) {
         BasketItem item = new BasketItem();
         item.setName(name);
-        item.setMfn(mfn);
+        item.setSku(mfn);
         item.setCategory("laptops");
         item.setQty(qty);
         item.setUnitPrice(unitPrice);
@@ -88,7 +88,7 @@ class BasketViewPageFactoryTest {
     private static BasketItem service(String name, double unitPrice) {
         BasketItem item = new BasketItem();
         item.setName(name);
-        item.setMfn("SRV-1");
+        item.setSku("SRV-1");
         item.setQty(1);
         item.setUnitPrice(unitPrice);
         item.setService(true);

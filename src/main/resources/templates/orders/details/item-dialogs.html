@@ -41,8 +41,7 @@
                     <div class="cl-span-2 cl-field">
                         <label class="cl-label" for="assign-sku-manual" th:text="#{order.item.assign.sku.manual.placeholder}"></label>
                         <div class="cl-input-row">
-                            <input class="cl-input" id="assign-sku-manual" type="text" inputmode="numeric" data-cl-sku-manual autocomplete="off"
-                                   pattern="\s*\d{8,14}\s*" th:title="#{product.error.ean.invalid}">
+                            <input class="cl-input" id="assign-sku-manual" type="text" data-cl-sku-manual autocomplete="off">
                             <button type="button" class="cl-button" data-cl-sku-add th:text="#{general.add}"></button>
                         </div>
                     </div>

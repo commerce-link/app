@@ -42,7 +42,7 @@ public class MarketplaceOrderImporter {
 
         BigDecimal commission = BigDecimal.ZERO;
         List<BasketItem> basketItems = new ArrayList<>();
-        // Basket.setBasketItems normalises mfn (uppercase, spaces stripped); the marketplace key must stay raw,
+        // Basket.setBasketItems strips the spaces of the sku; the marketplace key must stay raw,
         // so it is captured here, before the basket is built, and keyed by the basket item id.
         Map<String, String> rawKeysByBasketItemId = new HashMap<>();
 

@@ -1208,6 +1208,18 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void theSkuTypedByHandIsNotCheckedForItsFormat() {
+        // when
+        String html = page(render(order(OrderStatus.New), ADMIN));
+
+        // then
+        String dialog = html.substring(html.indexOf("id=\"assign-sku-dialog\""), html.indexOf("id=\"assign-warehouse-dialog\""));
+        String manual = dialog.substring(dialog.indexOf("<input class=\"cl-input\" id=\"assign-sku-manual\""));
+        manual = manual.substring(0, manual.indexOf('>') + 1);
+        assertThat(manual).doesNotContain("pattern=").doesNotContain("inputmode=\"numeric\"");
+    }
+
+    @Test
     void theItemDialogsAreOnThePageAndTheMoveFieldBelongsToTheItemsForm() {
         // when
         String html = page(render(order(OrderStatus.New), ADMIN));

@@ -28,7 +28,7 @@ class ClientOfferLineTest {
         ClientOfferLine group = lines.get(1);
         assertThat(group.isGroup()).isTrue();
         assertThat(group.getLabel()).isEqualTo("Dysk");
-        assertThat(group.item().getMfn()).isEqualTo("MFN-SSD-1");
+        assertThat(group.item().getSku()).isEqualTo("MFN-SSD-1");
         assertThat(group.options()).extracting(ClientOfferLine.Option::priceDelta).containsExactly(0.0, 380.0);
         assertThat(group.options()).extracting(ClientOfferLine.Option::selected).containsExactly(true, false);
     }
@@ -48,7 +48,7 @@ class ClientOfferLineTest {
         ClientOfferLine group = ClientOfferLine.from(basket).get(0);
 
         // then
-        assertThat(group.item().getMfn()).isEqualTo("MFN-SSD-2");
+        assertThat(group.item().getSku()).isEqualTo("MFN-SSD-2");
         assertThat(group.options()).extracting(ClientOfferLine.Option::priceDelta).containsExactly(-380.0, 0.0, 770.0);
         assertThat(group.options()).extracting(ClientOfferLine.Option::isIncluded).containsExactly(false, true, false);
         assertThat(group.options().get(0).absPriceDelta()).isEqualTo(380.0);

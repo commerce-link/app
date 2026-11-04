@@ -25,7 +25,7 @@ public record BasketViewPage(String basketId, String shortId, String backHref, S
     }
 
     /** The basket with the shop's prices; no supplier costs or estimated margin (the client's decision, 2026-10-22). */
-    public record Row(String name, String category, String mfn, long qty, String unitPrice, boolean service) {
+    public record Row(String name, String category, String sku, long qty, String unitPrice, boolean service) {
     }
 
     public enum DeliveryState { CHOSEN, NONE, UNKNOWN }

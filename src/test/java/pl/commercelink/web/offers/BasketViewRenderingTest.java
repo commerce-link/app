@@ -95,7 +95,7 @@ class BasketViewRenderingTest {
                 .contains("Usługi")
                 .contains("Usługa")
                 .contains("Ilość × cena (PLN)")
-                .contains("Kopiuj kod producenta")
+                .contains("<span>SKU</span>&nbsp;").contains("Kopiuj SKU")
                 .contains("<colgroup><col><col class=\"cl-col-price\"></colgroup>")
                 .contains("colspan=\"2\"")
                 .doesNotContain("Rynek")

@@ -100,7 +100,7 @@ public class BasketViewPageFactory {
     private Row row(BasketItem item) {
         String category = StringUtils.isBlank(item.getCategory()) ? null
                 : StringUtils.trimToNull(categoryLocalizer.localize(item.getCategory(), null));
-        return new Row(item.getName(), category, StringUtils.trimToNull(item.getMfn()), item.getQty(),
+        return new Row(item.getName(), category, StringUtils.trimToNull(item.getSku()), item.getQty(),
                 Money.format(item.getUnitPrice()), item.isService());
     }
 

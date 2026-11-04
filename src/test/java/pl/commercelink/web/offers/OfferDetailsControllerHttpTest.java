@@ -127,7 +127,7 @@ class OfferDetailsControllerHttpTest {
                         .param("basketItems[0].variantSelected", "true")
                         .param("basketItems[0].category", "GPU")
                         .param("basketItems[0].name", "RTX 5060")
-                        .param("basketItems[0].mfn", "V537-002R")
+                        .param("basketItems[0].sku", "V537-002R")
                         .param("basketItems[0].qty", "2")
                         .param("basketItems[0].unitPrice", "1799.50")
                         .param("basketItems[0].unitCost", "1534.17")
@@ -145,11 +145,28 @@ class OfferDetailsControllerHttpTest {
         assertThat(item.isVariantSelected()).isTrue();
         assertThat(item.getCategory()).isEqualTo("GPU");
         assertThat(item.getName()).isEqualTo("RTX 5060");
+        assertThat(item.getSku()).isEqualTo("V537-002R");
         assertThat(item.getQty()).isEqualTo(2);
         assertThat(item.getUnitPrice()).isEqualTo(1799.50);
         assertThat(item.getUnitCost()).isEqualTo(1534.17);
         assertThat(item.isConsolidated()).isTrue();
         assertThat(stored.getName()).isEqualTo("Gaming PC");
+    }
+
+    @Test
+    void tableOpenedBeforeTheSkuRenameKeepsItsItems() throws Exception {
+        // given
+        storedOffer();
+
+        // when
+        mvc.perform(post("/dashboard/offer/" + OFFER_ID)
+                        .param("basketItems[0].name", "CPU").param("basketItems[0].mfn", "M-1")
+                        .param("basketItems[0].category", "CPU").param("basketItems[0].qty", "1")
+                        .param("basketItems[0].unitPrice", "10"))
+                .andExpect(status().isFound());
+
+        // then
+        assertThat(saved().getBasketItems()).extracting(BasketItem::getSku).containsExactly("M-1");
     }
 
     @Test
@@ -159,7 +176,7 @@ class OfferDetailsControllerHttpTest {
 
         // when
         mvc.perform(post("/dashboard/offer/" + OFFER_ID)
-                        .param("basketItems[0].name", "CPU").param("basketItems[0].mfn", "M-1")
+                        .param("basketItems[0].name", "CPU").param("basketItems[0].sku", "M-1")
                         .param("basketItems[0].category", "CPU").param("basketItems[0].qty", "1")
                         .param("basketItems[0].unitPrice", "10")
                         .param("name", "Hacked").param("comment", "hacked").param("gclid", "x")
@@ -241,7 +258,7 @@ class OfferDetailsControllerHttpTest {
 
         // when / then: offer-details.js posts with fetch's default Accept and reads a 403 text/plain as the reason
         mvc.perform(post("/dashboard/offer/" + OFFER_ID).header("Accept", "*/*")
-                        .param("basketItems[0].name", "CPU").param("basketItems[0].mfn", "M-1")
+                        .param("basketItems[0].name", "CPU").param("basketItems[0].sku", "M-1")
                         .param("basketItems[0].category", "CPU").param("basketItems[0].qty", "1")
                         .param("basketItems[0].unitPrice", "10"))
                 .andExpect(status().isForbidden())
@@ -259,7 +276,7 @@ class OfferDetailsControllerHttpTest {
 
         // when
         String html = mvc.perform(post("/dashboard/offer/" + OFFER_ID + "/items/draft")
-                        .param("basketItems[0].name", "CPU").param("basketItems[0].mfn", "M-1")
+                        .param("basketItems[0].name", "CPU").param("basketItems[0].sku", "M-1")
                         .param("basketItems[0].category", "CPU").param("basketItems[0].qty", "1")
                         .param("basketItems[0].unitPrice", "10")
                         .param("items[0].source", "pricelist").param("items[0].catalogId", "cat-1")
@@ -278,7 +295,7 @@ class OfferDetailsControllerHttpTest {
         verify(offerItemsDraft).add(drafted.capture(), added.capture());
         assertThat(added.getValue().entries()).extracting(AddItemsForm.Entry::getPimId).containsExactly("pim-1", null);
         assertThat(added.getValue().entries().get(0).getQty()).isEqualTo(2);
-        assertThat(drafted.getValue().getBasketItems()).extracting(BasketItem::getMfn).containsExactly("M-1");
+        assertThat(drafted.getValue().getBasketItems()).extracting(BasketItem::getSku).containsExactly("M-1");
         verify(basketsRepository, never()).save(any());
     }
 
@@ -299,7 +316,7 @@ class OfferDetailsControllerHttpTest {
 
         // when
         String html = mvc.perform(post("/dashboard/offer/" + OFFER_ID).param("version", "7")
-                        .param("basketItems[0].name", "CPU").param("basketItems[0].mfn", "M-1")
+                        .param("basketItems[0].name", "CPU").param("basketItems[0].sku", "M-1")
                         .param("basketItems[0].category", "CPU").param("basketItems[0].qty", "1")
                         .param("basketItems[0].unitPrice", "10"))
                 .andExpect(status().isConflict())
@@ -319,12 +336,12 @@ class OfferDetailsControllerHttpTest {
 
         // when
         mvc.perform(post("/dashboard/offer/" + OFFER_ID).param("version", "8").param("overwrite", "true")
-                        .param("basketItems[0].name", "CPU").param("basketItems[0].mfn", "M-1")
+                        .param("basketItems[0].name", "CPU").param("basketItems[0].sku", "M-1")
                         .param("basketItems[0].category", "CPU").param("basketItems[0].qty", "1")
                         .param("basketItems[0].unitPrice", "10"))
                 .andExpect(status().isFound());
         mvc.perform(post("/dashboard/offer/" + OFFER_ID).param("version", "")
-                        .param("basketItems[0].name", "CPU").param("basketItems[0].mfn", "M-1")
+                        .param("basketItems[0].name", "CPU").param("basketItems[0].sku", "M-1")
                         .param("basketItems[0].category", "CPU").param("basketItems[0].qty", "1")
                         .param("basketItems[0].unitPrice", "10"))
                 .andExpect(status().isFound());

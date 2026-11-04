@@ -223,7 +223,7 @@
 
     // what the table save drops (OfferDetailsPageFactory.droppedOnSave)
     function dropped(row) {
-        return !field(row, 'name').value.trim() || !field(row, 'mfn').value.trim() || qtyOf(row) <= 0
+        return !field(row, 'name').value.trim() || !field(row, 'sku').value.trim() || qtyOf(row) <= 0
             || number(priceInput(row)) < 0;
     }
 
@@ -868,7 +868,7 @@
             if (!editing) {
                 return;
             }
-            ['name', 'mfn', 'unitCost'].forEach(function (name) {
+            ['name', 'sku', 'unitCost'].forEach(function (name) {
                 clearError(input(name));
                 input(name).value = field(editing, name).value;
             });
@@ -886,7 +886,7 @@
                 dialog.close();
                 return;
             }
-            var missing = [['name', 'name-required'], ['mfn', 'mfn-required']].filter(function (rule) {
+            var missing = [['name', 'name-required'], ['sku', 'sku-required']].filter(function (rule) {
                 clearError(input(rule[0]));
                 return !input(rule[0]).value.trim();
             });
@@ -899,7 +899,7 @@
             }
             var row = editing;
             field(row, 'name').value = input('name').value;
-            field(row, 'mfn').value = input('mfn').value;
+            field(row, 'sku').value = input('sku').value;
             field(row, 'category').value = input('category').value;
             field(row, 'unitCost').value = input('unitCost').value === '' ? '0' : input('unitCost').value;
             field(row, 'consolidated').value = input('consolidated').checked ? 'true' : 'false';
@@ -915,7 +915,7 @@
 
     function renderSub(row) {
         var category = field(row, 'category').value;
-        var mfn = field(row, 'mfn').value;
+        var sku = field(row, 'sku').value;
         var sub = row.querySelector('[data-cl-line-sub]');
         sub.replaceChildren();
         if (category) {
@@ -924,7 +924,7 @@
             categoryText.textContent = category;
             sub.append(categoryText);
         }
-        if (mfn) {
+        if (sku) {
             if (category) {
                 var separator = document.createElement('span');
                 separator.className = 'cl-table-sep';
@@ -934,8 +934,8 @@
             // the items.html row: the code cut to one line, its copy icon always after it
             var code = document.createElement('span');
             code.className = 'cl-copy-text';
-            code.setAttribute('data-cl-line-mfn', '');
-            code.textContent = mfn;
+            code.setAttribute('data-cl-line-sku', '');
+            code.textContent = sku;
             var icon = document.createElement('span');
             icon.className = 'cl-copy-icon';
             icon.setAttribute('aria-hidden', 'true');
@@ -946,13 +946,13 @@
             var copy = document.createElement('button');
             copy.type = 'button';
             copy.className = 'cl-copy-inline';
-            copy.setAttribute('data-cl-copy', mfn);
-            copy.title = mfn;
-            copy.setAttribute('aria-label', message('copy-mfn', [mfn]));
+            copy.setAttribute('data-cl-copy', sku);
+            copy.title = sku;
+            copy.setAttribute('aria-label', message('copy-sku', [sku]));
             copy.append(shown);
             var wrap = document.createElement('span');
             wrap.className = 'cl-line-code';
-            wrap.append(message('mfn-prefix') + '\u00a0', copy);
+            wrap.append(message('sku-prefix') + '\u00a0', copy);
             sub.append(wrap);
         }
     }

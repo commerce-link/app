@@ -230,7 +230,7 @@ class OfferDetailsRenderingTest {
         assertThat(inputs).isEqualTo(2);
         assertThat(row).contains("data-price=\"6899.0\"").contains("data-cost=\"5810.0\"").contains("data-qty=\"3\"")
                 .contains("data-selected=\"false\"").contains("data-service=\"false\"")
-                .contains("name=\"basketItems[0].mfn\" value=\"21ML003RPB\"")
+                .contains("name=\"basketItems[0].sku\" value=\"21ML003RPB\"")
                 .contains("name=\"basketItems[0].category\" value=\"Laptopy\"")
                 .contains("name=\"basketItems[0].unitCost\" value=\"5810.00\"")
                 .contains("name=\"basketItems[0].consolidated\" value=\"false\"")
@@ -296,14 +296,14 @@ class OfferDetailsRenderingTest {
     }
 
     @Test
-    void aLongCodeIsOneCopyButtonAfterItsLabel() {
+    void aLongSkuIsOneCopyButtonAfterItsLabel() {
         // when
         String row = row(html(fullOffer()), 0);
 
-        // then — client 2026-10-27: a long MFN ran over two lines; it is cut to one and copies whole, as on the order page
-        assertThat(row).containsPattern("<span class=\"cl-line-code\"><span>MFN</span>&nbsp;<button type=\"button\" class=\"cl-copy-inline\"\\s+"
-                        + "data-cl-copy=\"21ML003RPB\" title=\"21ML003RPB\" aria-label=\"Kopiuj kod producenta 21ML003RPB\">")
-                .contains("<span class=\"cl-copy-text\" data-cl-line-mfn>21ML003RPB</span>")
+        // then — client 2026-10-27: a long code ran over two lines; it is cut to one and copies whole, as on the order page
+        assertThat(row).containsPattern("<span class=\"cl-line-code\"><span>SKU</span>&nbsp;<button type=\"button\" class=\"cl-copy-inline\"\\s+"
+                        + "data-cl-copy=\"21ML003RPB\" title=\"21ML003RPB\" aria-label=\"Kopiuj SKU 21ML003RPB\">")
+                .contains("<span class=\"cl-copy-text\" data-cl-line-sku>21ML003RPB</span>")
                 .doesNotContain("cl-code-nowrap");
     }
 
@@ -648,9 +648,9 @@ class OfferDetailsRenderingTest {
         OfferItemForm form = new OfferItemForm();
         form.setName("Stacja dokująca");
         form.setCategory("Spoza katalogu");
-        form.setMfn("");
+        form.setSku("");
         model.put("form", form);
-        model.put("errors", Map.of("mfn", "offers.details.item.mfn.required"));
+        model.put("errors", Map.of("sku", "offers.details.item.sku.required"));
         model.put("index", 1);
         model.put("formAction", "/dashboard/offer/" + ID + "/items/1");
         model.put("pageHref", "/dashboard/offer/" + ID);
@@ -661,7 +661,9 @@ class OfferDetailsRenderingTest {
         // then
         assertThat(html).contains("action=\"/dashboard/offer/" + ID + "/items/1\"").contains("Edytuj pozycję")
                 .contains("value=\"Stacja dokująca\"").contains("<option value=\"Spoza katalogu\" selected")
-                .contains("Podaj kod producenta.").contains("Zapisz pozycję").contains("Koszt u dostawców: 611,00 PLN → 642,00 PLN (najniższy → mediana)")
+                .contains("<label class=\"cl-label\" for=\"offer-item-sku\">SKU</label>")
+                .contains("EAN produktu. Po nim szukamy kosztu u dostawców.").doesNotContain("kod producenta")
+                .contains("Podaj SKU.").contains("Zapisz pozycję").contains("Koszt u dostawców: 611,00 PLN → 642,00 PLN (najniższy → mediana)")
                 .contains("href=\"/dashboard/offer/" + ID + "\"")
                 .containsPattern("<input class=\"cl-input is-money\"[^>]*id=\"offer-item-cost\"")
                 .doesNotContainPattern("<input[^>]*id=\"offer-item-cost\"[^>]*required");

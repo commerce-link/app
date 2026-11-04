@@ -222,10 +222,6 @@
 
         function addManual() {
             var code = manual.value.trim();
-            if (code && !manual.checkValidity()) {
-                manual.reportValidity();
-                return;
-            }
             if (!code || selected.some(function (s) {
                 return s.code === code;
             })) {
