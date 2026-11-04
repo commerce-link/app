@@ -28,16 +28,13 @@ import pl.commercelink.carriers.CarriersRepository;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.marketplace.api.MarketplaceProviderDescriptor;
 import pl.commercelink.migration.V024_CreateCarrierTables;
-import pl.commercelink.carriers.CarrierSeed;
 import pl.commercelink.migration.V025_LocalDevelopmentCarriersSeed;
 import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.shipping.api.ShippingProviderDescriptor;
 import pl.commercelink.testsupport.DynamoDbLocalImage;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -83,7 +80,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
     MockMvc mvc;
 
     @BeforeAll
-    static void migrateAnEmptyDatabase() throws IOException {
+    static void migrateAnEmptyDatabase() {
         client = AmazonDynamoDBClientBuilder.standard()
                 .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(
                         "http://" + DYNAMODB.getHost() + ":" + DYNAMODB.getMappedPort(8000), "eu-central-1"))
@@ -93,34 +90,23 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         dictionaries = new CarrierDictionaryRepository(client);
         translator = new CarrierTranslator(dictionaries);
         new V024_CreateCarrierTables(client).createTables();
-        // the test's own dictionaries first: the local seed keeps what exists
-        CarrierSeed seed = new CarrierSeed(carriers, dictionaries);
-        seed.load(new ByteArrayInputStream(FIXTURES.getBytes(StandardCharsets.UTF_8)));
-        new V025_LocalDevelopmentCarriersSeed(seed).seed();
+        new V025_LocalDevelopmentCarriersSeed(client).seed();
+        // made-up marketplace and label vocabularies, for the dictionaries the local seed does not have
+        put(CENEO_FORMS, "InPost=InPost", "DPD=DPD", "Poczta Polska=Poczta Polska");
+        put(CENEO, "1=InPost", "1=InPost Kurier", "2=DHL", "3=DPD", "4=Poczta Polska");
+        put(EMPIK, "INPOST=InPost", "DPD=DPD");
+        put(MORELE, "2=InPost", "4=Orlen", "7=Poczta Polska");
+        put(FURGONETKA, "inpost=InPost", "inpost_courier=InPost Kurier", "dhl=DHL", "dpd=DPD");
     }
 
-    /** Made-up marketplace and label vocabularies, for the dictionaries the public example file does not have. */
-    private static final String FIXTURES = """
-            {
-              "carriers": [{"name": "InPost"}, {"name": "InPost Kurier"}, {"name": "DPD"}, {"name": "DHL"},
-                           {"name": "Poczta Polska"}, {"name": "Orlen"}],
-              "dictionaries": [
-                {"dictionary": "global#marketplace#ceneo#import", "mappings": [
-                  {"text": "InPost", "carrier": "InPost"}, {"text": "DPD", "carrier": "DPD"},
-                  {"text": "Poczta Polska", "carrier": "Poczta Polska"}]},
-                {"dictionary": "global#marketplace#ceneo#status", "mappings": [
-                  {"text": "1", "carrier": "InPost"}, {"text": "1", "carrier": "InPost Kurier"},
-                  {"text": "2", "carrier": "DHL"}, {"text": "3", "carrier": "DPD"}, {"text": "4", "carrier": "Poczta Polska"}]},
-                {"dictionary": "global#marketplace#empik#import", "mappings": [
-                  {"text": "INPOST", "carrier": "InPost"}, {"text": "DPD", "carrier": "DPD"}]},
-                {"dictionary": "global#marketplace#morele#import", "mappings": [
-                  {"text": "2", "carrier": "InPost"}, {"text": "4", "carrier": "Orlen"}, {"text": "7", "carrier": "Poczta Polska"}]},
-                {"dictionary": "global#shipping#furgonetka", "mappings": [
-                  {"text": "inpost", "carrier": "InPost"}, {"text": "inpost_courier", "carrier": "InPost Kurier"},
-                  {"text": "dhl", "carrier": "DHL"}, {"text": "dpd", "carrier": "DPD"}]}
-              ]
-            }
-            """;
+    private static void put(String key, String... pairs) {
+        CarrierDictionary dictionary = dictionaries.get(key);
+        dictionary.setMappings(new ArrayList<>(Arrays.stream(pairs)
+                .map(pair -> pair.split("=", 2))
+                .map(parts -> new CarrierMapping(parts[0], parts[1]))
+                .toList()));
+        dictionaries.save(dictionary);
+    }
 
     @BeforeEach
     void panel() {
@@ -139,7 +125,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
     }
 
     @Test
-    void theMigrationCreatesTheTablesAndTheLocalSeedLoadsThePublicExample() {
+    void theMigrationCreatesTheTablesAndTheLocalSeedFillsThem() {
         // when
         List<String> tables = client.listTables().getTableNames();
 
@@ -152,7 +138,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
     }
 
     @Test
-    void seedingAgainKeepsADictionaryEditedOnTheDashboard() throws IOException {
+    void creatingTheTablesAgainKeepsADictionaryEditedOnTheDashboard() {
         // given
         CarrierDictionary edited = dictionaries.get(ALLEGRO_METHODS);
         edited.getMappings().add(new CarrierMapping("Paczka w Ruchu", "Orlen"));
@@ -160,7 +146,6 @@ class CarriersEndToEndDynamoDbIntegrationTest {
 
         // when
         new V024_CreateCarrierTables(client).createTables();
-        new V025_LocalDevelopmentCarriersSeed(new CarrierSeed(carriers, dictionaries)).seed();
 
         // then
         assertThat(translator.carrierFor(ALLEGRO_METHODS, "Paczka w Ruchu")).isEqualTo("Orlen");
