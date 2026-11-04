@@ -2,6 +2,7 @@ package pl.commercelink.marketplace.links;
 
 import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.orders.OrderItem;
+import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.util.List;
@@ -57,6 +58,18 @@ public record ResolvedOffer(String pimId, String ean, String mfn, String categor
             return otherEans.isEmpty() ? ean : ean + ALTERNATIVE_CODES + String.join(ALTERNATIVE_CODES, otherEans);
         }
         return StringUtils.isNotBlank(mfn) ? UnifiedProductIdentifiers.unifyMfn(mfn) : null;
+    }
+
+    /**
+     * Gives an item exactly what a fresh import of a linked offer gives a line: its codes, its category (uncategorised
+     * when the taxonomy knows none) and no manufacturer code, replacing whatever an earlier link or fulfilment left.
+     * Used when the operator links or re-links an offer, where {@link #fill} would keep the old values.
+     */
+    public void replace(OrderItem item) {
+        item.setSku(sku());
+        item.setEan(StringUtils.trimToNull(ean));
+        item.setManufacturerCode(StringUtils.trimToNull(mfn));
+        item.setCategory(StringUtils.isNotBlank(category) ? category : Categories.UNCATEGORIZED);
     }
 
     /**

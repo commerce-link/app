@@ -6,6 +6,9 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.Arrays;
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class OfferEansTest {
@@ -47,5 +50,55 @@ class OfferEansTest {
 
         // then
         assertThat(twice).isEqualTo(once);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"12345670", "2000000001012", "20000000010120", "012345678905"})
+    void anEanOfEightToFourteenDigitsIsValid(String unified) {
+        // when
+        boolean valid = OfferEans.isValid(unified);
+
+        // then
+        assertThat(valid).isTrue();
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"N/A", "123:456", "20070000001A", "#2000000001012", "2000000 001012", "1234567",
+            "200000000101200", "２０００００００１０１２"})
+    void anythingElseIsNotAnEan(String unified) {
+        // when
+        boolean valid = OfferEans.isValid(unified);
+
+        // then
+        assertThat(valid).isFalse();
+    }
+
+    @Test
+    void theCheckDigitIsNotChecked() {
+        // when
+        boolean valid = OfferEans.isValid("2000000001013");
+
+        // then
+        assertThat(valid).isTrue();
+    }
+
+    @Test
+    void keepsTheValidEansUnifiedOnceEachInTheirOrder() {
+        // when
+        List<String> eans = OfferEans.validUnified(Arrays.asList(" 2000000001029 ", "N/A", null, "02000000001012",
+                "123:456", "2000000001029"));
+
+        // then
+        assertThat(eans).containsExactly("2000000001029", "2000000001012");
+    }
+
+    @Test
+    void noEansGiveAnEmptyList() {
+        // when
+        List<String> eans = OfferEans.validUnified(null);
+
+        // then
+        assertThat(eans).isEmpty();
     }
 }

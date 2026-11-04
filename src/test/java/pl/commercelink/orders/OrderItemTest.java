@@ -273,20 +273,20 @@ class OrderItemTest {
     void splitCopyKeepsTheMarketplaceOfferKey() {
         // given
         OrderItem source = orderItem("MFN-1");
-        source.setMarketplaceOfferKey("XS-84980");
+        source.setMarketplaceOfferKey("PS-8001");
 
         // when
         OrderItem split = new OrderItem(ORDER_ID, source, 1);
 
         // then
-        assertThat(split.getMarketplaceOfferKey()).isEqualTo("XS-84980");
+        assertThat(split.getMarketplaceOfferKey()).isEqualTo("PS-8001");
     }
 
     @Test
     void updatingANewItemFromAFormWithoutTheOfferKeyKeepsTheStoredKey() {
         // given
         OrderItem stored = orderItem("MFN-1");
-        stored.setMarketplaceOfferKey("XS-84980");
+        stored.setMarketplaceOfferKey("PS-8001");
         OrderItem fromForm = orderItem("MFN-2");
 
         // when
@@ -294,33 +294,87 @@ class OrderItemTest {
         stored.update(fromForm);
 
         // then
-        assertThat(stored.getMarketplaceOfferKey()).isEqualTo("XS-84980");
+        assertThat(stored.getMarketplaceOfferKey()).isEqualTo("PS-8001");
     }
 
     @Test
     void onlyANonServiceUncategorizedLineWithAnOfferKeyIsUnlinked() {
-        // given
-        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, "MFN-1", false);
+        // given an imported line nothing recognised: its sku is still the marketplace's code
+        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, "DMW-1001", false);
+        item.setExternalItemId("DMW-1001");
 
         // when / then
         assertThat(item.isUnlinkedMarketplaceItem()).isFalse();
-        item.setMarketplaceOfferKey("XS-84980");
+        item.setMarketplaceOfferKey("PS-1");
         assertThat(item.isUnlinkedMarketplaceItem()).isTrue();
         item.setService(true);
         assertThat(item.isUnlinkedMarketplaceItem()).isFalse();
     }
 
     @Test
+    void theMarketplaceCodeIsComparedWithoutItsSpacesAsTheBasketStripsThem() {
+        // given
+        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, "DMW1001", false);
+        item.setExternalItemId("DMW 1001");
+        item.setMarketplaceOfferKey("PS-1");
+
+        // when / then
+        assertThat(item.isUnlinkedMarketplaceItem()).isTrue();
+    }
+
+    @Test
+    void aLineWithoutAMarketplaceCodeIsUnlinkedWhileItHasNoSku() {
+        // given
+        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, null, false);
+        item.setMarketplaceOfferKey("PS-1");
+
+        // when / then
+        assertThat(item.isUnlinkedMarketplaceItem()).isTrue();
+    }
+
+    @Test
     void aLineOfALinkedOfferIsLinkedWithoutACategory() {
-        // given the link gave the line an EAN only: its goods need not be in a catalog
-        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, "5900000000011", false);
+        // given the link gave the line its EANs only: its goods need not be in a catalog
+        OrderItem item = linkedLine();
+
+        // when / then
+        assertThat(item.isUnlinkedMarketplaceItem()).isFalse();
+    }
+
+    @Test
+    void aLineOfALinkedOfferStaysLinkedWhenItsFulfilmentIsRemoved() {
+        // given "Remove supplier" clears the EAN the fulfilment chose, not the codes the link gave
+        OrderItem item = linkedLine();
+
+        // when
+        item.removeFulfilment();
+
+        // then
+        assertThat(item.getEan()).isNull();
+        assertThat(item.isUnlinkedMarketplaceItem()).isFalse();
+    }
+
+    @Test
+    void aLineGivenAnotherSkuByHandIsNotUnlinked() {
+        // given
+        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, "DMW-1001", false);
+        item.setExternalItemId("DMW-1001");
         item.setMarketplaceOfferKey("PS-1");
 
         // when
-        item.setEan("5900000000011");
+        item.setSku("2001000000043");
 
         // then
         assertThat(item.isUnlinkedMarketplaceItem()).isFalse();
+    }
+
+    private OrderItem linkedLine() {
+        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0,
+                "2001000000012:2001000000029", false);
+        item.setExternalItemId("DMW-1001");
+        item.setMarketplaceOfferKey("PS-1");
+        item.setEan("2001000000012");
+        return item;
     }
 
     private OrderItem orderItem(String mfn) {

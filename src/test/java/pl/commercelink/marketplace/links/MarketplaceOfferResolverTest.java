@@ -30,7 +30,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyString;
 import static pl.commercelink.pim.ScopedPimCatalog.cloneEntry;
 import static pl.commercelink.pim.ScopedPimCatalog.globalEntry;
 
@@ -143,6 +148,47 @@ class MarketplaceOfferResolverTest {
     }
 
     @Test
+    void anOfferCommerceLinkPublishedIsNeverTakenOverByALink() {
+        // given a link saved for the key of our own offer
+        storeSees("k7m2xq9pz4", globalEntry("k7m2xq9pz4", "5900000000011", "M1", "cat-a"));
+        lenient().when(links.find(STORE, EMPIK, "k7m2xq9pz4")).thenReturn(Optional.of(MarketplaceOfferLink.of(STORE, EMPIK,
+                "k7m2xq9pz4", List.of("2001000000043"), MarketplaceOfferLinkSource.MANUAL, "u", Instant.now())));
+
+        // when
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "k7m2xq9pz4", null);
+
+        // then the offer is recognised as before offer links existed
+        assertThat(result).map(ResolvedOffer::source).contains(Source.OWN_OFFER);
+        assertThat(result).map(ResolvedOffer::ean).contains("5900000000011");
+        verify(links, never()).find(any(), any(), any());
+    }
+
+    @Test
+    void anOfferCommerceLinkPublishedWithoutCodesFallsToTheManufacturerCodeNotToALink() {
+        // given
+        storeSees("pim-9", globalEntry("pim-9", null, null, "cat-a"));
+        lenient().when(links.find(STORE, EMPIK, "pim-9")).thenReturn(Optional.of(MarketplaceOfferLink.of(STORE, EMPIK,
+                "pim-9", List.of("2001000000043"), MarketplaceOfferLinkSource.MANUAL, "u", Instant.now())));
+
+        // when
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "pim-9", null);
+
+        // then
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void tellsTheKeyOfAnOfferCommerceLinkPublished() {
+        // given
+        storeSees("k7m2xq9pz4", globalEntry("k7m2xq9pz4", "5900000000011", "M1", "cat-a"));
+
+        // when / then
+        assertThat(resolver.isOwnOffer(STORE, "k7m2xq9pz4")).isTrue();
+        assertThat(resolver.isOwnOffer(STORE, "PS-1010")).isFalse();
+        assertThat(resolver.isOwnOffer(STORE, " ")).isFalse();
+    }
+
+    @Test
     void resolvesOwnOfferPublishedUnderCloneSourceAsTheClone() {
         // given
         storeSees("src", cloneEntry("clone", STORE, "src", "5900000000011", "M1", "cat-a"));
@@ -158,13 +204,13 @@ class MarketplaceOfferResolverTest {
     @Test
     void fallsBackToManufacturerCodeAsBeforeWithoutReadingTheCatalogs() {
         // given
-        mpnIn("1696938202", globalEntry("pim-2", "5900000000022", "1696938202", "cat-b"));
+        mpnIn("DMW-1001", globalEntry("pim-2", "5900000000022", "DMW-1001", "cat-b"));
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, null, "1696938202");
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, null, "DMW-1001");
 
         // then
-        assertThat(result).contains(new ResolvedOffer("pim-2", "5900000000022", "1696938202", "cat-b", Source.MFN));
+        assertThat(result).contains(new ResolvedOffer("pim-2", "5900000000022", "DMW-1001", "cat-b", Source.MFN));
         verifyNoInteractions(catalogs, products, links, aliases);
     }
 
@@ -230,17 +276,39 @@ class MarketplaceOfferResolverTest {
     }
 
     @Test
-    void resolvesALinkToItsEanWithoutReadingTheCatalogsOrAskingThePim() {
+    void readsOneCatalogProductByItsKeyOnlyInTheStoresOwnCategories() {
+        // given
+        storeCatalogs(catalog("a", category("c1", "Krzesła")));
+        Product chair = product("c1", "p1", null, "2001000000012", "M1");
+        when(products.findByProductId("c1", "p1")).thenReturn(chair);
+        MarketplaceOfferResolver.StoreOffers offers = resolver.forStore(STORE);
+
+        // when
+        Optional<Product> own = offers.catalogProduct("c1", "p1");
+        Optional<Product> foreign = offers.catalogProduct("other-store-category", "p1");
+
+        // then the product is read by its key, not with every product of the catalogs
+        assertThat(own).contains(chair);
+        assertThat(foreign).isEmpty();
+        verify(products, never()).findAll(anyString());
+        verify(products, never()).findByProductId(eq("other-store-category"), anyString());
+    }
+
+    @Test
+    void resolvesALinkToItsEanWithoutReadingTheCatalogsOrThePimData() {
         // given
         link("K", "5901234567890");
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", "1696938202");
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", "DMW-1001");
 
         // then the goods need not be in a catalog: fulfilment finds them by the EAN
         assertThat(result).contains(new ResolvedOffer(null, "5901234567890", null, null, Source.LINK));
         assertThat(result).map(ResolvedOffer::sku).contains("5901234567890");
-        verifyNoInteractions(pimCatalog, aliases, catalogs, products);
+        // the only question is whether the key is one of CommerceLink's own offers, which links leave alone
+        verify(aliases).effectiveEntry(STORE, "K");
+        verifyNoMoreInteractions(aliases);
+        verifyNoInteractions(pimCatalog, catalogs, products);
     }
 
     @Test
@@ -350,13 +418,57 @@ class MarketplaceOfferResolverTest {
     void aLinkWithoutEansFallsThroughToTheManufacturerCodeStep() {
         // given
         link("K");
-        mpnIn("1696938202", globalEntry("pim-2", "5900000000022", "1696938202", "cat-b"));
+        mpnIn("DMW-1001", globalEntry("pim-2", "5900000000022", "DMW-1001", "cat-b"));
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", "1696938202");
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", "DMW-1001");
 
         // then
-        assertThat(result).contains(new ResolvedOffer("pim-2", "5900000000022", "1696938202", "cat-b", Source.MFN));
+        assertThat(result).contains(new ResolvedOffer("pim-2", "5900000000022", "DMW-1001", "cat-b", Source.MFN));
+    }
+
+    @Test
+    void aLinkKeepsOnlyItsValidEans() {
+        // given a link saved before the format was checked
+        link("K", "N/A", "2000000001012", "123:456");
+
+        // when
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", null);
+
+        // then
+        assertThat(result).map(ResolvedOffer::sku).contains("2000000001012");
+        verify(taxonomy, never()).findByEan("N/A");
+    }
+
+    @Test
+    void aLinkWithoutAValidEanFallsThroughToTheManufacturerCodeStep() {
+        // given
+        link("K", "N/A", "20070000001A");
+        mpnIn("DMW-1001", globalEntry("pim-2", "5900000000022", "DMW-1001", "cat-b"));
+
+        // when
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", "DMW-1001");
+
+        // then
+        assertThat(result).contains(new ResolvedOffer("pim-2", "5900000000022", "DMW-1001", "cat-b", Source.MFN));
+    }
+
+    @Test
+    void looksEachEanUpInTheTaxonomyOncePerScope() {
+        // given the same goods on several lines of one import, one EAN the taxonomy knows and one it does not
+        when(taxonomy.findByEan("2000000001012")).thenReturn(null);
+        inTaxonomy("2000000001029", "Lamps", null);
+        MarketplaceOfferResolver.StoreOffers offers = resolver.forStore(STORE);
+
+        // when
+        ResolvedOffer first = offers.linked(List.of("2000000001012", "2000000001029"));
+        ResolvedOffer second = offers.linked(List.of("2000000001012", "2000000001029"));
+
+        // then the taxonomy is a scan of every entry, so a repeated EAN is not looked up again
+        assertThat(first.category()).isEqualTo("Lamps");
+        assertThat(second.category()).isEqualTo("Lamps");
+        verify(taxonomy, times(1)).findByEan("2000000001012");
+        verify(taxonomy, times(1)).findByEan("2000000001029");
     }
 
     @Test
@@ -372,7 +484,7 @@ class MarketplaceOfferResolverTest {
         Product full = new Product("c1");
         full.setProductId("p1");
         full.setEan("5901234567890");
-        full.setManufacturerCode("7041");
+        full.setManufacturerCode("DMW-2001");
         when(products.findAllByPimId("pim-1")).thenReturn(List.of(elsewhere, projection));
         when(products.findByProductId("c1", "p1")).thenReturn(full);
 
@@ -380,7 +492,7 @@ class MarketplaceOfferResolverTest {
         Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "pim-1", null);
 
         // then
-        assertThat(result).contains(new ResolvedOffer("pim-1", "5901234567890", "7041", "cat-a", Source.OWN_OFFER));
+        assertThat(result).contains(new ResolvedOffer("pim-1", "5901234567890", "DMW-2001", "cat-a", Source.OWN_OFFER));
     }
 
     @Test
@@ -407,13 +519,13 @@ class MarketplaceOfferResolverTest {
         when(aliases.aliasesOf(STORE, "clone")).thenReturn(Set.of("clone", "src"));
         catalogCategory("c1", "Krzesła");
         when(products.findAllByPimId("clone")).thenReturn(List.of());
-        catalogProduct("c1", "p1", "src", "5901234567890", "7041");
+        catalogProduct("c1", "p1", "src", "5901234567890", "DMW-2001");
 
         // when
         Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "src", null);
 
         // then
-        assertThat(result).contains(new ResolvedOffer("clone", "5901234567890", "7041", "cat-a", Source.OWN_OFFER));
+        assertThat(result).contains(new ResolvedOffer("clone", "5901234567890", "DMW-2001", "cat-a", Source.OWN_OFFER));
     }
 
     @Test
@@ -438,7 +550,7 @@ class MarketplaceOfferResolverTest {
         storeSees("pim-1", globalEntry("pim-1", "5900000000011", "M1", null));
         when(aliases.aliasesOf(STORE, "pim-1")).thenReturn(Set.of("pim-1"));
         catalogCategory("c1", "Krzesła");
-        catalogProduct("c1", "p1", "pim-1", "5901234567890", "7041");
+        catalogProduct("c1", "p1", "pim-1", "5901234567890", "DMW-2001");
 
         // when
         Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "pim-1", null);
@@ -455,7 +567,7 @@ class MarketplaceOfferResolverTest {
         when(aliases.aliasesOf(STORE, "pim-1")).thenReturn(Set.of("pim-1"));
         when(aliases.aliasesOf(STORE, "pim-2")).thenReturn(Set.of("pim-2"));
         catalogCategory("c1", "Krzesła");
-        catalogProduct("c1", "p1", "pim-1", "5901234567890", "7041");
+        catalogProduct("c1", "p1", "pim-1", "5901234567890", "DMW-2001");
         Product foreign = new Product("other-store-category");
         foreign.setProductId("p2");
         foreign.setEan("5909999999999");
@@ -467,7 +579,7 @@ class MarketplaceOfferResolverTest {
         Optional<ResolvedOffer> other = resolver.resolve(STORE, EMPIK, "pim-2", null);
 
         // then
-        assertThat(own).map(ResolvedOffer::mfn).contains("7041");
+        assertThat(own).map(ResolvedOffer::mfn).contains("DMW-2001");
         assertThat(other).contains(new ResolvedOffer("pim-2", "5900000000022", "M2", "cat-b", Source.OWN_OFFER));
         verify(products, never()).findByProductId("other-store-category", "p2");
     }

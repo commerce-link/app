@@ -235,14 +235,19 @@ public class OrderItem extends Item {
     }
 
     /**
-     * An imported marketplace line whose seller offer could not be tied to goods yet: no category and no EAN. A line of
-     * a linked offer has an EAN but no category (the goods need not be in a catalog); one resolved through the PIM has
-     * a category.
+     * An imported marketplace line whose seller offer could not be tied to goods yet: no category, and its sku is still
+     * the marketplace's own code, which the import gives a line nothing recognised (stored raw in externalItemId, the
+     * basket strips its spaces). A linked offer gives the line its EANs as the sku, "Assign SKU" or the warehouse another
+     * code. The EAN does not decide: it belongs to fulfilment, and removing the supplier clears it.
+     *
+     * <p>Accepted gap (user's decision): a marketplace whose product code is the EAN itself, linked to that same EAN,
+     * leaves a line without a category looking unlinked.
      */
     @DynamoDBIgnore
     public boolean isUnlinkedMarketplaceItem() {
-        return marketplaceOfferKey != null && Categories.UNCATEGORIZED.equals(getCategory())
-                && StringUtils.isBlank(getEan()) && !isService();
+        return marketplaceOfferKey != null && Categories.UNCATEGORIZED.equals(getCategory()) && !isService()
+                && StringUtils.defaultString(StringUtils.deleteWhitespace(externalItemId))
+                .equals(StringUtils.defaultString(getSku()));
     }
 
     public int getPosition() {

@@ -132,7 +132,7 @@ class OrderDetailsTemplateTest {
         OrderPageModelFactory factory = new OrderPageModelFactory(stores, events, dropship, new DeliveryRedirectResolver(),
                 pl.commercelink.web.orders.DropshipEligibilityStubs.acceptingEverySupplier(), labels, carrierOptions, mock(ProductCatalogRepository.class), mock(TaxonomyCache.class), messages,
                 receiptService, mock(ReceiptAlerts.class), courierAvailable(),
-                pl.commercelink.shipping.ShippingIntegrationNamesFixture.names());
+                pl.commercelink.shipping.ShippingIntegrationNamesFixture.names(), mock(pl.commercelink.marketplace.links.MarketplaceOfferResolver.class));
         ReflectionTestUtils.setField(factory, "appDomain", "https://app.example");
         return factory;
     }
@@ -2695,10 +2695,7 @@ class OrderDetailsTemplateTest {
     void anUnlinkedMarketplaceItemShowsTheBadgeAndTheLinkAction() {
         // given
         Order order = order(OrderStatus.New);
-        OrderItem unlinked = new OrderItem(order.getOrderId(), pl.commercelink.taxonomy.Categories.UNCATEGORIZED,
-                "Krzesło biurowe Ergo", 1, 499, "1696938202", false, 0);
-        unlinked.setStatus(FulfilmentStatus.New);
-        unlinked.setMarketplaceOfferKey("XS-84980");
+        OrderItem unlinked = unlinkedOfferItem(order, FulfilmentStatus.New);
 
         // when
         String html = page(render(order, List.of(unlinked), ADMIN, Set.of()));
@@ -2706,41 +2703,69 @@ class OrderDetailsTemplateTest {
         // then
         String cell = productCell(html, "Krzesło biurowe Ergo");
         assertThat(cell).contains("<span class=\"cl-status is-warn\">Niepołączona oferta</span>");
-        assertThat(html).contains("data-cl-dialog-open=\"link-offer-dialog\"").contains("data-offer-key=\"XS-84980\"")
-                .containsPattern("data-cl-dialog-open=\"link-offer-dialog\"[^>]*>Połącz z produktem</a>")
+        assertThat(html).contains("data-cl-dialog-open=\"link-offer-dialog\"").contains("data-offer-key=\"PS-1001\"")
+                .containsPattern("data-cl-dialog-open=\"link-offer-dialog\"[^>]*data-link-change=\"false\"[^>]*>Połącz z produktem</a>")
                 .contains("id=\"link-offer-dialog\"")
                 .contains("action=\"/dashboard/orders/" + order.getOrderId() + "/link-offer\"")
                 .contains("name=\"categoryId\"").contains("name=\"productId\"")
-                .doesNotContain("name=\"pimId\"");
+                .doesNotContain("name=\"pimId\"")
+                .doesNotContain("Zmień powiązanie</a>");
     }
 
     @Test
-    void aLinkedOrLegacyItemHasNeitherTheBadgeNorTheLinkAction() {
+    void theLinkDialogTakesATypedEanCheckedByTheScriptWithItsOwnMessage() {
         // given
         Order order = order(OrderStatus.New);
-        OrderItem linked = new OrderItem(order.getOrderId(), "Krzesła", "Krzesło biurowe Ergo", 1, 499, "AB123", false, 0);
-        linked.setStatus(FulfilmentStatus.New);
-        linked.setMarketplaceOfferKey("XS-84980");
+
+        // when
+        String html = page(render(order, List.of(unlinkedOfferItem(order, FulfilmentStatus.New)), ADMIN, Set.of()));
+
+        // then the browser's own pattern check is gone: it refused spaces inside and spoke the browser's language
+        String input = html.substring(html.indexOf("id=\"link-offer-ean\""));
+        input = input.substring(0, input.indexOf('>'));
+        assertThat(input).contains("name=\"ean\"").doesNotContain("pattern=")
+                .contains("data-invalid=\"EAN musi mieć od 8 do 14 cyfr i poprawną cyfrę kontrolną (ostatnią).\"");
+    }
+
+    @Test
+    void aLinkedOfferItemCanHaveItsLinkChanged() {
+        // given a line the link filled with its EANs, then its supplier removed: it is still linked
+        Order order = order(OrderStatus.New);
+        OrderItem linked = unlinkedOfferItem(order, FulfilmentStatus.New);
+        linked.setSku("2001000000012:2001000000029");
+
+        // when
+        String html = page(render(order, List.of(linked), ADMIN, Set.of()));
+
+        // then
+        assertThat(html).doesNotContain("Niepołączona oferta")
+                .containsPattern("data-cl-dialog-open=\"link-offer-dialog\"[^>]*data-sku=\"2001000000012:2001000000029\"[^>]*data-link-change=\"true\"[^>]*>Zmień powiązanie</a>")
+                .doesNotContain(">Połącz z produktem</a>")
+                .contains("data-submit-link=\"Połącz\"").contains("data-submit-change=\"Zapisz powiązanie\"");
+    }
+
+    @Test
+    void aLegacyItemWithoutAnOfferKeyHasNeitherTheBadgeNorALinkAction() {
+        // given
+        Order order = order(OrderStatus.New);
         OrderItem legacy = new OrderItem(order.getOrderId(), pl.commercelink.taxonomy.Categories.UNCATEGORIZED,
                 "Stara pozycja", 1, 99, "OLD-1", false, 1);
         legacy.setStatus(FulfilmentStatus.New);
 
         // when
-        String html = page(render(order, List.of(linked, legacy), ADMIN, Set.of()));
+        String html = page(render(order, List.of(legacy), ADMIN, Set.of()));
 
         // then
         assertThat(html).doesNotContain("Niepołączona oferta").doesNotContain("data-cl-dialog-open=\"link-offer-dialog\"")
-                .doesNotContain("<span>Połącz z produktem</span>").contains("data-cl-dialog-open=\"assign-sku-dialog\"");
+                .doesNotContain("<span>Połącz z produktem</span>").doesNotContain("<span>Zmień powiązanie</span>")
+                .contains("data-cl-dialog-open=\"assign-sku-dialog\"");
     }
 
     @Test
     void theLinkActionOfAnUnlinkedItemThatIsNoLongerNewIsGreyedWithTheReason() {
         // given
         Order order = order(OrderStatus.Assembly);
-        OrderItem ordered = new OrderItem(order.getOrderId(), pl.commercelink.taxonomy.Categories.UNCATEGORIZED,
-                "Krzesło biurowe Ergo", 1, 499, "1696938202", false, 0);
-        ordered.setStatus(FulfilmentStatus.Ordered);
-        ordered.setMarketplaceOfferKey("XS-84980");
+        OrderItem ordered = unlinkedOfferItem(order, FulfilmentStatus.Ordered);
 
         // when
         String html = page(render(order, List.of(ordered), ADMIN, Set.of()));
@@ -2755,16 +2780,23 @@ class OrderDetailsTemplateTest {
     void anUnlinkedItemOfAClosedOrderHasNoBadge() {
         // given
         Order order = order(OrderStatus.Cancelled);
-        OrderItem unlinked = new OrderItem(order.getOrderId(), pl.commercelink.taxonomy.Categories.UNCATEGORIZED,
-                "Krzesło biurowe Ergo", 1, 499, "1696938202", false, 0);
-        unlinked.setStatus(FulfilmentStatus.New);
-        unlinked.setMarketplaceOfferKey("XS-84980");
+        OrderItem unlinked = unlinkedOfferItem(order, FulfilmentStatus.New);
 
         // when
         String html = page(render(order, List.of(unlinked), ADMIN, Set.of()));
 
         // then
         assertThat(html).doesNotContain("Niepołączona oferta");
+    }
+
+    private static OrderItem unlinkedOfferItem(Order order, FulfilmentStatus status) {
+        // an imported line nothing recognised keeps the marketplace's product code as its sku
+        OrderItem item = new OrderItem(order.getOrderId(), pl.commercelink.taxonomy.Categories.UNCATEGORIZED,
+                "Krzesło biurowe Ergo", 1, 499, "DMW-1001", false, 0);
+        item.setStatus(status);
+        item.setExternalItemId("DMW-1001");
+        item.setMarketplaceOfferKey("PS-1001");
+        return item;
     }
 
     @Test

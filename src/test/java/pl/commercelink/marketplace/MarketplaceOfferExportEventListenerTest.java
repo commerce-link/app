@@ -967,13 +967,13 @@ class MarketplaceOfferExportEventListenerTest {
 
     @Test
     void skipsProductLinkedToForeignOffer() {
-        // given EAN-1 is linked to the offer XS-84980 another system published; pim-2 has no link
+        // given EAN-1 is linked to the offer PS-8001 another system published; pim-2 has no link
         Product linked = product("pim-1", "EAN-1");
         Product unlinked = product("pim-2", "EAN-2");
         configureCategoryWith(warehouseDefinition(5), List.of(linked, unlinked), 10);
         priceFor(linked, 100, 2);
         priceFor(unlinked, 200, 2);
-        linksOnTheMarketplace(link("XS-84980", "EAN-1"));
+        linksOnTheMarketplace(link("PS-8001", "EAN-1"));
 
         try (LogCapture logs = LogCapture.start()) {
             // when
@@ -995,7 +995,7 @@ class MarketplaceOfferExportEventListenerTest {
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
         when(aliases.offerIdOf(STORE_ID, "clone-C")).thenReturn("source-S");
-        linksOnTheMarketplace(link("XS-84980", "EAN-A"));
+        linksOnTheMarketplace(link("PS-8001", "EAN-A"));
 
         // when
         listener.handleMessage(request());
@@ -1027,7 +1027,7 @@ class MarketplaceOfferExportEventListenerTest {
         Product product = product("pim-1", "5901234123457");
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
-        MarketplaceOfferLink padded = link("XS-84980", "5901234123457");
+        MarketplaceOfferLink padded = link("PS-8001", "5901234123457");
         padded.setEans(List.of("05901234123457"));
         linksOnTheMarketplace(padded);
 
@@ -1070,7 +1070,7 @@ class MarketplaceOfferExportEventListenerTest {
                 ScopedPimCatalog.globalEntry("local-seed-0101", "730143315289", "100-100001084WOF", "CPU"),
                 ScopedPimCatalog.storeEntry("local-store-0001", STORE_ID, "730143315289", "STORE-OWN-01", "CPU"));
         MarketplaceOfferLink matched = matchedLink(pim,
-                new MarketplaceListedOffer("XS-84980", List.of("730143315289"), "Procesor z innego systemu", 3, new BigDecimal("19.99"), true));
+                new MarketplaceListedOffer("PS-8001", List.of("730143315289"), "Procesor z innego systemu", 3, new BigDecimal("19.99"), true));
         linksOnTheMarketplace(matched);
 
         // when
@@ -1104,7 +1104,7 @@ class MarketplaceOfferExportEventListenerTest {
         Product product = product("pim-2", "EAN-2");
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
-        linksOnTheMarketplace(link("XS-84980", "EAN-1"));
+        linksOnTheMarketplace(link("PS-8001", "EAN-1"));
 
         try (LogCapture logs = LogCapture.start()) {
             // when
@@ -1133,7 +1133,7 @@ class MarketplaceOfferExportEventListenerTest {
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
         previousSnapshotContains(MarketplaceOfferSnapshot.published("pim-1", 100L, 10L, "EAN-1", "MFN-pim-1"));
-        linksOnTheMarketplace(link("XS-84980", "EAN-1"));
+        linksOnTheMarketplace(link("PS-8001", "EAN-1"));
 
         // when
         listener.handleMessage(request());
@@ -1173,7 +1173,7 @@ class MarketplaceOfferExportEventListenerTest {
         configureCategoryWith(warehouseDefinition(5), List.of(linked, unlinked), 10);
         priceFor(linked, 100, 2);
         priceFor(unlinked, 200, 2);
-        linksOnTheMarketplace(link("XS-84980", "730143315111", "730143315289"));
+        linksOnTheMarketplace(link("PS-8001", "730143315111", "730143315289"));
 
         // when
         listener.handleMessage(request());
@@ -1188,7 +1188,7 @@ class MarketplaceOfferExportEventListenerTest {
         Product product = product("pim-1", "0730143315289");
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
-        linksOnTheMarketplace(link("XS-84980", "730143315289"));
+        linksOnTheMarketplace(link("PS-8001", "730143315289"));
 
         // when
         listener.handleMessage(request());
@@ -1203,7 +1203,7 @@ class MarketplaceOfferExportEventListenerTest {
         Product product = product("pim-1", " 0730143315289 ");
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
-        linksOnTheMarketplace(link("XS-84980", "730143315289"));
+        linksOnTheMarketplace(link("PS-8001", "730143315289"));
 
         // when
         listener.handleMessage(request());
@@ -1222,7 +1222,7 @@ class MarketplaceOfferExportEventListenerTest {
         priceFor(first, 100, 2);
         priceFor(second, 110, 2);
         priceFor(other, 200, 2);
-        linksOnTheMarketplace(link("XS-84980", "730143315289"));
+        linksOnTheMarketplace(link("PS-8001", "730143315289"));
 
         // when
         listener.handleMessage(request());
@@ -1237,7 +1237,7 @@ class MarketplaceOfferExportEventListenerTest {
         Product product = product("pim-1", "730143315289");
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
-        linksOnTheMarketplace(MarketplaceOfferLink.of(STORE_ID, MARKETPLACE, "XS-84980", List.of("730143315289"),
+        linksOnTheMarketplace(MarketplaceOfferLink.of(STORE_ID, MARKETPLACE, "PS-8001", List.of("730143315289"),
                 MarketplaceOfferLinkSource.MANUAL, "operator", Instant.parse("2026-11-01T10:00:00Z")));
 
         // when
@@ -1253,7 +1253,7 @@ class MarketplaceOfferExportEventListenerTest {
         Product product = product("pim-1", null);
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
-        linksOnTheMarketplace(link("XS-84980", "EAN-1"));
+        linksOnTheMarketplace(link("PS-8001", "EAN-1"));
 
         // when
         listener.handleMessage(request());
@@ -1268,7 +1268,7 @@ class MarketplaceOfferExportEventListenerTest {
         Product product = product("pim-1", "EAN-1");
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
-        MarketplaceOfferLink empty = link("XS-84980", "EAN-X");
+        MarketplaceOfferLink empty = link("PS-8001", "EAN-X");
         empty.setEans(null);
         linksOnTheMarketplace(empty);
 
@@ -1285,7 +1285,7 @@ class MarketplaceOfferExportEventListenerTest {
         Product product = product("pim-1", "EAN-1");
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
-        linksOnTheMarketplace(link("pim-1", "EAN-1"), link("XS-84980", "EAN-1"));
+        linksOnTheMarketplace(link("pim-1", "EAN-1"), link("PS-8001", "EAN-1"));
 
         // when
         listener.handleMessage(request());

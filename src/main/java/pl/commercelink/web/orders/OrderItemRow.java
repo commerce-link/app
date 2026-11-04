@@ -12,6 +12,7 @@ import pl.commercelink.warehouse.api.ItemCondition;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * One row of the items table. The five scope flags are the predicates the bulk actions use on the server
@@ -32,7 +33,14 @@ public record OrderItemRow(String itemId, int index, String name, String categor
      */
     public record Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
                           Function<OrderItem, String> deliveryHref, Function<String, String> serialHref,
-                          ReceiptLock receiptLock, boolean dropshipLocked) {
+                          ReceiptLock receiptLock, boolean dropshipLocked, Predicate<String> ownOffer) {
+
+        /** ownOffer: whether a marketplace offer key is an offer CommerceLink published, which offer links leave out. */
+        public Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
+                       Function<OrderItem, String> deliveryHref, Function<String, String> serialHref,
+                       ReceiptLock receiptLock, boolean dropshipLocked) {
+            this(order, readOnly, superAdmin, labels, deliveryHref, serialHref, receiptLock, dropshipLocked, key -> false);
+        }
 
         /** receiptLock: why the order's e-receipt locks it, if it does (ReceiptOrderState#receiptLock). */
         public Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
@@ -67,13 +75,14 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 deliveryLabel, deliveryHref, DeliveryRedirectResolver.isCreateLink(deliveryHref),
                 item.isReadyForAllocation(), item.isProduct() && item.isAllocated(), item.isProduct() && item.isDelivered(),
                 item.canBeMovedToAnotherOrder(), item.isNew() || item.isService(),
-                context.readOnly() ? List.of() : actions(item, context.order(), context.receiptLock(), context.dropshipLocked()),
+                context.readOnly() ? List.of() : actions(item, context.order(), context.receiptLock(), context.dropshipLocked(),
+                        context.ownOffer()),
                 context.readOnly() ? null : itemHref,
                 item.getPrice(), item.getTax(), item.isGroup(),
                 // without the item menu a closed order would have no way to its item page (EAN, VAT, delivery dates)
                 context.readOnly() && !context.superAdmin() ? itemHref : null,
                 // the badge asks for a link, which only a New item of an open order can still take
-                item.isUnlinkedMarketplaceItem() && item.isNew() && !context.order().isClosed(),
+                linkable(item, context.ownOffer()) && item.isUnlinkedMarketplaceItem() && item.isNew() && !context.order().isClosed(),
                 item.getMarketplaceOfferKey());
     }
 
@@ -112,6 +121,11 @@ public record OrderItemRow(String itemId, int index, String name, String categor
      * The conditions of the old order-details item menu, plus: consolidation and splitting a set stop at the closing
      * invoice.
      */
+    // a line imported with a seller offer key that is not one of CommerceLink's own offers
+    private static boolean linkable(OrderItem item, Predicate<String> ownOffer) {
+        return StringUtils.isNotBlank(item.getMarketplaceOfferKey()) && !ownOffer.test(item.getMarketplaceOfferKey());
+    }
+
     public static List<ItemAction.State> actions(OrderItem item, Order order) {
         return actions(item, order, false);
     }
@@ -135,6 +149,12 @@ public record OrderItemRow(String itemId, int index, String name, String categor
      * EAN, manufacturer code): the entry is greyed with the reason whenever the post would change nothing.
      */
     public static List<ItemAction.State> actions(OrderItem item, Order order, ReceiptLock receiptLock, boolean dropshipLocked) {
+        return actions(item, order, receiptLock, dropshipLocked, key -> false);
+    }
+
+    /** ownOffer: whether an offer key is an offer CommerceLink published; its lines get no link entry at all. */
+    public static List<ItemAction.State> actions(OrderItem item, Order order, ReceiptLock receiptLock, boolean dropshipLocked,
+                                                 Predicate<String> ownOffer) {
         List<ItemAction.State> states = new ArrayList<>();
         // an item that already has a supplier (Allocation) is released first, then reassigned: while it is
         // releasable only "Usuń dostawcę" is offered, the assign entries are absent rather than greyed
@@ -143,9 +163,14 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 : item.isNew() ? null
                 : "order.item.unavailable.not.new";
         if (!releaseFirst) {
-            // only an imported line that carries the seller's offer key can be linked; older lines keep "Assign SKU"
-            if (item.isUnlinkedMarketplaceItem()) {
+            // only an imported line that carries the seller's offer key can be linked; older lines keep "Assign SKU".
+            // A line already recognised can have its link changed, e.g. a mistyped EAN
+            if (!linkable(item, ownOffer)) {
+                // an offer CommerceLink published, or a line without an offer key: no link to make or change
+            } else if (item.isUnlinkedMarketplaceItem()) {
                 states.add(ItemAction.State.of(ItemAction.LINK_OFFER, assignReason, null));
+            } else if (!item.isService()) {
+                states.add(ItemAction.State.of(ItemAction.CHANGE_OFFER_LINK, assignReason, null));
             }
             states.add(ItemAction.State.of(ItemAction.ASSIGN_SKU, assignReason, null));
             states.add(ItemAction.State.of(ItemAction.ASSIGN_SUPPLIER, assignReason, null));

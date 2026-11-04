@@ -19,7 +19,8 @@ public record OfferMatchingView(String finishedAt, int total, int ownOffers, int
     private static final DateTimeFormatter FINISHED_AT =
             DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").withZone(ZoneId.of("Europe/Warsaw"));
     private static final String REASON_KEY = "store.marketplaces.offer.matching.reason.";
-    private static final Set<String> KNOWN_REASONS = Set.of(OfferMatchResult.NO_EAN, OfferMatchResult.NO_KEY);
+    private static final Set<String> KNOWN_REASONS = Set.of(OfferMatchResult.NO_EAN, OfferMatchResult.NO_KEY,
+            OfferMatchResult.NO_EAN_KEPT_LINK);
 
     public static OfferMatchingView of(OfferMatchResult result) {
         return new OfferMatchingView(FINISHED_AT.format(result.finishedAt()), result.total(), result.ownOffers(),

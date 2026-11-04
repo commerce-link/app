@@ -13,10 +13,10 @@ class MarketplaceOfferLinkTest {
     @Test
     void linkKeyJoinsMarketplaceAndOfferKey() {
         // when
-        String key = MarketplaceOfferLink.linkKey("Empik", "XS-84980");
+        String key = MarketplaceOfferLink.linkKey("Empik", "PS-8001");
 
         // then
-        assertThat(key).isEqualTo("Empik#XS-84980");
+        assertThat(key).isEqualTo("Empik#PS-8001");
     }
 
     @Test
@@ -25,14 +25,14 @@ class MarketplaceOfferLinkTest {
         Instant now = Instant.parse("2026-11-02T10:15:30Z");
 
         // when
-        MarketplaceOfferLink link = MarketplaceOfferLink.of("store-1", "Empik", "XS-84980",
+        MarketplaceOfferLink link = MarketplaceOfferLink.of("store-1", "Empik", "PS-8001",
                 List.of("5901234123457"), MarketplaceOfferLinkSource.MANUAL, "user@x.pl", now);
 
         // then
         assertThat(link.getStoreId()).isEqualTo("store-1");
-        assertThat(link.getLinkKey()).isEqualTo("Empik#XS-84980");
+        assertThat(link.getLinkKey()).isEqualTo("Empik#PS-8001");
         assertThat(link.getMarketplace()).isEqualTo("Empik");
-        assertThat(link.getSellerOfferKey()).isEqualTo("XS-84980");
+        assertThat(link.getSellerOfferKey()).isEqualTo("PS-8001");
         assertThat(link.getEans()).containsExactly("5901234123457");
         assertThat(link.getSource()).isEqualTo(MarketplaceOfferLinkSource.MANUAL);
         assertThat(link.getCreatedBy()).isEqualTo("user@x.pl");

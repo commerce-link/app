@@ -51,10 +51,27 @@ class MarketplaceOfferMatchTemplateTest {
                 .doesNotContain("Brak w katalogu")
                 .doesNotContain("<textarea")
                 .doesNotContain("PIM");
-        assertThat(html).contains("Oferta nie ma EAN").contains("nie podał klucza oferty")
+        assertThat(html).contains("Oferta nie ma poprawnego EAN-u").contains("nie podał klucza oferty")
                 .doesNotContain("kodu producenta");
         assertThat(html).contains("5901234123459").contains("sku-5");
         assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void anOfferThatLostItsEansShowsTheKeptLinkInsteadOfAskingForOne() {
+        // given
+        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 1, List.of(),
+                List.of(new Row("PS-1", "Lampa", List.of("2000000001012"), OfferMatchResult.NO_EAN_KEPT_LINK, true)),
+                0, 0);
+
+        // when
+        String html = render(OfferMatchingView.of(result), null);
+
+        // then
+        assertThat(html).contains("Oferta nie ma już EAN-u, zamówienia dostają EAN-y z poprzedniego powiązania")
+                .contains("2000000001012")
+                .doesNotContain("Połącz ją ręcznie")
+                .doesNotContain("??");
     }
 
     @Test

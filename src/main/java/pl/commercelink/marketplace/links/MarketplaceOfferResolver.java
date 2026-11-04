@@ -16,6 +16,7 @@ import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -56,11 +57,23 @@ public class MarketplaceOfferResolver {
     }
 
     /**
-     * Resolutions for the lines of one order (or one operator action): the store's catalogs are read at most once,
-     * and only when a line needs them. Not meant to outlive that call, so catalog changes are seen by the next one.
+     * Resolutions for the lines of one import message or one operator action. What a line needs is read lazily and then
+     * kept for the scope: the store's catalog list at most twice (once for the catalog categories of own offers, once
+     * through {@link StoreCategoryResolver} for the category names of linked lines), the products of every catalog
+     * category at most once (only {@link StoreOffers#catalogProducts()} reads them), and the taxonomy once per EAN. An own
+     * offer's product is still looked up by pimId for each line. Not meant to outlive that call, so catalog changes are
+     * seen by the next one.
      */
     public StoreOffers forStore(String storeId) {
         return new StoreOffers(storeId);
+    }
+
+    /**
+     * Whether the seller offer key is the pimId of an offer CommerceLink published for the store (the rule offer
+     * matching counts its own offers by). Such offers are left out of offer links altogether.
+     */
+    public boolean isOwnOffer(String storeId, String sellerOfferKey) {
+        return StringUtils.isNotBlank(sellerOfferKey) && pimAliases.effectiveEntry(storeId, sellerOfferKey).isPresent();
     }
 
     public Optional<ResolvedOffer> resolve(String storeId, String marketplace, String sellerOfferKey, String manufacturerCode) {
@@ -73,23 +86,27 @@ public class MarketplaceOfferResolver {
         private Map<String, String> categoryNamesById;
         private List<Product> catalogProducts;
         private Map<String, String> storeCategoryNamesByPimCategoryId;
+        // findByEan scans the whole taxonomy, and one import can bring the same offer in many orders
+        private final Map<String, Optional<Taxonomy>> taxonomyByEan = new HashMap<>();
 
         private StoreOffers(String storeId) {
             this.storeId = storeId;
         }
 
         public Optional<ResolvedOffer> resolve(String marketplace, String sellerOfferKey, String manufacturerCode) {
-            if (StringUtils.isNotBlank(sellerOfferKey)) {
-                Optional<ResolvedOffer> linked = linkRepository.find(storeId, marketplace, sellerOfferKey)
-                        .flatMap(this::fromLink);
-                if (linked.isPresent()) {
-                    return linked;
-                }
+            if (isOwnOffer(storeId, sellerOfferKey)) {
+                // an offer CommerceLink published is resolved as before offer links existed: a link never applies to it
                 Optional<ResolvedOffer> own = pimAliases.effectiveEntry(storeId, sellerOfferKey)
                         .map(entry -> fromEntry(entry, Source.OWN_OFFER))
                         .filter(offer -> hasProductCode(offer, sellerOfferKey));
                 if (own.isPresent()) {
                     return own;
+                }
+            } else if (StringUtils.isNotBlank(sellerOfferKey)) {
+                Optional<ResolvedOffer> linked = linkRepository.find(storeId, marketplace, sellerOfferKey)
+                        .flatMap(this::fromLink);
+                if (linked.isPresent()) {
+                    return linked;
                 }
             }
 
@@ -105,6 +122,17 @@ public class MarketplaceOfferResolver {
          * Every product of the store's catalogs, read once per scope, in a stable order: catalogs by id, categories in
          * each catalog's order, products of a category by id.
          */
+        /**
+         * One product of the store's catalogs, read by its key; a category that is not the store's gives nothing, so
+         * another store's product cannot be picked. "Link to product" needs only the one the operator chose.
+         */
+        public Optional<Product> catalogProduct(String categoryId, String productId) {
+            if (StringUtils.isAnyBlank(categoryId, productId) || !categoryNamesById().containsKey(categoryId)) {
+                return Optional.empty();
+            }
+            return Optional.ofNullable(productRepository.findByProductId(categoryId, productId));
+        }
+
         public List<Product> catalogProducts() {
             if (catalogProducts == null) {
                 catalogProducts = categoryNamesById().keySet().stream()
@@ -128,14 +156,11 @@ public class MarketplaceOfferResolver {
         /**
          * A marketplace offer is one product, so a link listing several EANs lists codes of the same goods (Empik gives
          * an EAN-13 and its 12-digit UPC form, which unify to one; a product can also carry two codes): all of them go
-         * on the item, so fulfilment finds the goods under whichever code a supplier knows.
+         * on the item, so fulfilment finds the goods under whichever code a supplier knows. A value without the format of
+         * an EAN, saved before the format was checked, is skipped; a link left without any is no link.
          */
         private Optional<ResolvedOffer> fromLink(MarketplaceOfferLink link) {
-            List<String> eans = Optional.ofNullable(link.getEans()).orElse(List.of()).stream()
-                    .map(OfferEans::unify)
-                    .filter(Objects::nonNull)
-                    .distinct()
-                    .toList();
+            List<String> eans = OfferEans.validUnified(link.getEans());
             return eans.isEmpty() ? Optional.empty() : Optional.of(linked(eans));
         }
 
@@ -147,11 +172,15 @@ public class MarketplaceOfferResolver {
         /**
          * The category of the first EAN the taxonomy knows with a category (one still waiting for its category is
          * skipped), named as the store calls the PIM category in its catalogs, else as the taxonomy does; null when none
-         * is known. The same rule as a warehouse item's category, so the goods keep one category from order to stock.
+         * is known. A warehouse item takes its category from the same taxonomy and names it the same way, but looks it
+         * up by the manufacturer code of the delivered goods, not by EAN ({@code WarehouseItemFactory}): the two agree
+         * while the taxonomy's entries for the goods agree, and can differ where its entries for the EAN and the code
+         * name different categories.
          */
         private String taxonomyCategory(List<String> eans) {
             for (String ean : eans) {
-                Taxonomy taxonomy = taxonomyCache.findByEan(ean);
+                Taxonomy taxonomy = taxonomyByEan.computeIfAbsent(ean,
+                        key -> Optional.ofNullable(taxonomyCache.findByEan(key))).orElse(null);
                 if (TaxonomyCache.hasCategory(taxonomy)) {
                     String storeName = StringUtils.isBlank(taxonomy.categoryId()) ? null
                             : storeCategoryNames().get(taxonomy.categoryId());

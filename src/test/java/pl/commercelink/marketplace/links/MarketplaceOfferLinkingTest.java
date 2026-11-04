@@ -6,6 +6,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.orders.ArchiveIndexEntry;
+import pl.commercelink.orders.ArchiveIndexRequest;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
@@ -22,9 +24,11 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -42,9 +46,9 @@ class MarketplaceOfferLinkingTest {
 
     private static final String STORE = "s1";
     private static final String EMPIK = "Empik";
-    private static final String KEY = "PS-84980";
+    private static final String KEY = "PS-1001";
     private static final Instant NOW = Instant.parse("2026-11-02T10:00:00Z");
-    private static final String EAN = "5900000000011";
+    private static final String EAN = "2001000000012";
 
     @Mock
     private MarketplaceOfferLinkRepository linkRepository;
@@ -65,11 +69,14 @@ class MarketplaceOfferLinkingTest {
         linking = new MarketplaceOfferLinking(linkRepository, resolver, ordersRepository, orderItemsRepository,
                 Clock.fixed(NOW, ZoneId.of("Europe/Warsaw")));
         lenient().when(resolver.forStore(STORE)).thenReturn(storeOffers);
-        lenient().when(storeOffers.catalogProducts()).thenReturn(List.of(
+        for (Product product : List.of(
                 catalogProduct("c1", "p1", null, EAN, "ab 123"),
                 catalogProduct("c1", "p2", "pim-2", null, "NO-EAN"),
-                catalogProduct("c1", "p3", null, "5909999999999", " "),
-                catalogProduct("c1", "p4", null, " 05900000000028 ", "CD-4")));
+                catalogProduct("c1", "p3", null, "2001000000036", " "),
+                catalogProduct("c1", "p4", null, " 02001000000029 ", "CD-4"))) {
+            lenient().when(storeOffers.catalogProduct("c1", product.getProductId())).thenReturn(Optional.of(product));
+        }
+        lenient().when(storeOffers.catalogProduct("other-store-category", "p1")).thenReturn(Optional.empty());
         lenient().when(storeOffers.linked(anyList()))
                 .thenAnswer(invocation -> ResolvedOffer.linked(invocation.getArgument(0), null));
         lenient().when(orderItemsRepository.findByOrderIds(anyList())).thenAnswer(invocation -> {
@@ -211,9 +218,9 @@ class MarketplaceOfferLinkingTest {
         // then
         ArgumentCaptor<MarketplaceOfferLink> saved = ArgumentCaptor.forClass(MarketplaceOfferLink.class);
         verify(linkRepository).save(saved.capture());
-        assertThat(saved.getValue().getEans()).containsExactly("5909999999999");
+        assertThat(saved.getValue().getEans()).containsExactly("2001000000036");
         assertThat(result.updatedItems()).isEqualTo(1);
-        assertThat(item.getSku()).isEqualTo("5909999999999");
+        assertThat(item.getSku()).isEqualTo("2001000000036");
         assertThat(item.getManufacturerCode()).isNull();
     }
 
@@ -249,8 +256,8 @@ class MarketplaceOfferLinkingTest {
         // then
         ArgumentCaptor<MarketplaceOfferLink> saved = ArgumentCaptor.forClass(MarketplaceOfferLink.class);
         verify(linkRepository).save(saved.capture());
-        assertThat(saved.getValue().getEans()).containsExactly("5900000000028");
-        assertThat(item.getSku()).isEqualTo("5900000000028");
+        assertThat(saved.getValue().getEans()).containsExactly("2001000000029");
+        assertThat(item.getSku()).isEqualTo("2001000000029");
     }
 
     @Test
@@ -262,21 +269,21 @@ class MarketplaceOfferLinkingTest {
         openOrders(order);
 
         // when
-        MarketplaceOfferLinking.LinkResult result = linking.linkEan(STORE, order, "i1", " 590 0000 000035 ", "user-1");
+        MarketplaceOfferLinking.LinkResult result = linking.linkEan(STORE, order, "i1", " 200 1000 000043 ", "user-1");
 
         // then
         ArgumentCaptor<MarketplaceOfferLink> saved = ArgumentCaptor.forClass(MarketplaceOfferLink.class);
         verify(linkRepository).save(saved.capture());
-        assertThat(saved.getValue().getEans()).containsExactly("5900000000035");
+        assertThat(saved.getValue().getEans()).containsExactly("2001000000043");
         assertThat(saved.getValue().getSource()).isEqualTo(MarketplaceOfferLinkSource.MANUAL);
         assertThat(saved.getValue().getCreatedBy()).isEqualTo("user-1");
         assertThat(result.updatedItems()).isEqualTo(2);
         assertThat(List.of(item, twin)).allSatisfy(filled -> {
-            assertThat(filled.getSku()).isEqualTo("5900000000035");
-            assertThat(filled.getEan()).isEqualTo("5900000000035");
+            assertThat(filled.getSku()).isEqualTo("2001000000043");
+            assertThat(filled.getEan()).isEqualTo("2001000000043");
             assertThat(filled.isUnlinkedMarketplaceItem()).isFalse();
         });
-        verify(storeOffers, never()).catalogProducts();
+        verify(storeOffers, never()).catalogProduct(any(), any());
     }
 
     @Test
@@ -285,15 +292,15 @@ class MarketplaceOfferLinkingTest {
         Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
         OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
         openOrders(order);
-        when(storeOffers.linked(List.of("5900000000035")))
-                .thenReturn(ResolvedOffer.linked(List.of("5900000000035"), "Dom i kuchnia"));
+        when(storeOffers.linked(List.of("2001000000043")))
+                .thenReturn(ResolvedOffer.linked(List.of("2001000000043"), "Dom i kuchnia"));
 
         // when
-        linking.linkEan(STORE, order, "i1", "5900000000035", "user-1");
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
 
         // then
         assertThat(item.getCategory()).isEqualTo("Dom i kuchnia");
-        assertThat(item.getSku()).isEqualTo("5900000000035");
+        assertThat(item.getSku()).isEqualTo("2001000000043");
     }
 
     @Test
@@ -304,7 +311,7 @@ class MarketplaceOfferLinkingTest {
         when(orderItemsRepository.findById("o1", "i1")).thenReturn(item);
 
         // when / then
-        for (String typed : new String[]{"1234567", "123456789012345", "59000000000AB", "", null}) {
+        for (String typed : new String[]{"1234567", "123456789012345", "20010000000AB", "2001000000013", "", null}) {
             assertThatThrownBy(() -> linking.linkEan(STORE, order, "i1", typed, "user-1"))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage(MarketplaceOfferLinking.INVALID_EAN);
@@ -371,13 +378,169 @@ class MarketplaceOfferLinkingTest {
         verify(orderItemsRepository).save(item);
     }
 
+    @Test
+    void theOtherOrdersAreReadFromTheSweepWindowOnly() {
+        // given
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        openOrders(order);
+
+        // when
+        linking.link(STORE, order, "i1", "c1", "p1", "user-1");
+
+        // then the date index is asked for the last 90 days of open orders, not for every open order of the store
+        ArgumentCaptor<ArchiveIndexRequest> asked = ArgumentCaptor.forClass(ArchiveIndexRequest.class);
+        verify(ordersRepository).archiveIndex(eq(STORE), asked.capture());
+        assertThat(asked.getValue().from()).isEqualTo(java.time.LocalDate.of(2026, 11, 2).minusDays(90));
+        assertThat(asked.getValue().statuses()).doesNotContain(OrderStatus.Completed, OrderStatus.Cancelled);
+        verify(ordersRepository, never()).findByStoreAndStatuses(any(), anyCollection());
+    }
+
+    @Test
+    void linkEanAcceptsAnEanWithNonBreakingSpaces() {
+        // given an EAN pasted from a spreadsheet
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        openOrders(order);
+
+        // when
+        linking.linkEan(STORE, order, "i1", "2001\u00A0000\u2007000043", "user-1");
+
+        // then
+        assertThat(item.getSku()).isEqualTo("2001000000043");
+    }
+
+    @Test
+    void linkEanAcceptsEveryGtinLengthWithItsCheckDigit() {
+        // given EAN-8 and UPC-A, both with a correct last digit
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        openOrders(order);
+
+        // when / then
+        for (String typed : new String[]{"20010003", "200100005"}) {
+            assertThat(linking.linkEan(STORE, order, "i1", typed, "user-1").updatedItems()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void anItemGivenAnotherSkuByHandInAnotherOrderIsLeftAsItIs() {
+        // given the operator assigned a substitute by hand in the other order
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        Order other = marketplaceOrder("o2", EMPIK, OrderStatus.New, 2);
+        unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        OrderItem substitute = unlinkedItem("o2", "i2", FulfilmentStatus.New);
+        substitute.setSku("DMW-9");
+        openOrders(order, other);
+
+        // when
+        MarketplaceOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1");
+
+        // then
+        assertThat(result.updatedItems()).isEqualTo(1);
+        assertThat(substitute.getSku()).isEqualTo("DMW-9");
+        verify(orderItemsRepository, never()).save(substitute);
+    }
+
+    @Test
+    void changingALinkAlsoCorrectsOtherItemsTheOldLinkFilled() {
+        // given a wrong EAN linked earlier gave both items its codes
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        Order other = marketplaceOrder("o2", EMPIK, OrderStatus.New, 2);
+        OrderItem chosen = linkedItem("o1", "i1", "2001000000050");
+        OrderItem filledByOldLink = linkedItem("o2", "i2", "2001000000050");
+        openOrders(order, other);
+        when(linkRepository.find(STORE, EMPIK, KEY)).thenReturn(Optional.of(MarketplaceOfferLink.of(STORE, EMPIK, KEY,
+                List.of("2001000000050"), MarketplaceOfferLinkSource.MANUAL, "user-0", NOW)));
+
+        // when
+        MarketplaceOfferLinking.LinkResult result = linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+
+        // then
+        assertThat(result.updatedItems()).isEqualTo(2);
+        assertThat(List.of(chosen, filledByOldLink)).allSatisfy(item -> {
+            assertThat(item.getSku()).isEqualTo("2001000000043");
+            assertThat(item.getEan()).isEqualTo("2001000000043");
+        });
+    }
+
+    @Test
+    void theChosenItemTakesTheNewLinksValuesInPlaceOfItsOldOnes() {
+        // given the old link gave a category and fulfilment a manufacturer code; the taxonomy knows nothing of the new EAN
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        OrderItem chosen = linkedItem("o1", "i1", "2001000000050");
+        chosen.setCategory("Dom i kuchnia");
+        chosen.setManufacturerCode("DMW-OLD");
+        openOrders(order);
+
+        // when
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+
+        // then the item looks as the next import of the offer would bring it
+        assertThat(chosen.getSku()).isEqualTo("2001000000043");
+        assertThat(chosen.getEan()).isEqualTo("2001000000043");
+        assertThat(chosen.getCategory()).isEqualTo(Categories.UNCATEGORIZED);
+        assertThat(chosen.getManufacturerCode()).isNull();
+    }
+
+    @Test
+    void linkingAgainToTheSameEanCountsOnlyTheItemsItChanged() {
+        // given both items already carry what the link gives
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        Order other = marketplaceOrder("o2", EMPIK, OrderStatus.New, 2);
+        linkedItem("o1", "i1", EAN);
+        OrderItem twin = linkedItem("o2", "i2", EAN);
+        openOrders(order, other);
+        when(linkRepository.find(STORE, EMPIK, KEY)).thenReturn(Optional.of(MarketplaceOfferLink.of(STORE, EMPIK, KEY,
+                List.of(EAN), MarketplaceOfferLinkSource.MANUAL, "user-0", NOW)));
+
+        // when
+        MarketplaceOfferLinking.LinkResult result = linking.linkEan(STORE, order, "i1", EAN, "user-1");
+
+        // then
+        assertThat(result.updatedItems()).isZero();
+        verify(orderItemsRepository, never()).save(twin);
+    }
+
+    @Test
+    void anOfferCommerceLinkPublishedCannotBeLinked() {
+        // given
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        when(orderItemsRepository.findById("o1", "i1")).thenReturn(item);
+        when(resolver.isOwnOffer(STORE, KEY)).thenReturn(true);
+
+        // when / then
+        assertThatThrownBy(() -> linking.linkEan(STORE, order, "i1", "2001000000043", "user-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(MarketplaceOfferLinking.OWN_OFFER);
+        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", "p1", "user-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(MarketplaceOfferLinking.OWN_OFFER);
+        verify(linkRepository, never()).save(any());
+        verify(orderItemsRepository, never()).save(any());
+    }
+
+    private OrderItem linkedItem(String orderId, String itemId, String ean) {
+        OrderItem item = unlinkedItem(orderId, itemId, FulfilmentStatus.New);
+        item.setSku(ean);
+        item.setEan(ean);
+        return item;
+    }
+
     private void openOrders(Order... orders) {
-        when(ordersRepository.findByStoreAndStatuses(eq(STORE), anyCollection())).thenReturn(new ArrayList<>(List.of(orders)));
+        List<ArchiveIndexEntry> entries = new ArrayList<>();
         for (Order order : orders) {
+            entries.add(new ArchiveIndexEntry(order.getOrderId(), order.getOrderedAt().toString(), order.getStatus(), null));
             for (OrderItem item : itemsByOrder.getOrDefault(order.getOrderId(), List.of())) {
                 lenient().when(orderItemsRepository.findById(order.getOrderId(), item.getItemId())).thenReturn(item);
             }
         }
+        lenient().when(ordersRepository.archiveIndex(eq(STORE), any())).thenAnswer(invocation -> entries.iterator());
+        lenient().when(ordersRepository.findByIds(eq(STORE), anyList())).thenAnswer(invocation -> {
+            List<String> ids = invocation.getArgument(1);
+            return new ArrayList<>(Arrays.stream(orders).filter(order -> ids.contains(order.getOrderId())).toList());
+        });
     }
 
     private static Product catalogProduct(String categoryId, String productId, String pimId, String ean, String mfn) {

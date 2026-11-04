@@ -245,7 +245,8 @@
                            th:attr="data-cl-dialog-open=${state.action().dialogId()}, data-item-id=${row.itemId()},
                                     data-name=${row.name()}, data-sku=${row.sku()}, data-category=${row.category()},
                                     data-qty=${row.qty()}, data-price=${row.price()}, data-tax=${row.tax()},
-                                    data-offer-key=${row.marketplaceOfferKey()}"
+                                    data-offer-key=${row.marketplaceOfferKey()},
+                                    data-link-change=${state.action().name() == 'CHANGE_OFFER_LINK'}"
                            th:text="#{${state.labelKey()}}"></a>
                     </li>
                     <li th:if="${state.available() and state.action().name() == 'CLEAR_SUPPLIER'}">

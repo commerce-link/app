@@ -52,7 +52,7 @@ class OfferMatchResultStoreTest {
         // given a result of the catalog-based matching: a product per row, a group of offers not in a catalog and the
         // EAN to add to one
         String old = "{\"finishedAt\":\"2026-11-02T10:00:00Z\",\"total\":3,"
-                + "\"linked\":[{\"sellerOfferKey\":\"PS-1\",\"title\":\"Klocki\",\"eans\":[\"5903771700818\"],"
+                + "\"linked\":[{\"sellerOfferKey\":\"PS-1\",\"title\":\"Klocki\",\"eans\":[\"2000000001012\"],"
                 + "\"product\":\"Klocki Classic\",\"reason\":null,\"active\":true,\"catalogEan\":null}],"
                 + "\"notInCatalog\":[{\"sellerOfferKey\":\"PS-3\",\"title\":\"Puzzle\",\"eans\":[\"5900000000000\"],"
                 + "\"product\":null,\"reason\":null,\"active\":true,\"catalogEan\":\"5900000000000\"}],"
@@ -69,14 +69,14 @@ class OfferMatchResultStoreTest {
         assertThat(latest).isPresent();
         assertThat(latest.get().total()).isEqualTo(3);
         assertThat(latest.get().linked()).containsExactly(new OfferMatchResult.Row("PS-1", "Klocki",
-                List.of("5903771700818"), null, true));
+                List.of("2000000001012"), null, true));
         assertThat(latest.get().toReview()).extracting(OfferMatchResult.Row::reason).containsExactly("ambiguous");
     }
 
     private static OfferMatchResult result() {
         return new OfferMatchResult(Instant.parse("2026-11-02T10:00:00Z"), 6,
-                List.of(new OfferMatchResult.Row("PS-1", "Klocki", List.of("5903771700818"), null, true),
-                        new OfferMatchResult.Row("PS-2", "Lalka", List.of("5903771700825"), null, false)),
+                List.of(new OfferMatchResult.Row("PS-1", "Klocki", List.of("2000000001012"), null, true),
+                        new OfferMatchResult.Row("PS-2", "Lalka", List.of("2000000001029"), null, false)),
                 List.of(new OfferMatchResult.Row("PS-4", "Gra", List.of(), "no-ean", true)),
                 1, 1);
     }
@@ -140,7 +140,7 @@ class OfferMatchResultStoreTest {
     private static OfferMatchProgress progress() {
         return new OfferMatchProgress("run-1", Instant.parse("2026-11-02T10:00:00Z"),
                 Instant.parse("2026-11-02T10:01:00Z"), OfferMatchProgress.Status.RUNNING, "200", 2, 6150, 1, 0,
-                List.of(new OfferMatchResult.Row("PS-1", "Klocki", List.of("5903771700818"), null, true),
+                List.of(new OfferMatchResult.Row("PS-1", "Klocki", List.of("2000000001012"), null, true),
                         new OfferMatchResult.Row("PS-3", "Puzzle", List.of("5900000000000"), null, false)),
                 List.of(), java.util.Set.of("PS-1", "PS-3"), 2, null, null);
     }

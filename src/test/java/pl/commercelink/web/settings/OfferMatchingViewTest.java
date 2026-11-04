@@ -35,6 +35,7 @@ class OfferMatchingViewTest {
         // given
         List<Row> rows = List.of(new Row("c", "C", List.of(), OfferMatchResult.NO_EAN, true),
                 new Row("k", "K", List.of("111"), OfferMatchResult.NO_KEY, true),
+                new Row("l", "L", List.of("2000000001012"), OfferMatchResult.NO_EAN_KEPT_LINK, true),
                 new Row("a", "A", List.of("222"), "ambiguous", true),
                 new Row("b", "B", List.of("333"), "no-mfn", true));
 
@@ -45,6 +46,7 @@ class OfferMatchingViewTest {
         assertThat(group.rows()).extracting(OfferMatchingView.Row::reasonKey).containsExactly(
                 "store.marketplaces.offer.matching.reason.no-ean",
                 "store.marketplaces.offer.matching.reason.no-key",
+                "store.marketplaces.offer.matching.reason.no-ean-kept-link",
                 null, null);
     }
 

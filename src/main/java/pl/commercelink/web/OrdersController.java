@@ -1295,6 +1295,8 @@ public class OrdersController extends BaseController {
             return refuse(redirectAttributes, orderId, "order.item.assign.sku.locked", locale);
         }
         orderItem.setSku(sku);
+        // a New item's EAN can only come from its offer link; the typed codes replace that link's codes
+        orderItem.setEan(null);
         orderItemsRepository.save(orderItem);
         return details(orderId);
     }
@@ -1318,8 +1320,8 @@ public class OrdersController extends BaseController {
         }
         MarketplaceOfferLinking.LinkResult result;
         try {
-            // a typed EAN wins: the dialog clears the product choice when one is typed
-            result = StringUtils.isNotBlank(ean)
+            // a typed EAN wins: the dialog clears the product choice when one is typed; spaces alone are a bad EAN
+            result = StringUtils.isNotEmpty(ean)
                     ? marketplaceOfferLinking.linkEan(getStoreId(), order, itemId, ean, getUserId())
                     : marketplaceOfferLinking.link(getStoreId(), order, itemId, categoryId, productId, getUserId());
         } catch (IllegalArgumentException e) {

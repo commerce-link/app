@@ -25,9 +25,9 @@ import java.util.Set;
 /**
  * Links a store's offers on a marketplace, published there by another system, to their EANs. Every offer with an EAN
  * gets its link, and the next order line of the offer carries that EAN; whether a catalog has the product does not
- * matter, as fulfilment finds the goods by EAN in the warehouse and the suppliers' feeds. Offers without an EAN or a key
- * are listed for review. A link from an earlier run is replaced when the offer's EANs changed; an operator's (MANUAL)
- * link is never touched. Each link is saved as soon as its offer is read, so a run cut short keeps what it linked.
+ * matter, as fulfilment finds the goods by EAN in the warehouse and the suppliers' feeds. Only values with the format of
+ * an EAN count ({@link OfferEans#isValid}). Offers without an EAN or a key are listed for review. A link from an earlier
+ * run is replaced when the offer's EANs changed; an operator's (MANUAL) link is never touched. Each link is saved as soon as its offer is read, so a run cut short keeps what it linked.
  * <p>
  * A run goes page by page from where its {@link OfferMatchProgress} stopped, and pauses when the marketplace limits
  * requests (Empik answers about ten pages a minute) or the message's time budget is used, so the caller can carry on in
@@ -155,12 +155,12 @@ public class MarketplaceOfferMatching {
                 alreadyLinked++;
                 return;
             }
-            MarketplaceOfferLink link = MarketplaceOfferLink.of(storeId, marketplace, key, eans,
-                    MarketplaceOfferLinkSource.EAN, CREATED_BY, clock.instant());
-            if (link.getEans().isEmpty()) {
-                toReview.add(row(offer, eans, OfferMatchResult.NO_EAN));
+            if (eans.isEmpty()) {
+                toReview.add(withoutEan(offer, existing));
                 return;
             }
+            MarketplaceOfferLink link = MarketplaceOfferLink.of(storeId, marketplace, key, eans,
+                    MarketplaceOfferLinkSource.EAN, CREATED_BY, clock.instant());
             // an unchanged link is not written again, so a rerun does not rewrite thousands of links; the order counts,
             // since an order item's EAN is the first one
             boolean unchanged = existing != null && link.getEans().equals(existing.getEans());
@@ -170,6 +170,19 @@ public class MarketplaceOfferMatching {
                 return;
             }
             linked.add(row(offer, eans, null));
+        }
+
+        /**
+         * An offer that lists no valid EAN. An earlier run's link stays: the EANs were removed on the marketplace, not
+         * proven wrong, and the offer's orders keep getting them, so the report names them instead of asking for a
+         * link the order item's menu no longer offers. A link without a valid EAN is ignored by order import, so such
+         * an offer is simply without an EAN.
+         */
+        private Row withoutEan(MarketplaceListedOffer offer, MarketplaceOfferLink existing) {
+            List<String> kept = existing == null ? List.of() : OfferEans.validUnified(existing.getEans());
+            return kept.isEmpty()
+                    ? row(offer, List.of(), OfferMatchResult.NO_EAN)
+                    : row(offer, kept, OfferMatchResult.NO_EAN_KEPT_LINK);
         }
 
         void total(Integer total) {
@@ -202,6 +215,10 @@ public class MarketplaceOfferMatching {
         }
     }
 
+    /**
+     * The offer's EANs as the marketplace spells them (trimmed), only those that unify to a {@linkplain OfferEans#isValid
+     * valid} EAN: a placeholder such as {@code N/A} or a typo would otherwise become the sku of every order of the offer.
+     */
     private static List<String> eansOf(MarketplaceListedOffer offer) {
         if (offer.eans() == null) {
             return List.of();
@@ -209,11 +226,10 @@ public class MarketplaceOfferMatching {
         return offer.eans().stream()
                 .filter(Objects::nonNull)
                 .map(String::trim)
-                .filter(StringUtils::isNotEmpty)
+                .filter(ean -> OfferEans.isValid(OfferEans.unify(ean)))
                 .distinct()
                 .toList();
     }
-
 
     private static Row row(MarketplaceListedOffer offer, List<String> eans, String reason) {
         return new Row(offer.sellerOfferKey(), offer.title(), eans, reason, offer.active());

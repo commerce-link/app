@@ -72,6 +72,12 @@ class OrderDetailsMessagesTest {
                 MarketplaceOfferLinking.NO_OFFER_KEY,
                 MarketplaceOfferLinking.NOT_A_MARKETPLACE_ORDER,
                 MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG,
+                MarketplaceOfferLinking.INVALID_EAN,
+                MarketplaceOfferLinking.OWN_OFFER,
+                "order.item.menu.change.offer.link",
+                "order.item.link.offer.change.title",
+                "order.item.link.offer.current",
+                "order.item.link.offer.change.submit",
                 "order.item.link.offer.search.placeholder",
                 "order.item.link.offer.done");
 

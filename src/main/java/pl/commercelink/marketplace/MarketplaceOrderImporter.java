@@ -35,8 +35,9 @@ public class MarketplaceOrderImporter {
     private CarrierDictionary carrierDictionary;
 
     /**
-     * Imports one fetch of a marketplace's orders. The store's catalogs are read at most once for all of them, not once
-     * per order: a large catalog read for every new order of a backlog could outlast the queue message.
+     * Imports one fetch of a marketplace's orders in one {@link MarketplaceOfferResolver.StoreOffers} scope, not one per
+     * order: what the scope reads (the store's catalog list, at most twice, and the taxonomy category of each EAN) is
+     * read for the whole fetch, since repeating it for every new order of a backlog could outlast the queue message.
      *
      * @return how many orders were new and saved
      */

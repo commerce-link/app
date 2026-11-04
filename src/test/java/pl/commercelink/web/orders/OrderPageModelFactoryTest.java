@@ -113,7 +113,7 @@ class OrderPageModelFactoryTest {
         factory = new OrderPageModelFactory(storesRepository, orderEventsRepository, dropshipItemLookup,
                 deliveryRedirectResolver, dropshipEligibility, supplierLabels, shipmentCarrierOptions, productCatalogRepository, taxonomyCache,
                 messageSource, receiptAttemptService, receiptAlerts, shippingService,
-                ShippingIntegrationNamesFixture.names());
+                ShippingIntegrationNamesFixture.names(), mock(pl.commercelink.marketplace.links.MarketplaceOfferResolver.class));
         ReflectionTestUtils.setField(factory, "appDomain", "https://app.example");
         Store store = new Store();
         store.setStoreId("store-1");
@@ -954,7 +954,7 @@ class OrderPageModelFactoryTest {
                 dropshipItemLookup, deliveryRedirectResolver, dropshipEligibility, supplierLabels,
                 new ShipmentCarrierOptions(new CarrierDictionary()), productCatalogRepository, taxonomyCache,
                 messageSource, receiptAttemptService, receiptAlerts, realShipping,
-                ShippingIntegrationNamesFixture.names());
+                ShippingIntegrationNamesFixture.names(), mock(pl.commercelink.marketplace.links.MarketplaceOfferResolver.class));
         ReflectionTestUtils.setField(withRealShipping, "appDomain", "https://app.example");
 
         // when

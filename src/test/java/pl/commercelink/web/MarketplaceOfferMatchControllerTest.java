@@ -42,7 +42,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -66,6 +65,10 @@ class MarketplaceOfferMatchControllerTest {
     private OfferMatchResultStore resultStore;
     @Mock
     private StoreActivity storeActivity;
+    @Mock
+    private MarketplaceProviderDescriptor empik;
+    @Mock
+    private MarketplaceProviderDescriptor otherMarketplace;
 
     private MarketplaceOfferMatchController controller;
 
@@ -76,7 +79,6 @@ class MarketplaceOfferMatchControllerTest {
         when(storeActivity.isActive(org.mockito.ArgumentMatchers.any(Store.class))).thenReturn(true);
         givenStoreConnectedTo(STORE_ID, EMPIK);
         givenStoreConnectedTo("store-2", EMPIK);
-        MarketplaceProviderDescriptor empik = mock(MarketplaceProviderDescriptor.class);
         when(empik.supportsOfferListing()).thenReturn(true);
         when(marketplaces.descriptor(EMPIK)).thenReturn(empik);
         when(marketplaces.displayName(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -145,7 +147,23 @@ class MarketplaceOfferMatchControllerTest {
 
         // then
         String csv = new String(response.getBody().getByteArray(), java.nio.charset.StandardCharsets.UTF_8);
-        assertThat(csv).contains("\"sku-r\";\"Zestaw\";\"\";\"tak\";\"Oferta nie ma EAN-u.");
+        assertThat(csv).contains("\"sku-r\";\"Zestaw\";\"\";\"tak\";\"Oferta nie ma poprawnego EAN-u");
+    }
+
+    @Test
+    void theCsvSaysWhichEanAnOfferThatLostItsEansKeeps() throws Exception {
+        // given
+        when(resultStore.latest(STORE_ID, EMPIK)).thenReturn(Optional.of(new OfferMatchResult(NOW, 1, List.of(),
+                List.of(new Row("PS-1", "Lampa", List.of("2000000001012"), OfferMatchResult.NO_EAN_KEPT_LINK, true)),
+                0, 0)));
+
+        // when
+        var response = controller.groupCsv(EMPIK, "toReview", PL);
+
+        // then
+        String csv = new String(response.getBody().getByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(csv).contains("\"PS-1\";\"Lampa\";\"2000000001012\";\"tak\";"
+                + "\"Oferta nie ma już EAN-u, zamówienia dostają EAN-y z poprzedniego powiązania");
     }
 
     @Test
@@ -264,9 +282,8 @@ class MarketplaceOfferMatchControllerTest {
     @Test
     void marketplaceNotConnectedIsNotFound() {
         // given
-        MarketplaceProviderDescriptor ceneo = mock(MarketplaceProviderDescriptor.class);
-        when(ceneo.supportsOfferListing()).thenReturn(true);
-        when(marketplaces.descriptor("Ceneo")).thenReturn(ceneo);
+        when(otherMarketplace.supportsOfferListing()).thenReturn(true);
+        when(marketplaces.descriptor("Ceneo")).thenReturn(otherMarketplace);
 
         // when / then
         assertNotFound(() -> controller.offerMatching("Ceneo", new ExtendedModelMap(), PL));
@@ -288,9 +305,8 @@ class MarketplaceOfferMatchControllerTest {
     @Test
     void marketplaceWithoutOfferListingIsNotFound() {
         // given
-        MarketplaceProviderDescriptor allegro = mock(MarketplaceProviderDescriptor.class);
-        when(allegro.supportsOfferListing()).thenReturn(false);
-        when(marketplaces.descriptor("Allegro")).thenReturn(allegro);
+        when(otherMarketplace.supportsOfferListing()).thenReturn(false);
+        when(marketplaces.descriptor("Allegro")).thenReturn(otherMarketplace);
         storesRepository.findById(STORE_ID).connectMarketplace("Allegro", false);
 
         // when / then

@@ -73,7 +73,8 @@
            the store's other New items with the same offer. */-->
     <dialog class="cl-dialog is-form is-wide" id="link-offer-dialog" aria-labelledby="link-offer-title">
         <form method="post" th:action="@{/dashboard/orders/{o}/link-offer(o=${page.orderId()})}" data-cl-link-offer>
-            <h2 class="cl-dialog-title" id="link-offer-title" th:text="#{order.item.menu.link.offer}"></h2>
+            <h2 class="cl-dialog-title" id="link-offer-title" th:text="#{order.item.menu.link.offer}"
+                th:attr="data-title-link=#{order.item.menu.link.offer}, data-title-change=#{order.item.link.offer.change.title}"></h2>
             <div class="cl-dialog-body">
                 <input type="hidden" name="itemId" data-cl-item-id>
                 <input type="hidden" name="categoryId" data-cl-link-category-id>
@@ -81,6 +82,7 @@
                 <dl class="cl-kv" th:replace="~{orders/details/item-dialogs :: context}"></dl>
                 <dl class="cl-kv">
                     <div><dt th:text="#{order.item.link.offer.key}"></dt><dd><code class="cl-code" data-cl-link-key></code></dd></div>
+                    <div data-cl-link-current hidden><dt th:text="#{order.item.link.offer.current}"></dt><dd><code class="cl-code" data-cl-link-current-codes></code></dd></div>
                 </dl>
                 <div class="cl-form-grid">
                     <div class="cl-span-2 cl-field">
@@ -116,14 +118,15 @@
                 <div class="cl-field">
                     <label class="cl-label" for="link-offer-ean" th:text="#{order.item.link.offer.ean}"></label>
                     <input class="cl-input" id="link-offer-ean" name="ean" type="text" inputmode="numeric" autocomplete="off"
-                           pattern="\s*\d{8,14}\s*" th:title="#{product.error.ean.invalid}" data-cl-link-ean
+                           th:attr="data-invalid=#{order.item.link.offer.ean.invalid}" data-cl-link-ean
                            aria-describedby="link-offer-ean-help">
                     <p class="cl-help" id="link-offer-ean-help" th:text="#{order.item.link.offer.ean.help}"></p>
                 </div>
                 <p class="cl-dialog-effect" th:text="#{order.item.link.offer.effect}"></p>
             </div>
             <div class="cl-dialog-actions">
-                <button type="submit" class="cl-button is-primary" data-cl-link-submit disabled th:text="#{order.item.link.offer.submit}"></button>
+                <button type="submit" class="cl-button is-primary" data-cl-link-submit disabled th:text="#{order.item.link.offer.submit}"
+                        th:attr="data-submit-link=#{order.item.link.offer.submit}, data-submit-change=#{order.item.link.offer.change.submit}"></button>
                 <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
                 <span class="cl-help" data-cl-link-hint th:text="#{order.item.link.offer.empty.hint}"></span>
             </div>

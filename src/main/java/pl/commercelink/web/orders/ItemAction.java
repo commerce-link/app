@@ -4,6 +4,7 @@ package pl.commercelink.web.orders;
 public enum ItemAction {
 
     LINK_OFFER("order.item.menu.link.offer", "link-offer-dialog"),
+    CHANGE_OFFER_LINK("order.item.menu.change.offer.link", "link-offer-dialog"),
     ASSIGN_SKU("order.item.menu.assign.sku", "assign-sku-dialog"),
     ASSIGN_SUPPLIER("order.item.menu.assign.supplier", "assign-supplier-dialog"),
     ASSIGN_WAREHOUSE("order.item.menu.assign.warehouse", "assign-warehouse-dialog"),

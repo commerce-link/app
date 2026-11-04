@@ -286,53 +286,53 @@ class MarketplaceOrderImporterTest {
     }
 
     @Test
-    void usesResolvedProductCodesAndCategory() {
+    void fillsALinkedLineWithItsEanAndTheTaxonomyCategory() {
         // given
-        when(storeOffers.resolve("Empik", "XS-84980", "4M-7041"))
-                .thenReturn(Optional.of(new ResolvedOffer("pim-1", "5903771700818", "7041", "Zabawki", ResolvedOffer.Source.LINK)));
+        when(storeOffers.resolve("Empik", "PS-8001", "DMW-2001"))
+                .thenReturn(Optional.of(new ResolvedOffer(null, "2000000001012", null, "Lampy", ResolvedOffer.Source.LINK)));
 
         // when
-        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("4M-7041", "XS-84980"));
+        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("DMW-2001", "PS-8001"));
 
         // then
         OrderItem item = productItem();
-        assertEquals("5903771700818", item.getSku());
-        assertEquals("7041", item.getManufacturerCode());
-        assertEquals("5903771700818", item.getEan());
-        assertEquals("Zabawki", item.getCategory());
-        assertEquals("4M-7041", item.getExternalItemId());
-        assertEquals("XS-84980", item.getMarketplaceOfferKey());
+        assertEquals("2000000001012", item.getSku());
+        assertNull(item.getManufacturerCode());
+        assertEquals("2000000001012", item.getEan());
+        assertEquals("Lampy", item.getCategory());
+        assertEquals("DMW-2001", item.getExternalItemId());
+        assertEquals("PS-8001", item.getMarketplaceOfferKey());
     }
 
     @Test
     void fillsALinkedLineWithTheLinksEansOnly() {
         // given a link to two EANs of the same goods, which need not be in a catalog
-        when(storeOffers.resolve("Empik", "PS-1", "4M-7041")).thenReturn(Optional.of(new ResolvedOffer(null,
-                "5903771700818", null, null, ResolvedOffer.Source.LINK, List.of("5903771700825"))));
+        when(storeOffers.resolve("Empik", "PS-1", "DMW-2001")).thenReturn(Optional.of(new ResolvedOffer(null,
+                "2000000001012", null, null, ResolvedOffer.Source.LINK, List.of("2000000001029"))));
 
         // when
-        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("4M-7041", "PS-1"));
+        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("DMW-2001", "PS-1"));
 
         // then fulfilment looks the goods up under either EAN and fills the manufacturer code itself
         OrderItem item = productItem();
-        assertEquals("5903771700818:5903771700825", item.getSku());
-        assertEquals("5903771700818", item.getEan());
+        assertEquals("2000000001012:2000000001029", item.getSku());
+        assertEquals("2000000001012", item.getEan());
         assertNull(item.getManufacturerCode());
         assertEquals(Categories.UNCATEGORIZED, item.getCategory());
-        assertEquals("4M-7041", item.getExternalItemId());
+        assertEquals("DMW-2001", item.getExternalItemId());
         assertFalse(item.isUnlinkedMarketplaceItem());
     }
 
     @Test
     void everyResolvedLineTakesItsEanAsTheSkuAndKeepsItsManufacturerCode() {
         // given
-        when(storeOffers.resolve("Empik", "k7m2xq9pz4", "4M-7041"))
-                .thenReturn(Optional.of(new ResolvedOffer("k7m2xq9pz4", "5903771700818", "7041", "Zabawki", ResolvedOffer.Source.OWN_OFFER)));
+        when(storeOffers.resolve("Empik", "k7m2xq9pz4", "DMW-2001"))
+                .thenReturn(Optional.of(new ResolvedOffer("k7m2xq9pz4", "2000000001012", "MFN-2001", "Lampy", ResolvedOffer.Source.OWN_OFFER)));
         when(storeOffers.resolve("Allegro", null, "ab 12"))
-                .thenReturn(Optional.of(new ResolvedOffer("pim-1", "5903771700825", "ab 12", "Monitors", ResolvedOffer.Source.MFN)));
+                .thenReturn(Optional.of(new ResolvedOffer("pim-1", "2000000001029", "ab 12", "Monitors", ResolvedOffer.Source.MFN)));
 
         // when
-        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("4M-7041", "k7m2xq9pz4"));
+        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("DMW-2001", "k7m2xq9pz4"));
         importer.importOrder(storeWithId("store-1"), "Allegro", orderWithProduct("ab 12"));
 
         // then
@@ -341,11 +341,11 @@ class MarketplaceOrderImporterTest {
         List<OrderItem> lines = itemsCaptor.getAllValues().stream()
                 .flatMap(List::stream).filter(i -> !i.isService()).toList();
         assertEquals(2, lines.size());
-        assertEquals("5903771700818", lines.get(0).getSku());
-        assertEquals("5903771700818", lines.get(0).getEan());
-        assertEquals("7041", lines.get(0).getManufacturerCode());
-        assertEquals("5903771700825", lines.get(1).getSku());
-        assertEquals("5903771700825", lines.get(1).getEan());
+        assertEquals("2000000001012", lines.get(0).getSku());
+        assertEquals("2000000001012", lines.get(0).getEan());
+        assertEquals("MFN-2001", lines.get(0).getManufacturerCode());
+        assertEquals("2000000001029", lines.get(1).getSku());
+        assertEquals("2000000001029", lines.get(1).getEan());
         assertEquals("AB12", lines.get(1).getManufacturerCode());
         assertEquals("ab 12", lines.get(1).getExternalItemId());
         assertNull(lines.get(1).getMarketplaceOfferKey());
@@ -374,13 +374,13 @@ class MarketplaceOrderImporterTest {
         when(storeOffers.resolve(anyString(), anyString(), anyString())).thenReturn(Optional.empty());
 
         // when
-        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("4M-7041", "XS-84980"));
+        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("DMW-2001", "PS-8001"));
 
         // then
         OrderItem item = productItem();
         assertEquals(Categories.UNCATEGORIZED, item.getCategory());
-        assertEquals("4M-7041", item.getSku());
-        assertEquals("XS-84980", item.getMarketplaceOfferKey());
+        assertEquals("DMW-2001", item.getSku());
+        assertEquals("PS-8001", item.getMarketplaceOfferKey());
         assertTrue(item.isUnlinkedMarketplaceItem());
     }
 
@@ -388,8 +388,8 @@ class MarketplaceOrderImporterTest {
     void resolvesTwoLinesWithTheSameOfferKey() {
         // given
         when(storeOffers.resolve(anyString(), anyString(), anyString()))
-                .thenReturn(Optional.of(new ResolvedOffer("pim-1", "5903771700818", "7041", "Zabawki", ResolvedOffer.Source.LINK)));
-        MarketplaceOrder base = orderWithProduct("4M-7041", "XS-84980");
+                .thenReturn(Optional.of(new ResolvedOffer(null, "2000000001012", null, "Lampy", ResolvedOffer.Source.LINK)));
+        MarketplaceOrder base = orderWithProduct("DMW-2001", "PS-8001");
         MarketplaceProduct first = base.products().get(0);
         MarketplaceOrder order = new MarketplaceOrder(base.externalOrderId(), base.customer(), List.of(first, first),
                 base.shipping(), base.paymentType(), base.paymentTransactionId());
@@ -400,8 +400,8 @@ class MarketplaceOrderImporterTest {
         // then
         List<OrderItem> products = capturedOrderItems().stream().filter(i -> !i.isService()).toList();
         assertEquals(2, products.size());
-        assertEquals("5903771700818", products.get(0).getSku());
-        assertEquals("5903771700818", products.get(1).getSku());
+        assertEquals("2000000001012", products.get(0).getSku());
+        assertEquals("2000000001012", products.get(1).getSku());
     }
 
     @Test
@@ -410,7 +410,7 @@ class MarketplaceOrderImporterTest {
         when(ordersManager.isAlreadyImported("store-1", "mp-order-1")).thenReturn(true);
 
         // when
-        boolean imported = importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("4M-7041", "XS-84980"));
+        boolean imported = importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("DMW-2001", "PS-8001"));
 
         // then
         assertFalse(imported);
@@ -420,11 +420,11 @@ class MarketplaceOrderImporterTest {
     }
 
     @Test
-    void importsOneFetchReadingTheCatalogsOnceForAllItsOrders() {
+    void importsOneFetchInOneStoreScopeForAllItsOrders() {
         // given three orders of one fetch, one of them already imported
-        MarketplaceOrder first = renamed(orderWithProduct("4M-7041", "XS-1"), "mp-order-1");
-        MarketplaceOrder second = renamed(orderWithProduct("4M-7042", "XS-2"), "mp-order-2");
-        MarketplaceOrder known = renamed(orderWithProduct("4M-7043", "XS-3"), "mp-order-3");
+        MarketplaceOrder first = renamed(orderWithProduct("DMW-2001", "PS-1"), "mp-order-1");
+        MarketplaceOrder second = renamed(orderWithProduct("DMW-2002", "PS-2"), "mp-order-2");
+        MarketplaceOrder known = renamed(orderWithProduct("DMW-2003", "PS-3"), "mp-order-3");
         when(ordersManager.isAlreadyImported("store-1", "mp-order-3")).thenReturn(true);
         when(ordersManager.saveWithFulfilment(any(), any())).thenReturn(true);
 
@@ -434,20 +434,20 @@ class MarketplaceOrderImporterTest {
         // then
         assertEquals(2, imported);
         verify(offerResolver, times(1)).forStore("store-1");
-        verify(storeOffers).resolve("Empik", "XS-1", "4M-7041");
-        verify(storeOffers).resolve("Empik", "XS-2", "4M-7042");
-        verify(storeOffers, never()).resolve("Empik", "XS-3", "4M-7043");
+        verify(storeOffers).resolve("Empik", "PS-1", "DMW-2001");
+        verify(storeOffers).resolve("Empik", "PS-2", "DMW-2002");
+        verify(storeOffers, never()).resolve("Empik", "PS-3", "DMW-2003");
     }
 
     @Test
     void resolvesAllLinesOfAnOrderInOneStoreScope() {
         // given
         when(storeOffers.resolve(anyString(), anyString(), anyString()))
-                .thenReturn(Optional.of(new ResolvedOffer("pim-1", "5903771700818", "7041", "Zabawki", ResolvedOffer.Source.LINK)));
-        MarketplaceOrder base = orderWithProduct("4M-7041", "XS-84980");
+                .thenReturn(Optional.of(new ResolvedOffer(null, "2000000001012", null, "Lampy", ResolvedOffer.Source.LINK)));
+        MarketplaceOrder base = orderWithProduct("DMW-2001", "PS-8001");
         MarketplaceProduct first = base.products().get(0);
-        MarketplaceProduct second = new MarketplaceProduct("Other", "4M-7042", new BigDecimal("50.00"), 1,
-                BigDecimal.ZERO, "XS-84981");
+        MarketplaceProduct second = new MarketplaceProduct("Other", "DMW-2002", new BigDecimal("50.00"), 1,
+                BigDecimal.ZERO, "PS-8002");
         MarketplaceOrder order = new MarketplaceOrder(base.externalOrderId(), base.customer(), List.of(first, second),
                 base.shipping(), base.paymentType(), base.paymentTransactionId());
 
@@ -462,10 +462,10 @@ class MarketplaceOrderImporterTest {
     @Test
     void aBlankOfferKeyIsStoredAsNoKey() {
         // given
-        when(storeOffers.resolve("Empik", null, "4M-7041")).thenReturn(Optional.empty());
+        when(storeOffers.resolve("Empik", null, "DMW-2001")).thenReturn(Optional.empty());
 
         // when
-        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("4M-7041", "   "));
+        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("DMW-2001", "   "));
 
         // then
         OrderItem item = productItem();

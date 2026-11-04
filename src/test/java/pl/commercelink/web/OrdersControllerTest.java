@@ -158,7 +158,7 @@ class OrdersControllerTest {
 
     private static final String STORE_ID = "store-1";
     private static final String ORDER_ID = "order-1";
-    private static final String SUPPLIER_EAN = "5901234567890";
+    private static final String SUPPLIER_EAN = "2001000000043";
 
     @Mock
     private OrdersRepository ordersRepository;
@@ -2460,7 +2460,7 @@ class OrdersControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "5901234567890", "10", "net", "Bravo-k7f3a9c2", null), null,
+        ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "2001000000043", "10", "net", "Bravo-k7f3a9c2", null), null,
                 new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
 
         // then
@@ -2482,7 +2482,7 @@ class OrdersControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "5901234567890", "10", "net", "Acme", null), null,
+        ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "2001000000043", "10", "net", "Acme", null), null,
                 new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
 
         // then
@@ -2525,7 +2525,7 @@ class OrdersControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "5901234567890", "10", "net", SupplierChoice.CUSTOM, "Stub"), null,
+        ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "2001000000043", "10", "net", SupplierChoice.CUSTOM, "Stub"), null,
                 new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
 
         // then
@@ -3923,6 +3923,22 @@ class OrdersControllerTest {
         }
 
         @Test
+        void assignSkuDropsTheEanAnOfferLinkGaveTheItem() {
+            // given a New item carries an EAN only from its offer link, which the typed codes now replace
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.New));
+            OrderItem linked = item("i1", FulfilmentStatus.New, "2001000000012:2001000000029");
+            linked.setEan("2001000000012");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(linked);
+
+            // when
+            ordersController.assignSku(ORDER_ID, "i1", "DMW-9", new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(linked.getSku()).isEqualTo("DMW-9");
+            assertThat(linked.getEan()).isNull();
+        }
+
+        @Test
         void linkOfferRefusesItemThatIsNotNew() {
             // given
             Order order = order(OrderStatus.Assembly);
@@ -4009,15 +4025,36 @@ class OrdersControllerTest {
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
             fresh.setMarketplaceOfferKey("PS-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
-            when(marketplaceOfferLinking.linkEan(STORE_ID, order, "i1", "5901234567890", null))
+            when(marketplaceOfferLinking.linkEan(STORE_ID, order, "i1", "2001000000043", null))
                     .thenReturn(new pl.commercelink.marketplace.links.MarketplaceOfferLinking.LinkResult(1));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
-            ordersController.linkOffer(ORDER_ID, "i1", "", "", "5901234567890", redirect, polish);
+            ordersController.linkOffer(ORDER_ID, "i1", "", "", "2001000000043", redirect, polish);
 
             // then
             assertThat(notice(redirect).text()).isEqualTo("order.item.link.offer.done [1]");
+            verify(marketplaceOfferLinking, never()).link(any(), any(), any(), any(), any(), any());
+        }
+
+        @Test
+        void linkOfferTreatsAnEanOfSpacesOnlyAsATypedEan() {
+            // given the field was filled with spaces, not left empty for a product choice
+            Order order = order(OrderStatus.New);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
+            fresh.setMarketplaceOfferKey("PS-1");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
+            when(marketplaceOfferLinking.linkEan(STORE_ID, order, "i1", "   ", null)).thenThrow(new IllegalArgumentException(
+                    pl.commercelink.marketplace.links.MarketplaceOfferLinking.INVALID_EAN));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.linkOffer(ORDER_ID, "i1", "", "", "   ", redirect, polish);
+
+            // then
+            assertThat(flash(redirect)).containsEntry("errorMessage",
+                    pl.commercelink.marketplace.links.MarketplaceOfferLinking.INVALID_EAN);
             verify(marketplaceOfferLinking, never()).link(any(), any(), any(), any(), any(), any());
         }
 
