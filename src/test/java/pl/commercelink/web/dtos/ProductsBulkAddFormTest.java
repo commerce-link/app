@@ -38,10 +38,10 @@ class ProductsBulkAddFormTest {
 
     /**
      * The identifiers are editable here, so they are checked here, by the rules the product page uses: a product needs
-     * both its EAN (8--14 digits) and its manufacturer code, each missing one an error of its own field.
+     * both its EAN and its manufacturer code, each missing one an error of its own field.
      */
     @Test
-    void aRowNeedsAnEanOfEightToFourteenDigitsAndAManufacturerCode() {
+    void aRowNeedsAnEanAndAManufacturerCode() {
         // given
         ProductsBulkAddForm form = ProductsBulkAddForm.of(List.of(
                 withIdentifiers(null, null), withIdentifiers("12345", "MFN-1"), withIdentifiers(null, "MFN-1"),
@@ -53,7 +53,7 @@ class ProductsBulkAddFormTest {
         // then
         assertThat(errors).containsEntry("product-0-ean", "product.error.ean.required")
                 .containsEntry("product-0-manufacturerCode", "product.error.mfn.required")
-                .containsEntry("product-1-ean", "product.error.ean.invalid")
+                .doesNotContainKey("product-1-ean")
                 .doesNotContainKey("product-1-manufacturerCode")
                 .containsEntry("product-2-ean", "product.error.ean.required")
                 .doesNotContainKey("product-2-manufacturerCode")

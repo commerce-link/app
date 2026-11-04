@@ -59,7 +59,7 @@ class OfferItemsDraftTest {
 
         // then
         assertThat(skipped).isEqualTo(1);
-        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-1");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getSku).containsExactly("EAN-pim-1");
     }
 
     @Test
@@ -110,10 +110,10 @@ class OfferItemsDraftTest {
 
         // then
         assertThat(skipped).isZero();
-        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).startsWith("MFN-CASE", "MFN-PSU")
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getSku).startsWith("EAN-pim-case", "MFN-PSU")
                 .contains("MFN-INV");
         assertThat(basket.getBasketItems().get(0).getQty()).isEqualTo(2);
-        assertThat(basket.getBasketItems()).filteredOn(i -> !i.getMfn().equals("MFN-PSU"))
+        assertThat(basket.getBasketItems()).filteredOn(i -> !i.getSku().equals("MFN-PSU"))
                 .allMatch(BasketItem::isConsolidated);
     }
 

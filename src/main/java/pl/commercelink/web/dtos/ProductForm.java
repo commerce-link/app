@@ -184,21 +184,13 @@ public class ProductForm {
     }
 
     /**
-     * Puts what is wrong with the identifiers of a product at their fields: both the EAN (8--14 digits) and the
-     * manufacturer code are required. The bulk-add review edits the same two fields and answers with the same messages.
+     * Puts what is wrong with the identifiers of a product at their fields: both the EAN and the manufacturer code are
+     * required. The bulk-add review edits the same two fields and answers with the same messages.
      */
     static void validateIdentifiers(Map<String, String> errors, String eanField, String manufacturerCodeField,
                                     String ean, String manufacturerCode) {
-        validateIdentifiers(errors, eanField, manufacturerCodeField, ean, manufacturerCode, true);
-    }
-
-    /** @param checkEanFormat false for an EAN kept as it was saved, which may predate the 8--14 digit rule (RF-4) */
-    private static void validateIdentifiers(Map<String, String> errors, String eanField, String manufacturerCodeField,
-                                            String ean, String manufacturerCode, boolean checkEanFormat) {
         if (StringUtils.isBlank(ean)) {
             errors.put(eanField, "product.error.ean.required");
-        } else if (checkEanFormat && !ean.trim().matches("\\d{8,14}")) {
-            errors.put(eanField, "product.error.ean.invalid");
         }
         if (StringUtils.isBlank(manufacturerCode)) {
             errors.put(manufacturerCodeField, "product.error.mfn.required");
@@ -227,7 +219,7 @@ public class ProductForm {
         // A product the PIM knows keeps the codes it was saved with (rememberSaved put them back), so there is nothing
         // of the operator's to check in them.
         if (!identifiersLocked()) {
-            validateIdentifiers(errors, "ean", "manufacturerCode", ean, manufacturerCode, eanChanged());
+            validateIdentifiers(errors, "ean", "manufacturerCode", ean, manufacturerCode);
         }
         // A label the category no longer offers stays allowed while it is the one the product was saved with: the page
         // says so with an option of its own instead of moving the product to another label behind the operator's back.

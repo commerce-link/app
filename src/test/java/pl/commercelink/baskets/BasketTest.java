@@ -76,6 +76,19 @@ class BasketTest {
     }
 
     @Test
+    void skuLosesOnlyItsSpaces() {
+        // given
+        Basket basket = new Basket();
+
+        // when
+        basket.setBasketItems(List.of(basketItem(" 5901234 123457 "), basketItem("#1x5901234123457|2xab-1")));
+
+        // then
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getSku)
+                .containsExactly("5901234123457", "#1x5901234123457|2xab-1");
+    }
+
+    @Test
     @DisplayName("addBasketItem appends the item with the next list index as position")
     void addBasketItemAppendsItemWithNextListIndexAsPosition() {
         // given
@@ -105,7 +118,7 @@ class BasketTest {
         basket.addBasketItem(addedLaptop);
 
         // then
-        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A", "MFN-C", "MFN-B");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-A", "MFN-C", "MFN-B");
         assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1, 2);
     }
 
@@ -122,7 +135,7 @@ class BasketTest {
 
         // then
         assertThat(addedCpu.getPosition()).isEqualTo(2);
-        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A", "MFN-B", "MFN-C");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-A", "MFN-B", "MFN-C");
     }
 
     @Test
@@ -137,7 +150,7 @@ class BasketTest {
         basket.addBasketItemInCategoryOrder(addedMotherboard, Map.of("CPU", 1, "Motherboard", 2, "GPU", 3));
 
         // then
-        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A", "MFN-C", "MFN-B");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-A", "MFN-C", "MFN-B");
         assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1, 2);
     }
 
@@ -153,7 +166,7 @@ class BasketTest {
         basket.addBasketItemInCategoryOrder(addedCpu, Map.of("CPU", 1, "GPU", 2));
 
         // then
-        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A", "MFN-B", "MFN-C");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-A", "MFN-B", "MFN-C");
         assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1, 2);
     }
 
@@ -169,7 +182,7 @@ class BasketTest {
         basket.addBasketItemInCategoryOrder(addedRam, Map.of("CPU", 1, "GPU", 2));
 
         // then
-        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A", "MFN-B", "MFN-C");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-A", "MFN-B", "MFN-C");
         assertThat(addedRam.getPosition()).isEqualTo(2);
     }
 
@@ -184,7 +197,7 @@ class BasketTest {
         basket.removeBasketItem(1);
 
         // then
-        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A", "MFN-C");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-A", "MFN-C");
         assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 2);
     }
 
@@ -203,7 +216,7 @@ class BasketTest {
         basket.removeBasketItem(0);
 
         // then
-        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-B");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-B");
     }
 
     @Test
@@ -217,7 +230,7 @@ class BasketTest {
         List<BasketItem> effective = basket.getEffectiveBasketItems();
 
         // then
-        assertThat(effective).extracting(BasketItem::getMfn).containsExactly("MFN-CPU", "MFN-SSD-1");
+        assertThat(effective).extracting(BasketItem::getSku).containsExactly("MFN-CPU", "MFN-SSD-1");
     }
 
     @Test
@@ -234,7 +247,7 @@ class BasketTest {
         basket.selectVariant("SSD", ssd2.getPosition());
 
         // then
-        assertThat(basket.getEffectiveBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-CPU", "MFN-SSD-2");
+        assertThat(basket.getEffectiveBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-CPU", "MFN-SSD-2");
         assertThat(ssd1.isVariantSelected()).isFalse();
         assertThat(ssd2.isVariantSelected()).isTrue();
         assertThat(basket.getTotalPrice()).isEqualTo(400.0);
@@ -263,7 +276,7 @@ class BasketTest {
         basket.setBasketItems(List.of(variant("MFN-SSD-1", "SSD"), basketItem("MFN-CPU", "CPU"), variant("MFN-SSD-2", "SSD")));
 
         // then
-        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-SSD-1", "MFN-SSD-2", "MFN-CPU");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-SSD-1", "MFN-SSD-2", "MFN-CPU");
         assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1, 2);
     }
 
@@ -300,7 +313,7 @@ class BasketTest {
         // then
         assertThat(ssd1.isVariantSelected()).isFalse();
         assertThat(ssd2.isVariantSelected()).isTrue();
-        assertThat(basket.getEffectiveBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-SSD-2");
+        assertThat(basket.getEffectiveBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-SSD-2");
     }
 
     @Test
@@ -330,7 +343,7 @@ class BasketTest {
         basket.addBasketItem(loose);
 
         // then
-        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-SSD-1", "MFN-SSD-2", "MFN-SSD-3", "MFN-CPU");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-SSD-1", "MFN-SSD-2", "MFN-SSD-3", "MFN-CPU");
         assertThat(loose.isInVariantGroup()).isFalse();
     }
 
@@ -394,7 +407,7 @@ class BasketTest {
                 .build();
 
         // then
-        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A", "MFN-B");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-A", "MFN-B");
         assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1);
     }
 

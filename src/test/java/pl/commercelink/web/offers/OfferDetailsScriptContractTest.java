@@ -289,9 +289,9 @@ class OfferDetailsScriptContractTest {
         String renderSub = js.substring(js.indexOf("function renderSub("), js.indexOf("function showConsolidated("));
 
         // then
-        assertThat(renderSub).contains("copy.className = 'cl-copy-inline';").contains("copy.setAttribute('data-cl-copy', mfn);")
+        assertThat(renderSub).contains("copy.className = 'cl-copy-inline';").contains("copy.setAttribute('data-cl-copy', sku);")
                 .contains("code.className = 'cl-copy-text';").contains("wrap.className = 'cl-line-code';")
-                .contains("message('copy-mfn', [mfn])").doesNotContain("cl-code-nowrap");
+                .contains("message('copy-sku', [sku])").doesNotContain("cl-code-nowrap");
     }
 
     @Test

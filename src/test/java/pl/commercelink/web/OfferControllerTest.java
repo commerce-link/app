@@ -182,7 +182,7 @@ class OfferControllerTest {
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
         verify(basketsRepository).save(basketCaptor.capture());
         assertThat(basketCaptor.getValue().getBasketItems())
-                .extracting(BasketItem::getMfn).contains("MFN-1");
+                .extracting(BasketItem::getSku).contains("EAN-1");
     }
 
     @Test
@@ -240,7 +240,7 @@ class OfferControllerTest {
         BasketItem psu = basketItem("MFN-PSU", "PSU");
         basket.setBasketItems(List.of(psu));
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
-                "pim-1", "EAN-1", "MFN-CASE", "Brand", "GroupLabel", "Test Case",
+                "pim-1", "EAN-CASE", "MFN-CASE", "Brand", "GroupLabel", "Test Case",
                 "Case", 199L, 1L, 3, 0L, false);
         when(pricelistFinder.findByPimId(STORE_ID, "cat-1", entry.getPimId())).thenReturn(Optional.of(entry));
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
@@ -255,14 +255,14 @@ class OfferControllerTest {
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
         verify(basketsRepository).save(basketCaptor.capture());
         Basket saved = basketCaptor.getValue();
-        assertThat(saved.getBasketItems()).extracting(BasketItem::getMfn)
-                .containsExactly("MFN-CASE", "MFN-PSU");
+        assertThat(saved.getBasketItems()).extracting(BasketItem::getSku)
+                .containsExactly("EAN-CASE", "MFN-PSU");
         assertThat(saved.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1);
 
         // then the order survives a persistence round-trip (setter reindexes positions on load)
         saved.setBasketItems(saved.getBasketItems());
-        assertThat(saved.getBasketItems()).extracting(BasketItem::getMfn)
-                .containsExactly("MFN-CASE", "MFN-PSU");
+        assertThat(saved.getBasketItems()).extracting(BasketItem::getSku)
+                .containsExactly("EAN-CASE", "MFN-PSU");
         assertThat(saved.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1);
     }
 
@@ -275,7 +275,7 @@ class OfferControllerTest {
         BasketItem psu = basketItem("MFN-PSU", "PSU");
         basket.setBasketItems(List.of(firstCase, psu));
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
-                "pim-2", "EAN-2", "MFN-CASE-2", "Brand", "GroupLabel", "Second Case",
+                "pim-2", "EAN-CASE-2", "MFN-CASE-2", "Brand", "GroupLabel", "Second Case",
                 "Case", 149L, 1L, 3, 0L, false);
         when(pricelistFinder.findByPimId(STORE_ID, "cat-1", entry.getPimId())).thenReturn(Optional.of(entry));
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
@@ -289,8 +289,8 @@ class OfferControllerTest {
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
         verify(basketsRepository).save(basketCaptor.capture());
-        assertThat(basketCaptor.getValue().getBasketItems()).extracting(BasketItem::getMfn)
-                .containsExactly("MFN-CASE-1", "MFN-CASE-2", "MFN-PSU");
+        assertThat(basketCaptor.getValue().getBasketItems()).extracting(BasketItem::getSku)
+                .containsExactly("MFN-CASE-1", "EAN-CASE-2", "MFN-PSU");
     }
 
     @Test
@@ -359,7 +359,7 @@ class OfferControllerTest {
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
         verify(basketsRepository).save(basketCaptor.capture());
         assertThat(basketCaptor.getValue().getBasketItems())
-                .extracting(BasketItem::getMfn).containsExactly("MFN-B");
+                .extracting(BasketItem::getSku).containsExactly("MFN-B");
     }
 
     @Test
@@ -391,7 +391,7 @@ class OfferControllerTest {
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
         verify(basketsRepository).save(basketCaptor.capture());
         List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
-        assertThat(savedItems).extracting(BasketItem::getMfn).containsExactly("MFN-1", "MFN-X", "MFN-2");
+        assertThat(savedItems).extracting(BasketItem::getSku).containsExactly("EAN-1", "MFN-X", "EAN-2");
         assertThat(savedItems).extracting(BasketItem::getQty).containsExactly(2L, 1L, 1L);
     }
 
@@ -417,7 +417,7 @@ class OfferControllerTest {
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
         verify(basketsRepository).save(basketCaptor.capture());
-        assertThat(basketCaptor.getValue().getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-1");
+        assertThat(basketCaptor.getValue().getBasketItems()).extracting(BasketItem::getSku).containsExactly("EAN-1");
         assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("skipped 1 of 2");
     }
 
@@ -470,7 +470,7 @@ class OfferControllerTest {
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
         verify(basketsRepository).save(basketCaptor.capture());
-        assertThat(basketCaptor.getValue().getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A");
+        assertThat(basketCaptor.getValue().getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-A");
     }
 
     @Test
@@ -486,7 +486,7 @@ class OfferControllerTest {
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
         verify(basketsRepository).save(basketCaptor.capture());
-        assertThat(basketCaptor.getValue().getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A");
+        assertThat(basketCaptor.getValue().getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-A");
     }
 
     private AddItemsForm form(AddItemsForm.Entry... entries) {
@@ -601,7 +601,7 @@ class OfferControllerTest {
         Basket saved = basketCaptor.getValue();
         assertThat(view).isEqualTo("redirect:/dashboard/offer/" + saved.getBasketId());
         assertThat(saved.getType()).isEqualTo(BasketType.Offer);
-        assertThat(saved.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-1", "MFN-2");
+        assertThat(saved.getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-1", "MFN-2");
         assertThat(saved.getName()).isEqualTo("New offer");
         assertThat(saved.getGclid()).isEqualTo("gclid-1");
         assertThat(saved.getContactDetails().getName()).isEqualTo("Jan");

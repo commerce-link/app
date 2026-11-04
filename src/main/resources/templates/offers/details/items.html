@@ -47,8 +47,8 @@
                         data-msg-margin-ok=#{offers.details.margin.ok},
                         data-msg-margin-loss=#{offers.details.margin.loss},
                         data-msg-margin-unknown=#{offers.details.margin.unknown},
-                        data-msg-mfn-prefix=#{order.items.mfn.prefix},
-                        data-msg-copy-mfn=#{order.items.copy.mfn},
+                        data-msg-sku-prefix=#{order.items.sku.prefix},
+                        data-msg-copy-sku=#{order.items.copy.sku},
                         data-msg-consolidate=#{offers.details.line.menu.consolidate},
                         data-msg-deconsolidate=#{offers.details.line.menu.deconsolidate},
                         data-msg-last-item=#{offers.details.line.menu.remove.reason},
@@ -169,7 +169,7 @@
         <input type="hidden" th:name="|basketItems[${i}].variantSelected|" th:value="${it.variantSelected()}" data-cl-field="variantSelected">
         <input type="hidden" th:name="|basketItems[${i}].name|" th:value="${it.name() ?: ''}" data-cl-field="name">
         <input type="hidden" th:name="|basketItems[${i}].category|" th:value="${it.category() ?: ''}" data-cl-field="category">
-        <input type="hidden" th:name="|basketItems[${i}].mfn|" th:value="${it.mfn() ?: ''}" data-cl-field="mfn">
+        <input type="hidden" th:name="|basketItems[${i}].sku|" th:value="${it.sku() ?: ''}" data-cl-field="sku">
         <input type="hidden" th:name="|basketItems[${i}].unitCost|" th:value="${it.unitCostInput()}" data-cl-field="unitCost">
         <input type="hidden" th:name="|basketItems[${i}].consolidated|" th:value="${it.consolidated()}" data-cl-field="consolidated">
     </td>
@@ -184,11 +184,11 @@
         </span>
         <span class="cl-table-sub" data-cl-line-sub>
             <span th:if="${it.category() != null and !#strings.isEmpty(it.category())}" data-cl-line-category th:text="${it.category()}"></span>
-            <th:block th:if="${it.mfn() != null and !#strings.isEmpty(it.mfn())}">
+            <th:block th:if="${it.sku() != null and !#strings.isEmpty(it.sku())}">
                 <span th:if="${it.category() != null and !#strings.isEmpty(it.category())}" class="cl-table-sep">·</span>
-                <span class="cl-line-code"><span th:text="#{order.items.mfn.prefix}"></span>&nbsp;<button type="button" class="cl-copy-inline"
-                      th:attr="data-cl-copy=${it.mfn()}, title=${it.mfn()}, aria-label=#{order.items.copy.mfn(${it.mfn()})}"><span
-                      class="cl-copy-code"><span class="cl-copy-text" data-cl-line-mfn th:text="${it.mfn()}"></span><span class="cl-copy-icon"
+                <span class="cl-line-code"><span th:text="#{order.items.sku.prefix}"></span>&nbsp;<button type="button" class="cl-copy-inline"
+                      th:attr="data-cl-copy=${it.sku()}, title=${it.sku()}, aria-label=#{order.items.copy.sku(${it.sku()})}"><span
+                      class="cl-copy-code"><span class="cl-copy-text" data-cl-line-sku th:text="${it.sku()}"></span><span class="cl-copy-icon"
                       aria-hidden="true"><i class="far fa-copy"></i></span></span></button></span>
             </th:block>
         </span>
@@ -302,14 +302,14 @@
             <p class="cl-help" th:id="|${prefix}-category-help|" th:text="#{offers.details.item.category.help}"></p>
         </div>
         <div class="cl-field cl-span-3">
-            <label class="cl-label" th:for="|${prefix}-mfn|" th:text="#{offers.details.item.mfn}"></label>
-            <input class="cl-input" type="text" name="mfn" th:id="|${prefix}-mfn|" th:value="${form?.mfn}" autocomplete="off"
-                   data-cl-item-field="mfn" aria-required="true" th:classappend="${errors.containsKey('mfn')} ? 'is-invalid'"
-                   th:attr="aria-invalid=${errors.containsKey('mfn')} ? 'true' : null,
-                            aria-describedby=|${prefix}-mfn-help ${prefix}-mfn-error|">
-            <p class="cl-field-error" th:id="|${prefix}-mfn-error|" th:if="${errors.containsKey('mfn')}">
-                <i class="fas fa-exclamation-circle" aria-hidden="true"></i> <span th:text="#{${errors['mfn']}}"></span></p>
-            <p class="cl-help" th:id="|${prefix}-mfn-help|" th:text="#{offers.details.item.mfn.help}"></p>
+            <label class="cl-label" th:for="|${prefix}-sku|" th:text="#{offers.details.item.sku}"></label>
+            <input class="cl-input" type="text" name="sku" th:id="|${prefix}-sku|" th:value="${form?.sku}" autocomplete="off"
+                   data-cl-item-field="sku" aria-required="true" th:classappend="${errors.containsKey('sku')} ? 'is-invalid'"
+                   th:attr="aria-invalid=${errors.containsKey('sku')} ? 'true' : null,
+                            aria-describedby=|${prefix}-sku-help ${prefix}-sku-error|">
+            <p class="cl-field-error" th:id="|${prefix}-sku-error|" th:if="${errors.containsKey('sku')}">
+                <i class="fas fa-exclamation-circle" aria-hidden="true"></i> <span th:text="#{${errors['sku']}}"></span></p>
+            <p class="cl-help" th:id="|${prefix}-sku-help|" th:text="#{offers.details.item.sku.help}"></p>
         </div>
         <div class="cl-field cl-span-3">
             <label class="cl-label" th:for="|${prefix}-cost|" th:text="#{offers.details.item.cost}"></label>
@@ -337,7 +337,7 @@
 <dialog th:fragment="editDialog(p)" class="cl-dialog is-form" id="item-edit-dialog" aria-labelledby="item-edit-title">
     <form method="dialog" data-cl-item-edit-form th:with="market=${null}, marketStock=${null}"
           th:attr="data-msg-name-required=#{offers.details.item.name.required},
-                   data-msg-mfn-required=#{offers.details.item.mfn.required}">
+                   data-msg-sku-required=#{offers.details.item.sku.required}">
         <h2 class="cl-dialog-title" id="item-edit-title" th:text="#{offers.details.item.title}"></h2>
         <div class="cl-dialog-body">
             <th:block th:replace="~{offers/details/items :: itemFields(${null}, ${ {:} }, ${p}, 'item-edit')}"></th:block>

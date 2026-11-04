@@ -75,10 +75,10 @@ class CsvOfferImporterTest {
         assertThat(items.get(0).getQty()).isEqualTo(2);
         assertThat(items.get(0).getUnitPrice()).isEqualTo(2899);
         assertThat(items.get(0).getUnitCost()).isEqualTo(2410.50);
-        assertThat(items.get(0).getMfn()).isEqualTo("GV-N5070EAGLE");
+        assertThat(items.get(0).getSku()).isEqualTo("GV-N5070EAGLE");
         assertThat(items.get(1).getName()).isEqualTo("Montaż zestawu");
         assertThat(items.get(1).isService()).isTrue();
-        assertThat(items.get(1).getMfn()).isEqualTo("MONTAZ-PC");
+        assertThat(items.get(1).getSku()).isEqualTo("MONTAZ-PC");
     }
 
     @Test

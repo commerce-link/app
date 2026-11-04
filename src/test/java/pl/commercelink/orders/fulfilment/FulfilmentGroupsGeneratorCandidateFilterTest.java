@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -65,6 +66,7 @@ class FulfilmentGroupsGeneratorCandidateFilterTest {
     @DisplayName("a routed order falls back to its supplier when warehouse stock is not permitted")
     void routedOrderFallsBackToSupplierCandidatesWhenWarehouseStockIsNotPermitted() {
         // given
+        when(inventory.findByEan("MFN-1")).thenReturn(MatchedInventory.empty(new InventoryKey()));
         when(inventory.findByProductCode("MFN-1")).thenReturn(matchedInventory);
         when(matchedInventory.getInventoryItems()).thenReturn(List.of(warehouseItem(), acmeItem()));
 
@@ -85,6 +87,7 @@ class FulfilmentGroupsGeneratorCandidateFilterTest {
     @DisplayName("an unrouted order still prefers warehouse stock")
     void unroutedOrderStillPrefersWarehouseStock() {
         // given
+        when(inventory.findByEan("MFN-1")).thenReturn(MatchedInventory.empty(new InventoryKey()));
         when(inventory.findByProductCode("MFN-1")).thenReturn(matchedInventory);
         when(matchedInventory.getInventoryItems()).thenReturn(List.of(warehouseItem(), acmeItem()));
 
@@ -104,6 +107,7 @@ class FulfilmentGroupsGeneratorCandidateFilterTest {
     @DisplayName("an item without offers keeps the manual placeholder")
     void itemWithoutOffersKeepsTheManualPlaceholder() {
         // given
+        when(inventory.findByEan("MFN-1")).thenReturn(MatchedInventory.empty(new InventoryKey()));
         when(inventory.findByProductCode("MFN-1")).thenReturn(matchedInventory);
         when(matchedInventory.getInventoryItems()).thenReturn(List.of());
 

@@ -310,7 +310,7 @@ public class OrderItem extends Item {
                 basketItem.getName(),
                 (int) basketItem.getQty(),
                 basketItem.getUnitPrice(),
-                basketItem.getMfn(),
+                basketItem.getSku(),
                 basketItem.isConsolidated()
         );
         orderItem.setService(basketItem.isService());

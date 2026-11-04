@@ -1,6 +1,7 @@
 package pl.commercelink.baskets;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
+import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.PositionGroup;
@@ -10,7 +11,6 @@ import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.Store;
-import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -171,10 +171,8 @@ public class Basket {
 
     public void setBasketItems(List<BasketItem> basketItems) {
         this.basketItems = joinVariantGroups(basketItems.stream()
-                .peek(i -> {
-                    var unifiedMfn = UnifiedProductIdentifiers.unifyMfn(i.getMfn());
-                    i.setMfn(unifiedMfn);
-                }).toList());
+                .peek(i -> i.setSku(StringUtils.deleteWhitespace(i.getSku())))
+                .toList());
         reindexPositions();
     }
 

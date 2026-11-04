@@ -92,7 +92,7 @@ class MarketplaceReturnDecisionsTest {
     }
 
     private static OrderItem shippingOrderItem(String itemId) {
-        OrderItem item = new OrderItem(ORDER_ID, "Other", "shipping", 1, 0.0, BasketItem.SHIPPING_MFN_CODE, false);
+        OrderItem item = new OrderItem(ORDER_ID, "Other", "shipping", 1, 0.0, BasketItem.SHIPPING_SKU, false);
         item.setItemId(itemId);
         item.setService(true);
         return item;

@@ -15,6 +15,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.areEansEq;
+
 @Component
 public class TaxonomyCache {
 
@@ -150,6 +152,19 @@ public class TaxonomyCache {
 
     public Taxonomy findByMfn(String mfn) {
         return taxonomyByMfn.get(mfn);
+    }
+
+    public Taxonomy findByEan(String ean) {
+        if (StringUtils.isBlank(ean)) {
+            return null;
+        }
+        Taxonomy best = null;
+        for (Taxonomy t : taxonomyByMfn.values()) {
+            if (areEansEq(t.ean(), ean) && (best == null || preferredOver(t, best))) {
+                best = t;
+            }
+        }
+        return best;
     }
 
     public String getFileName() {

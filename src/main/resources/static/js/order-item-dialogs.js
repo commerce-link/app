@@ -120,7 +120,7 @@
         function refresh() {
             selected.forEach(function (s) {
                 s.foreign = !data.some(function (p) {
-                    return p.mfn === s.code;
+                    return p.ean === s.code;
                 });
             });
             options(category, unique(data.map(function (p) {
@@ -134,12 +134,13 @@
             var term = search.value.trim().toLowerCase();
             var shown = data.filter(function (p) {
                 return (!category.value || p.category === category.value) && (!label.value || p.label === label.value)
-                    && (!term || (p.name || '').toLowerCase().indexOf(term) >= 0 || (p.mfn || '').toLowerCase().indexOf(term) >= 0);
+                    && (!term || (p.name || '').toLowerCase().indexOf(term) >= 0 || (p.ean || '').indexOf(term) >= 0
+                        || (p.mfn || '').toLowerCase().indexOf(term) >= 0);
             });
             rows.replaceChildren();
             shown.forEach(function (p) {
                 var picked = selected.some(function (s) {
-                    return s.code === p.mfn;
+                    return s.code === p.ean;
                 });
                 var row = document.createElement('tr');
                 row.classList.toggle('is-selected', picked);
@@ -149,19 +150,24 @@
                 box.type = 'checkbox';
                 box.className = 'cl-check-input';
                 box.checked = picked;
-                box.setAttribute('aria-label', p.name || p.mfn);
+                box.disabled = !p.ean;
+                box.setAttribute('aria-label', p.name || p.ean);
                 check.appendChild(box);
                 row.appendChild(check);
                 cell(row, p.name);
                 cell(row, p.label);
+                cell(row, p.ean, 'cl-table-code');
                 cell(row, p.mfn, 'cl-table-code');
                 cell(row, format(p.price), 'is-numeric');
                 cell(row, p.qty, 'is-numeric');
                 row.addEventListener('click', function (event) {
+                    if (!p.ean) {
+                        return;
+                    }
                     if (event.target !== box) {
                         box.checked = !box.checked;
                     }
-                    toggle(p.mfn);
+                    toggle(p.ean);
                 });
                 rows.appendChild(row);
             });
@@ -217,13 +223,13 @@
 
         function addManual() {
             var code = manual.value.trim();
-            if (!code || code.indexOf(':') >= 0 || selected.some(function (s) {
+            if (!code || selected.some(function (s) {
                 return s.code === code;
             })) {
                 return;
             }
             selected.push({ code: code, foreign: !data.some(function (p) {
-                return p.mfn === code;
+                return p.ean === code;
             }) });
             manual.value = '';
             renderChips();
@@ -437,9 +443,9 @@
                 .replace('{0}', format(other)).replace('{1}', String(vat));
         }
 
-        function mfnOptions(codes) {
-            var list = form().querySelector('[data-cl-mfn-options]');
-            var input = form().querySelector('input[name="manufacturerCode"]');
+        function eanOptions(codes) {
+            var list = form().querySelector('[data-cl-ean-options]');
+            var input = form().querySelector('input[name="ean"]');
             list.replaceChildren();
             codes.forEach(function (code) {
                 var item = document.createElement('li');
@@ -466,10 +472,10 @@
             f.querySelectorAll('[data-cl-item-id]').forEach(function (input) {
                 input.value = trigger.getAttribute('data-item-id') || '';
             });
-            f.querySelector('input[name="manufacturerCode"]').value = '';
-            var eanField = f.querySelector('[data-cl-ean-field]');
-            if (eanField) {
-                eanField.remove();
+            f.querySelector('input[name="ean"]').value = '';
+            var mfnField = f.querySelector('[data-cl-mfn-field]');
+            if (mfnField) {
+                mfnField.remove();
             }
             f.querySelector('input[name="cost"]').value = '';
             f.querySelector('input[name="priceType"]').value = 'net';
@@ -483,7 +489,7 @@
             if (summary) {
                 summary.remove();
             }
-            mfnOptions(codesOf(trigger));
+            eanOptions(codesOf(trigger));
             hint();
         });
         dialog.addEventListener('click', function (event) {
