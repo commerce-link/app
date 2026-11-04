@@ -5,7 +5,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.carriers.CarrierDictionary;
-import pl.commercelink.carriers.CarrierMappings;
+import pl.commercelink.carriers.CarrierTranslator;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
@@ -30,7 +30,7 @@ public class ShippingService {
     private ShippingProviderFactory shippingProviderFactory;
 
     @Autowired
-    private CarrierMappings carrierMappings;
+    private CarrierTranslator carrierTranslator;
 
     @Autowired
     private ShippingProviders shippingProviders;
@@ -273,7 +273,7 @@ public class ShippingService {
             return Optional.empty();
         }
         String dictionary = CarrierDictionary.shipping(integration);
-        return carrierMappings.outboundMappingFor(dictionary, deliveryTarget.carrier(), List.of(dictionary));
+        return carrierTranslator.textFor(dictionary, deliveryTarget.carrier(), List.of(dictionary));
     }
 
     /** The services of the code, or every service the store ticked when there is no code or none of them has it. */

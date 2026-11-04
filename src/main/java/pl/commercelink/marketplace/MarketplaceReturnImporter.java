@@ -23,7 +23,7 @@ import pl.commercelink.orders.rma.RMARepository;
 import pl.commercelink.orders.rma.RMAResolutionType;
 import pl.commercelink.orders.rma.RMAStatus;
 import pl.commercelink.carriers.CarrierDictionary;
-import pl.commercelink.carriers.CarrierMappings;
+import pl.commercelink.carriers.CarrierTranslator;
 import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreNotification;
@@ -52,7 +52,7 @@ public class MarketplaceReturnImporter {
     private final StoreNotificationService notificationService;
     private final OrderItemFamily orderItemFamily;
     private final OpenRmaCoverage openRmaCoverage;
-    private final CarrierMappings carrierMappings;
+    private final CarrierTranslator carrierTranslator;
 
     public void importReturn(Store store, String marketplace, MarketplaceReturn ret) {
         RMA existing = rmaRepository.findByExternalReturnId(store.getStoreId(), marketplace, ret.externalReturnId());
@@ -246,7 +246,7 @@ public class MarketplaceReturnImporter {
         for (MarketplaceReturn.Parcel parcel : ret.parcels()) {
             Shipment shipment = new Shipment(ShipmentType.Courier);
             shipment.setTrackingNo(parcel.trackingNo());
-            shipment.setCarrier(carrierMappings.carrierNameFor(dictionary, parcel.carrierId()));
+            shipment.setCarrier(carrierTranslator.carrierFor(dictionary, parcel.carrierId()));
             shipments.add(shipment);
         }
         return shipments;

@@ -30,7 +30,7 @@ import java.util.Optional;
 @NoArgsConstructor
 public class CarrierDictionary {
 
-    public static final String TABLE_NAME = "CarrierMappings";
+    public static final String TABLE_NAME = "CarrierDictionaries";
 
     private static final String GLOBAL = "global";
     private static final String MARKETPLACE = "marketplace";
@@ -81,7 +81,7 @@ public class CarrierDictionary {
         return type(dictionary).filter(SUPPLIER::equals).isPresent();
     }
 
-    public Optional<String> inboundMappingFor(String text) {
+    public Optional<String> carrierFor(String text) {
         String normalized = normalize(text);
         if (normalized == null) {
             return Optional.empty();
@@ -96,7 +96,7 @@ public class CarrierDictionary {
      * The carrier of the longest text of the list contained in the given one, for systems that send whole names
      * ("Allegro Paczkomaty InPost 24/7"). A text made of digits only matches exactly, so Morele's "14" is not "4".
      */
-    public Optional<String> fragmentMappingFor(String text) {
+    public Optional<String> carrierByFragmentFor(String text) {
         String normalized = normalize(text);
         if (normalized == null) {
             return Optional.empty();
@@ -109,7 +109,7 @@ public class CarrierDictionary {
                 .map(CarrierMapping::getCarrier);
     }
 
-    public Optional<String> outboundMappingFor(String carrier) {
+    public Optional<String> textFor(String carrier) {
         if (StringUtils.isBlank(carrier)) {
             return Optional.empty();
         }

@@ -1,7 +1,7 @@
 package pl.commercelink.marketplace;
 
 import pl.commercelink.carriers.CarrierDictionary;
-import pl.commercelink.carriers.CarrierMappings;
+import pl.commercelink.carriers.CarrierTranslator;
 import pl.commercelink.carriers.InMemoryCarrierDictionaries;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -66,9 +66,9 @@ class MarketplaceReturnImporterTest {
     @Mock private StoreNotificationService notificationService;
     @Mock private OrderItemFamily orderItemFamily;
     @Mock private OpenRmaCoverage openRmaCoverage;
-    @Spy private CarrierMappings carrierMappings = new InMemoryCarrierDictionaries()
+    @Spy private CarrierTranslator carrierTranslator = new InMemoryCarrierDictionaries()
             .with(CarrierDictionary.marketplaceStatus("Allegro"), "INPOST=InPost", "INPOST=InPost Kurier")
-            .mappings();
+            .translator();
     @Mock private Order order;
     @Mock private OrderItem orderItem;
 

@@ -20,13 +20,25 @@ public class CarrierDictionaryRepository {
         this.mapper = new DynamoDBMapper(amazonDynamoDB);
     }
 
-    /** A consistent GetItem: a change made on the dashboard counts from the next read on every instance. */
+    /** An eventually consistent GetItem: a dashboard edit read a moment late changes nothing for an order. */
     public Optional<CarrierDictionary> find(String dictionary) {
-        return Optional.ofNullable(mapper.load(CarrierDictionary.class, dictionary, CONSISTENT));
+        return load(dictionary, false);
     }
 
     public CarrierDictionary get(String dictionary) {
         return find(dictionary).orElseGet(() -> CarrierDictionary.empty(dictionary));
+    }
+
+    /**
+     * A consistent GetItem for the dashboard editor: the page shown right after a save has to carry the new version,
+     * otherwise the next save would be refused as a concurrent edit.
+     */
+    public CarrierDictionary getForEditing(String dictionary) {
+        return load(dictionary, true).orElseGet(() -> CarrierDictionary.empty(dictionary));
+    }
+
+    protected Optional<CarrierDictionary> load(String dictionary, boolean consistent) {
+        return Optional.ofNullable(mapper.load(CarrierDictionary.class, dictionary, consistent ? CONSISTENT : DynamoDBMapperConfig.DEFAULT));
     }
 
     /** The whole dictionary in one PutItem, conditional on its version: a concurrent edit fails instead of being lost. */

@@ -5,7 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.carriers.CarrierDictionary;
-import pl.commercelink.carriers.CarrierMappings;
+import pl.commercelink.carriers.CarrierTranslator;
 import pl.commercelink.documents.Document;
 import pl.commercelink.marketplace.api.InvoiceUpdate;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
@@ -29,7 +29,7 @@ public class MarketplaceOrderLifecycleEventListener {
     private final StoresRepository storesRepository;
     private final OrdersRepository ordersRepository;
     private final MarketplaceProviderFactory providerFactory;
-    private final CarrierMappings carrierMappings;
+    private final CarrierTranslator carrierTranslator;
 
     @SqsListener(
             value = "marketplace-order-lifecycle-queue",
@@ -117,7 +117,7 @@ public class MarketplaceOrderLifecycleEventListener {
                 .filter(s -> !attachedByMarketplace(s, marketplace))
                 .findFirst()
                 .map(s -> new ShipmentUpdate(s.getTrackingNo(),
-                        carrierCode(s, store, marketplace),
+                        carrierIdFor(s, store, marketplace),
                         s.getCarrier(),
                         s.getTrackingUrl()));
 
@@ -140,14 +140,14 @@ public class MarketplaceOrderLifecycleEventListener {
      * Newer shipments hold our carrier name; older ones a label code ("dhl") of their integration (the store's default
      * one when the shipment names none) or the marketplace's own text, which are turned into a carrier first.
      */
-    private String carrierCode(Shipment shipment, Store store, String marketplace) {
+    private String carrierIdFor(Shipment shipment, Store store, String marketplace) {
         String integration = shipment.getProvider() != null
                 ? shipment.getProvider()
                 : store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
         List<String> sources = integration != null
                 ? List.of(CarrierDictionary.shipping(integration), CarrierDictionary.marketplaceImport(marketplace))
                 : List.of(CarrierDictionary.marketplaceImport(marketplace));
-        return carrierMappings.outboundMappingFor(CarrierDictionary.marketplaceStatus(marketplace), shipment.getCarrier(), sources)
+        return carrierTranslator.textFor(CarrierDictionary.marketplaceStatus(marketplace), shipment.getCarrier(), sources)
                 .orElse(null);
     }
 

@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.carriers.CarrierDictionary;
-import pl.commercelink.carriers.CarrierMappings;
+import pl.commercelink.carriers.CarrierTranslator;
 import pl.commercelink.marketplace.api.MarketplaceCustomer;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProduct;
@@ -32,7 +32,7 @@ public class MarketplaceOrderImporter {
     private OrdersManager ordersManager;
 
     @Autowired
-    private CarrierMappings carrierMappings;
+    private CarrierTranslator carrierTranslator;
 
     /** @return false when the marketplace order is already in the store and nothing was saved. */
     public boolean importOrder(Store store, String marketplaceName, MarketplaceOrder marketplaceOrder) {
@@ -87,7 +87,7 @@ public class MarketplaceOrderImporter {
                 .withExternalOrderId(marketplaceOrder.externalOrderId())
                 .withExternalSupplierId(marketplaceOrder.externalSupplierId())
                 .withPayment(payment)
-                .withDeliveryCarrier(toCarrierName(marketplaceName, marketplaceOrder.shipping().carrier()))
+                .withDeliveryCarrier(carrierFor(marketplaceName, marketplaceOrder.shipping().carrier()))
                 .withPreferredShippingAt(marketplaceOrder.shipping().estimatedShippingAt());
 
         String collectionPointCode = toCollectionPointCode(marketplaceOrder.shipping().pickupPoint());
@@ -110,8 +110,8 @@ public class MarketplaceOrderImporter {
         return ordersManager.saveWithFulfilment(order, orderItems);
     }
 
-    String toCarrierName(String marketplaceName, String shippingCarrier) {
-        return carrierMappings.carrierNameFor(CarrierDictionary.marketplaceImport(marketplaceName), shippingCarrier);
+    String carrierFor(String marketplaceName, String shippingCarrier) {
+        return carrierTranslator.carrierFor(CarrierDictionary.marketplaceImport(marketplaceName), shippingCarrier);
     }
 
     static String toCollectionPointCode(PickupPoint pickupPoint) {

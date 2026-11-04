@@ -1,7 +1,7 @@
 package pl.commercelink.inventory.deliveries;
 
 import pl.commercelink.carriers.CarrierDictionary;
-import pl.commercelink.carriers.CarrierMappings;
+import pl.commercelink.carriers.CarrierTranslator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -50,29 +50,29 @@ public class DropshipTrackingService {
     private final SupplierProviderResolver providerResolver;
     private final DropshipDeliveryCompletion completion;
     private final DropshipTrackingProperties properties;
-    private final CarrierMappings carrierMappings;
+    private final CarrierTranslator carrierTranslator;
     private final Clock clock;
 
     @Autowired
     public DropshipTrackingService(DeliveriesQueryService deliveriesQueryService,
                                    DeliveriesRepository deliveriesRepository, OrdersRepository ordersRepository,
                                    SupplierProviderResolver providerResolver, DropshipDeliveryCompletion completion,
-                                   DropshipTrackingProperties properties, CarrierMappings carrierMappings) {
+                                   DropshipTrackingProperties properties, CarrierTranslator carrierTranslator) {
         this(deliveriesQueryService, deliveriesRepository, ordersRepository, providerResolver, completion, properties,
-                carrierMappings, Clock.systemDefaultZone());
+                carrierTranslator, Clock.systemDefaultZone());
     }
 
     DropshipTrackingService(DeliveriesQueryService deliveriesQueryService, DeliveriesRepository deliveriesRepository,
                             OrdersRepository ordersRepository, SupplierProviderResolver providerResolver,
                             DropshipDeliveryCompletion completion, DropshipTrackingProperties properties,
-                            CarrierMappings carrierMappings, Clock clock) {
+                            CarrierTranslator carrierTranslator, Clock clock) {
         this.deliveriesQueryService = deliveriesQueryService;
         this.deliveriesRepository = deliveriesRepository;
         this.ordersRepository = ordersRepository;
         this.providerResolver = providerResolver;
         this.completion = completion;
         this.properties = properties;
-        this.carrierMappings = carrierMappings;
+        this.carrierTranslator = carrierTranslator;
         this.clock = clock;
     }
 
@@ -198,7 +198,7 @@ public class DropshipTrackingService {
             ShipmentType type = pickup != null ? ShipmentType.PickupPoint : ShipmentType.Courier;
             String collectionPointCode = pickup != null ? pickup.getCollectionPointCode() : null;
             LocalDateTime shippedAt = parcel.shippedAt() != null ? parcel.shippedAt() : now;
-            String carrier = carrierMappings.carrierNameFor(
+            String carrier = carrierTranslator.carrierFor(
                     CarrierDictionary.supplier(storeId, delivery.getProvider()), parcel.carrier());
             DropshipShipment shipment = new DropshipShipment(type, carrier, parcel.trackingNo(),
                     collectionPointCode, shippedAt, parcel.trackingUrl());

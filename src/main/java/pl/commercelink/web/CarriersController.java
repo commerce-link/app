@@ -60,7 +60,7 @@ public class CarriersController {
                 .map(d -> new DictionaryRow(d.key(), purpose(d, locale),
                         dictionaryRepository.get(d.key()).getMappings().size(), dictionaryHref(d.key())))
                 .toList();
-        model.addAttribute("carriers", carriersRepository.findAll());
+        model.addAttribute("carriers", carriersRepository.findAllForEditing());
         model.addAttribute("dictionaries", dictionaries);
         return "carriers";
     }
@@ -82,7 +82,7 @@ public class CarriersController {
     @GetMapping(DICTIONARY_PATH)
     public String dictionary(@RequestParam String dictionary, Model model, Locale locale) {
         SharedDictionary shared = requireShared(dictionary);
-        CarrierDictionary entry = dictionaryRepository.get(dictionary);
+        CarrierDictionary entry = dictionaryRepository.getForEditing(dictionary);
         return dictionaryPage(model, shared, entry.getMappings(), entry.getVersion(), null, locale);
     }
 
@@ -114,7 +114,7 @@ public class CarriersController {
         model.addAttribute("purpose", purpose(shared, locale));
         model.addAttribute("pairs", withEmptyRow(pairs));
         model.addAttribute("version", version);
-        model.addAttribute("carrierNames", carriersRepository.names());
+        model.addAttribute("carrierNames", carriersRepository.findAllForEditing().stream().map(Carrier::getName).toList());
         model.addAttribute("fragments", CarrierDictionary.matchesByFragment(dictionary));
         model.addAttribute(SettingsFlash.ERROR_MESSAGE, error);
         return "carrier-dictionary";

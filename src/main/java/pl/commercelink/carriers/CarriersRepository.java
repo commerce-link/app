@@ -23,13 +23,16 @@ public class CarriersRepository {
 
     /** A Scan, but of a dozen or so rows: only for the lists of the super admin page and the shipment forms. */
     public List<Carrier> findAll() {
-        return mapper.scan(Carrier.class, new DynamoDBScanExpression().withConsistentRead(true)).stream()
-                .sorted(Comparator.comparing(Carrier::getName, String.CASE_INSENSITIVE_ORDER))
-                .toList();
+        return scan(false);
     }
 
     public List<String> names() {
         return findAll().stream().map(Carrier::getName).toList();
+    }
+
+    /** A consistent Scan for the super admin page, so a carrier just added is listed and refused a second time. */
+    public List<Carrier> findAllForEditing() {
+        return scan(true);
     }
 
     /**
@@ -37,7 +40,7 @@ public class CarriersRepository {
      *         and dictionaries look carriers up regardless of case, so "inpost" next to "InPost" would be ambiguous
      */
     public boolean create(Carrier carrier) {
-        if (names().stream().anyMatch(name -> name.equalsIgnoreCase(carrier.getName()))) {
+        if (findAllForEditing().stream().anyMatch(existing -> existing.getName().equalsIgnoreCase(carrier.getName()))) {
             return false;
         }
         try {
@@ -48,5 +51,11 @@ public class CarriersRepository {
         } catch (ConditionalCheckFailedException e) {
             return false;
         }
+    }
+
+    private List<Carrier> scan(boolean consistent) {
+        return mapper.scan(Carrier.class, new DynamoDBScanExpression().withConsistentRead(consistent)).stream()
+                .sorted(Comparator.comparing(Carrier::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
     }
 }

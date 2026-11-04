@@ -7,7 +7,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class CarrierMappingsTest {
+class CarrierTranslatorTest {
 
     private static final String ALLEGRO_METHODS = CarrierDictionary.marketplaceImport("Allegro");
     private static final String ALLEGRO = CarrierDictionary.marketplaceStatus("Allegro");
@@ -15,60 +15,60 @@ class CarrierMappingsTest {
     private static final String FURGONETKA = CarrierDictionary.shipping("furgonetka");
     private static final String SHOPER = CarrierDictionary.supplier("store-1", "Shoper-k7f3a9c2");
 
-    private final CarrierMappings mappings = new InMemoryCarrierDictionaries()
+    private final CarrierTranslator translator = new InMemoryCarrierDictionaries()
             .with(ALLEGRO_METHODS, "Paczkomat=InPost", "Kurier24 InPost=InPost Kurier", "InPost=InPost", "DPD=DPD")
             .with(ALLEGRO, "INPOST=InPost", "INPOST=InPost Kurier", "DPD=DPD")
             .with(MORELE, "2=InPost", "4=Orlen", "7=Poczta Polska")
             .with(FURGONETKA, "inpost=InPost", "inpost_courier=InPost Kurier")
             .with(SHOPER, "5=DPD", "Kurier DPD pobranie=DPD", "7=InPost")
-            .mappings();
+            .translator();
 
     @Test
     void recognizesATextExactlyRegardlessOfCaseAndSpaces() {
         // when / then
-        assertThat(mappings.inboundMappingFor(FURGONETKA, "  INPOST_COURIER ")).contains("InPost Kurier");
-        assertThat(mappings.inboundMappingFor(SHOPER, "kurier  dpd pobranie")).contains("DPD");
+        assertThat(translator.carrierFor(FURGONETKA, "  INPOST_COURIER ")).isEqualTo("InPost Kurier");
+        assertThat(translator.carrierFor(SHOPER, "kurier  dpd pobranie")).isEqualTo("DPD");
     }
 
     @Test
     void recognizesAWholeMarketplaceNameByItsLongestFragment() {
         // when / then
-        assertThat(mappings.inboundMappingFor(ALLEGRO_METHODS, "Allegro Paczkomaty InPost 24/7")).contains("InPost");
-        assertThat(mappings.inboundMappingFor(ALLEGRO_METHODS, "Allegro Kurier24 InPost pobranie")).contains("InPost Kurier");
+        assertThat(translator.carrierFor(ALLEGRO_METHODS, "Allegro Paczkomaty InPost 24/7")).isEqualTo("InPost");
+        assertThat(translator.carrierFor(ALLEGRO_METHODS, "Allegro Kurier24 InPost pobranie")).isEqualTo("InPost Kurier");
     }
 
     @Test
     void matchesDigitsOnlyExactly() {
         // when / then
-        assertThat(mappings.inboundMappingFor(MORELE, "14")).isEmpty();
-        assertThat(mappings.inboundMappingFor(MORELE, "4")).contains("Orlen");
+        assertThat(translator.carrierFor(MORELE, "14")).isEqualTo("14");
+        assertThat(translator.carrierFor(MORELE, "4")).isEqualTo("Orlen");
     }
 
     @Test
     void supplierMethodsMatchOnlyExactly() {
         // when / then
-        assertThat(mappings.inboundMappingFor(SHOPER, "Kurier DPD pobranie 2")).isEmpty();
+        assertThat(translator.carrierFor(SHOPER, "Kurier DPD pobranie 2")).isEqualTo("Kurier DPD pobranie 2");
     }
 
     @Test
     void firstPairDecidesInBothDirections() {
         // when / then
-        assertThat(mappings.inboundMappingFor(ALLEGRO, "INPOST")).contains("InPost");
-        assertThat(mappings.outboundMappingFor(ALLEGRO, "InPost Kurier")).contains("INPOST");
-        assertThat(mappings.outboundMappingFor(SHOPER, "DPD")).contains("5");
+        assertThat(translator.carrierFor(ALLEGRO, "INPOST")).isEqualTo("InPost");
+        assertThat(translator.textFor(ALLEGRO, "InPost Kurier")).contains("INPOST");
+        assertThat(translator.textFor(SHOPER, "DPD")).contains("5");
     }
 
     @Test
     void keepsAnUnknownTextAsItCame() {
         // when / then
-        assertThat(mappings.carrierNameFor(MORELE, "99")).isEqualTo("99");
-        assertThat(mappings.carrierNameFor(MORELE, "7")).isEqualTo("Poczta Polska");
+        assertThat(translator.carrierFor(MORELE, "99")).isEqualTo("99");
+        assertThat(translator.carrierFor(MORELE, "7")).isEqualTo("Poczta Polska");
     }
 
     @Test
     void readsAnOlderLabelCodeThroughTheGivenDictionaries() {
         // when
-        Optional<String> code = mappings.outboundMappingFor(ALLEGRO, "inpost_courier", List.of(FURGONETKA));
+        Optional<String> code = translator.textFor(ALLEGRO, "inpost_courier", List.of(FURGONETKA));
 
         // then
         assertThat(code).contains("INPOST");
@@ -77,7 +77,7 @@ class CarrierMappingsTest {
     @Test
     void missingDictionaryRecognizesNothing() {
         // when / then
-        assertThat(mappings.inboundMappingFor(CarrierDictionary.shipping("apaczka"), "inpost")).isEmpty();
-        assertThat(mappings.outboundMappingFor(CarrierDictionary.shipping("apaczka"), "InPost")).isEmpty();
+        assertThat(translator.carrierFor(CarrierDictionary.shipping("apaczka"), "inpost")).isEqualTo("inpost");
+        assertThat(translator.textFor(CarrierDictionary.shipping("apaczka"), "InPost")).isEmpty();
     }
 }

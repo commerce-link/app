@@ -58,7 +58,7 @@ class ShipmentCreationSettlerTest {
         when(owners.get(ShipmentOwnerType.ORDER)).thenReturn(owner);
         when(owners.get(ShipmentOwnerType.RMA_RETURN)).thenReturn(returnOwner);
         settler = new ShipmentCreationSettler(owners, immediatePickup, new InMemoryCarrierDictionaries()
-                .with(CarrierDictionary.shipping("furgonetka"), "dpd=DPD", "inpost_courier=InPost Kurier").mappings());
+                .with(CarrierDictionary.shipping("furgonetka"), "dpd=DPD", "inpost_courier=InPost Kurier").translator());
     }
 
     private static ShipmentCreationCheckRequest request() {

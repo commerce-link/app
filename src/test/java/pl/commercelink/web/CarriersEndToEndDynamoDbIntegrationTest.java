@@ -23,7 +23,7 @@ import pl.commercelink.carriers.CarrierDictionary;
 import pl.commercelink.carriers.CarrierDictionaryRepository;
 import pl.commercelink.carriers.CarrierDictionaryWriter;
 import pl.commercelink.carriers.CarrierMapping;
-import pl.commercelink.carriers.CarrierMappings;
+import pl.commercelink.carriers.CarrierTranslator;
 import pl.commercelink.carriers.CarriersRepository;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.marketplace.api.MarketplaceProviderDescriptor;
@@ -78,7 +78,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
     static AmazonDynamoDB client;
     static CarriersRepository carriers;
     static CarrierDictionaryRepository dictionaries;
-    static CarrierMappings mappings;
+    static CarrierTranslator translator;
 
     MockMvc mvc;
 
@@ -91,7 +91,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
                 .build();
         carriers = new CarriersRepository(client);
         dictionaries = new CarrierDictionaryRepository(client);
-        mappings = new CarrierMappings(dictionaries);
+        translator = new CarrierTranslator(dictionaries);
         new V024_CreateCarrierTables(client).createTables();
         // the test's own dictionaries first: the local seed keeps what exists
         CarrierSeed seed = new CarrierSeed(carriers, dictionaries);
@@ -146,7 +146,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         // then
         assertThat(tables).contains(CarrierDictionary.TABLE_NAME, "Carriers");
         assertThat(carriers.names()).contains("InPost", "InPost Kurier", "Allegro One", "Meest", "X-press");
-        assertThat(mappings.inboundMappingFor(ALLEGRO, "AMBRO_EXPRESS")).contains("Ambro Express");
+        assertThat(translator.carrierFor(ALLEGRO, "AMBRO_EXPRESS")).isEqualTo("Ambro Express");
         assertThat(List.of(ALLEGRO_METHODS, ALLEGRO, CENEO_FORMS, CENEO, EMPIK, MORELE, FURGONETKA, WZA))
                 .allSatisfy(dictionary -> assertThat(dictionaries.find(dictionary)).isPresent());
     }
@@ -163,15 +163,15 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         new V025_LocalDevelopmentCarriersSeed(new CarrierSeed(carriers, dictionaries)).seed();
 
         // then
-        assertThat(mappings.inboundMappingFor(ALLEGRO_METHODS, "Paczka w Ruchu")).contains("Orlen");
+        assertThat(translator.carrierFor(ALLEGRO_METHODS, "Paczka w Ruchu")).isEqualTo("Orlen");
     }
 
     @Test
     void anAllegroParcelLockerOrderTravelsThroughItsDictionaries() {
         // when: import, quote at Furgonetka, shipped status back to Allegro
-        String carrier = mappings.carrierNameFor(ALLEGRO_METHODS, "Allegro Paczkomaty InPost 24/7");
-        String service = mappings.outboundMappingFor(FURGONETKA, carrier, List.of(FURGONETKA)).orElseThrow();
-        String status = mappings.outboundMappingFor(ALLEGRO, carrier, List.of(FURGONETKA, ALLEGRO_METHODS)).orElseThrow();
+        String carrier = translator.carrierFor(ALLEGRO_METHODS, "Allegro Paczkomaty InPost 24/7");
+        String service = translator.textFor(FURGONETKA, carrier, List.of(FURGONETKA)).orElseThrow();
+        String status = translator.textFor(ALLEGRO, carrier, List.of(FURGONETKA, ALLEGRO_METHODS)).orElseThrow();
 
         // then
         assertThat(carrier).isEqualTo("InPost");
@@ -182,13 +182,13 @@ class CarriersEndToEndDynamoDbIntegrationTest {
     @Test
     void aCourierLabelNamesTheCarrierAndTheMarketplacesGetTheirOwnCodes() {
         // when
-        String carrier = mappings.carrierNameFor(FURGONETKA, "inpost_courier");
+        String carrier = translator.carrierFor(FURGONETKA, "inpost_courier");
 
         // then
         assertThat(carrier).isEqualTo("InPost Kurier");
-        assertThat(mappings.outboundMappingFor(ALLEGRO, carrier)).contains("INPOST");
-        assertThat(mappings.outboundMappingFor(CENEO, carrier)).contains("1");
-        assertThat(mappings.outboundMappingFor(FURGONETKA, carrier)).contains("inpost_courier");
+        assertThat(translator.textFor(ALLEGRO, carrier)).contains("INPOST");
+        assertThat(translator.textFor(CENEO, carrier)).contains("1");
+        assertThat(translator.textFor(FURGONETKA, carrier)).contains("inpost_courier");
     }
 
     @Test
@@ -197,36 +197,36 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         List<String> sources = List.of(FURGONETKA, CENEO_FORMS);
 
         // then
-        assertThat(mappings.outboundMappingFor(CENEO, "dhl", sources)).contains("2");
-        assertThat(mappings.outboundMappingFor(CENEO, "my", sources)).isEmpty();
+        assertThat(translator.textFor(CENEO, "dhl", sources)).contains("2");
+        assertThat(translator.textFor(CENEO, "my", sources)).isEmpty();
     }
 
     @Test
     void aSellersCeneoFormNameIsReadByItsLongestFragment() {
         // when
-        String carrier = mappings.carrierNameFor(CENEO_FORMS, "Poczta Polska - list polecony, płatność przelewem");
+        String carrier = translator.carrierFor(CENEO_FORMS, "Poczta Polska - list polecony, płatność przelewem");
 
         // then
         assertThat(carrier).isEqualTo("Poczta Polska");
-        assertThat(mappings.outboundMappingFor(CENEO, carrier)).contains("4");
+        assertThat(translator.textFor(CENEO, carrier)).contains("4");
     }
 
     @Test
     void marketplaceCodesOfDigitsAndWholeWordsMatchOnlyExactly() {
         // when / then
-        assertThat(mappings.carrierNameFor(MORELE, "7")).isEqualTo("Poczta Polska");
-        assertThat(mappings.carrierNameFor(MORELE, "14")).isEqualTo("14");
-        assertThat(mappings.carrierNameFor(EMPIK, "dpd")).isEqualTo("DPD");
+        assertThat(translator.carrierFor(MORELE, "7")).isEqualTo("Poczta Polska");
+        assertThat(translator.carrierFor(MORELE, "14")).isEqualTo("14");
+        assertThat(translator.carrierFor(EMPIK, "dpd")).isEqualTo("DPD");
     }
 
     @Test
     void aWysylamZAllegroLabelOfAllegroOneComesBackToAllegroAsItsId() {
         // when
-        String carrier = mappings.carrierNameFor(WZA, "ALLEGRO");
+        String carrier = translator.carrierFor(WZA, "ALLEGRO");
 
         // then
         assertThat(carrier).isEqualTo("Allegro One");
-        assertThat(mappings.outboundMappingFor(ALLEGRO, carrier)).contains("ALLEGRO");
+        assertThat(translator.textFor(ALLEGRO, carrier)).contains("ALLEGRO");
     }
 
     @Test
@@ -236,12 +236,12 @@ class CarriersEndToEndDynamoDbIntegrationTest {
 
         // when / then
         for (String text : texts) {
-            assertThat(mappings.carrierNameFor(ALLEGRO_METHODS, text)).isEqualTo(text);
-            assertThat(mappings.carrierNameFor(MORELE, text)).isEqualTo(text);
-            assertThat(mappings.carrierNameFor(FURGONETKA, text)).isEqualTo(text);
-            assertThat(mappings.outboundMappingFor(FURGONETKA, text, List.of(FURGONETKA))).isEmpty();
-            assertThat(mappings.outboundMappingFor(ALLEGRO, text, List.of(FURGONETKA, ALLEGRO_METHODS))).isEmpty();
-            assertThat(mappings.outboundMappingFor(CENEO, text, List.of(FURGONETKA, CENEO_FORMS))).isEmpty();
+            assertThat(translator.carrierFor(ALLEGRO_METHODS, text)).isEqualTo(text);
+            assertThat(translator.carrierFor(MORELE, text)).isEqualTo(text);
+            assertThat(translator.carrierFor(FURGONETKA, text)).isEqualTo(text);
+            assertThat(translator.textFor(FURGONETKA, text, List.of(FURGONETKA))).isEmpty();
+            assertThat(translator.textFor(ALLEGRO, text, List.of(FURGONETKA, ALLEGRO_METHODS))).isEmpty();
+            assertThat(translator.textFor(CENEO, text, List.of(FURGONETKA, CENEO_FORMS))).isEmpty();
         }
     }
 
@@ -252,8 +252,8 @@ class CarriersEndToEndDynamoDbIntegrationTest {
 
         // when / then
         for (String source : sources) {
-            assertThat(mappings.carrierNameFor(CarrierDictionary.marketplaceImport(source), "DPD")).isEqualTo("DPD");
-            assertThat(mappings.outboundMappingFor(CarrierDictionary.marketplaceStatus(source), "DPD")).isEmpty();
+            assertThat(translator.carrierFor(CarrierDictionary.marketplaceImport(source), "DPD")).isEqualTo("DPD");
+            assertThat(translator.textFor(CarrierDictionary.marketplaceStatus(source), "DPD")).isEmpty();
         }
     }
 
@@ -326,7 +326,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         assertThat(after.getVersion()).isEqualTo(before.getVersion() + 1);
         assertThat(after.getMappings()).extracting(m -> m.getText() + "=" + m.getCarrier())
                 .containsExactly("4=Orlen", "2=InPost", "5=Orlen", "6=Zabka", "7=Poczta Polska", "8=DPD");
-        assertThat(mappings.carrierNameFor(MORELE, "8")).isEqualTo("DPD");
+        assertThat(translator.carrierFor(MORELE, "8")).isEqualTo("DPD");
     }
 
     @Test

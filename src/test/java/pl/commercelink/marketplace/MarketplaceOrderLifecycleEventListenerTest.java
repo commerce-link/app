@@ -17,7 +17,7 @@ import pl.commercelink.marketplace.api.InvoiceUpdate;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.ShipmentUpdate;
 import pl.commercelink.carriers.CarrierDictionary;
-import pl.commercelink.carriers.CarrierMappings;
+import pl.commercelink.carriers.CarrierTranslator;
 import pl.commercelink.carriers.InMemoryCarrierDictionaries;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderLifecycleEvent;
@@ -54,11 +54,11 @@ class MarketplaceOrderLifecycleEventListenerTest {
     @Mock private StoresRepository storesRepository;
     @Mock private OrdersRepository ordersRepository;
     @Mock private MarketplaceProviderFactory providerFactory;
-    @Spy private CarrierMappings carrierMappings = new InMemoryCarrierDictionaries()
+    @Spy private CarrierTranslator carrierTranslator = new InMemoryCarrierDictionaries()
             .with(CarrierDictionary.marketplaceStatus("Allegro"), "INPOST=InPost", "INPOST=InPost Kurier", "DPD=DPD")
             .with(CarrierDictionary.shipping("furgonetka"), "inpost=InPost", "inpost_courier=InPost Kurier")
             .with(CarrierDictionary.marketplaceImport("Empik"), "DPD=DPD")
-            .mappings();
+            .translator();
 
     @Mock private Store store;
     @Mock private Order order;

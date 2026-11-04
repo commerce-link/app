@@ -1,6 +1,6 @@
 package pl.commercelink.shipping;
 
-import pl.commercelink.carriers.CarrierMappings;
+import pl.commercelink.carriers.CarrierTranslator;
 import pl.commercelink.stores.ShippingConfiguration;
 import pl.commercelink.shipping.api.ShipmentAddress;
 import pl.commercelink.orders.ShippingDetails;
@@ -29,7 +29,7 @@ import static org.mockito.Mockito.when;
 class ShippingServiceAvailabilityTest {
 
     @Mock private ShippingProviderFactory shippingProviderFactory;
-    @Mock private CarrierMappings carrierMappings;
+    @Mock private CarrierTranslator carrierTranslator;
     @Mock private ShippingProviders shippingProviders;
     @Mock private ShippingProvider provider;
 

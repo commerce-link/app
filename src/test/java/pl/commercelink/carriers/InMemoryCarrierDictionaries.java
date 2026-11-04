@@ -9,7 +9,7 @@ import java.util.Optional;
 
 import static org.mockito.Mockito.mock;
 
-/** Dictionaries kept in memory, for tests of the code that reads them through {@link CarrierMappings}. */
+/** Dictionaries kept in memory, for tests of the code that reads them through {@link CarrierTranslator}. */
 public class InMemoryCarrierDictionaries extends CarrierDictionaryRepository {
 
     private final Map<String, CarrierDictionary> dictionaries = new HashMap<>();
@@ -18,8 +18,8 @@ public class InMemoryCarrierDictionaries extends CarrierDictionaryRepository {
         super(mock(AmazonDynamoDB.class));
     }
 
-    public static CarrierMappings none() {
-        return new CarrierMappings(new InMemoryCarrierDictionaries());
+    public static CarrierTranslator none() {
+        return new CarrierTranslator(new InMemoryCarrierDictionaries());
     }
 
     public InMemoryCarrierDictionaries with(String dictionary, String... pairs) {
@@ -30,12 +30,12 @@ public class InMemoryCarrierDictionaries extends CarrierDictionaryRepository {
         return this;
     }
 
-    public CarrierMappings mappings() {
-        return new CarrierMappings(this);
+    public CarrierTranslator translator() {
+        return new CarrierTranslator(this);
     }
 
     @Override
-    public Optional<CarrierDictionary> find(String dictionary) {
+    protected Optional<CarrierDictionary> load(String dictionary, boolean consistent) {
         return Optional.ofNullable(dictionaries.get(dictionary));
     }
 
