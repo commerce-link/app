@@ -21,18 +21,18 @@ public class CarriersRepository {
         this.mapper = new DynamoDBMapper(amazonDynamoDB);
     }
 
-    /** A Scan, but of a dozen or so rows: only for the lists of the super admin page and the shipment forms. */
+    /**
+     * A Scan, but of a dozen or so rows: only for the lists of the super admin page and the shipment forms. Eventually
+     * consistent, so a carrier added a moment ago may be missing from the next page for a while.
+     */
     public List<Carrier> findAll() {
-        return scan(false);
+        return mapper.scan(Carrier.class, new DynamoDBScanExpression()).stream()
+                .sorted(Comparator.comparing(Carrier::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
     }
 
     public List<String> names() {
         return findAll().stream().map(Carrier::getName).toList();
-    }
-
-    /** A consistent Scan for the super admin page, so a carrier just added is listed and refused a second time. */
-    public List<Carrier> findAllForEditing() {
-        return scan(true);
     }
 
     /**
@@ -40,7 +40,7 @@ public class CarriersRepository {
      *         and dictionaries look carriers up regardless of case, so "inpost" next to "InPost" would be ambiguous
      */
     public boolean create(Carrier carrier) {
-        if (findAllForEditing().stream().anyMatch(existing -> existing.getName().equalsIgnoreCase(carrier.getName()))) {
+        if (findAll().stream().anyMatch(existing -> existing.getName().equalsIgnoreCase(carrier.getName()))) {
             return false;
         }
         try {
@@ -51,11 +51,5 @@ public class CarriersRepository {
         } catch (ConditionalCheckFailedException e) {
             return false;
         }
-    }
-
-    private List<Carrier> scan(boolean consistent) {
-        return mapper.scan(Carrier.class, new DynamoDBScanExpression().withConsistentRead(consistent)).stream()
-                .sorted(Comparator.comparing(Carrier::getName, String.CASE_INSENSITIVE_ORDER))
-                .toList();
     }
 }

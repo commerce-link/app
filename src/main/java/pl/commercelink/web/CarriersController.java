@@ -40,6 +40,7 @@ public class CarriersController {
 
     static final String PATH = "/dashboard/carriers";
     static final String DICTIONARY_PATH = PATH + "/dictionary";
+    private static final String SAVED_DICTIONARY = "savedDictionary";
 
     private final CarriersRepository carriersRepository;
     private final CarrierDictionaryRepository dictionaryRepository;
@@ -60,7 +61,7 @@ public class CarriersController {
                 .map(d -> new DictionaryRow(d.key(), purpose(d, locale),
                         dictionaryRepository.get(d.key()).getMappings().size(), dictionaryHref(d.key())))
                 .toList();
-        model.addAttribute("carriers", carriersRepository.findAllForEditing());
+        model.addAttribute("carriers", carriersRepository.findAll());
         model.addAttribute("dictionaries", dictionaries);
         return "carriers";
     }
@@ -82,7 +83,8 @@ public class CarriersController {
     @GetMapping(DICTIONARY_PATH)
     public String dictionary(@RequestParam String dictionary, Model model, Locale locale) {
         SharedDictionary shared = requireShared(dictionary);
-        CarrierDictionary entry = dictionaryRepository.getForEditing(dictionary);
+        CarrierDictionary entry = model.getAttribute(SAVED_DICTIONARY) instanceof CarrierDictionary saved
+                && saved.getDictionary().equals(dictionary) ? saved : dictionaryRepository.get(dictionary);
         return dictionaryPage(model, shared, entry.getMappings(), entry.getVersion(), null, locale);
     }
 
@@ -101,6 +103,9 @@ public class CarriersController {
                         result.externalText());
                 return dictionaryPage(model, shared, pairs, version, error, locale);
             }
+            // the page after the redirect shows what was saved: an eventually consistent read could still return the
+            // previous version, and the next save from that page would be refused as a concurrent edit
+            redirectAttributes.addFlashAttribute(SAVED_DICTIONARY, result.saved());
         } catch (ConditionalCheckFailedException e) {
             return dictionaryPage(model, shared, pairs, version, message("carriers.dictionary.conflict", locale), locale);
         }
@@ -115,7 +120,7 @@ public class CarriersController {
         model.addAttribute("purpose", purpose(shared, locale));
         model.addAttribute("pairs", withEmptyRow(pairs));
         model.addAttribute("version", version);
-        model.addAttribute("carrierNames", carriersRepository.findAllForEditing().stream().map(Carrier::getName).toList());
+        model.addAttribute("carrierNames", carriersRepository.findAll().stream().map(Carrier::getName).toList());
         model.addAttribute("fragments", CarrierDictionary.matchesByFragment(dictionary));
         model.addAttribute(SettingsFlash.ERROR_MESSAGE, error);
         return "carrier-dictionary";

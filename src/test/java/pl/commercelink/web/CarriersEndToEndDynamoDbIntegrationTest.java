@@ -315,6 +315,23 @@ class CarriersEndToEndDynamoDbIntegrationTest {
     }
 
     @Test
+    void thePageAfterASaveShowsTheSavedVersionWithoutReadingItBack() throws Exception {
+        // given
+        CarrierDictionary before = dictionaries.get(MORELE);
+        MvcResult saved = mvc.perform(dictionaryPost(MORELE, before.getVersion(), "8=DPD", "2=InPost")).andReturn();
+
+        // when
+        MvcResult page = mvc.perform(get(CarriersController.DICTIONARY_PATH).param("dictionary", MORELE).locale(PL)
+                        .flashAttrs(saved.getFlashMap()))
+                .andExpect(status().isOk()).andReturn();
+
+        // then
+        String html = render("carrier-dictionary", page);
+        assertThat(html).contains("name=\"version\" value=\"" + (before.getVersion() + 1) + "\"");
+        assertThat(html.indexOf("value=\"2\"")).isGreaterThan(html.indexOf("value=\"8\""));
+    }
+
+    @Test
     void aSaveFromAPageReadBeforeSomeoneElsesSaveIsRefusedAndKeepsTheirs() throws Exception {
         // given: two operators open the page, the first one saves
         Long seen = dictionaries.get(WZA).getVersion();

@@ -27,10 +27,14 @@ public class CarrierDictionaryWriter {
         EMPTY_PAIR, DUPLICATE_PAIR, AMBIGUOUS_SUPPLIER_TEXT
     }
 
-    public record Result(Refusal refusal, String externalText) {
+    public record Result(Refusal refusal, String externalText, CarrierDictionary saved) {
 
-        static Result saved() {
-            return new Result(null, null);
+        static Result refused(Refusal refusal, String externalText) {
+            return new Result(refusal, externalText, null);
+        }
+
+        static Result saved(CarrierDictionary saved) {
+            return new Result(null, null, saved);
         }
 
         public boolean isSaved() {
@@ -48,7 +52,7 @@ public class CarrierDictionaryWriter {
                 continue;
             }
             if (externalText == null || carrier == null) {
-                return new Result(Refusal.EMPTY_PAIR, StringUtils.defaultString(externalText));
+                return Result.refused(Refusal.EMPTY_PAIR, StringUtils.defaultString(externalText));
             }
             normalized.add(new CarrierMapping(externalText, carrier));
         }
@@ -59,7 +63,7 @@ public class CarrierDictionaryWriter {
         CarrierDictionary entry = new CarrierDictionary(dictionary, normalized);
         entry.setVersion(version);
         repository.save(entry);
-        return Result.saved();
+        return Result.saved(entry);
     }
 
     private static Optional<Result> validate(String dictionary, List<CarrierMapping> pairs) {
@@ -69,12 +73,12 @@ public class CarrierDictionaryWriter {
         for (CarrierMapping pair : pairs) {
             String externalText = pair.getExternalText().toUpperCase(Locale.ROOT);
             if (!seenPairs.add(externalText + "\n" + pair.getCarrier().toUpperCase(Locale.ROOT))) {
-                return Optional.of(new Result(Refusal.DUPLICATE_PAIR, pair.getExternalText()));
+                return Optional.of(Result.refused(Refusal.DUPLICATE_PAIR, pair.getExternalText()));
             }
             // a supplier's method has to name one carrier, otherwise its parcels could not be told apart
             String other = carrierByExternalText.putIfAbsent(externalText, pair.getCarrier());
             if (supplier && other != null && !other.equalsIgnoreCase(pair.getCarrier())) {
-                return Optional.of(new Result(Refusal.AMBIGUOUS_SUPPLIER_TEXT, pair.getExternalText()));
+                return Optional.of(Result.refused(Refusal.AMBIGUOUS_SUPPLIER_TEXT, pair.getExternalText()));
             }
         }
         return Optional.empty();

@@ -35,7 +35,7 @@ public class InMemoryCarrierDictionaries extends CarrierDictionaryRepository {
     }
 
     @Override
-    protected Optional<CarrierDictionary> load(String dictionary, boolean consistent) {
+    protected Optional<CarrierDictionary> load(String dictionary) {
         return Optional.ofNullable(dictionaries.get(dictionary));
     }
 
