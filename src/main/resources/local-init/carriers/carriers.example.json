@@ -1,5 +1,5 @@
 {
-  "_comment": "Public codes only (Allegro GET /order/carriers ids, Furgonetka service codes, words of Allegro delivery method names). Production data lives outside this repository; see scripts/carriers/README.md.",
+  "_comment": "Public codes only (Allegro GET /order/carriers ids, Furgonetka service codes, words of Allegro delivery method names). Production data lives outside this repository.",
   "carriers": [
     {
       "name": "InPost"

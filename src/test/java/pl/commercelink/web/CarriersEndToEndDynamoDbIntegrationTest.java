@@ -93,7 +93,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         dictionaries = new CarrierDictionaryRepository(client);
         mappings = new CarrierMappings(dictionaries);
         new V024_CreateCarrierTables(client).createTables();
-        // the test's own dictionaries first: the local seed keeps what exists, as the loading script does
+        // the test's own dictionaries first: the local seed keeps what exists
         CarrierSeed seed = new CarrierSeed(carriers, dictionaries);
         seed.load(new ByteArrayInputStream(FIXTURES.getBytes(StandardCharsets.UTF_8)));
         new V025_LocalDevelopmentCarriersSeed(seed).seed();

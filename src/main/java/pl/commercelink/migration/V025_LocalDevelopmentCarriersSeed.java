@@ -13,7 +13,7 @@ import java.io.InputStream;
 
 /**
  * Local carriers from the public example file. Production carriers and dictionaries are not seeded by the app:
- * they are loaded with scripts/carriers/load-carriers.sh from a file kept outside this repository.
+ * they are loaded from outside this repository, before the deploy.
  */
 @Profile("localdev")
 @ChangeUnit(id = "V025-local-development-carriers-seed", order = "025", author = "commercelink")

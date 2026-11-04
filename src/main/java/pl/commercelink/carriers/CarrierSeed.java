@@ -10,9 +10,9 @@ import java.io.InputStream;
 import java.util.List;
 
 /**
- * Loads carriers and dictionaries from a file in the format of scripts/carriers/load-carriers.sh, keeping whatever
- * already exists: a carrier or dictionary edited on the dashboard is never overwritten. Used for local development
- * and tests only; production data is loaded by the script, so it never has to be in this repository.
+ * Loads carriers and dictionaries from a file in the format of local-init/carriers/carriers.example.json, keeping
+ * whatever already exists: a carrier or dictionary edited on the dashboard is never overwritten. Used for local
+ * development and tests only; production data is loaded from outside this repository.
  */
 @Component
 @RequiredArgsConstructor
