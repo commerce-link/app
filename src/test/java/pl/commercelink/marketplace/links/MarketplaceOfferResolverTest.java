@@ -14,10 +14,14 @@ import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.products.StoreCategoryResolver;
 import pl.commercelink.products.information.StorePimAliases;
+import pl.commercelink.taxonomy.Taxonomy;
+import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -48,9 +52,18 @@ class MarketplaceOfferResolverTest {
     private ProductRepository products;
     @Mock
     private ProductCatalogRepository catalogs;
+    @Mock
+    private TaxonomyCache taxonomy;
+    @Mock
+    private StoreCategoryResolver storeCategories;
 
     @InjectMocks
     private MarketplaceOfferResolver resolver;
+
+    private void inTaxonomy(String ean, String category, String categoryId) {
+        when(taxonomy.findByEan(ean)).thenReturn(new Taxonomy(ean, "MFN-" + ean, "Brand", "Name " + ean, category, 1,
+                null, null, "raw", categoryId));
+    }
 
     private void link(String key, String... eans) {
         when(links.find(STORE, EMPIK, key)).thenReturn(Optional.of(
@@ -228,6 +241,84 @@ class MarketplaceOfferResolverTest {
         assertThat(result).contains(new ResolvedOffer(null, "5901234567890", null, null, Source.LINK));
         assertThat(result).map(ResolvedOffer::sku).contains("5901234567890");
         verifyNoInteractions(pimCatalog, aliases, catalogs, products);
+    }
+
+    @Test
+    void aLinkedLineTakesTheStoresNameForTheTaxonomyCategoryOfItsEan() {
+        // given
+        link("K", "5901234567890");
+        inTaxonomy("5901234567890", "Processors", "pim-cpu");
+        when(storeCategories.categoryNamesByPimCategoryId(STORE)).thenReturn(Map.of("pim-cpu", "Procesory"));
+
+        // when
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", null);
+
+        // then
+        assertThat(result).map(ResolvedOffer::category).contains("Procesory");
+        verifyNoInteractions(pimCatalog, catalogs, products);
+    }
+
+    @Test
+    void aLinkedLineTakesTheTaxonomyCategoryWhenTheStoreHasNoCategoryForIt() {
+        // given
+        link("K", "5901234567890");
+        inTaxonomy("5901234567890", "Processors", "pim-cpu");
+        when(storeCategories.categoryNamesByPimCategoryId(STORE)).thenReturn(Map.of());
+
+        // when
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", null);
+
+        // then
+        assertThat(result).map(ResolvedOffer::category).contains("Processors");
+    }
+
+    @Test
+    void aLinkedLineSkipsAnEanTheTaxonomyKnowsWithoutACategoryYet() {
+        // given the first EAN still waits for its category
+        link("K", "5900000000099", "5901234567890");
+        inTaxonomy("5900000000099", null, null);
+        inTaxonomy("5901234567890", "Lamps", null);
+
+        // when
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", null);
+
+        // then
+        assertThat(result).map(ResolvedOffer::category).contains("Lamps");
+        assertThat(result).map(ResolvedOffer::ean).contains("5900000000099");
+    }
+
+    @Test
+    void aLinkedLineWhoseEansTheTaxonomyDoesNotKnowKeepsNoCategory() {
+        // given
+        link("K", "5901234567890");
+
+        // when
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", null);
+
+        // then the line is still resolved by its EAN
+        assertThat(result).map(ResolvedOffer::sku).contains("5901234567890");
+        assertThat(result.get().category()).isNull();
+        verifyNoInteractions(storeCategories);
+    }
+
+    @Test
+    void readsTheStoresCategoriesOnceForAllLinesOfOneScope() {
+        // given
+        link("K1", "5901234567890");
+        link("K2", "5901234567891");
+        inTaxonomy("5901234567890", "Processors", "pim-cpu");
+        inTaxonomy("5901234567891", "Lamps", "pim-lamps");
+        when(storeCategories.categoryNamesByPimCategoryId(STORE)).thenReturn(Map.of("pim-cpu", "Procesory"));
+        MarketplaceOfferResolver.StoreOffers offers = resolver.forStore(STORE);
+
+        // when
+        Optional<ResolvedOffer> first = offers.resolve(EMPIK, "K1", null);
+        Optional<ResolvedOffer> second = offers.resolve(EMPIK, "K2", null);
+
+        // then
+        assertThat(first).map(ResolvedOffer::category).contains("Procesory");
+        assertThat(second).map(ResolvedOffer::category).contains("Lamps");
+        verify(storeCategories, times(1)).categoryNamesByPimCategoryId(STORE);
     }
 
     @Test

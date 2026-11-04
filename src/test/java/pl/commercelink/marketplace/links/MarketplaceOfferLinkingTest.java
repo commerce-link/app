@@ -70,6 +70,8 @@ class MarketplaceOfferLinkingTest {
                 catalogProduct("c1", "p2", "pim-2", null, "NO-EAN"),
                 catalogProduct("c1", "p3", null, "5909999999999", " "),
                 catalogProduct("c1", "p4", null, " 05900000000028 ", "CD-4")));
+        lenient().when(storeOffers.linked(anyList()))
+                .thenAnswer(invocation -> ResolvedOffer.linked(invocation.getArgument(0), null));
         lenient().when(orderItemsRepository.findByOrderIds(anyList())).thenAnswer(invocation -> {
             List<String> ids = invocation.getArgument(0);
             Map<String, List<OrderItem>> found = new LinkedHashMap<>();
@@ -274,7 +276,24 @@ class MarketplaceOfferLinkingTest {
             assertThat(filled.getEan()).isEqualTo("5900000000035");
             assertThat(filled.isUnlinkedMarketplaceItem()).isFalse();
         });
-        verify(resolver, never()).forStore(any());
+        verify(storeOffers, never()).catalogProducts();
+    }
+
+    @Test
+    void theFilledItemsTakeTheCategoryTheNextImportWouldGiveThem() {
+        // given the taxonomy knows the goods behind the EAN
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        openOrders(order);
+        when(storeOffers.linked(List.of("5900000000035")))
+                .thenReturn(ResolvedOffer.linked(List.of("5900000000035"), "Dom i kuchnia"));
+
+        // when
+        linking.linkEan(STORE, order, "i1", "5900000000035", "user-1");
+
+        // then
+        assertThat(item.getCategory()).isEqualTo("Dom i kuchnia");
+        assertThat(item.getSku()).isEqualTo("5900000000035");
     }
 
     @Test

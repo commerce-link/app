@@ -23,8 +23,15 @@ public class StoreCategoryResolver {
         return Optional.ofNullable(categoryNamesByPimCategoryId(storeId).get(pimCategoryId));
     }
 
-    private Map<String, String> categoryNamesByPimCategoryId(String storeId) {
+    /**
+     * The name of the store's category for every PIM category one of its catalog categories is mapped to; the first
+     * catalog (by name) and category (by sequence) mapped to it wins. For callers that look up many ids at once.
+     */
+    public Map<String, String> categoryNamesByPimCategoryId(String storeId) {
         Map<String, String> names = new HashMap<>();
+        if (StringUtils.isBlank(storeId)) {
+            return names;
+        }
         List<ProductCatalog> catalogs = productCatalogRepository.findAll(storeId);
         
         catalogs.stream()

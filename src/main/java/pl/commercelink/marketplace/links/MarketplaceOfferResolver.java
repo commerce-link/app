@@ -10,7 +10,10 @@ import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.products.StoreCategoryResolver;
 import pl.commercelink.products.information.StorePimAliases;
+import pl.commercelink.taxonomy.Taxonomy;
+import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -22,10 +25,10 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Resolves a marketplace order line to the EAN fulfilment looks goods up by: an explicit offer link first (its first EAN,
- * taken as it is: fulfilment finds the goods in the warehouse and the suppliers' feeds, so the product need not be in a
- * catalog), then the seller offer key taken as our own pimId, then the manufacturer code as MPN (the behaviour before
- * offer links existed). See {@link ResolvedOffer#sku()}.
+ * Resolves a marketplace order line to the EAN fulfilment looks goods up by: an explicit offer link first (its EANs,
+ * taken as they are: fulfilment finds the goods in the warehouse and the suppliers' feeds, so the product need not be in
+ * a catalog; the category comes from the taxonomy, as for a warehouse item), then the seller offer key taken as our own
+ * pimId, then the manufacturer code as MPN (the behaviour before offer links existed). See {@link ResolvedOffer#sku()}.
  */
 @Slf4j
 @Component
@@ -36,15 +39,20 @@ public class MarketplaceOfferResolver {
     private final StorePimAliases pimAliases;
     private final ProductRepository productRepository;
     private final ProductCatalogRepository productCatalogRepository;
+    private final TaxonomyCache taxonomyCache;
+    private final StoreCategoryResolver storeCategoryResolver;
 
     public MarketplaceOfferResolver(MarketplaceOfferLinkRepository linkRepository, PimCatalog pimCatalog,
                                     StorePimAliases pimAliases, ProductRepository productRepository,
-                                    ProductCatalogRepository productCatalogRepository) {
+                                    ProductCatalogRepository productCatalogRepository, TaxonomyCache taxonomyCache,
+                                    StoreCategoryResolver storeCategoryResolver) {
         this.linkRepository = linkRepository;
         this.pimCatalog = pimCatalog;
         this.pimAliases = pimAliases;
         this.productRepository = productRepository;
         this.productCatalogRepository = productCatalogRepository;
+        this.taxonomyCache = taxonomyCache;
+        this.storeCategoryResolver = storeCategoryResolver;
     }
 
     /**
@@ -64,6 +72,7 @@ public class MarketplaceOfferResolver {
         private final String storeId;
         private Map<String, String> categoryNamesById;
         private List<Product> catalogProducts;
+        private Map<String, String> storeCategoryNamesByPimCategoryId;
 
         private StoreOffers(String storeId) {
             this.storeId = storeId;
@@ -127,7 +136,36 @@ public class MarketplaceOfferResolver {
                     .filter(Objects::nonNull)
                     .distinct()
                     .toList();
-            return eans.isEmpty() ? Optional.empty() : Optional.of(ResolvedOffer.linked(eans));
+            return eans.isEmpty() ? Optional.empty() : Optional.of(linked(eans));
+        }
+
+        /** What a line linked to these unified EANs gets: the EANs, and the category the taxonomy gives the goods. */
+        public ResolvedOffer linked(List<String> eans) {
+            return ResolvedOffer.linked(eans, taxonomyCategory(eans));
+        }
+
+        /**
+         * The category of the first EAN the taxonomy knows with a category (one still waiting for its category is
+         * skipped), named as the store calls the PIM category in its catalogs, else as the taxonomy does; null when none
+         * is known. The same rule as a warehouse item's category, so the goods keep one category from order to stock.
+         */
+        private String taxonomyCategory(List<String> eans) {
+            for (String ean : eans) {
+                Taxonomy taxonomy = taxonomyCache.findByEan(ean);
+                if (TaxonomyCache.hasCategory(taxonomy)) {
+                    String storeName = StringUtils.isBlank(taxonomy.categoryId()) ? null
+                            : storeCategoryNames().get(taxonomy.categoryId());
+                    return StringUtils.isNotBlank(storeName) ? storeName : taxonomy.category();
+                }
+            }
+            return null;
+        }
+
+        private Map<String, String> storeCategoryNames() {
+            if (storeCategoryNamesByPimCategoryId == null) {
+                storeCategoryNamesByPimCategoryId = storeCategoryResolver.categoryNamesByPimCategoryId(storeId);
+            }
+            return storeCategoryNamesByPimCategoryId;
         }
 
         private ResolvedOffer fromEntry(PimEntry entry, Source source) {

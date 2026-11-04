@@ -41,7 +41,7 @@ class MarketplaceOrderImporterScopeTest {
     private String importedLineCategory(String storeId) {
         org.springframework.test.util.ReflectionTestUtils.setField(importer, "offerResolver", new MarketplaceOfferResolver(
                 null, ScopedPimCatalog.of(ScopedPimCatalog.storeEntry("s1-2", "s1", ScopedPimCatalog.STORE_GTIN, MPN, "Monitors")),
-                null, null, null));
+                null, null, null, null, null));
         Store store = new Store();
         store.setStoreId(storeId);
         store.setFulfilmentConfiguration(new FulfilmentConfiguration());

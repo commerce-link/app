@@ -25,15 +25,19 @@ public record ResolvedOffer(String pimId, String ean, String mfn, String categor
         this(pimId, ean, mfn, category, source, List.of());
     }
 
-    /** A link's unified EANs, in the marketplace's order: the first is the item's EAN, the rest its alternatives. */
-    static ResolvedOffer linked(List<String> eans) {
-        return new ResolvedOffer(null, eans.get(0), null, null, Source.LINK, eans.subList(1, eans.size()));
+    /**
+     * A link's unified EANs, in the marketplace's order: the first is the item's EAN, the rest its alternatives.
+     *
+     * @param category the store's category name for the goods, or null to leave the item's own
+     */
+    static ResolvedOffer linked(List<String> eans, String category) {
+        return new ResolvedOffer(null, eans.get(0), null, category, Source.LINK, eans.subList(1, eans.size()));
     }
 
     public enum Source {
         /**
-         * An explicit link from the seller offer key to EANs: only the EANs are set, with no pimId, manufacturer code or
-         * category (fulfilment fills the manufacturer code from the offer it picks).
+         * An explicit link from the seller offer key to EANs: the EANs and, where the taxonomy knows the goods, their
+         * category; no pimId or manufacturer code (fulfilment fills the code from the offer it picks).
          */
         LINK,
         /** The seller offer key is our own pimId, published by CommerceLink. */

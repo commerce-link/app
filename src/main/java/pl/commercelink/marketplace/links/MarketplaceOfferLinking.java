@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
  * The operator's "Link to product" on an order item whose marketplace offer was not recognised: saves a MANUAL offer
  * link to an EAN, either a catalog product's or one typed in (the goods need not be in a catalog, fulfilment finds them
  * by EAN), so later imports resolve the offer, and fills this item and the store's other New items carrying the same
- * offer key exactly as the next import would. Items already in fulfilment are left to the operator, as with
+ * offer key exactly as the next import would (the EAN, and the category the taxonomy gives it). Items already in fulfilment are left to the operator, as with
  * "Assign SKU"; the link is saved regardless.
  */
 @Slf4j
@@ -121,7 +121,7 @@ public class MarketplaceOfferLinking {
                 MarketplaceOfferLinkSource.MANUAL, userId, clock.instant()));
 
         // what the next import gives a line of this offer, so filled items look like newly imported ones
-        ResolvedOffer offer = ResolvedOffer.linked(List.of(ean));
+        ResolvedOffer offer = resolver.forStore(storeId).linked(List.of(ean));
         int updated = 0;
         for (OrderItem item : itemsWithTheKey(storeId, order, marketplace, offerKey)) {
             if (!item.isNew() || item.isGroup()) {
