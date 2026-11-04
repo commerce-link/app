@@ -34,12 +34,16 @@ class InventoryAutoDiscovery {
 
     /** @param pim the PIM view to match known entries in: a store's own inventory uses that store's view */
     Collection<MatchedInventory> run(List<InventoryItem> inventoryItems, PimView pim) {
+        SharedManufacturerCodes sharedCodes = SharedManufacturerCodes.of(inventoryItems);
+
         // Build a mapping of EANs and product codes to inventory items for quick lookup
         Map<String, List<InventoryItem>> mappedByEan = new HashMap<>();
         Map<String, List<InventoryItem>> mappedByProductCode = new HashMap<>();
         for (InventoryItem inventoryItem : inventoryItems) {
             mappedByEan.computeIfAbsent(inventoryItem.ean(), k -> new LinkedList<>()).add(inventoryItem);
-            mappedByProductCode.computeIfAbsent(inventoryItem.mfn(), k -> new LinkedList<>()).add(inventoryItem);
+            if (!sharedCodes.isShared(inventoryItem)) {
+                mappedByProductCode.computeIfAbsent(inventoryItem.mfn(), k -> new LinkedList<>()).add(inventoryItem);
+            }
         }
 
         // Resolve already known mappings based on the PIM index
@@ -64,6 +68,9 @@ class InventoryAutoDiscovery {
 
             for (InventoryItem itemByEan : items) {
                 matchingItems.add(itemByEan);
+                if (sharedCodes.isShared(itemByEan)) {
+                    continue;
+                }
                 mappedByProductCode.getOrDefault(itemByEan.mfn(), Collections.emptyList()).stream()
                         .filter(itemByMfn -> itemByMfn.isOfBrand(itemByEan.brand()))
                         .forEach(matchingItems::add);

@@ -17,6 +17,7 @@ import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
@@ -331,6 +332,89 @@ class InventoryAutoDiscoveryTest {
                 .satisfies(m -> assertThat(m.getInventoryItems()).containsExactlyInAnyOrder(kingstonA, kingstonB));
         assertThat(result).filteredOn(m -> m.getInventoryKey().getId() == null).singleElement()
                 .satisfies(m -> assertThat(m.getInventoryItems()).containsExactlyInAnyOrder(lexarA, lexarB));
+    }
+
+    @Test
+    void sizesUnderOneModelCodeStayApart() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        InventoryItem size40 = item("EAN40", "RNR1/100", 300, "Action", "TYR");
+        InventoryItem size41 = item("EAN41", "RNR1/100", 300, "Action", "TYR");
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(List.of(size40, size41));
+
+        // then
+        assertThat(result).extracting(m -> List.copyOf(m.getInventoryItems()))
+                .containsExactlyInAnyOrder(List.of(size40), List.of(size41));
+    }
+
+    @Test
+    void brandNameAsCodeDoesNotJoinProducts() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        InventoryItem cable = item("EAN1", "PROOVE", 20, "Morele", "Proove");
+        InventoryItem charger = item("EAN2", "PROOVE", 60, "Morele", "Proove");
+        InventoryItem cableElsewhere = item("EAN1", "PROOVE", 21, "B", "Proove");
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(List.of(cable, charger, cableElsewhere));
+
+        // then
+        assertThat(result).extracting(m -> Set.copyOf(m.getInventoryItems()))
+                .containsExactlyInAnyOrder(Set.of(cable, cableElsewhere), Set.of(charger));
+    }
+
+    @Test
+    void codeSharedAtOneSupplierStillJoinsOffersOfAnother() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        InventoryItem sharedFirst = item("EAN1", "X1", 100, "A", "Kingston");
+        InventoryItem sharedSecond = item("EAN2", "X1", 100, "A", "Kingston");
+        InventoryItem fromB = item("EAN3", "X1", 100, "B", "Kingston");
+        InventoryItem fromC = item("EAN4", "X1", 105, "C", "Kingston");
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(List.of(sharedFirst, sharedSecond, fromB, fromC));
+
+        // then
+        assertThat(result).extracting(m -> Set.copyOf(m.getInventoryItems()))
+                .containsExactlyInAnyOrder(Set.of(sharedFirst), Set.of(sharedSecond), Set.of(fromB, fromC));
+    }
+
+    @Test
+    void codeOfOneEanPerBrandAtASupplierStillJoins() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        InventoryItem maclean = item("EAN1", "3", 10, "A", "Maclean");
+        InventoryItem otherBrand = item("EAN2", "3", 50, "A", "Other");
+        InventoryItem macleanElsewhere = item("EAN3", "3", 11, "B", "Maclean");
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(List.of(maclean, otherBrand, macleanElsewhere));
+
+        // then
+        assertThat(result).extracting(m -> Set.copyOf(m.getInventoryItems()))
+                .containsExactlyInAnyOrder(Set.of(maclean, macleanElsewhere), Set.of(otherBrand));
+    }
+
+    @Test
+    void pimEntryDoesNotTakeOffersUnderASharedCode() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of(pimEntry("PIM1", "Kingston", gtin("EAN9"), mpn("X1"))));
+        InventoryItem sharedFirst = item("EAN1", "X1", 100, "A", "Kingston");
+        InventoryItem sharedSecond = item("EAN2", "X1", 100, "A", "Kingston");
+        InventoryItem fromB = item("EAN3", "X1", 100, "B", "Kingston");
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(List.of(sharedFirst, sharedSecond, fromB));
+
+        // then
+        assertThat(result).filteredOn(m -> "PIM1".equals(m.getInventoryKey().getId())).singleElement()
+                .satisfies(m -> assertThat(m.getInventoryItems()).containsExactly(fromB));
+        assertThat(result).filteredOn(m -> m.getInventoryKey().getId() == null)
+                .extracting(m -> List.copyOf(m.getInventoryItems()))
+                .containsExactlyInAnyOrder(List.of(sharedFirst), List.of(sharedSecond));
     }
 
     private InventoryItem item(String ean, String mfn, double netPrice, String supplier) {
