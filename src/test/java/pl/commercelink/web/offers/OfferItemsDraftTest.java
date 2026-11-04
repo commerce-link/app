@@ -78,18 +78,33 @@ class OfferItemsDraftTest {
     }
 
     @Test
-    void anInventoryEntryWithoutOffersAndWithoutACodeIsSkipped() {
+    void anInventoryEntryWithoutOffersAndWithoutAnEanIsSkipped() {
         // given
         Basket basket = basket(true);
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        when(inventoryView.findByInventoryKey(any())).thenReturn(MatchedInventory.empty(new InventoryKey("EAN-X", "")));
+        when(inventoryView.findByInventoryKey(any())).thenReturn(MatchedInventory.empty(new InventoryKey("", "MFN-X")));
 
         // when
-        int skipped = draft.add(basket, form(AddItemsForm.Entry.fromInventory("EAN-X", "", 1)));
+        int skipped = draft.add(basket, form(AddItemsForm.Entry.fromInventory("", "MFN-X", 1)));
 
         // then
         assertThat(skipped).isEqualTo(1);
         assertThat(basket.getBasketItems()).isEmpty();
+    }
+
+    @Test
+    void anInventoryEntryWithOnlyAnEanAndNoOffersIsAdded() {
+        // given
+        Basket basket = basket(true);
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        when(inventoryView.findByInventoryKey(any())).thenReturn(MatchedInventory.empty(new InventoryKey("5901234123457", "")));
+
+        // when
+        int skipped = draft.add(basket, form(AddItemsForm.Entry.fromInventory("5901234123457", "", 1)));
+
+        // then
+        assertThat(skipped).isZero();
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getSku).containsExactly("5901234123457");
     }
 
     @Test
@@ -102,16 +117,16 @@ class OfferItemsDraftTest {
         when(productCatalogRepository.findById(STORE_ID, "cat-1"))
                 .thenReturn(catalog(definition("Case", 1), definition("PSU", 5)));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        when(inventoryView.findByInventoryKey(any())).thenReturn(MatchedInventory.empty(new InventoryKey("", "MFN-INV")));
+        when(inventoryView.findByInventoryKey(any())).thenReturn(MatchedInventory.empty(new InventoryKey("EAN-INV", "MFN-INV")));
 
         // when
         int skipped = draft.add(basket, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-case", 2),
-                AddItemsForm.Entry.fromInventory("", "MFN-INV", 1)));
+                AddItemsForm.Entry.fromInventory("EAN-INV", "MFN-INV", 1)));
 
         // then
         assertThat(skipped).isZero();
         assertThat(basket.getBasketItems()).extracting(BasketItem::getSku).startsWith("EAN-pim-case", "MFN-PSU")
-                .contains("MFN-INV");
+                .contains("EAN-INV");
         assertThat(basket.getBasketItems().get(0).getQty()).isEqualTo(2);
         assertThat(basket.getBasketItems()).filteredOn(i -> !i.getSku().equals("MFN-PSU"))
                 .allMatch(BasketItem::isConsolidated);

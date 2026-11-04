@@ -251,7 +251,7 @@ public class BasketItem {
 
     public static BasketItem of(MatchedInventory matchedInventory, long qty, boolean consolidated) {
         if (!matchedInventory.hasAnyOffers()) {
-            return BasketItem.missing(matchedInventory.getInventoryKey().getProductCodes().iterator().next(), qty, consolidated);
+            return BasketItem.missing(matchedInventory.getInventoryKey().getProductEans().iterator().next(), qty, consolidated);
         } else {
             Taxonomy taxonomy = matchedInventory.getTaxonomy();
             return new BasketItem(

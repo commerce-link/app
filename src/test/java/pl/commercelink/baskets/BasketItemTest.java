@@ -1,6 +1,7 @@
 package pl.commercelink.baskets;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
@@ -103,6 +104,19 @@ class BasketItemTest {
         BasketItem item = BasketItem.of(matched, 1, false);
 
         // then
+        assertThat(item.getSku()).isEqualTo("5901234123457");
+    }
+
+    @Test
+    void missingProductLineGetsTheTypedEan() {
+        // given
+        MatchedInventory matched = MatchedInventory.empty(new InventoryKey("5901234123457", "MZ-V9P1T0BW"));
+
+        // when
+        BasketItem item = BasketItem.of(matched, 1, false);
+
+        // then
+        assertThat(item.getName()).isEqualTo("Brak produktu");
         assertThat(item.getSku()).isEqualTo("5901234123457");
     }
 
