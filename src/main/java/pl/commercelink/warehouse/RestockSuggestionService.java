@@ -3,7 +3,6 @@ package pl.commercelink.warehouse;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.Inventory;
-import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.InventoryItem;
@@ -16,13 +15,10 @@ import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.warehouse.api.WarehouseItemView;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -30,7 +26,7 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class RestockSuggestionService {
 
-    private static final int MAX_DELIVERY_SUGGESTIONS = 50;
+    private static final int MAX_DELIVERY_SUGGESTIONS = 25;
 
     private final Inventory inventory;
     private final StockLevels stockLevels;
@@ -38,7 +34,7 @@ public class RestockSuggestionService {
     private final StoresRepository storesRepository;
     private final Warehouse warehouse;
 
-    public List<RestockSuggestion> suggestForDelivery(String storeId, String supplier, Set<String> excludedMfns) {
+    public List<RestockSuggestion> suggestForDelivery(String storeId, String supplier, Set<String> excludedEans) {
         Store store = storesRepository.findById(storeId);
         if (store == null || !store.isEnabledSupplier(supplier)) {
             return new ArrayList<>();
@@ -48,7 +44,7 @@ public class RestockSuggestionService {
                 .map(ProductCatalog::getCatalogId)
                 .collect(Collectors.toList());
 
-        List<RestockSuggestion> suggestions = suggest(storeId, catalogIds, null, RestockScope.WholeCatalog, false, supplier, excludedMfns, true)
+        List<RestockSuggestion> suggestions = suggest(storeId, catalogIds, null, RestockScope.WholeCatalog, false, supplier, excludedEans, true)
                 .stream()
                 .filter(s -> s.getPriceCategory() != null)
                 .sorted(Comparator.comparing(RestockSuggestion::getPriceCategory)
@@ -71,30 +67,34 @@ public class RestockSuggestionService {
     }
 
     private List<RestockSuggestion> suggest(String storeId, List<String> catalogIds, String categoryId, RestockScope scope,
-                                            boolean onlyMissingItems, String supplier, Set<String> excludedMfns,
+                                            boolean onlyMissingItems, String supplier, Set<String> excludedEans,
                                             boolean onlyDeliverySuggestionCategories) {
         InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(storeId, SupplierScope.FULFILMENT);
 
-        Map<String, RestockSuggestion> suggestionsByMfn = new LinkedHashMap<>();
+        List<StockProductLevel> suggestedLevels = new ArrayList<>();
+        List<RestockSuggestion> suggestions = new ArrayList<>();
 
         for (String catalogId : catalogIds) {
             for (StockProductLevel level : stockLevels.calculate(storeId, catalogId, categoryId, scope, onlyMissingItems, onlyDeliverySuggestionCategories)) {
-                String mfn = level.getManufacturerCode().toLowerCase();
-                if (excludedMfns.contains(mfn) || suggestionsByMfn.containsKey(mfn)) {
+                if (suggestedLevels.stream().anyMatch(s -> s.inventoryKey().matches(level.inventoryKey()))) {
                     continue;
                 }
                 if (scope == RestockScope.ExpectedStockQty && !level.qualifiesForRestock()) {
                     continue;
                 }
 
-                MatchedInventory matched = enabledInventory.findByInventoryKey(InventoryKey.fromPimIdAndEan(level.getPimId(), level.getEan()));
+                MatchedInventory matched = enabledInventory.findByInventoryKey(level.inventoryKey());
+                Collection<String> productEans = productEans(level, matched);
+                if (productEans.stream().anyMatch(excludedEans::contains)) {
+                    continue;
+                }
                 InventoryItem offer = findCheapestOffer(matched, supplier);
 
-                suggestionsByMfn.put(mfn, new RestockSuggestion(level, offer, categorize(level, offer)));
+                suggestedLevels.add(level);
+                suggestions.add(new RestockSuggestion(level, offer, categorize(level, offer), productEans));
             }
         }
 
-        List<RestockSuggestion> suggestions = new ArrayList<>(suggestionsByMfn.values());
         suggestions.sort(Comparator
                 .comparing((RestockSuggestion s) -> s.getCategory() != null ? s.getCategory() : "")
                 .thenComparing(s -> s.getName() != null ? s.getName() : ""));
@@ -114,6 +114,10 @@ public class RestockSuggestionService {
                 .orElse(null);
     }
 
+    private static Collection<String> productEans(StockProductLevel level, MatchedInventory matched) {
+        return matched == null ? level.inventoryKey().getProductEans() : matched.getInventoryKey().getProductEans();
+    }
+
     private RestockPriceCategory categorize(StockProductLevel level, InventoryItem offer) {
         if (offer == null) {
             return null;
@@ -126,26 +130,19 @@ public class RestockSuggestionService {
             return suggestions;
         }
 
-        Set<String> mfnsToCheck = new HashSet<>();
-        for (RestockSuggestion suggestion : suggestions) {
-            mfnsToCheck.add(suggestion.getManufacturerCode());
-            if (suggestion.getOfferMfn() != null) {
-                mfnsToCheck.add(suggestion.getOfferMfn());
-            }
-        }
+        Set<String> eansToCheck = suggestions.stream()
+                .flatMap(s -> s.productEans().stream())
+                .collect(Collectors.toSet());
 
-        Set<String> inStockMfns = warehouse.stockQueryService(storeId)
-                .searchByMfns(storeId, mfnsToCheck)
+        Set<String> inStockEans = warehouse.stockQueryService(storeId)
+                .searchByEans(storeId, eansToCheck)
                 .stream()
                 .filter(item -> item.getQty() > 0)
-                .map(WarehouseItemView::getMfn)
-                .filter(Objects::nonNull)
-                .map(String::toLowerCase)
+                .map(WarehouseItemView::getEan)
                 .collect(Collectors.toSet());
 
         return suggestions.stream()
-                .filter(s -> !inStockMfns.contains(s.getManufacturerCode().toLowerCase()))
-                .filter(s -> s.getOfferMfn() == null || !inStockMfns.contains(s.getOfferMfn().toLowerCase()))
+                .filter(s -> s.productEans().stream().noneMatch(inStockEans::contains))
                 .collect(Collectors.toList());
     }
 

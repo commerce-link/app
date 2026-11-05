@@ -28,9 +28,9 @@ class WarehouseRepositoryTest {
     }
 
     @Test
-    void findAllByMfnsReturnsEmptyWithoutQueryingForEmptyMfns() {
+    void findAllByEansReturnsEmptyWithoutQueryingForEmptyEans() {
         // given / when
-        List<WarehouseItem> result = repository.findAllByMfns("store-1", List.of());
+        List<WarehouseItem> result = repository.findAllByEans("store-1", List.of());
 
         // then
         assertThat(result).isEmpty();

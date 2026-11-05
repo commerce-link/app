@@ -55,14 +55,29 @@ class BuiltInStockQueryServiceTest {
         // given
         WarehouseItem openBox = anAvailableItem(20.0);
         openBox.setCondition(ItemCondition.OpenBox);
-        when(warehouseRepository.findAllByMfns("store-1", List.of("MFN-1"))).thenReturn(List.of(openBox));
+        when(warehouseRepository.findAllByEans("store-1", List.of("5901234123457"))).thenReturn(List.of(openBox));
 
         // when
         List<WarehouseItemView> views = new BuiltInStockQueryService(warehouseRepository)
-                .searchByMfns("store-1", List.of("MFN-1"));
+                .searchByEans("store-1", List.of("5901234123457"));
 
         // then
         assertEquals(0, views.size());
+    }
+
+    @Test
+    void reservedItemOfTheProductCountsAsStock() {
+        // given
+        WarehouseItem reserved = anAvailableItem(20.0);
+        reserved.setStatus(FulfilmentStatus.Reserved);
+        when(warehouseRepository.findAllByEans("store-1", List.of("5901234123457"))).thenReturn(List.of(reserved));
+
+        // when
+        List<WarehouseItemView> views = new BuiltInStockQueryService(warehouseRepository)
+                .searchByEans("store-1", List.of("5901234123457"));
+
+        // then
+        assertThat(views).extracting(WarehouseItemView::getItemId).containsExactly(reserved.getItemId());
     }
 
     @Test

@@ -3,6 +3,8 @@ package pl.commercelink.warehouse;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.inventory.supplier.InventoryItem;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RestockSuggestionTest {
@@ -13,7 +15,7 @@ class RestockSuggestionTest {
         StockProductLevel level = new StockProductLevel("GPU", null, null, "MFN-1", "GPU", 0, 0, 1);
         level.setRestockPriceLowest(81.63);
         InventoryItem offer = new InventoryItem("EAN", "MFN-1", 81.63, "PLN", 5, 1, "Action");
-        RestockSuggestion suggestion = new RestockSuggestion(level, offer, RestockPriceCategory.LowestPrice);
+        RestockSuggestion suggestion = new RestockSuggestion(level, offer, RestockPriceCategory.LowestPrice, List.of());
 
         // when
         double gross = suggestion.restockPriceGrossFor(RestockPriceCategory.LowestPrice);

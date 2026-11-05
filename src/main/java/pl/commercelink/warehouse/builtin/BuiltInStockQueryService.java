@@ -31,8 +31,8 @@ class BuiltInStockQueryService implements StockQueryService {
     }
 
     @Override
-    public List<WarehouseItemView> searchByMfns(String storeId, Collection<String> mfns) {
-        return warehouseRepository.findAllByMfns(storeId, mfns)
+    public List<WarehouseItemView> searchByEans(String storeId, Collection<String> eans) {
+        return warehouseRepository.findAllByEans(storeId, eans)
                 .stream()
                 .filter(WarehouseItem::isSealed)
                 .filter(e -> !e.hasOneOfTheStatuses(
