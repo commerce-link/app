@@ -1,6 +1,7 @@
 package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.externaloffers.ExternalOfferLinking;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -61,6 +62,34 @@ class OrderDetailsMessagesTest {
 
         // then
         assertThat(missing).isEmpty();
+    }
+
+    @Test
+    void theOfferLinkRefusalsAndOutcomeExistInBothBundles() throws IOException {
+        // given
+        Properties pl = load("messages_pl.properties"), en = load("messages_en.properties");
+        List<String> keys = List.of(
+                ExternalOfferLinking.NO_OFFER_KEY,
+                ExternalOfferLinking.NOT_A_MARKETPLACE_ORDER,
+                ExternalOfferLinking.PRODUCT_NOT_IN_CATALOG,
+                ExternalOfferLinking.INVALID_EAN,
+                ExternalOfferLinking.OWN_OFFER,
+                "order.item.menu.change.offer.link",
+                "order.item.link.offer.change.title",
+                "order.item.link.offer.current",
+                "order.item.link.offer.change.submit",
+                "order.item.link.offer.search.placeholder",
+                "order.item.link.offer.done");
+
+        // then
+        for (Properties bundle : List.of(pl, en)) {
+            assertThat(keys).allSatisfy(key -> assertThat(bundle.getProperty(key)).as(key).isNotBlank());
+            assertThat(bundle.getProperty("order.item.link.offer.done")).contains("{0}");
+            assertThat(bundle.getProperty("order.item.link.offer.search.placeholder")).contains("EAN");
+            // a link is never refused for an EAN other products share: they are the same goods to fulfilment
+            assertThat(bundle.getProperty("order.item.link.offer.conflict")).isNull();
+            assertThat(bundle.getProperty("order.item.link.offer.unrecognised")).isNull();
+        }
     }
 
     @Test

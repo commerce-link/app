@@ -77,12 +77,7 @@ public class MarketplaceOrdersImportEventListener {
         List<MarketplaceOrder> orders = provider.fetchOrders();
         long fetchDurationInMs = elapsed.inMillis();
 
-        int imported = 0;
-        for (MarketplaceOrder order : orders) {
-            if (marketplaceOrderImporter.importOrder(store, marketplace, order)) {
-                imported++;
-            }
-        }
+        int imported = marketplaceOrderImporter.importOrders(store, marketplace, orders);
 
         store.updateLastFetchedAt(marketplace);
         storesRepository.save(store);

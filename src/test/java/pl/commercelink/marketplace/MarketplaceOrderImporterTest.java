@@ -1,7 +1,7 @@
 package pl.commercelink.marketplace;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -13,12 +13,14 @@ import org.mockito.quality.Strictness;
 import pl.commercelink.marketplace.api.MarketplaceCustomer;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProduct;
+import pl.commercelink.externaloffers.ExternalOfferResolver;
+import pl.commercelink.externaloffers.ResolvedOffer;
+import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.ShippingDetails;
-import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.shipping.CarrierDictionary;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Integration;
@@ -37,7 +39,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,22 +53,20 @@ class MarketplaceOrderImporterTest {
     private CarrierDictionary carrierDictionary = dictionaryForMorele();
 
     @Mock
-    private PimCatalog pimCatalog;
-    @Mock
-    private PimView pimView;
+    private OrdersManager ordersManager;
 
     @Mock
-    private OrdersManager ordersManager;
+    private ExternalOfferResolver offerResolver;
+    @Mock
+    private ExternalOfferResolver.StoreOffers storeOffers;
 
     @InjectMocks
     private MarketplaceOrderImporter importer;
 
-    @org.junit.jupiter.api.BeforeEach
-    void pimStoreViewIsTheCatalog() {
-        org.mockito.Mockito.lenient().when(pimCatalog.withStoreData(org.mockito.ArgumentMatchers.any())).thenReturn(pimView);
-        org.mockito.Mockito.lenient().when(pimCatalog.withGlobalData()).thenReturn(pimView);
+    @BeforeEach
+    void linesResolveThroughTheStoresOffers() {
+        when(offerResolver.forStore(any())).thenReturn(storeOffers);
     }
-
 
     private static CarrierDictionary dictionaryForMorele() {
         CarrierDictionary dictionary = new CarrierDictionary();
@@ -235,7 +238,6 @@ class MarketplaceOrderImporterTest {
     @Test
     void setsTheExternalItemIdOnProductItemsButNotOnTheShippingItem() {
         // given
-        when(pimView.findByMpn(anyString())).thenReturn(Optional.empty());
         Store store = new Store();
         store.setFulfilmentConfiguration(new FulfilmentConfiguration());
         MarketplaceOrder marketplaceOrder = orderWithProduct("SKU-1");
@@ -254,7 +256,6 @@ class MarketplaceOrderImporterTest {
     @Test
     void storesTheMarketplaceKeyVerbatimEvenWhenItIsLowercase() {
         // given: pimId-shaped seller SKU — UniqueIdentifierGenerator emits 10 lowercase alphanumerics
-        when(pimView.findByMpn(anyString())).thenReturn(Optional.empty());
         Store store = new Store();
         store.setFulfilmentConfiguration(new FulfilmentConfiguration());
         MarketplaceOrder order = orderWithProduct("k7m2xq9pz4");
@@ -269,7 +270,6 @@ class MarketplaceOrderImporterTest {
 
     @Test
     void storesTheMarketplaceShippingDateAsThePreferredOne() {
-        when(pimView.findByMpn(anyString())).thenReturn(Optional.empty());
         Store store = new Store();
         store.setFulfilmentConfiguration(new FulfilmentConfiguration());
         MarketplaceOrder base = orderWithProduct("SKU-1");
@@ -283,6 +283,218 @@ class MarketplaceOrderImporterTest {
         verify(ordersManager).saveWithFulfilment(orderCaptor.capture(), any());
         assertEquals(LocalDate.of(2026, 9, 10), orderCaptor.getValue().getPreferredShippingAt());
         assertNull(orderCaptor.getValue().getEstimatedShippingAt());
+    }
+
+    @Test
+    void fillsALinkedLineWithItsEanAndTheTaxonomyCategory() {
+        // given
+        when(storeOffers.resolve("Empik", "PS-8001", "DMW-2001"))
+                .thenReturn(Optional.of(new ResolvedOffer(null, "2000000001012", null, "Lampy", ResolvedOffer.Source.LINK)));
+
+        // when
+        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("DMW-2001", "PS-8001"));
+
+        // then
+        OrderItem item = productItem();
+        assertEquals("2000000001012", item.getSku());
+        assertNull(item.getManufacturerCode());
+        assertEquals("2000000001012", item.getEan());
+        assertEquals("Lampy", item.getCategory());
+        assertEquals("DMW-2001", item.getExternalItemId());
+        assertEquals("PS-8001", item.getExternalOfferKey());
+    }
+
+    @Test
+    void fillsALinkedLineWithTheLinksEansOnly() {
+        // given a link to two EANs of the same goods, which need not be in a catalog
+        when(storeOffers.resolve("Empik", "PS-1", "DMW-2001")).thenReturn(Optional.of(new ResolvedOffer(null,
+                "2000000001012", null, null, ResolvedOffer.Source.LINK, List.of("2000000001029"))));
+
+        // when
+        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("DMW-2001", "PS-1"));
+
+        // then fulfilment looks the goods up under either EAN and fills the manufacturer code itself
+        OrderItem item = productItem();
+        assertEquals("2000000001012:2000000001029", item.getSku());
+        assertEquals("2000000001012", item.getEan());
+        assertNull(item.getManufacturerCode());
+        assertEquals(Categories.UNCATEGORIZED, item.getCategory());
+        assertEquals("DMW-2001", item.getExternalItemId());
+        assertFalse(item.hasUnlinkedExternalOffer());
+    }
+
+    @Test
+    void everyResolvedLineTakesItsEanAsTheSkuAndKeepsItsManufacturerCode() {
+        // given
+        when(storeOffers.resolve("Empik", "k7m2xq9pz4", "DMW-2001"))
+                .thenReturn(Optional.of(new ResolvedOffer("k7m2xq9pz4", "2000000001012", "MFN-2001", "Lampy", ResolvedOffer.Source.OWN_OFFER)));
+        when(storeOffers.resolve("Allegro", null, "ab 12"))
+                .thenReturn(Optional.of(new ResolvedOffer("pim-1", "2000000001029", "ab 12", "Monitors", ResolvedOffer.Source.MFN)));
+
+        // when
+        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("DMW-2001", "k7m2xq9pz4"));
+        importer.importOrder(storeWithId("store-1"), "Allegro", orderWithProduct("ab 12"));
+
+        // then
+        ArgumentCaptor<List<OrderItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(ordersManager, times(2)).saveWithFulfilment(any(), itemsCaptor.capture());
+        List<OrderItem> lines = itemsCaptor.getAllValues().stream()
+                .flatMap(List::stream).filter(i -> !i.isService()).toList();
+        assertEquals(2, lines.size());
+        assertEquals("2000000001012", lines.get(0).getSku());
+        assertEquals("2000000001012", lines.get(0).getEan());
+        assertEquals("MFN-2001", lines.get(0).getManufacturerCode());
+        assertEquals("2000000001029", lines.get(1).getSku());
+        assertEquals("2000000001029", lines.get(1).getEan());
+        assertEquals("AB12", lines.get(1).getManufacturerCode());
+        assertEquals("ab 12", lines.get(1).getExternalItemId());
+        assertNull(lines.get(1).getExternalOfferKey());
+        assertFalse(lines.get(1).hasUnlinkedExternalOffer());
+    }
+
+    @Test
+    void aResolvedLineWithoutAnEanKeepsItsManufacturerCodeAsTheSku() {
+        // given the PIM entry the code matched has no GTIN
+        when(storeOffers.resolve("Allegro", null, "ab 12"))
+                .thenReturn(Optional.of(new ResolvedOffer("pim-1", null, "ab 12", "Monitors", ResolvedOffer.Source.MFN)));
+
+        // when
+        importer.importOrder(storeWithId("store-1"), "Allegro", orderWithProduct("ab 12"));
+
+        // then
+        OrderItem item = productItem();
+        assertEquals("AB12", item.getSku());
+        assertNull(item.getEan());
+        assertEquals("Monitors", item.getCategory());
+    }
+
+    @Test
+    void leavesItemUncategorizedAndRemembersOfferKeyWhenUnresolved() {
+        // given
+        when(storeOffers.resolve(anyString(), anyString(), anyString())).thenReturn(Optional.empty());
+
+        // when
+        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("DMW-2001", "PS-8001"));
+
+        // then
+        OrderItem item = productItem();
+        assertEquals(Categories.UNCATEGORIZED, item.getCategory());
+        assertEquals("DMW-2001", item.getSku());
+        assertEquals("PS-8001", item.getExternalOfferKey());
+        assertTrue(item.hasUnlinkedExternalOffer());
+    }
+
+    @Test
+    void resolvesTwoLinesWithTheSameOfferKey() {
+        // given
+        when(storeOffers.resolve(anyString(), anyString(), anyString()))
+                .thenReturn(Optional.of(new ResolvedOffer(null, "2000000001012", null, "Lampy", ResolvedOffer.Source.LINK)));
+        MarketplaceOrder base = orderWithProduct("DMW-2001", "PS-8001");
+        MarketplaceProduct first = base.products().get(0);
+        MarketplaceOrder order = new MarketplaceOrder(base.externalOrderId(), base.customer(), List.of(first, first),
+                base.shipping(), base.paymentType(), base.paymentTransactionId());
+
+        // when
+        importer.importOrder(storeWithId("store-1"), "Empik", order);
+
+        // then
+        List<OrderItem> products = capturedOrderItems().stream().filter(i -> !i.isService()).toList();
+        assertEquals(2, products.size());
+        assertEquals("2000000001012", products.get(0).getSku());
+        assertEquals("2000000001012", products.get(1).getSku());
+    }
+
+    @Test
+    void anAlreadyImportedOrderIsNeitherResolvedNorSavedAgain() {
+        // given
+        when(ordersManager.isAlreadyImported("store-1", "mp-order-1")).thenReturn(true);
+
+        // when
+        boolean imported = importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("DMW-2001", "PS-8001"));
+
+        // then
+        assertFalse(imported);
+        // the store scope reads the catalogs lazily, so creating it costs nothing; no line is resolved
+        verifyNoInteractions(storeOffers);
+        verify(ordersManager, never()).saveWithFulfilment(any(), any());
+    }
+
+    @Test
+    void importsOneFetchInOneStoreScopeForAllItsOrders() {
+        // given three orders of one fetch, one of them already imported
+        MarketplaceOrder first = renamed(orderWithProduct("DMW-2001", "PS-1"), "mp-order-1");
+        MarketplaceOrder second = renamed(orderWithProduct("DMW-2002", "PS-2"), "mp-order-2");
+        MarketplaceOrder known = renamed(orderWithProduct("DMW-2003", "PS-3"), "mp-order-3");
+        when(ordersManager.isAlreadyImported("store-1", "mp-order-3")).thenReturn(true);
+        when(ordersManager.saveWithFulfilment(any(), any())).thenReturn(true);
+
+        // when
+        int imported = importer.importOrders(storeWithId("store-1"), "Empik", List.of(first, second, known));
+
+        // then
+        assertEquals(2, imported);
+        verify(offerResolver, times(1)).forStore("store-1");
+        verify(storeOffers).resolve("Empik", "PS-1", "DMW-2001");
+        verify(storeOffers).resolve("Empik", "PS-2", "DMW-2002");
+        verify(storeOffers, never()).resolve("Empik", "PS-3", "DMW-2003");
+    }
+
+    @Test
+    void resolvesAllLinesOfAnOrderInOneStoreScope() {
+        // given
+        when(storeOffers.resolve(anyString(), anyString(), anyString()))
+                .thenReturn(Optional.of(new ResolvedOffer(null, "2000000001012", null, "Lampy", ResolvedOffer.Source.LINK)));
+        MarketplaceOrder base = orderWithProduct("DMW-2001", "PS-8001");
+        MarketplaceProduct first = base.products().get(0);
+        MarketplaceProduct second = new MarketplaceProduct("Other", "DMW-2002", new BigDecimal("50.00"), 1,
+                BigDecimal.ZERO, "PS-8002");
+        MarketplaceOrder order = new MarketplaceOrder(base.externalOrderId(), base.customer(), List.of(first, second),
+                base.shipping(), base.paymentType(), base.paymentTransactionId());
+
+        // when
+        importer.importOrder(storeWithId("store-1"), "Empik", order);
+
+        // then
+        verify(offerResolver, times(1)).forStore("store-1");
+        verify(storeOffers, times(2)).resolve(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void aBlankOfferKeyIsStoredAsNoKey() {
+        // given
+        when(storeOffers.resolve("Empik", null, "DMW-2001")).thenReturn(Optional.empty());
+
+        // when
+        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("DMW-2001", "   "));
+
+        // then
+        OrderItem item = productItem();
+        assertNull(item.getExternalOfferKey());
+        assertFalse(item.hasUnlinkedExternalOffer());
+    }
+
+    private OrderItem productItem() {
+        return capturedOrderItems().stream().filter(i -> !i.isService()).findFirst().orElseThrow();
+    }
+
+    private static Store storeWithId(String storeId) {
+        Store store = new Store();
+        store.setStoreId(storeId);
+        store.setFulfilmentConfiguration(new FulfilmentConfiguration());
+        return store;
+    }
+
+    private static MarketplaceOrder orderWithProduct(String manufacturerCode, String sellerOfferKey) {
+        MarketplaceOrder base = orderWithProduct(manufacturerCode);
+        MarketplaceProduct product = new MarketplaceProduct("Widget", manufacturerCode, new BigDecimal("100.00"), 2,
+                BigDecimal.ZERO, sellerOfferKey);
+        return new MarketplaceOrder(base.externalOrderId(), base.customer(), List.of(product), base.shipping(),
+                base.paymentType(), base.paymentTransactionId());
+    }
+
+    private static MarketplaceOrder renamed(MarketplaceOrder order, String externalOrderId) {
+        return new MarketplaceOrder(externalOrderId, order.customer(), order.products(), order.shipping(),
+                order.paymentType(), order.paymentTransactionId());
     }
 
     private static MarketplaceOrder orderWithProduct(String manufacturerCode) {

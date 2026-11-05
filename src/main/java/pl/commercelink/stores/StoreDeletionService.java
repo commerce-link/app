@@ -102,6 +102,7 @@ public class StoreDeletionService {
         allSucceeded &= step(storeId, "order filters", () -> wipeRepository.deleteAll(wipeRepository.findOrderFilters(storeId)));
         allSucceeded &= step(storeId, "shipment trackings", () -> wipeRepository.deleteAll(wipeRepository.findShipmentTrackings(storeId)));
         allSucceeded &= step(storeId, "discount codes", () -> wipeRepository.deleteAll(wipeRepository.findDiscountCodes(storeId)));
+        allSucceeded &= step(storeId, "marketplace offer links", () -> wipeRepository.deleteAll(wipeRepository.findExternalOfferLinks(storeId)));
         if (store.getTrial() != null) {
             // The counts are billing data that outlive a deleted paying store; a trial is never billed.
             allSucceeded &= step(storeId, "schedule execution counts",

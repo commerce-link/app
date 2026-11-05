@@ -62,16 +62,34 @@ public class ProductRepository extends DynamoDbRepository<Product> {
                 .orElse(null);
     }
 
+    /**
+     * Every product of the category. One query page holds at most 1 MB, so a large category takes several pages, and
+     * every one of them is read: a caller deciding "not in the catalog" or "one product per EAN" needs all products.
+     */
     public List<Product> findAll(String categoryId) {
+        return findAll(categoryId, null);
+    }
+
+    /** As {@link #findAll(String)}, at most pageSize items a query page (null: DynamoDB's 1 MB page). */
+    List<Product> findAll(String categoryId, Integer pageSize) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":categoryId", new AttributeValue().withS(categoryId));
-
-        QueryRequest queryRequest = new QueryRequest()
-                .withTableName(TABLE)
-                .withKeyConditionExpression("categoryId = :categoryId")
-                .withExpressionAttributeValues(eav);
-
-        return query(queryRequest, Product.class);
+        List<Product> products = new ArrayList<>();
+        Map<String, AttributeValue> lastEvaluatedKey = null;
+        do {
+            QueryRequest queryRequest = new QueryRequest()
+                    .withTableName(TABLE)
+                    .withKeyConditionExpression("categoryId = :categoryId")
+                    .withExpressionAttributeValues(eav)
+                    .withLimit(pageSize)
+                    .withExclusiveStartKey(lastEvaluatedKey);
+            QueryResult queryResult = amazonDynamoDB.query(queryRequest);
+            for (Map<String, AttributeValue> item : queryResult.getItems()) {
+                products.add(dynamoDBMapper.marshallIntoObject(Product.class, item));
+            }
+            lastEvaluatedKey = queryResult.getLastEvaluatedKey();
+        } while (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty());
+        return products;
     }
 
     /**
@@ -153,14 +171,7 @@ public class ProductRepository extends DynamoDbRepository<Product> {
         List<String> categoryIds = getCategoryIds(catalog);
         List<Product> result = new ArrayList<>();
         for (String categoryId : categoryIds) {
-            Map<String, AttributeValue> eav = new HashMap<>();
-            eav.put(":categoryId", new AttributeValue().withS(categoryId));
-
-            QueryRequest queryRequest = new QueryRequest()
-                    .withTableName(TABLE)
-                    .withKeyConditionExpression("categoryId = :categoryId")
-                    .withExpressionAttributeValues(eav);
-            result.addAll(query(queryRequest, Product.class));
+            result.addAll(findAll(categoryId));
         }
         return result;
     }

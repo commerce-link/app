@@ -9,10 +9,10 @@ import pl.commercelink.marketplace.api.MarketplaceCustomer;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProduct;
 import pl.commercelink.marketplace.api.PickupPoint;
+import pl.commercelink.externaloffers.ExternalOfferResolver;
+import pl.commercelink.externaloffers.ResolvedOffer;
 import pl.commercelink.orders.*;
 import pl.commercelink.taxonomy.Categories;
-import pl.commercelink.pim.api.PimCatalog;
-import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.shipping.CarrierDictionary;
 import pl.commercelink.starter.util.CountryCodeConverter;
 import pl.commercelink.stores.IntegrationType;
@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 public class MarketplaceOrderImporter {
 
     @Autowired
-    private PimCatalog pimCatalog;
+    private ExternalOfferResolver offerResolver;
 
     @Autowired
     private OrdersManager ordersManager;
@@ -34,8 +34,36 @@ public class MarketplaceOrderImporter {
     @Autowired
     private CarrierDictionary carrierDictionary;
 
+    /**
+     * Imports one fetch of a marketplace's orders in one {@link ExternalOfferResolver.StoreOffers} scope, not one per
+     * order: what the scope reads (the store's catalog list, at most twice, and the taxonomy category of each EAN) is
+     * read for the whole fetch, since repeating it for every new order of a backlog could outlast the queue message.
+     *
+     * @return how many orders were new and saved
+     */
+    public int importOrders(Store store, String marketplaceName, List<MarketplaceOrder> marketplaceOrders) {
+        ExternalOfferResolver.StoreOffers offers = offerResolver.forStore(store.getStoreId());
+        int imported = 0;
+        for (MarketplaceOrder marketplaceOrder : marketplaceOrders) {
+            if (importOrder(store, marketplaceName, marketplaceOrder, offers)) {
+                imported++;
+            }
+        }
+        return imported;
+    }
+
     /** @return false when the marketplace order is already in the store and nothing was saved. */
     public boolean importOrder(Store store, String marketplaceName, MarketplaceOrder marketplaceOrder) {
+        return importOrder(store, marketplaceName, marketplaceOrder, offerResolver.forStore(store.getStoreId()));
+    }
+
+    private boolean importOrder(Store store, String marketplaceName, MarketplaceOrder marketplaceOrder,
+                                ExternalOfferResolver.StoreOffers offers) {
+        // every poll fetches orders already imported; resolving their lines would read the catalogs for nothing.
+        // saveWithFulfilment checks again, against an import running at the same time.
+        if (ordersManager.isAlreadyImported(store.getStoreId(), marketplaceOrder.externalOrderId())) {
+            return false;
+        }
         MarketplaceCustomer customer = marketplaceOrder.customer();
         BillingDetails billingDetails = toBillingDetails(customer);
         ShippingDetails shippingDetails = toShippingDetails(customer);
@@ -45,6 +73,7 @@ public class MarketplaceOrderImporter {
         // Basket.setBasketItems strips the spaces of the sku; the marketplace key must stay raw,
         // so it is captured here, before the basket is built, and keyed by the basket item id.
         Map<String, String> rawKeysByBasketItemId = new HashMap<>();
+        Map<String, ResolvedLine> resolvedByBasketItemId = new HashMap<>();
 
         for (MarketplaceProduct product : marketplaceOrder.products()) {
             commission = commission.add(product.commission());
@@ -52,11 +81,15 @@ public class MarketplaceOrderImporter {
             String basketItemId = UUID.randomUUID().toString();
             rawKeysByBasketItemId.put(basketItemId, product.manufacturerCode());
 
+            String sellerOfferKey = StringUtils.trimToNull(product.sellerOfferKey());
+            Optional<ResolvedOffer> resolved = offers.resolve(marketplaceName, sellerOfferKey, product.manufacturerCode());
+            resolvedByBasketItemId.put(basketItemId, new ResolvedLine(sellerOfferKey, resolved.orElse(null)));
+
             basketItems.add(new BasketItem(
                     basketItemId,
                     product.name(),
-                    product.manufacturerCode(),
-                    resolveProductCategory(store.getStoreId(), product.manufacturerCode()),
+                    resolved.map(ResolvedOffer::sku).orElse(product.manufacturerCode()),
+                    resolved.map(ResolvedOffer::category).orElse(Categories.UNCATEGORIZED),
                     product.priceGross().doubleValue(),
                     0,
                     product.quantity(),
@@ -102,6 +135,12 @@ public class MarketplaceOrderImporter {
                     OrderItem orderItem = OrderItem.fromBasketItem(order.getOrderId(), i);
                     if (!i.isService()) {
                         orderItem.setExternalItemId(rawKeysByBasketItemId.get(i.getId()));
+                        ResolvedLine line = resolvedByBasketItemId.get(i.getId());
+                        orderItem.setExternalOfferKey(line.sellerOfferKey());
+                        // the same fill as "Link to product", so both give a resolved line the same codes
+                        if (line.offer() != null) {
+                            line.offer().fill(orderItem);
+                        }
                     }
                     return orderItem;
                 })
@@ -161,10 +200,7 @@ public class MarketplaceOrderImporter {
         return shipping;
     }
 
-    private String resolveProductCategory(String storeId, String mfn) {
-        return pimCatalog.withStoreData(storeId).findByMpn(mfn)
-                .map(PimEntry::category)
-                .orElse(Categories.UNCATEGORIZED);
+    private record ResolvedLine(String sellerOfferKey, ResolvedOffer offer) {
     }
 
     private PaymentSource resolvePaymentSource(String paymentType) {

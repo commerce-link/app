@@ -76,6 +76,32 @@ class MarketplaceConnectionsTest {
     }
 
     @Test
+    void offerMatchingLinkShownForMarketplaceWithOfferListing() {
+        // given
+        when(providerFactory.getDescriptor("Allegro").supportsOfferListing()).thenReturn(true);
+        store.connectMarketplace("Allegro", false);
+
+        // when
+        MarketplaceView view = marketplaces.views(store, PATH, PL).get(0);
+
+        // then
+        assertThat(view.offerMatchingHref()).isEqualTo(PATH + "/Allegro/offer-matching");
+    }
+
+    @Test
+    void linkHiddenForMarketplaceWithoutOfferListing() {
+        // given
+        store.connectMarketplace("CsCart", false);
+        store.connectMarketplace("Ceneo", false);
+
+        // when
+        List<MarketplaceView> views = marketplaces.views(store, PATH, PL);
+
+        // then
+        assertThat(views).extracting(MarketplaceView::offerMatchingHref).containsOnlyNulls();
+    }
+
+    @Test
     void aMarketplaceWithoutReturnsImportHasNoReturnsLineNorAccountPage() {
         // given
         store.connectMarketplace("CsCart", false);
