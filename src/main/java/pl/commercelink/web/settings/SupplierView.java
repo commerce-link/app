@@ -16,11 +16,13 @@ import java.time.LocalDateTime;
  * @param type         the integration's type name, null for a price list
  * @param editHref     the supplier's page, null when there is nothing to edit (integration gone)
  * @param removeHref   disconnecting (integration) or deleting (price list), confirmed first
+ * @param carriersHref how the supplier's delivery methods translate to our carriers, null for a price list (no parcels)
+ *                     and for an integration that is gone
  */
 public record SupplierView(String identity, String title, Source source, State state, String type,
                            boolean includeInPricing, boolean includeInFulfilment, LocalDateTime feedLastModified,
                            PollingScheduleDescription schedule, String externalSupplierId,
-                           String editHref, String removeHref) {
+                           String editHref, String removeHref, String carriersHref) {
 
     public enum Source {
         GLOBAL, OWN, CSV
@@ -49,7 +51,8 @@ public record SupplierView(String identity, String title, Source source, State s
                 source == Source.OWN ? connection.scheduleDescription() : null,
                 connection.hasExternalSupplierId() ? connection.externalSupplierId() : null,
                 state == State.UNAVAILABLE ? null : href,
-                href + (source == Source.CSV ? "/delete" : "/disconnect"));
+                href + (source == Source.CSV ? "/delete" : "/disconnect"),
+                source == Source.CSV || state == State.UNAVAILABLE ? null : href + "/carriers");
     }
 
     public boolean csv() {

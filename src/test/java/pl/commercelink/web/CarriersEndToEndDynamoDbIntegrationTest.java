@@ -291,15 +291,21 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         String html = render("carriers", result);
 
         // then
-        assertThat(result.getModelAndView().getModel().get("dictionaries"))
-                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.list(CarriersController.DictionaryRow.class))
+        @SuppressWarnings("unchecked")
+        List<CarriersController.IntegrationDictionaries> integrations =
+                (List<CarriersController.IntegrationDictionaries>) result.getModelAndView().getModel().get("integrations");
+        assertThat(integrations).extracting(CarriersController.IntegrationDictionaries::heading)
+                .containsExactly("Allegro · marketplace", "Ceneo · marketplace", "Empik · marketplace", "Morele · marketplace",
+                        "allegro · integracja wysyłkowa", "furgonetka · integracja wysyłkowa");
+        assertThat(integrations).flatExtracting(CarriersController.IntegrationDictionaries::dictionaries)
                 .extracting(CarriersController.DictionaryRow::key)
                 .containsExactly(ALLEGRO_METHODS, ALLEGRO, CENEO_FORMS, CENEO, EMPIK,
                         CarrierDictionary.marketplaceStatusCarrierCodes("Empik"), MORELE, CarrierDictionary.marketplaceStatusCarrierCodes("Morele"),
                         WZA, FURGONETKA);
         assertThat(html).doesNotContain("??").contains("InPost Kurier").contains("Allegro One")
-                .contains("global#marketplace#allegro#import").contains("global#shipping#furgonetka")
-                .contains("Ceneo: teksty przewoźnika w importowanym zamówieniu")
+                .contains("Ceneo · marketplace").contains("Przewoźnik w importowanym zamówieniu")
+                .contains("Po tekście przewoźnika z zamówienia z Ceneo rozpoznajemy")
+                .contains("Pusty: wysyłkę oznaczamy bez kodu przewoźnika.")
                 .contains("/dashboard/carriers/dictionary?dictionary=global%23marketplace%23ceneo%23import");
     }
 
@@ -387,7 +393,8 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         String html = render("carrier-dictionary", result);
 
         // then
-        assertThat(html).doesNotContain("??").contains("Ceneo: kody przewoźnika przy statusie „wysłane” i w zwrotach");
+        assertThat(html).doesNotContain("??").contains("Ceneo · Kod przewoźnika przy oznaczaniu wysyłki")
+                .contains("Klucz słownika: global#marketplace#ceneo#status").contains("Kod przewoźnika");
         assertThat(html.indexOf("value=\"4\"")).isGreaterThan(html.indexOf("value=\"1\""));
         assertThat(org.apache.commons.lang3.StringUtils.countMatches(html, "data-carrier-row>"))
                 .isEqualTo(dictionaries.get(CENEO).getMappings().size() + 1);

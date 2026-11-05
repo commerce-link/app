@@ -6,20 +6,20 @@
 <div layout:fragment="content">
     <section class="cl-page">
         <div class="cl-page-body is-form">
-            <div th:replace="~{fragments/settings-header :: subpageWithActions('/dashboard/carriers', #{carriers.title}, ${dictionary}, ${purpose}, null)}"></div>
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${backLabel}, ${title}, ${description}, null)}"></div>
             <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
 
-            <form class="cl-form" th:action="@{/dashboard/carriers/dictionary}" method="post" data-carrier-dictionary>
-                <input type="hidden" name="dictionary" th:value="${dictionary}"/>
+            <form class="cl-form" th:action="@{${formAction}}" method="post" data-carrier-dictionary>
+                <input th:if="${dictionaryKey != null}" type="hidden" name="dictionary" th:value="${dictionaryKey}"/>
                 <input type="hidden" name="version" th:value="${version}"/>
                 <div class="cl-card">
-                    <p class="cl-card-desc" th:text="#{carriers.dictionary.order}"></p>
-                    <p class="cl-card-desc" th:text="${fragments} ? #{carriers.dictionary.fragments} : #{carriers.dictionary.exact}"></p>
+                    <p class="cl-card-desc" th:each="hint : ${hints}" th:text="${hint}"></p>
+                    <p th:if="${dictionaryKey != null}" class="cl-card-desc"><small th:text="#{carriers.dictionary.key(${dictionaryKey})}"></small></p>
 
                     <table class="cl-table is-compact">
                         <thead>
                         <tr>
-                            <th scope="col" th:text="#{carriers.dictionary.column.externalText}"></th>
+                            <th scope="col" th:text="${externalTextColumn}"></th>
                             <th scope="col" th:text="#{carriers.dictionary.column.carrier}"></th>
                             <th scope="col"><span class="cl-visually-hidden" th:text="#{carriers.dictionary.column.actions}"></span></th>
                         </tr>
@@ -29,7 +29,7 @@
                             <td>
                                 <input class="cl-input" type="text" name="externalText" maxlength="200" autocomplete="off"
                                        th:value="${pair.externalText}"
-                                       th:attr="aria-label=#{carriers.dictionary.column.externalText}"/>
+                                       th:attr="aria-label=${externalTextColumn}"/>
                             </td>
                             <td>
                                 <select class="cl-select" name="carrier" th:attr="aria-label=#{carriers.dictionary.column.carrier}">
@@ -56,7 +56,7 @@
                     <div class="cl-card-footer">
                         <button class="cl-button is-primary" type="submit" th:text="#{carriers.dictionary.save}"></button>
                         <button class="cl-button" type="button" data-carrier-add hidden th:text="#{carriers.dictionary.add}"></button>
-                        <a class="cl-button" th:href="@{/dashboard/carriers}" th:text="#{general.cancel}"></a>
+                        <a class="cl-button" th:href="@{${backHref}}" th:text="#{general.cancel}"></a>
                     </div>
                 </div>
             </form>

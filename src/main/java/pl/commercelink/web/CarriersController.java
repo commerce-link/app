@@ -28,8 +28,10 @@ import pl.commercelink.web.settings.SettingsFlash;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.function.Function;
 
 /** Our carriers and the shared dictionaries that translate them, for the super admin. */
@@ -49,20 +51,39 @@ public class CarriersController {
     private final MarketplaceProviderFactory marketplaces;
     private final ShippingProviderFactory shipping;
 
-    public record DictionaryRow(String key, String purpose, int pairs, String href) {
+    public record DictionaryRow(String key, String title, String description, String whenEmpty, int pairs, String href) {
     }
 
-    private record SharedDictionary(String key, String purpose, String integration) {
+    /** The dictionaries of one integration, so the page reads per marketplace or shipping integration. */
+    public record IntegrationDictionaries(String heading, List<DictionaryRow> dictionaries) {
+    }
+
+    private enum Kind {
+        IMPORT("import"), STATUS("status"), SHIPPING("shipping");
+
+        private final String messageKey;
+
+        Kind(String messageKey) {
+            this.messageKey = "carriers.dictionary.kind." + messageKey;
+        }
+    }
+
+    private record SharedDictionary(String key, Kind kind, String integration, String heading) {
     }
 
     @GetMapping(PATH)
     public String carriers(Model model, Locale locale) {
-        List<DictionaryRow> dictionaries = sharedDictionaries().stream()
-                .map(d -> new DictionaryRow(d.key(), purpose(d, locale),
-                        dictionaryRepository.get(d.key()).getMappings().size(), dictionaryHref(d.key())))
-                .toList();
+        Map<String, List<DictionaryRow>> byIntegration = new LinkedHashMap<>();
+        for (SharedDictionary d : sharedDictionaries(locale)) {
+            byIntegration.computeIfAbsent(d.heading(), heading -> new ArrayList<>())
+                    .add(new DictionaryRow(d.key(), message(d.kind().messageKey + ".title", locale),
+                            description(d, locale), message(d.kind().messageKey + ".empty", locale),
+                            dictionaryRepository.get(d.key()).getMappings().size(),
+                            dictionaryHref(d.key())));
+        }
         model.addAttribute("carriers", carriersRepository.findAll());
-        model.addAttribute("dictionaries", dictionaries);
+        model.addAttribute("integrations", byIntegration.entrySet().stream()
+                .map(e -> new IntegrationDictionaries(e.getKey(), e.getValue())).toList());
         return "carriers";
     }
 
@@ -82,7 +103,7 @@ public class CarriersController {
 
     @GetMapping(DICTIONARY_PATH)
     public String dictionary(@RequestParam String dictionary, Model model, Locale locale) {
-        SharedDictionary shared = requireShared(dictionary);
+        SharedDictionary shared = requireShared(dictionary, locale);
         CarrierDictionary entry = model.getAttribute(SAVED_DICTIONARY) instanceof CarrierDictionary saved
                 && saved.getDictionary().equals(dictionary) ? saved : dictionaryRepository.get(dictionary);
         return dictionaryPage(model, shared, entry.getMappings(), entry.getVersion(), null, locale);
@@ -94,8 +115,8 @@ public class CarriersController {
                                  @RequestParam(name = "externalText", required = false) List<String> externalTexts,
                                  @RequestParam(name = "carrier", required = false) List<String> carriers,
                                  Locale locale, Model model, RedirectAttributes redirectAttributes) {
-        SharedDictionary shared = requireShared(dictionary);
-        List<CarrierMapping> pairs = pairs(externalTexts, carriers);
+        SharedDictionary shared = requireShared(dictionary, locale);
+        List<CarrierMapping> pairs = CarrierDictionaryForm.pairs(externalTexts, carriers);
         try {
             CarrierDictionaryWriter.Result result = dictionaryWriter.save(dictionary, pairs, version);
             if (!result.isSaved()) {
@@ -109,45 +130,45 @@ public class CarriersController {
         } catch (ConditionalCheckFailedException e) {
             return dictionaryPage(model, shared, pairs, version, message("carriers.dictionary.conflict", locale), locale);
         }
-        SettingsFlash.onRedirect(redirectAttributes, message("carriers.dictionary.saved", locale, dictionary));
+        SettingsFlash.onRedirect(redirectAttributes, message("carriers.dictionary.saved", locale, title(shared, locale)));
         return "redirect:" + dictionaryHref(dictionary);
     }
 
     private String dictionaryPage(Model model, SharedDictionary shared, List<CarrierMapping> pairs, Long version,
                                   String error, Locale locale) {
         String dictionary = shared.key();
-        model.addAttribute("dictionary", dictionary);
-        model.addAttribute("purpose", purpose(shared, locale));
-        model.addAttribute("pairs", withEmptyRow(pairs));
+        model.addAttribute("title", title(shared, locale));
+        model.addAttribute("description", description(shared, locale));
+        model.addAttribute("externalTextColumn", message(shared.kind().messageKey + ".column", locale));
+        model.addAttribute("pairs", CarrierDictionaryForm.withEmptyRow(pairs));
         model.addAttribute("version", version);
         model.addAttribute("carrierNames", carriersRepository.findAll().stream().map(Carrier::getName).toList());
-        model.addAttribute("fragments", CarrierDictionary.matchesByFragment(dictionary));
+        model.addAttribute("hints", List.of(message("carriers.dictionary.order", locale),
+                message(CarrierDictionary.matchesByFragment(dictionary)
+                        ? "carriers.dictionary.fragments" : "carriers.dictionary.exact", locale)));
+        model.addAttribute("dictionaryKey", dictionary);
+        model.addAttribute("formAction", DICTIONARY_PATH);
+        model.addAttribute("backHref", PATH);
+        model.addAttribute("backLabel", message("carriers.title", locale));
         model.addAttribute(SettingsFlash.ERROR_MESSAGE, error);
-        return "carrier-dictionary";
-    }
-
-    // the last empty row is how a pair is added without JavaScript; an empty row is not saved
-    private static List<CarrierMapping> withEmptyRow(List<CarrierMapping> pairs) {
-        List<CarrierMapping> rows = new ArrayList<>(pairs);
-        CarrierMapping last = rows.isEmpty() ? null : rows.get(rows.size() - 1);
-        if (last == null || StringUtils.isNotBlank(last.getExternalText()) || StringUtils.isNotBlank(last.getCarrier())) {
-            rows.add(new CarrierMapping());
-        }
-        return rows;
+        return CarrierDictionaryForm.VIEW;
     }
 
     /** Every installed marketplace and shipping adapter has its dictionaries; supplier ones belong to the stores. */
-    private List<SharedDictionary> sharedDictionaries() {
+    private List<SharedDictionary> sharedDictionaries(Locale locale) {
         List<SharedDictionary> dictionaries = new ArrayList<>();
         for (ProviderDescriptor<?> marketplace : sorted(marketplaces.availableProviders())) {
+            String name = marketplace.displayName();
+            String heading = message("carriers.dictionaries.group.marketplace", locale, name);
             dictionaries.add(new SharedDictionary(CarrierDictionary.marketplaceOrderCarrierTexts(marketplace.name()),
-                    "carriers.dictionary.purpose.import", marketplace.displayName()));
+                    Kind.IMPORT, name, heading));
             dictionaries.add(new SharedDictionary(CarrierDictionary.marketplaceStatusCarrierCodes(marketplace.name()),
-                    "carriers.dictionary.purpose.status", marketplace.displayName()));
+                    Kind.STATUS, name, heading));
         }
         for (ProviderDescriptor<?> integration : sorted(shipping.availableProviders())) {
+            String name = integration.displayName();
             dictionaries.add(new SharedDictionary(CarrierDictionary.shippingLabelCarrierCodes(integration.name()),
-                    "carriers.dictionary.purpose.shipping", integration.displayName()));
+                    Kind.SHIPPING, name, message("carriers.dictionaries.group.shipping", locale, name)));
         }
         return dictionaries;
     }
@@ -156,26 +177,21 @@ public class CarriersController {
         return descriptors.stream().sorted(Comparator.comparing((Function<D, String>) ProviderDescriptor::name)).toList();
     }
 
-    private static List<CarrierMapping> pairs(List<String> externalTexts, List<String> carriers) {
-        List<String> texts = externalTexts == null ? List.of() : externalTexts;
-        List<String> names = carriers == null ? List.of() : carriers;
-        List<CarrierMapping> pairs = new ArrayList<>();
-        for (int i = 0; i < Math.max(texts.size(), names.size()); i++) {
-            pairs.add(new CarrierMapping(i < texts.size() ? texts.get(i) : null, i < names.size() ? names.get(i) : null));
-        }
-        return pairs;
-    }
-
     // store dictionaries (supplier connections) are edited by the store, not here
-    private SharedDictionary requireShared(String dictionary) {
-        return sharedDictionaries().stream()
+    private SharedDictionary requireShared(String dictionary, Locale locale) {
+        return sharedDictionaries(locale).stream()
                 .filter(shared -> shared.key().equals(dictionary))
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
-    private String purpose(SharedDictionary dictionary, Locale locale) {
-        return message(dictionary.purpose(), locale, dictionary.integration());
+    private String title(SharedDictionary dictionary, Locale locale) {
+        return message("carriers.dictionary.page.title", locale, dictionary.integration(),
+                message(dictionary.kind().messageKey + ".title", locale));
+    }
+
+    private String description(SharedDictionary dictionary, Locale locale) {
+        return message(dictionary.kind().messageKey + ".description", locale, dictionary.integration());
     }
 
     static String dictionaryHref(String dictionary) {
