@@ -15,8 +15,8 @@ import static pl.commercelink.starter.migration.DynamoDbMigrationSupport.hashKey
 import static pl.commercelink.starter.migration.DynamoDbMigrationSupport.stringAttribute;
 
 @RequiredArgsConstructor
-@ChangeUnit(id = "V024-create-carrier-tables", order = "024", author = "commercelink")
-public class V024_CreateCarrierTables {
+@ChangeUnit(id = "V025-create-carrier-tables", order = "025", author = "commercelink")
+public class V025_CreateCarrierTables {
 
     private final AmazonDynamoDB dynamoDB;
 

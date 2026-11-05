@@ -27,8 +27,8 @@ import pl.commercelink.carriers.CarrierTranslator;
 import pl.commercelink.carriers.CarriersRepository;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.marketplace.api.MarketplaceProviderDescriptor;
-import pl.commercelink.migration.V024_CreateCarrierTables;
-import pl.commercelink.migration.V025_LocalDevelopmentCarriersSeed;
+import pl.commercelink.migration.V025_CreateCarrierTables;
+import pl.commercelink.migration.V026_LocalDevelopmentCarriersSeed;
 import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.shipping.api.ShippingProviderDescriptor;
 import pl.commercelink.testsupport.DynamoDbLocalImage;
@@ -89,8 +89,8 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         carriers = new CarriersRepository(client);
         dictionaries = new CarrierDictionaryRepository(client);
         translator = new CarrierTranslator(dictionaries);
-        new V024_CreateCarrierTables(client).createTables();
-        new V025_LocalDevelopmentCarriersSeed(client).seed();
+        new V025_CreateCarrierTables(client).createTables();
+        new V026_LocalDevelopmentCarriersSeed(client).seed();
         // made-up marketplace and label vocabularies, for the dictionaries the local seed does not have
         put(CENEO_FORMS, "InPost=InPost", "DPD=DPD", "Poczta Polska=Poczta Polska");
         put(CENEO, "1=InPost", "1=InPost Kurier", "2=DHL", "3=DPD", "4=Poczta Polska");
@@ -145,10 +145,25 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         dictionaries.save(edited);
 
         // when
-        new V024_CreateCarrierTables(client).createTables();
+        new V025_CreateCarrierTables(client).createTables();
 
         // then
         assertThat(translator.carrierFor(ALLEGRO_METHODS, "Paczka w Ruchu")).isEqualTo("Orlen");
+    }
+
+    @Test
+    void seedingAgainKeepsADictionaryEditedOnTheDashboard() {
+        // given
+        CarrierDictionary edited = dictionaries.get(ALLEGRO_METHODS);
+        edited.getMappings().add(new CarrierMapping("Paczka w Ruchu", "Orlen"));
+        dictionaries.save(edited);
+
+        // when
+        new V026_LocalDevelopmentCarriersSeed(client).seed();
+
+        // then
+        assertThat(translator.carrierFor(ALLEGRO_METHODS, "Paczka w Ruchu")).isEqualTo("Orlen");
+        assertThat(dictionaries.get(ALLEGRO_METHODS).getVersion()).isEqualTo(edited.getVersion());
     }
 
     @Test
