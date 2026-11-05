@@ -27,17 +27,14 @@ public class TaxonomyCategoryEnrichment {
     }
 
     public Taxonomy enrich(Taxonomy taxonomy) {
-        if (TaxonomyCache.hasCategory(taxonomy) || taxonomy.mfn() == null || taxonomy.mfn().isEmpty()) {
+        if (TaxonomyCache.hasCategory(taxonomy)) {
             return taxonomy;
         }
-        Taxonomy cached = taxonomyCache.findByMfn(taxonomy.mfn());
-        if (cached == null || !TaxonomyCache.hasCategory(cached)) {
+        Taxonomy cached = taxonomyCache.findCategorySource(taxonomy);
+        if (cached == null) {
             return taxonomy;
         }
-        return new Taxonomy(taxonomy.ean(), taxonomy.mfn(), taxonomy.brand(), taxonomy.name(),
-                cached.category(), taxonomy.dataAccuracyScore(),
-                taxonomy.netWeightInGrams(), taxonomy.grossWeightInGrams(),
-                taxonomy.rawCategory(), cached.categoryId());
+        return taxonomy.withCategory(cached.category(), cached.categoryId());
     }
 
     public boolean isPendingEligible(Taxonomy taxonomy) {
@@ -65,7 +62,7 @@ public class TaxonomyCategoryEnrichment {
                 || event.category() == null || event.category().isBlank()) {
             return;
         }
-        if (taxonomyCache.updateCategory(event.mfn(), event.category(), event.categoryId())) {
+        if (taxonomyCache.updateCategory(event.ean(), event.category(), event.categoryId())) {
             attempts.clear(event.mfn());
             System.out.println("Category match applied: mfn=" + event.mfn()
                     + " category=" + event.category() + " source=" + event.source());
@@ -81,7 +78,7 @@ public class TaxonomyCategoryEnrichment {
         if (event.confidence() != null && event.confidence() < properties.mapping().minConfidence()) {
             return;
         }
-        Taxonomy taxonomy = taxonomyCache.findByMfn(event.mfn());
+        Taxonomy taxonomy = taxonomyCache.findByEan(event.ean());
         if (taxonomy == null || isBlank(taxonomy.rawCategory())) {
             return;
         }

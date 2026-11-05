@@ -77,7 +77,7 @@ class TaxonomyCategoryMatchSweepTest {
         // given
         List<String> pendingMfns = IntStream.range(0, 20).mapToObj(i -> "MFN-P-" + i).toList();
         pendingMfns.forEach(mfn -> cache.add(pending(mfn)));
-        cache.add(new Taxonomy("1234567890123", "MFN-CAT", "Brand", "Name", "CPU", 5, null, null));
+        cache.add(new Taxonomy(eanOf("MFN-CAT"), "MFN-CAT", "Brand", "Name", "CPU", 5, null, null));
         TaxonomyCategoryMatchSweep sweep = sweep(new TaxonomyCategoryMatchProperties(4, 300000));
 
         // when
@@ -146,8 +146,8 @@ class TaxonomyCategoryMatchSweepTest {
         sweep.sweep();
 
         // then
-        assertThat(cache.findByMfn(mfn).category()).isEqualTo("GPU");
-        assertThat(cache.findByMfn(mfn).categoryId()).isEqualTo("301");
+        assertThat(cache.findByEan("1234567890123").category()).isEqualTo("GPU");
+        assertThat(cache.findByEan("1234567890123").categoryId()).isEqualTo("301");
         verify(pimCatalog, never()).submitCategoryMatch(any());
     }
 
@@ -167,7 +167,7 @@ class TaxonomyCategoryMatchSweepTest {
 
         // then
         verify(pimCatalog).submitCategoryMatch(any());
-        assertThat(cache.findByMfn(mfn).category()).isNull();
+        assertThat(cache.findByEan("1234567890123").category()).isNull();
     }
 
     @Test
@@ -248,7 +248,7 @@ class TaxonomyCategoryMatchSweepTest {
         sweep.sweep();
 
         // when
-        enrichment.applyMatch(new CategoryMatchedEvent("1234567890123", "MFN-1", "CPU", "301", 0.95, "gemini"));
+        enrichment.applyMatch(new CategoryMatchedEvent(eanOf("MFN-1"), "MFN-1", "CPU", "301", 0.95, "gemini"));
         Mockito.when(taxonomyRepository.loadNewest()).thenReturn(Pair.of("N/A", new ArrayList<>(List.of(pending("MFN-1")))));
         cache.onStartUp();
         for (int i = 0; i < 6; i++) {
@@ -311,6 +311,10 @@ class TaxonomyCategoryMatchSweepTest {
     }
 
     private static Taxonomy pending(String mfn) {
-        return new Taxonomy("1234567890123", mfn, "Brand", "Name", null, 5, null, null);
+        return new Taxonomy(eanOf(mfn), mfn, "Brand", "Name", null, 5, null, null);
+    }
+
+    private static String eanOf(String mfn) {
+        return "EAN-" + mfn;
     }
 }

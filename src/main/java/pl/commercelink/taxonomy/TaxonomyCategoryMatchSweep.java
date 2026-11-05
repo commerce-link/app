@@ -72,7 +72,7 @@ class TaxonomyCategoryMatchSweep {
             return false;
         }
         boolean resolved = mappingCache.findActive(supplier, taxonomy.rawCategory())
-                .map(mapping -> taxonomyCache.updateCategory(taxonomy.mfn(), mapping.categoryName(), mapping.categoryId()))
+                .map(mapping -> taxonomyCache.updateCategory(taxonomy.ean(), mapping.categoryName(), mapping.categoryId()))
                 .orElse(false);
         if (resolved) {
             attempts.clear(taxonomy.mfn());
