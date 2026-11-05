@@ -35,14 +35,35 @@ class BuiltInReservationServiceTest {
     @Mock
     private WarehouseItemFactory warehouseItemFactory;
 
+    private static final String EAN = "5901234123457";
+
+    @Test
+    void reservationTakesOnlyItemsWithTheGivenEan() {
+        // given
+        WarehouseItem warehouseItem = anAvailableItem(20.0);
+        when(warehouseRepository.findAllByEanAndStatus("store-1", EAN, FulfilmentStatus.Delivered))
+                .thenReturn(List.of(warehouseItem));
+
+        ReservationItem reservationItem = new ReservationItem("order-item-1", EAN, 1);
+        Reservation reservation = Reservation.internalUse("store-1", List.of(reservationItem));
+
+        // when
+        new BuiltInReservationService(deliveriesRepository, warehouseRepository, warehouseItemFactory).create(reservation);
+
+        // then
+        assertEquals(1, reservationItem.getConfirmations().size());
+        assertEquals(EAN, reservationItem.getConfirmations().get(0).ean());
+        assertEquals(0, warehouseItem.getQty());
+    }
+
     @Test
     void carriesPurchaseCostOntoOrderItemInsteadOfUnitSystemCost() {
         // given
         WarehouseItem warehouseItem = anAvailableItem(20.0);
         warehouseItem.setUnitSystemCost(150.0);
-        when(warehouseRepository.findAllByMfnAndStatus(any(), any(), any())).thenReturn(List.of(warehouseItem));
+        when(warehouseRepository.findAllByEanAndStatus(any(), any(), any())).thenReturn(List.of(warehouseItem));
 
-        ReservationItem reservationItem = new ReservationItem(warehouseItem.getItemId(), warehouseItem.getManufacturerCode(), 1);
+        ReservationItem reservationItem = new ReservationItem(warehouseItem.getItemId(), warehouseItem.getEan(), 1);
         Reservation reservation = Reservation.internalUse("store-1", List.of(reservationItem));
 
         OrderItem orderItem = new OrderItem();
@@ -61,7 +82,7 @@ class BuiltInReservationServiceTest {
         WarehouseItem requested = anAvailableItem(20.0);
         when(warehouseRepository.findById("store-1", requested.getItemId())).thenReturn(requested);
 
-        ReservationItem reservationItem = new ReservationItem("order-item-1", "MFN-1", 1, requested.getItemId());
+        ReservationItem reservationItem = new ReservationItem("order-item-1", EAN, 1, requested.getItemId());
         Reservation reservation = Reservation.internalUse("store-1", List.of(reservationItem));
 
         // when
@@ -71,7 +92,7 @@ class BuiltInReservationServiceTest {
         assertEquals(1, reservationItem.getConfirmations().size());
         assertEquals(0, requested.getQty());
         verify(warehouseRepository).delete(requested);
-        verify(warehouseRepository, never()).findAllByMfnAndStatus(any(), any(), any());
+        verify(warehouseRepository, never()).findAllByEanAndStatus(any(), any(), any());
     }
 
     @Test
@@ -79,7 +100,7 @@ class BuiltInReservationServiceTest {
         // given
         when(warehouseRepository.findById("store-1", "missing-item")).thenReturn(null);
 
-        ReservationItem reservationItem = new ReservationItem("order-item-1", "MFN-1", 1, "missing-item");
+        ReservationItem reservationItem = new ReservationItem("order-item-1", EAN, 1, "missing-item");
         Reservation reservation = Reservation.internalUse("store-1", List.of(reservationItem));
 
         // when
@@ -87,7 +108,7 @@ class BuiltInReservationServiceTest {
 
         // then
         assertFalse(reservationItem.hasConfirmations());
-        verify(warehouseRepository, never()).findAllByMfnAndStatus(any(), any(), any());
+        verify(warehouseRepository, never()).findAllByEanAndStatus(any(), any(), any());
     }
 
     @Test
@@ -97,7 +118,7 @@ class BuiltInReservationServiceTest {
         requested.setQty(2);
         when(warehouseRepository.findById("store-1", requested.getItemId())).thenReturn(requested);
 
-        ReservationItem reservationItem = new ReservationItem("order-item-1", "MFN-1", 5, requested.getItemId());
+        ReservationItem reservationItem = new ReservationItem("order-item-1", EAN, 5, requested.getItemId());
         Reservation reservation = Reservation.internalUse("store-1", List.of(reservationItem));
 
         // when
@@ -106,17 +127,17 @@ class BuiltInReservationServiceTest {
         // then
         assertEquals(2, reservationItem.getConfirmations().get(0).qty());
         assertEquals(3, reservationItem.getRemainingQty());
-        verify(warehouseRepository, never()).findAllByMfnAndStatus(any(), any(), any());
+        verify(warehouseRepository, never()).findAllByEanAndStatus(any(), any(), any());
     }
 
     @Test
-    void skipsNotSealedItemsWhenReservingByMfn() {
+    void skipsNotSealedItemsWhenReservingByEan() {
         // given
         WarehouseItem openBox = anAvailableItem(20.0);
         openBox.setCondition(ItemCondition.OpenBox);
-        when(warehouseRepository.findAllByMfnAndStatus(any(), any(), any())).thenReturn(List.of(openBox));
+        when(warehouseRepository.findAllByEanAndStatus(any(), any(), any())).thenReturn(List.of(openBox));
 
-        ReservationItem reservationItem = new ReservationItem("order-item-1", "MFN-1", 1);
+        ReservationItem reservationItem = new ReservationItem("order-item-1", EAN, 1);
         Reservation reservation = Reservation.internalUse("store-1", List.of(reservationItem));
 
         // when
@@ -134,7 +155,7 @@ class BuiltInReservationServiceTest {
         openBox.setCondition(ItemCondition.OpenBox);
         when(warehouseRepository.findById("store-1", openBox.getItemId())).thenReturn(openBox);
 
-        ReservationItem reservationItem = new ReservationItem("order-item-1", "MFN-1", 1, openBox.getItemId());
+        ReservationItem reservationItem = new ReservationItem("order-item-1", EAN, 1, openBox.getItemId());
         Reservation reservation = Reservation.internalUse("store-1", List.of(reservationItem));
 
         // when
@@ -152,7 +173,7 @@ class BuiltInReservationServiceTest {
         damaged.setCondition(ItemCondition.Damaged);
         when(warehouseRepository.findById("store-1", damaged.getItemId())).thenReturn(damaged);
 
-        ReservationItem reservationItem = new ReservationItem("order-item-1", "MFN-1", 1, damaged.getItemId());
+        ReservationItem reservationItem = new ReservationItem("order-item-1", EAN, 1, damaged.getItemId());
         Reservation reservation = Reservation.internalUse("store-1", List.of(reservationItem));
 
         // when

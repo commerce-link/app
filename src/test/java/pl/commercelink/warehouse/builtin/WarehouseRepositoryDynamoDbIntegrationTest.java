@@ -56,6 +56,10 @@ class WarehouseRepositoryDynamoDbIntegrationTest {
         mapper.save(item("store-1", "s1-allocation", null, FulfilmentStatus.Allocation));
         mapper.save(item("store-2", "s2-destroyed-ssd", "SSD", FulfilmentStatus.Destroyed));
         mapper.save(item("store-2", "s2-delivered-ssd", "SSD", FulfilmentStatus.Delivered));
+        mapper.save(item("store-3", "s3-ean-a-delivered", "5901000000001", "MFN-X", FulfilmentStatus.Delivered));
+        mapper.save(item("store-3", "s3-ean-a-ordered", "5901000000001", "MFN-X", FulfilmentStatus.Ordered));
+        mapper.save(item("store-3", "s3-ean-b-delivered", "5901000000002", "MFN-X", FulfilmentStatus.Delivered));
+        mapper.save(item("store-4", "s4-ean-a-delivered", "5901000000001", "MFN-X", FulfilmentStatus.Delivered));
         repository = new WarehouseRepository(client);
     }
 
@@ -66,6 +70,13 @@ class WarehouseRepositoryDynamoDbIntegrationTest {
 
     static WarehouseItem item(String storeId, String id, String category, FulfilmentStatus status) {
         WarehouseItem item = new WarehouseItem(storeId, "d-1", category, id, "880", "MFN-" + id, 10.0, 1);
+        item.setItemId(id);
+        item.setStatus(status);
+        return item;
+    }
+
+    static WarehouseItem item(String storeId, String id, String ean, String mfn, FulfilmentStatus status) {
+        WarehouseItem item = new WarehouseItem(storeId, "d-1", "SSD", id, ean, mfn, 10.0, 1);
         item.setItemId(id);
         item.setStatus(status);
         return item;
@@ -121,6 +132,15 @@ class WarehouseRepositoryDynamoDbIntegrationTest {
         // then
         assertThat(ids(shown)).containsExactly("s1-delivered-ssd", "s1-ordered-gpu");
         readOnlyTheStorePartition();
+    }
+
+    @Test
+    void itemWithTheSameCodeButAnotherEanIsNotReserved() {
+        // when
+        List<WarehouseItem> found = repository.findAllByEanAndStatus("store-3", "5901000000001", FulfilmentStatus.Delivered);
+
+        // then
+        assertThat(ids(found)).containsExactly("s3-ean-a-delivered");
     }
 
     @Test
