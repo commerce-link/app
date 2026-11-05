@@ -9,10 +9,11 @@ import java.util.List;
  * @param catalogs      names of the catalogs with categories exported to this marketplace; empty means no offer goes there
  * @param returns       the returns schedule, or null when the marketplace does not import returns
  * @param authorizeHref the account connection page, or null when the marketplace is connected with keys only
+ * @param offerMatchingHref the offer matching page, or null when the adapter cannot list the store's offers
  */
 public record MarketplaceView(String name, String displayName, State state, String orders, String returns,
                               List<String> catalogs, String editHref, String authorizeHref, String disconnectHref,
-                              String exportsHref) {
+                              String exportsHref, String offerMatchingHref) {
 
     public enum State {
         /** Orders are fetched and offers exported. */

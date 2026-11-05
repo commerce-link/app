@@ -60,6 +60,10 @@
                                     </th:block>
                                     <a th:href="@{${marketplace.exportsHref()}}" th:text="#{store.marketplaces.list.exports}"
                                        th:attr="aria-label=#{store.marketplaces.list.exports.for(${marketplace.displayName()})}"></a>
+                                    <th:block th:if="${marketplace.offerMatchingHref() != null}"> ·
+                                        <a th:href="@{${marketplace.offerMatchingHref()}}" th:text="#{store.marketplaces.list.offerMatching}"
+                                           th:attr="aria-label=#{store.marketplaces.list.offerMatching.for(${marketplace.displayName()})}"></a>
+                                    </th:block>
                                 </p>
                             </div>
                             <div class="cl-list-actions">

@@ -1,0 +1,138 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpage(${marketplacesHref}, ${backLabel}, ${pageTitle})}"></div>
+
+            <th:block th:replace="~{fragments/settings-form :: savedAlert}"></th:block>
+
+            <div class="cl-stack">
+                <section class="cl-card" id="offer-matching-run" aria-labelledby="offer-matching-run-title">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="offer-matching-run-title" th:text="#{store.marketplaces.offer.matching.run.title}"></h2>
+                    </div>
+                    <p class="cl-card-desc" th:text="#{store.marketplaces.offer.matching.run.description(${displayName})}"></p>
+                    <p th:if="${matching == null}" class="cl-card-body"
+                       th:text="#{store.marketplaces.offer.matching.empty(${displayName})}"></p>
+                    <p th:if="${matching != null}" class="cl-card-body"
+                       th:text="#{store.marketplaces.offer.matching.last(${matching.finishedAt()}, ${displayName}, ${matching.total()}, ${matching.ownOffers()}, ${matching.alreadyLinked()})}"></p>
+                    <!--/* Ordered, not run here: the worker saves its progress and the result, and a refresh shows them. */-->
+                    <div th:if="${run != null and run.running()}" aria-live="polite" aria-busy="true">
+                        <p class="cl-card-inset cl-loading"><span class="cl-spinner" aria-hidden="true"></span>
+                            <span th:if="${run.total() != null}"
+                                  th:text="#{store.marketplaces.offer.matching.running(${run.processed()}, ${run.total()}, ${run.updatedAt()})}"></span>
+                            <span th:if="${run.total() == null}"
+                                  th:text="#{store.marketplaces.offer.matching.running.unknownTotal(${run.processed()}, ${run.updatedAt()})}"></span>
+                        </p>
+                    </div>
+                    <div th:if="${run != null and run.failed()}" class="cl-alert is-bad" role="status">
+                        <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                        <!--/* A reason code in a sentence, never the exception's text (the log has that). */-->
+                        <p class="cl-alert-text">
+                            <span th:text="#{store.marketplaces.offer.matching.failed(${run.startedAt()})}"></span>
+                            <span th:text="#{${run.errorKey()}(${run.errorStatus()}, ${displayName})}"></span>
+                        </p>
+                    </div>
+                    <!--/* A run the worker would skip is not offered: the reason and where to fix it instead of the button. */-->
+                    <div th:if="${runBlockedMessage != null}" class="cl-alert is-warn" role="status">
+                        <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                        <p class="cl-alert-text">
+                            <span th:text="${runBlockedMessage}"></span>
+                            <a th:if="${runBlockedHref != null}" th:href="@{${runBlockedHref}}"
+                               th:text="#{store.marketplaces.offer.matching.blocked.integration.link}"></a>
+                        </p>
+                    </div>
+                    <form th:if="${runBlockedMessage == null and (run == null or !run.running())}" method="post" th:action="@{${formAction}}" data-cl-submit-once>
+                        <div class="cl-card-footer">
+                            <button type="submit" class="cl-button is-primary" th:text="#{store.marketplaces.offer.matching.run.button}"
+                                    th:attr="data-cl-busy-label=#{store.marketplaces.offer.matching.run.busy}"></button>
+                        </div>
+                    </form>
+                </section>
+
+                <th:block th:if="${matching != null}">
+                    <!--/* is-orders: the list reset and spacing shared by the read-only tiles of payments and the statement */-->
+                    <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{store.marketplaces.offer.matching.stats}">
+                        <li th:each="group : ${matching.groups()}">
+                            <div class="cl-stat">
+                                <span class="cl-eyebrow" th:text="#{'store.marketplaces.offer.matching.stat.' + ${group.name()}}"></span>
+                                <span class="cl-stat-value" th:text="${#numbers.formatInteger(group.count(), 1, 'DEFAULT')}"></span>
+                            </div>
+                        </li>
+                    </ul>
+
+                    <section class="cl-card" th:each="group : ${matching.groups()}"
+                             th:id="${'offer-matching-' + group.name()}"
+                             th:attr="aria-labelledby=${'offer-matching-' + group.name() + '-title'}"
+                             th:with="key=${'store.marketplaces.offer.matching.group.' + group.name()}">
+                        <div class="cl-card-head">
+                            <h2 class="cl-card-title" th:id="${'offer-matching-' + group.name() + '-title'}">
+                                <span th:text="#{${key + '.title'}}"></span>
+                                <span class="cl-status is-neutral" th:text="${#numbers.formatInteger(group.count(), 1, 'DEFAULT')}"></span>
+                            </h2>
+                            <!--/* Every offer of the group: the list below stops at the first rows. */-->
+                            <a th:if="${group.count() > 0}" class="cl-link-button" download
+                               th:href="@{${csvHrefBase + '/' + group.name() + '.csv'}}"
+                               th:id="${'offer-matching-' + group.name() + '-csv'}">
+                                <i class="fas fa-download" aria-hidden="true"></i>
+                                <span th:text="#{store.marketplaces.offer.matching.csv.download}"></span>
+                            </a>
+                        </div>
+                        <p class="cl-card-desc" th:text="#{${key + '.description'}}"></p>
+
+                        <p th:if="${group.count() == 0}" class="cl-list-empty" th:text="#{store.marketplaces.offer.matching.group.empty}"></p>
+
+                        <details th:if="${group.count() > 0}" class="cl-disclosure" th:id="${'offer-matching-' + group.name() + '-rows'}">
+                            <summary th:text="#{store.marketplaces.offer.matching.rows.show(${group.count()})}"></summary>
+                            <div class="cl-disclosure-body">
+                                <table class="cl-table is-products">
+                                    <thead>
+                                    <tr>
+                                        <th scope="col" th:text="#{store.marketplaces.offer.matching.column.offer}"></th>
+                                        <th scope="col" th:text="#{store.marketplaces.offer.matching.column.eans}"></th>
+                                        <th scope="col" th:if="${group.name() == 'toReview'}"
+                                            th:text="#{store.marketplaces.offer.matching.column.reason}"></th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="row : ${group.rows()}">
+                                        <th scope="row" class="cl-table-key" th:attr="data-label=#{store.marketplaces.offer.matching.column.offer}">
+                                            <div th:with="hasTitle=${row.title() != null and !#strings.isEmpty(#strings.trim(row.title()))}, hasKey=${row.sellerOfferKey() != null and !#strings.isEmpty(#strings.trim(row.sellerOfferKey()))}">
+                                                <!--/* name falls back to the SKU, then to a placeholder; the SKU line only when it adds something */-->
+                                                <span th:if="${hasTitle}" th:text="${row.title()}"></span>
+                                                <span th:if="${!hasTitle and hasKey}" th:text="${row.sellerOfferKey()}"></span>
+                                                <span th:if="${!hasTitle and !hasKey}" th:text="#{store.marketplaces.offer.matching.row.untitled}"></span>
+                                                <span th:if="${!row.active()}" class="cl-status is-neutral"
+                                                      th:text="#{store.marketplaces.offer.matching.inactive}"></span>
+                                                <span th:if="${hasTitle and hasKey}" class="cl-table-sub">SKU <span class="cl-table-code" th:text="${row.sellerOfferKey()}"></span></span>
+                                            </div>
+                                        </th>
+                                        <td th:attr="data-label=#{store.marketplaces.offer.matching.column.eans}"
+                                            th:classappend="${row.eans().isEmpty()} ? 'is-empty'">
+                                            <th:block th:each="ean, it : ${row.eans()}"><span class="cl-table-code" th:text="${ean}"></span><th:block th:unless="${it.last}"> · </th:block></th:block>
+                                            <span th:if="${row.eans().isEmpty()}" class="cl-table-empty">—</span>
+                                        </td>
+                                        <td th:if="${group.name() == 'toReview'}"
+                                            th:attr="data-label=#{store.marketplaces.offer.matching.column.reason}">
+                                            <span th:if="${row.reasonKey() != null}" th:text="#{${row.reasonKey()}}"></span>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                                <p th:if="${group.limited()}" class="cl-card-desc cl-card-note"
+                                   th:text="#{store.marketplaces.offer.matching.rows.limited(${group.rows().size()}, ${group.count()})}"></p>
+                            </div>
+                        </details>
+                    </section>
+                </th:block>
+            </div>
+        </div>
+    </section>
+    <script th:src="@{/js/submit-once.js}" defer></script>
+</div>
+</body>
+</html>

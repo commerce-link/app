@@ -65,6 +65,27 @@ class StoreCategoryResolverTest {
     }
 
     @Test
+    void givesEveryMappedPimCategoryIdAtOnce() {
+        // given
+        ProductCatalog catalog = catalog("Podzespoły komputerowe",
+                definition("Obudowa", 1, "PIM-100"),
+                definition("Procesor", 2, "PIM-200"));
+        when(productCatalogRepository.findAll("store-1")).thenReturn(List.of(catalog));
+
+        // when
+        java.util.Map<String, String> names = storeCategoryResolver.categoryNamesByPimCategoryId("store-1");
+
+        // then
+        assertThat(names).containsExactlyInAnyOrderEntriesOf(java.util.Map.of("PIM-100", "Obudowa", "PIM-200", "Procesor"));
+    }
+
+    @Test
+    void givesNoNamesForABlankStoreId() {
+        // when / then
+        assertThat(storeCategoryResolver.categoryNamesByPimCategoryId(" ")).isEmpty();
+    }
+
+    @Test
     void resolvesCollisionInFavourOfLowerSequenceNumber() {
         // given
         ProductCatalog catalog = catalog("Podzespoły komputerowe",

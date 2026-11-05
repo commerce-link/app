@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
+import pl.commercelink.externaloffers.ExternalOfferResolver;
 import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierChoice;
@@ -132,7 +133,7 @@ class OrderDetailsTemplateTest {
         OrderPageModelFactory factory = new OrderPageModelFactory(stores, events, dropship, new DeliveryRedirectResolver(),
                 pl.commercelink.web.orders.DropshipEligibilityStubs.acceptingEverySupplier(), labels, carrierOptions, mock(ProductCatalogRepository.class), mock(TaxonomyCache.class), messages,
                 receiptService, mock(ReceiptAlerts.class), courierAvailable(),
-                pl.commercelink.shipping.ShippingIntegrationNamesFixture.names());
+                pl.commercelink.shipping.ShippingIntegrationNamesFixture.names(), mock(pl.commercelink.externaloffers.ExternalOfferResolver.class));
         ReflectionTestUtils.setField(factory, "appDomain", "https://app.example");
         return factory;
     }
@@ -2689,6 +2690,114 @@ class OrderDetailsTemplateTest {
         assertThat(marks.indexOf("cl-status")).isPositive().isLessThan(marks.indexOf("<details class=\"cl-note is-accent\">"));
         assertThat(marks).doesNotContain("<details class=\"cl-note\">");
         assertThat(cell).doesNotContain("cl-table-pills");
+    }
+
+    @Test
+    void anUnlinkedMarketplaceItemShowsTheBadgeAndTheLinkAction() {
+        // given
+        Order order = order(OrderStatus.New);
+        OrderItem unlinked = unlinkedOfferItem(order, FulfilmentStatus.New);
+
+        // when
+        String html = page(render(order, List.of(unlinked), ADMIN, Set.of()));
+
+        // then
+        String cell = productCell(html, "Krzesło biurowe Ergo");
+        assertThat(cell).contains("<span class=\"cl-status is-warn\">Niepołączona oferta</span>");
+        assertThat(html).contains("data-cl-dialog-open=\"link-offer-dialog\"").contains("data-offer-key=\"PS-1001\"")
+                .containsPattern("data-cl-dialog-open=\"link-offer-dialog\"[^>]*data-link-change=\"false\"[^>]*>Połącz z produktem</a>")
+                .contains("id=\"link-offer-dialog\"")
+                .contains("action=\"/dashboard/orders/" + order.getOrderId() + "/link-offer\"")
+                .contains("name=\"categoryId\"").contains("name=\"productId\"")
+                .doesNotContain("name=\"pimId\"")
+                .doesNotContain("Zmień powiązanie</a>");
+    }
+
+    @Test
+    void theLinkDialogTakesATypedEanCheckedByTheScriptWithItsOwnMessage() {
+        // given
+        Order order = order(OrderStatus.New);
+
+        // when
+        String html = page(render(order, List.of(unlinkedOfferItem(order, FulfilmentStatus.New)), ADMIN, Set.of()));
+
+        // then the browser's own pattern check is gone: it refused spaces inside and spoke the browser's language
+        String input = html.substring(html.indexOf("id=\"link-offer-ean\""));
+        input = input.substring(0, input.indexOf('>'));
+        assertThat(input).contains("name=\"ean\"").doesNotContain("pattern=")
+                .contains("data-invalid=\"EAN musi mieć od 8 do 14 cyfr i poprawną cyfrę kontrolną (ostatnią).\"");
+    }
+
+    @Test
+    void aLinkedOfferItemCanHaveItsLinkChanged() {
+        // given a line the link filled with its EANs, then its supplier removed: it is still linked
+        Order order = order(OrderStatus.New);
+        OrderItem linked = unlinkedOfferItem(order, FulfilmentStatus.New);
+        linked.setSku("2001000000012:2001000000029");
+
+        // when
+        String html = page(render(order, List.of(linked), ADMIN, Set.of()));
+
+        // then
+        assertThat(html).doesNotContain("Niepołączona oferta")
+                .containsPattern("data-cl-dialog-open=\"link-offer-dialog\"[^>]*data-sku=\"2001000000012:2001000000029\"[^>]*data-link-change=\"true\"[^>]*>Zmień powiązanie</a>")
+                .doesNotContain(">Połącz z produktem</a>")
+                .contains("data-submit-link=\"Połącz\"").contains("data-submit-change=\"Zapisz powiązanie\"");
+    }
+
+    @Test
+    void aLegacyItemWithoutAnOfferKeyHasNeitherTheBadgeNorALinkAction() {
+        // given
+        Order order = order(OrderStatus.New);
+        OrderItem legacy = new OrderItem(order.getOrderId(), pl.commercelink.taxonomy.Categories.UNCATEGORIZED,
+                "Stara pozycja", 1, 99, "OLD-1", false, 1);
+        legacy.setStatus(FulfilmentStatus.New);
+
+        // when
+        String html = page(render(order, List.of(legacy), ADMIN, Set.of()));
+
+        // then
+        assertThat(html).doesNotContain("Niepołączona oferta").doesNotContain("data-cl-dialog-open=\"link-offer-dialog\"")
+                .doesNotContain("<span>Połącz z produktem</span>").doesNotContain("<span>Zmień powiązanie</span>")
+                .contains("data-cl-dialog-open=\"assign-sku-dialog\"");
+    }
+
+    @Test
+    void theLinkActionOfAnUnlinkedItemThatIsNoLongerNewIsGreyedWithTheReason() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        OrderItem ordered = unlinkedOfferItem(order, FulfilmentStatus.Ordered);
+
+        // when
+        String html = page(render(order, List.of(ordered), ADMIN, Set.of()));
+
+        // then: the badge goes once the item is in fulfilment; the greyed entry says why it can no longer be linked
+        assertThat(html).doesNotContain("Niepołączona oferta")
+                .containsPattern("<span>Połącz z produktem</span>\\s*<span class=\"cl-menu-reason\">Tylko dla pozycji w stanie Nowy</span>")
+                .doesNotContain("data-cl-dialog-open=\"link-offer-dialog\"");
+    }
+
+    @Test
+    void anUnlinkedItemOfAClosedOrderHasNoBadge() {
+        // given
+        Order order = order(OrderStatus.Cancelled);
+        OrderItem unlinked = unlinkedOfferItem(order, FulfilmentStatus.New);
+
+        // when
+        String html = page(render(order, List.of(unlinked), ADMIN, Set.of()));
+
+        // then
+        assertThat(html).doesNotContain("Niepołączona oferta");
+    }
+
+    private static OrderItem unlinkedOfferItem(Order order, FulfilmentStatus status) {
+        // an imported line nothing recognised keeps the marketplace's product code as its sku
+        OrderItem item = new OrderItem(order.getOrderId(), pl.commercelink.taxonomy.Categories.UNCATEGORIZED,
+                "Krzesło biurowe Ergo", 1, 499, "DMW-1001", false, 0);
+        item.setStatus(status);
+        item.setExternalItemId("DMW-1001");
+        item.setExternalOfferKey("PS-1001");
+        return item;
     }
 
     @Test

@@ -28,6 +28,7 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
+import pl.commercelink.externaloffers.ExternalOfferLinking;
 import pl.commercelink.orders.*;
 import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.exceptions.OrderFilterException;
@@ -229,6 +230,9 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private ReceiptAttemptService receiptAttemptService;
+
+    @Autowired
+    private ExternalOfferLinking externalOfferLinking;
 
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -1291,7 +1295,40 @@ public class OrdersController extends BaseController {
             return refuse(redirectAttributes, orderId, "order.item.assign.sku.locked", locale);
         }
         orderItem.setSku(sku);
+        // a New item's EAN can only come from its offer link; the typed codes replace that link's codes
+        orderItem.setEan(null);
         orderItemsRepository.save(orderItem);
+        return details(orderId);
+    }
+
+    @PostMapping("/dashboard/orders/{orderId}/link-offer")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String linkOffer(@PathVariable String orderId, @RequestParam String itemId,
+                            @RequestParam(required = false) String categoryId,
+                            @RequestParam(required = false) String productId,
+                            @RequestParam(required = false) String ean,
+                            RedirectAttributes redirectAttributes, Locale locale) {
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        // the page of a closed order has no item menu; a stale page must not save a link or fill its items either
+        if (order.isClosed()) {
+            return refuse(redirectAttributes, orderId, "order.item.error.closed", locale);
+        }
+        OrderItem orderItem = requireItem(orderId, itemId);
+        // the rule of "Assign SKU": the codes are filled before fulfilment only
+        if (!orderItem.isNew() || orderItem.isGroup()) {
+            return refuse(redirectAttributes, orderId, "order.item.link.offer.locked", locale);
+        }
+        ExternalOfferLinking.LinkResult result;
+        try {
+            // a typed EAN wins: the dialog clears the product choice when one is typed; spaces alone are a bad EAN
+            result = StringUtils.isNotEmpty(ean)
+                    ? externalOfferLinking.linkEan(getStoreId(), order, itemId, ean, getUserId())
+                    : externalOfferLinking.link(getStoreId(), order, itemId, categoryId, productId, getUserId());
+        } catch (IllegalArgumentException e) {
+            return refuse(redirectAttributes, orderId, e.getMessage(), locale);
+        }
+        OrderFlash.saved(redirectAttributes,
+                messageSource.getMessage("order.item.link.offer.done", new Object[]{result.updatedItems()}, locale));
         return details(orderId);
     }
 

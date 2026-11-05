@@ -80,7 +80,7 @@ class MarketplaceOrdersImportEventListenerTest {
         listener.handleMessage(new MarketplaceOrdersImportEventListener.MarketplaceOrderPayload("Allegro", "store-1"));
 
         // then
-        verify(marketplaceOrderImporter).importOrder(addressed, "Allegro", order);
+        verify(marketplaceOrderImporter).importOrders(addressed, "Allegro", List.of(order));
         verify(storesRepository).save(addressed);
         verify(scheduledExecutionCounter).countCompleted("store-1", ScheduledExecution.ORDERS_IMPORT, "Allegro");
         verify(storesRepository, never()).findAll();

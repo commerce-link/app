@@ -12,6 +12,7 @@ import org.mockito.quality.Strictness;
 import pl.commercelink.marketplace.api.MarketplaceCustomer;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProduct;
+import pl.commercelink.externaloffers.ExternalOfferResolver;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.pim.ScopedPimCatalog;
@@ -35,12 +36,12 @@ class MarketplaceOrderImporterScopeTest {
 
     @Spy private CarrierDictionary carrierDictionary = new CarrierDictionary();
     @Mock private OrdersManager ordersManager;
-    @Mock private pl.commercelink.pim.api.PimCatalog pimCatalog;
     @InjectMocks private MarketplaceOrderImporter importer;
 
     private String importedLineCategory(String storeId) {
-        org.springframework.test.util.ReflectionTestUtils.setField(importer, "pimCatalog", ScopedPimCatalog.of(
-                ScopedPimCatalog.storeEntry("s1-2", "s1", ScopedPimCatalog.STORE_GTIN, MPN, "Monitors")));
+        org.springframework.test.util.ReflectionTestUtils.setField(importer, "offerResolver", new ExternalOfferResolver(
+                null, ScopedPimCatalog.of(ScopedPimCatalog.storeEntry("s1-2", "s1", ScopedPimCatalog.STORE_GTIN, MPN, "Monitors")),
+                null, null, null, null, null));
         Store store = new Store();
         store.setStoreId(storeId);
         store.setFulfilmentConfiguration(new FulfilmentConfiguration());

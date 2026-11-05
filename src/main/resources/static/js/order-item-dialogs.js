@@ -1,9 +1,12 @@
 // Dialogs of the order's items (orders details), opened by dialog.js from the row menu: the menu entry's data
 // attributes (item id, name, sku, category, qty, price, tax) fill the dialog on cl:dialog-open. Assign SKU picks codes
-// from a catalog's pricelist (fetched once per catalog) or typed by hand and joins them with ":"; Assign supplier offers
-// the item's own codes and turns a gross price net with the item's VAT for the hint (the server converts it); Assign
-// from warehouse lists the stock of the item's category; Split bundle keeps the rows numbered rows[0..n] and the total
-// balanced; Serial numbers never submit on Enter; Move previews the target order.
+// from a catalog's pricelist (fetched once per catalog) or typed by hand and joins them with ":"; Link to product (and
+// Change link, the same dialog for an item already recognised) picks one product of the catalog (every product with an
+// EAN, the price where the pricelist has one) and posts its category and product id, or posts an EAN typed by hand,
+// checked for its form and check digit; Assign supplier offers the item's own codes and turns a gross price net
+// with the item's VAT for the hint (the server converts it); Assign from warehouse lists the stock of the item's
+// category; Split bundle keeps the rows numbered rows[0..n] and the total balanced; Serial numbers never submit on
+// Enter; Move previews the target order.
 (function () {
     'use strict';
 
@@ -273,6 +276,194 @@
         form.addEventListener('submit', function (event) {
             if (selected.length === 0) {
                 event.preventDefault();
+            }
+        });
+    })();
+
+    // --- Link offer to product ------------------------------------------------------------------------------------
+    // One product of the catalog (not only the pricelist's available ones), whose category and product id are posted (an
+    // EAN may repeat across products), or a typed EAN for goods in no catalog; one choice clears the other, and the
+    // server links the offer to the EAN and fills the codes.
+    (function () {
+        var dialog = document.getElementById('link-offer-dialog');
+        if (!dialog) {
+            return;
+        }
+        var form = dialog.querySelector('form');
+        var catalog = dialog.querySelector('[data-cl-link-catalog]');
+        var category = dialog.querySelector('[data-cl-link-category]');
+        var search = dialog.querySelector('[data-cl-link-search]');
+        var rows = dialog.querySelector('[data-cl-link-rows]');
+        var categoryId = dialog.querySelector('[data-cl-link-category-id]');
+        var productId = dialog.querySelector('[data-cl-link-product-id]');
+        var ean = dialog.querySelector('[data-cl-link-ean]');
+        var title = dialog.querySelector('#link-offer-title');
+        var current = dialog.querySelector('[data-cl-link-current]');
+        var currentCodes = dialog.querySelector('[data-cl-link-current-codes]');
+        var cache = {};
+
+        // the server's rule: 8 to 14 digits once every space is gone, and the GTIN check digit
+        function eanProblem() {
+            var digits = ean.value.replace(/\s/g, '');
+            if (digits === '') {
+                return '';
+            }
+            if (!/^[0-9]{8,14}$/.test(digits)) {
+                return ean.getAttribute('data-invalid');
+            }
+            var sum = 0;
+            for (var i = digits.length - 2, weight = 3; i >= 0; i--, weight = 4 - weight) {
+                sum += Number(digits.charAt(i)) * weight;
+            }
+            return (10 - sum % 10) % 10 === Number(digits.charAt(digits.length - 1)) ? '' : ean.getAttribute('data-invalid');
+        }
+        var data = [];
+
+        function load(catalogId, done) {
+            if (!catalogId) {
+                data = [];
+                done();
+                return;
+            }
+            if (cache[catalogId]) {
+                data = cache[catalogId];
+                done();
+                return;
+            }
+            fetch(catalog.getAttribute('data-url') + '?catalogId=' + encodeURIComponent(catalogId))
+                .then(function (response) {
+                    return response.ok ? response.json() : [];
+                })
+                .catch(function () {
+                    return [];
+                })
+                .then(function (loaded) {
+                    cache[catalogId] = loaded.filter(function (p) {
+                        return p.categoryId && p.productId;
+                    });
+                    data = cache[catalogId];
+                    done();
+                });
+        }
+
+        function refreshCategories() {
+            var values = data.map(function (p) {
+                return p.category;
+            }).filter(function (value, index, all) {
+                return value && all.indexOf(value) === index;
+            });
+            category.replaceChildren(new Option(category.getAttribute('data-placeholder'), ''));
+            values.forEach(function (value) {
+                category.appendChild(new Option(value, value));
+            });
+            renderTable();
+        }
+
+        function isChosen(p) {
+            return p.categoryId === categoryId.value && p.productId === productId.value;
+        }
+
+        function choose(p) {
+            categoryId.value = p ? p.categoryId : '';
+            productId.value = p ? p.productId : '';
+            if (p) {
+                // the product replaces a typed EAN, so a complaint about that EAN must not block the form
+                ean.value = '';
+                ean.setCustomValidity('');
+            }
+            refreshSubmit();
+        }
+
+        function refreshSubmit() {
+            var ready = !!productId.value || ean.value.trim() !== '';
+            dialog.querySelector('[data-cl-link-submit]').disabled = !ready;
+            dialog.querySelector('[data-cl-link-hint]').hidden = ready;
+        }
+
+        function renderTable() {
+            var term = search.value.trim().toLowerCase();
+            var shown = data.filter(function (p) {
+                return (!category.value || p.category === category.value)
+                    && (!term || [p.name, p.ean, p.mfn].some(function (value) {
+                        return (value || '').toLowerCase().indexOf(term) >= 0;
+                    }));
+            });
+            rows.replaceChildren();
+            shown.forEach(function (p) {
+                var row = document.createElement('tr');
+                row.classList.toggle('is-selected', isChosen(p));
+                var check = document.createElement('td');
+                check.className = 'cl-table-check';
+                var radio = document.createElement('input');
+                radio.type = 'radio';
+                radio.name = 'link-offer-product';
+                radio.className = 'cl-check-input';
+                radio.checked = isChosen(p);
+                radio.setAttribute('aria-label', p.name || p.ean);
+                check.appendChild(radio);
+                row.appendChild(check);
+                cell(row, p.name);
+                cell(row, p.label);
+                cell(row, p.ean, 'cl-table-code');
+                cell(row, p.mfn, 'cl-table-code');
+                // a product the newest pricelist does not carry has no price, not a price of zero
+                cell(row, p.price == null ? '—' : format(p.price), 'is-numeric');
+                row.addEventListener('click', function () {
+                    choose(p);
+                    renderTable();
+                });
+                rows.appendChild(row);
+            });
+            dialog.querySelector('[data-cl-link-none]').hidden = shown.length > 0;
+        }
+
+        dialog.addEventListener('cl:dialog-open', function (event) {
+            var trigger = event.detail.trigger;
+            fillContext(dialog, trigger);
+            dialog.querySelector('[data-cl-link-key]').textContent = trigger.getAttribute('data-offer-key') || '';
+            var change = trigger.getAttribute('data-link-change') === 'true';
+            title.textContent = title.getAttribute(change ? 'data-title-change' : 'data-title-link');
+            var submit = dialog.querySelector('[data-cl-link-submit]');
+            submit.textContent = submit.getAttribute(change ? 'data-submit-change' : 'data-submit-link');
+            current.hidden = !change;
+            currentCodes.textContent = change ? trigger.getAttribute('data-sku') || '' : '';
+            search.value = '';
+            ean.value = '';
+            ean.setCustomValidity('');
+            choose(null);
+            if (!catalog.value && catalog.options.length === 2) {
+                catalog.selectedIndex = 1;
+            }
+            load(catalog.value, refreshCategories);
+        });
+        catalog.addEventListener('change', function () {
+            choose(null);
+            load(catalog.value, refreshCategories);
+        });
+        category.addEventListener('change', renderTable);
+        search.addEventListener('input', renderTable);
+        ean.addEventListener('input', function () {
+            ean.setCustomValidity(eanProblem());
+            if (ean.value.trim() !== '' && productId.value) {
+                choose(null);
+                renderTable();
+            }
+            refreshSubmit();
+        });
+        search.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+            }
+        });
+        form.addEventListener('submit', function (event) {
+            if (ean.value.trim() === '' && (!categoryId.value || !productId.value)) {
+                event.preventDefault();
+                return;
+            }
+            ean.setCustomValidity(eanProblem());
+            if (!ean.checkValidity()) {
+                event.preventDefault();
+                ean.reportValidity();
             }
         });
     })();
