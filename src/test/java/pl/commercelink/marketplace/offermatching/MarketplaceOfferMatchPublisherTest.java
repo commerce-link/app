@@ -90,4 +90,25 @@ class MarketplaceOfferMatchPublisherTest {
         // then
         verify(sentOptions()).delaySeconds(0);
     }
+
+    @Test
+    void ordersAScheduledRunWithTheStartMessageHeldBackByTheDelay() {
+        // when
+        publisher.order("s1", "Empik", Duration.ofSeconds(437));
+
+        // then
+        SqsSendOptions<String> options = sentOptions();
+        verify(options).queue("marketplace-offer-match-queue");
+        verify(options).payload("{\"storeId\":\"s1\",\"marketplace\":\"Empik\"}");
+        verify(options).delaySeconds(437);
+    }
+
+    @Test
+    void capsTheDelayOfAScheduledRunAtWhatSqsAllows() {
+        // when
+        publisher.order("s1", "Empik", Duration.ofMinutes(16));
+
+        // then
+        verify(sentOptions()).delaySeconds(900);
+    }
 }

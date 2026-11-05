@@ -18,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.marketplace.api.MarketplaceProviderDescriptor;
 import pl.commercelink.marketplace.offermatching.MarketplaceOfferMatchPublisher;
+import pl.commercelink.marketplace.offermatching.MarketplaceOfferMatchSchedule;
 import pl.commercelink.marketplace.offermatching.OfferMatchError;
 import pl.commercelink.marketplace.offermatching.OfferMatchProgress;
 import pl.commercelink.marketplace.offermatching.OfferMatchResult;
@@ -42,6 +43,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -64,6 +67,8 @@ class MarketplaceOfferMatchControllerTest {
     @Mock
     private OfferMatchResultStore resultStore;
     @Mock
+    private MarketplaceOfferMatchSchedule schedule;
+    @Mock
     private StoreActivity storeActivity;
     @Mock
     private MarketplaceProviderDescriptor empik;
@@ -74,7 +79,7 @@ class MarketplaceOfferMatchControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new MarketplaceOfferMatchController(storesRepository, marketplaces, publisher, resultStore,
+        controller = new MarketplaceOfferMatchController(storesRepository, marketplaces, publisher, schedule, resultStore,
                 storeActivity, MarketplacesFixture.polishMessages(), Clock.fixed(NOW, ZoneOffset.UTC));
         when(storeActivity.isActive(org.mockito.ArgumentMatchers.any(Store.class))).thenReturn(true);
         givenStoreConnectedTo(STORE_ID, EMPIK);
@@ -488,6 +493,139 @@ class MarketplaceOfferMatchControllerTest {
 
         // then
         verify(publisher).order(STORE_ID, EMPIK);
+    }
+
+    @Test
+    void orderingARunSwitchesDailyMatchingOnBeforeTheRunIsOrdered() {
+        // given
+        when(schedule.set(STORE_ID, EMPIK, true)).thenReturn(true);
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        controller.orderOfferMatching(EMPIK, PL, redirectAttributes);
+
+        // then
+        var order = inOrder(schedule, publisher);
+        order.verify(schedule).set(STORE_ID, EMPIK, true);
+        order.verify(publisher).order(STORE_ID, EMPIK);
+        assertThat((String) redirectAttributes.getFlashAttributes().get(SettingsFlash.SAVED_MESSAGE))
+                .startsWith("Dopasowanie ofert z Empik zlecone")
+                .endsWith("Od teraz dopasowanie uruchomi się też samo co wieczór — wyłączysz to przełącznikiem „Dopasowuj codziennie”.");
+    }
+
+    @Test
+    void orderingARunWithDailyMatchingAlreadyOnDoesNotRepeatTheNotice() {
+        // given
+        when(schedule.set(STORE_ID, EMPIK, true)).thenReturn(false);
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        controller.orderOfferMatching(EMPIK, PL, redirectAttributes);
+
+        // then
+        assertThat((String) redirectAttributes.getFlashAttributes().get(SettingsFlash.SAVED_MESSAGE))
+                .doesNotContain("co wieczór");
+    }
+
+    @Test
+    void aRefusedOrderLeavesDailyMatchingAsItWas() {
+        // given
+        storesRepository.findById(STORE_ID).getMarketplaceIntegration(EMPIK).setLoggedIn(false);
+        when(resultStore.progress("store-2", EMPIK)).thenReturn(Optional.of(running(NOW, 6150)));
+        authenticateAs(STORE_ID, "SUPER_ADMIN");
+
+        // when
+        controller.orderOfferMatching(EMPIK, PL, new RedirectAttributesModelMap());
+        controller.superAdminOrderOfferMatching("store-2", EMPIK, PL, new RedirectAttributesModelMap());
+
+        // then
+        verify(schedule, never()).set(anyString(), anyString(), anyBoolean());
+    }
+
+    @Test
+    void pageShowsDailyMatchingOffForAConnectionThatNeverRanIt() {
+        // given
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.offerMatching(EMPIK, model, PL);
+
+        // then
+        assertThat(model.getAttribute("scheduled")).isEqualTo(false);
+        assertThat(model.getAttribute("scheduleFormAction"))
+                .isEqualTo("/dashboard/store/marketplaces/Empik/offer-matching/schedule");
+    }
+
+    @Test
+    void pageShowsDailyMatchingOnForAScheduledConnection() {
+        // given
+        storesRepository.findById(STORE_ID).getMarketplaceIntegration(EMPIK).setOfferMatchingScheduled(true);
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.offerMatching(EMPIK, model, PL);
+
+        // then
+        assertThat(model.getAttribute("scheduled")).isEqualTo(true);
+    }
+
+    @Test
+    void switchingDailyMatchingOffSavesItAndSaysSoAfterTheRedirect() {
+        // given
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.switchSchedule(EMPIK, false, null, new ExtendedModelMap(), PL, redirectAttributes);
+
+        // then
+        verify(schedule).set(STORE_ID, EMPIK, false);
+        verify(publisher, never()).order(anyString(), anyString());
+        assertThat(view).isEqualTo("redirect:/dashboard/store/marketplaces/Empik/offer-matching");
+        assertThat((String) redirectAttributes.getFlashAttributes().get(SettingsFlash.SAVED_MESSAGE))
+                .isEqualTo("Codzienne dopasowanie ofert z Empik wyłączone.");
+    }
+
+    @Test
+    void switchingDailyMatchingOnWithoutReloadAnswersTheSwitchCard() {
+        // given
+        Model model = new ExtendedModelMap();
+
+        // when
+        String view = controller.switchSchedule(EMPIK, true, "fetch", model, PL, new RedirectAttributesModelMap());
+
+        // then
+        verify(schedule).set(STORE_ID, EMPIK, true);
+        assertThat(view).isEqualTo("store-marketplace-offer-matching :: scheduleForm");
+        assertThat(model.getAttribute("savedMessage")).isEqualTo("Codzienne dopasowanie ofert z Empik włączone.");
+        assertThat(model.getAttribute("scheduleFormAction"))
+                .isEqualTo("/dashboard/store/marketplaces/Empik/offer-matching/schedule");
+    }
+
+    @Test
+    void superAdminSwitchesDailyMatchingOfTheStoreInThePath() {
+        // given
+        authenticateAs(STORE_ID, "SUPER_ADMIN");
+
+        // when
+        String view = controller.superAdminSwitchSchedule("store-2", EMPIK, true, null, new ExtendedModelMap(), PL,
+                new RedirectAttributesModelMap());
+
+        // then
+        verify(schedule).set("store-2", EMPIK, true);
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-2/marketplaces/Empik/offer-matching");
+    }
+
+    @Test
+    void dailyMatchingOfAMarketplaceWithoutOfferListingIsNotFound() {
+        // given
+        when(otherMarketplace.supportsOfferListing()).thenReturn(false);
+        when(marketplaces.descriptor("Allegro")).thenReturn(otherMarketplace);
+        storesRepository.findById(STORE_ID).connectMarketplace("Allegro", false);
+
+        // when / then
+        assertNotFound(() -> controller.switchSchedule("Allegro", true, null, new ExtendedModelMap(), PL,
+                new RedirectAttributesModelMap()));
+        verify(schedule, never()).set(anyString(), anyString(), anyBoolean());
     }
 
     private static void assertNotFound(org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {

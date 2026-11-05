@@ -25,6 +25,15 @@ public class MarketplaceOfferMatchPublisher {
         sqsTemplate.send(QUEUE_NAME, MarketplaceOfferMatchMessage.start(storeId, marketplace).toJson());
     }
 
+    /** The nightly sweep's order: the same start message, held back by SQS so the stores do not all start at once. */
+    public void order(String storeId, String marketplace, Duration delay) {
+        String body = MarketplaceOfferMatchMessage.start(storeId, marketplace).toJson();
+        sqsTemplate.send(to -> to
+                .queue(QUEUE_NAME)
+                .payload(body)
+                .delaySeconds(delaySeconds(delay)));
+    }
+
     /** The next part of a run, held back by SQS for the delay instead of a worker sleeping through it. */
     void continueRun(String storeId, String marketplace, String runId, String cursor, Duration delay) {
         String body = MarketplaceOfferMatchMessage.continuation(storeId, marketplace, runId, cursor).toJson();

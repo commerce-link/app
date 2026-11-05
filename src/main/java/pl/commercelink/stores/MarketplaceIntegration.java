@@ -23,6 +23,12 @@ public class MarketplaceIntegration {
     private String ordersImportSchedule;
     @DynamoDBAttribute(attributeName = "returnsImportSchedule")
     private String returnsImportSchedule;
+    /**
+     * Whether the nightly sweep orders offer matching for this connection. Null on connections saved before the field
+     * existed, read as off; switched on by the operator's first manual run.
+     */
+    @DynamoDBAttribute(attributeName = "offerMatchingScheduled")
+    private Boolean offerMatchingScheduled;
 
     public MarketplaceIntegration() {
     }
@@ -70,5 +76,18 @@ public class MarketplaceIntegration {
 
     public void setReturnsImportSchedule(String returnsImportSchedule) {
         this.returnsImportSchedule = returnsImportSchedule;
+    }
+
+    public Boolean getOfferMatchingScheduled() {
+        return offerMatchingScheduled;
+    }
+
+    public void setOfferMatchingScheduled(Boolean offerMatchingScheduled) {
+        this.offerMatchingScheduled = offerMatchingScheduled;
+    }
+
+    // No get/is prefix: the DynamoDB mapper would take it for a second attribute.
+    public boolean runsOfferMatchingDaily() {
+        return Boolean.TRUE.equals(offerMatchingScheduled);
     }
 }
