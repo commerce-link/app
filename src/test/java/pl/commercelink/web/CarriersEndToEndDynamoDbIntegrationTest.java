@@ -91,7 +91,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         translator = new CarrierTranslator(dictionaries);
         new V025_CreateCarrierTables(client).createTables();
         new V026_LocalDevelopmentCarriersSeed(client).seed();
-        // made-up marketplace and label vocabularies, for the dictionaries the local seed does not have
+        // test vocabularies laid over the seeded ones, so the assertions do not depend on what the local seed holds
         put(CENEO_FORMS, "InPost=InPost", "DPD=DPD", "Poczta Polska=Poczta Polska");
         put(CENEO, "1=InPost", "1=InPost Kurier", "2=DHL", "3=DPD", "4=Poczta Polska");
         put(EMPIK, "INPOST=InPost", "DPD=DPD");
