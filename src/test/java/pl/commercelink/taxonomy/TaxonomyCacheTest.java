@@ -24,50 +24,52 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TaxonomyCacheTest {
 
+    private static final String EAN_1 = "5901234567801";
+    private static final String EAN_2 = "5901234567802";
+    private static final String EAN_3 = "5901234567803";
+
     private TaxonomyCache cache;
 
     @BeforeEach
     void setUp() {
-        TaxonomyRepository repo = Mockito.mock(TaxonomyRepository.class);
-        Mockito.when(repo.loadNewest()).thenReturn(Pair.of("N/A", new ArrayList<>()));
-        cache = new TaxonomyCache(repo);
-        cache.onStartUp();
+        cache = loadedWith(new ArrayList<>());
     }
 
     @Test
     void betterScoreRecordWithoutWeightKeepsPreviousWeight() {
-        cache.add(taxonomy("MFN-1", 10, 1300));
-        cache.add(taxonomyNamed("MFN-1", 1, null, "BetterName"));
+        cache.add(taxonomy(EAN_1, 10, 1300));
+        cache.add(taxonomyNamed(EAN_1, 1, null, "BetterName"));
 
-        Taxonomy result = cache.findByMfn("MFN-1");
+        Taxonomy result = cache.findByEan(EAN_1);
         assertEquals("BetterName", result.name());
         assertEquals(1300, result.netWeightInGrams());
     }
 
     @Test
     void betterScoreRecordWithWeightReplacesEverything() {
-        cache.add(taxonomy("MFN-1", 10, 1300));
-        cache.add(taxonomyNamed("MFN-1", 1, 1500, "BetterName"));
+        cache.add(taxonomy(EAN_1, 10, 1300));
+        cache.add(taxonomyNamed(EAN_1, 1, 1500, "BetterName"));
 
-        Taxonomy result = cache.findByMfn("MFN-1");
+        Taxonomy result = cache.findByEan(EAN_1);
         assertEquals("BetterName", result.name());
         assertEquals(1500, result.netWeightInGrams());
     }
 
     @Test
     void worseScoreRecordWithWeightFillsMissingWeightOnly() {
-        cache.add(taxonomyNamed("MFN-1", 1, null, "BestName"));
-        cache.add(taxonomyNamed("MFN-1", 10, 1300, "WorseName"));
+        cache.add(taxonomyNamed(EAN_1, 1, null, "BestName"));
+        cache.add(taxonomyNamed(EAN_1, 10, 1300, "WorseName"));
 
-        Taxonomy result = cache.findByMfn("MFN-1");
+        Taxonomy result = cache.findByEan(EAN_1);
         assertEquals("BestName", result.name());
         assertEquals(1300, result.netWeightInGrams());
     }
 
     @Test
-    void blankMfnIsNoop() {
+    void blankEanIsNoop() {
         cache.add(taxonomy("", 5, 1300));
         cache.add(taxonomy("   ", 5, 1300));
+        cache.add(taxonomy(null, 5, 1300));
 
         assertEquals(0, cache.size());
     }
@@ -75,9 +77,9 @@ class TaxonomyCacheTest {
     @Test
     void concurrentAddsDoNotDropWeight() throws InterruptedException {
         ExecutorService pool = Executors.newFixedThreadPool(8);
-        Taxonomy bestSource = taxonomyNamed("MFN-1", 5, 1000, "Best");
+        Taxonomy bestSource = taxonomyNamed(EAN_1, 5, 1000, "Best");
         List<Taxonomy> inputs = IntStream.range(0, 200)
-                .mapToObj(i -> taxonomyNamed("MFN-1", 10 + (i % 3), 2000 + (i % 5), "N" + i))
+                .mapToObj(i -> taxonomyNamed(EAN_1, 10 + (i % 3), 2000 + (i % 5), "N" + i))
                 .toList();
 
         pool.submit(() -> cache.add(bestSource));
@@ -85,46 +87,46 @@ class TaxonomyCacheTest {
         pool.shutdown();
         assertTrue(pool.awaitTermination(5, TimeUnit.SECONDS));
 
-        Taxonomy result = cache.findByMfn("MFN-1");
+        Taxonomy result = cache.findByEan(EAN_1);
         assertEquals(1000, result.netWeightInGrams());
         assertEquals("Best", result.name());
     }
 
     @Test
     void mergesNetFromOneAndGrossFromOtherIndependently() {
-        Taxonomy a = new Taxonomy("E", "MFN1", "B", "N", null, 5, 100, null);
-        Taxonomy b = new Taxonomy("E", "MFN1", "B", "N", null, 10, null, 200);
+        Taxonomy a = new Taxonomy(EAN_1, "MFN1", "B", "N", null, 5, 100, null);
+        Taxonomy b = new Taxonomy(EAN_1, "MFN1", "B", "N", null, 10, null, 200);
 
         cache.add(a);
         cache.add(b);
 
-        Taxonomy result = cache.findByMfn("MFN1");
+        Taxonomy result = cache.findByEan(EAN_1);
         assertThat(result.netWeightInGrams()).isEqualTo(100);
         assertThat(result.grossWeightInGrams()).isEqualTo(200);
     }
 
     @Test
     void prefersWeightFromLowestScorePerDimension() {
-        Taxonomy lowScoreNet = new Taxonomy("E", "MFN1", "B", "N", null, 2, 999, null);
-        Taxonomy highScoreBoth = new Taxonomy("E", "MFN1", "B", "N", null, 9, 100, 200);
+        Taxonomy lowScoreNet = new Taxonomy(EAN_1, "MFN1", "B", "N", null, 2, 999, null);
+        Taxonomy highScoreBoth = new Taxonomy(EAN_1, "MFN1", "B", "N", null, 9, 100, 200);
 
         cache.add(highScoreBoth);
         cache.add(lowScoreNet);
 
-        Taxonomy result = cache.findByMfn("MFN1");
+        Taxonomy result = cache.findByEan(EAN_1);
         assertThat(result.netWeightInGrams()).isEqualTo(999);
         assertThat(result.grossWeightInGrams()).isEqualTo(200);
     }
 
     @Test
     void incomingWinsTieBreakForBothDimensions() {
-        Taxonomy first = new Taxonomy("E", "MFN1", "B", "N", null, 5, 100, 200);
-        Taxonomy second = new Taxonomy("E", "MFN1", "B", "N", null, 5, 150, 250);
+        Taxonomy first = new Taxonomy(EAN_1, "MFN1", "B", "N", null, 5, 100, 200);
+        Taxonomy second = new Taxonomy(EAN_1, "MFN1", "B", "N", null, 5, 150, 250);
 
         cache.add(first);
         cache.add(second);
 
-        Taxonomy result = cache.findByMfn("MFN1");
+        Taxonomy result = cache.findByEan(EAN_1);
         assertThat(result.netWeightInGrams()).isEqualTo(150);
         assertThat(result.grossWeightInGrams()).isEqualTo(250);
     }
@@ -132,13 +134,13 @@ class TaxonomyCacheTest {
     @Test
     void categorizedEntryIsNotClobberedByBetterScoreUncategorized() {
         // given
-        cache.add(categorized("MFN-1", "CPU", 10));
+        cache.add(categorized(EAN_1, "CPU", 10));
 
         // when
-        cache.add(uncategorized("MFN-1", 1));
+        cache.add(uncategorized(EAN_1, 1));
 
         // then
-        Taxonomy result = cache.findByMfn("MFN-1");
+        Taxonomy result = cache.findByEan(EAN_1);
         assertEquals("CPU", result.category());
         assertEquals(10, result.dataAccuracyScore());
     }
@@ -146,49 +148,49 @@ class TaxonomyCacheTest {
     @Test
     void incomingCategorizedEntryReplacesUncategorizedDespiteWorseScore() {
         // given
-        cache.add(uncategorized("MFN-1", 1));
+        cache.add(uncategorized(EAN_1, 1));
 
         // when
-        cache.add(categorized("MFN-1", "CPU", 10));
+        cache.add(categorized(EAN_1, "CPU", 10));
 
         // then
-        assertEquals("CPU", cache.findByMfn("MFN-1").category());
+        assertEquals("CPU", cache.findByEan(EAN_1).category());
     }
 
     @Test
     void blankCategoryIsTreatedAsUncategorized() {
         // given
-        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "", 1, null, null));
+        cache.add(new Taxonomy(EAN_1, "MFN-1", "Brand", "Name", "", 1, null, null));
 
         // when
-        cache.add(categorized("MFN-1", "CPU", 10));
+        cache.add(categorized(EAN_1, "CPU", 10));
 
         // then
-        assertEquals("CPU", cache.findByMfn("MFN-1").category());
+        assertEquals("CPU", cache.findByEan(EAN_1).category());
     }
 
     @Test
     void twoCategorizedEntriesStillMergeByScore() {
         // given
-        cache.add(categorized("MFN-1", "CPU", 10));
+        cache.add(categorized(EAN_1, "CPU", 10));
 
         // when
-        cache.add(categorized("MFN-1", "GPU", 1));
+        cache.add(categorized(EAN_1, "GPU", 1));
 
         // then
-        assertEquals("GPU", cache.findByMfn("MFN-1").category());
+        assertEquals("GPU", cache.findByEan(EAN_1).category());
     }
 
     @Test
     void categorizedWinnerStillAdoptsWeightFromUncategorizedEntry() {
         // given
-        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 1, 777, null));
+        cache.add(new Taxonomy(EAN_1, "MFN-1", "Brand", "Name", null, 1, 777, null));
 
         // when
-        cache.add(categorized("MFN-1", "CPU", 10));
+        cache.add(categorized(EAN_1, "CPU", 10));
 
         // then
-        Taxonomy result = cache.findByMfn("MFN-1");
+        Taxonomy result = cache.findByEan(EAN_1);
         assertEquals("CPU", result.category());
         assertEquals(777, result.netWeightInGrams());
     }
@@ -196,13 +198,13 @@ class TaxonomyCacheTest {
     @Test
     void mergePreservesRawCategoryOfWinningPendingEntry() {
         // given
-        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 10, null, 500, "First"));
+        cache.add(new Taxonomy(EAN_1, "MFN-1", "Brand", "Name", null, 10, null, 500, "First"));
 
         // when
-        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 1, 300, null, "Second"));
+        cache.add(new Taxonomy(EAN_1, "MFN-1", "Brand", "Name", null, 1, 300, null, "Second"));
 
         // then
-        Taxonomy result = cache.findByMfn("MFN-1");
+        Taxonomy result = cache.findByEan(EAN_1);
         assertEquals(300, result.netWeightInGrams());
         assertEquals(500, result.grossWeightInGrams());
         assertEquals("Second", result.rawCategory());
@@ -211,13 +213,13 @@ class TaxonomyCacheTest {
     @Test
     void mergePreservesCategoryIdOfWinningEntry() {
         // given
-        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 10, null, 500, "Raw", "111"));
+        cache.add(new Taxonomy(EAN_1, "MFN-1", "Brand", "Name", "CPU", 10, null, 500, "Raw", "111"));
 
         // when
-        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 1, 300, null, "Raw", "999"));
+        cache.add(new Taxonomy(EAN_1, "MFN-1", "Brand", "Name", "CPU", 1, 300, null, "Raw", "999"));
 
         // then
-        Taxonomy result = cache.findByMfn("MFN-1");
+        Taxonomy result = cache.findByEan(EAN_1);
         assertEquals(300, result.netWeightInGrams());
         assertEquals(500, result.grossWeightInGrams());
         assertEquals("999", result.categoryId());
@@ -226,23 +228,66 @@ class TaxonomyCacheTest {
     @Test
     void pimCorrectionWithoutIdReplacesPreviouslyResolvedCategoryId() {
         // given
-        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Karty graficzne", 3, null, null, "Raw", "1613"));
+        cache.add(new Taxonomy(EAN_1, "MFN-1", "Brand", "Name", "Karty graficzne", 3, null, null, "Raw", "1613"));
 
         // when
-        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Karty graficzne", 0, null, null, "Raw", null));
+        cache.add(new Taxonomy(EAN_1, "MFN-1", "Brand", "Name", "Karty graficzne", 0, null, null, "Raw", null));
 
         // then
-        Taxonomy result = cache.findByMfn("MFN-1");
+        Taxonomy result = cache.findByEan(EAN_1);
         assertEquals("Karty graficzne", result.category());
         assertNull(result.categoryId());
     }
 
     @Test
+    void rowsOfOneEanMergeIntoOneRecord() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "SM-G991B", "Samsung", "Galaxy S21", null, 1, null, null));
+
+        // when
+        cache.add(new Taxonomy(EAN_1, "SM-G991BZADEUE", "Samsung", "Galaxy S21 EU", "Smartfony", 10, null, null));
+
+        // then
+        assertEquals(1, cache.size());
+        assertEquals("Smartfony", cache.findByEan(EAN_1).category());
+    }
+
+    @Test
+    void twoEansOfOneProductKeepTwoRecords() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "920-002509", "Logitech", "K120 PL", "Klawiatury", 3, null, null));
+
+        // when
+        cache.add(new Taxonomy(EAN_2, "920-002509", "Logitech", "K120 DE", "Klawiatury", 1, null, null));
+
+        // then
+        assertEquals(2, cache.size());
+        assertEquals("K120 PL", cache.findByEan(EAN_1).name());
+        assertEquals("K120 DE", cache.findByEan(EAN_2).name());
+    }
+
+    @Test
+    void groupTaxonomyIsTheBestRecordOfItsEans() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "MFN-A", "Brand", "Name A", "CPU", 5, null, null));
+        cache.add(new Taxonomy(EAN_2, "MFN-B", "Brand", "Name B", "CPU", 2, null, null));
+        cache.add(new Taxonomy(EAN_3, "MFN-C", "Brand", "Name C", null, 1, null, null));
+        cache.add(new Taxonomy("4006381333931", "MFN-OTHER", "Other", "Other product", "GPU", 0, null, null));
+        InventoryKey key = new InventoryKey(Set.of(EAN_1, EAN_2, EAN_3), Set.of("MFN-OTHER"));
+
+        // when
+        Taxonomy result = cache.find(key);
+
+        // then
+        assertEquals("Name B", result.name());
+    }
+
+    @Test
     void findPrefersCategorizedEntryOverPendingWithBetterScore() {
         // given
-        cache.add(uncategorized("MFN-PENDING", 1));
-        cache.add(categorized("MFN-CAT", "CPU", 10));
-        InventoryKey key = new InventoryKey(Set.of(), Set.of("MFN-PENDING", "MFN-CAT"));
+        cache.add(uncategorized(EAN_1, 1));
+        cache.add(categorized(EAN_2, "CPU", 10));
+        InventoryKey key = new InventoryKey(Set.of(EAN_1, EAN_2), Set.of());
 
         // when
         Taxonomy result = cache.find(key);
@@ -254,14 +299,112 @@ class TaxonomyCacheTest {
     @Test
     void findReturnsPendingEntryWhenNoCategorizedCandidateExists() {
         // given
-        cache.add(uncategorized("MFN-PENDING", 1));
-        InventoryKey key = new InventoryKey(Set.of(), Set.of("MFN-PENDING"));
+        cache.add(uncategorized(EAN_1, 1));
+        InventoryKey key = new InventoryKey(Set.of(EAN_1), Set.of());
 
         // when
         Taxonomy result = cache.find(key);
 
         // then
-        assertEquals("MFN-PENDING", result.mfn());
+        assertEquals(EAN_1, result.ean());
+    }
+
+    @Test
+    void findGivesNothingForAKeyWithoutEan() {
+        // given
+        cache.add(categorized(EAN_1, "CPU", 1));
+
+        // when
+        Taxonomy result = cache.find(InventoryKey.fromMfn("MFN-1"));
+
+        // then
+        assertThat(result).isSameAs(Taxonomy.EMPTY);
+    }
+
+    @Test
+    void findByMfnGivesNothingWhenTheCodeHasTwoBrands() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "920", "Logitech", "Mysz", "Myszki", 1, null, null));
+        cache.add(new Taxonomy(EAN_2, "920", "Genesis", "Kabel", "Kable", 1, null, null));
+
+        // when / then
+        assertNull(cache.findByMfn("920"));
+    }
+
+    @Test
+    void findByMfnGivesTheBestRecordWhenTheCodeHasOneBrand() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "920", "Logitech", "K120 PL", "Klawiatury", 5, null, null));
+        cache.add(new Taxonomy(EAN_2, "920", "logitech ", "K120 DE", "Klawiatury", 2, null, null));
+
+        // when
+        Taxonomy result = cache.findByMfn("920");
+
+        // then
+        assertEquals("K120 DE", result.name());
+    }
+
+    @Test
+    void findByMfnCountsTheBrandsTheCodeCameWith() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "920", "Logitech", "K120", "Klawiatury", 1, null, null));
+        cache.add(new Taxonomy(EAN_1, "920", "Natec", "K120", null, 9, null, null));
+
+        // when / then
+        assertNull(cache.findByMfn("920"));
+    }
+
+    @Test
+    void rowWithoutBrandIsNotFoundByItsCode() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "920", null, "K120", "Klawiatury", 1, null, null));
+
+        // when / then
+        assertNull(cache.findByMfn("920"));
+    }
+
+    @Test
+    void findByMfnGivesNothingForAnUnknownOrBlankCode() {
+        // given
+        cache.add(categorized(EAN_1, "CPU", 1));
+
+        // when / then
+        assertNull(cache.findByMfn("UNKNOWN"));
+        assertNull(cache.findByMfn(null));
+        assertNull(cache.findByMfn(" "));
+    }
+
+    @Test
+    void fileWithOneRowPerCodeLoadsByEan() {
+        // given
+        TaxonomyCache loaded = loadedWith(List.of(
+                new Taxonomy(EAN_1, "MFN-A", "Brand", "Name A", "CPU", 5, null, null),
+                new Taxonomy(EAN_1, "MFN-B", "Brand", "Name B", "CPU", 2, null, null),
+                new Taxonomy(EAN_2, "MFN-C", "Brand", "Name C", "GPU", 3, null, null)));
+
+        // when / then
+        assertEquals(2, loaded.size());
+        assertEquals("Name B", loaded.findByEan(EAN_1).name());
+        assertEquals("Name B", loaded.findByMfn("MFN-A").name());
+        assertEquals("Name C", loaded.findByMfn("MFN-C").name());
+    }
+
+    @Test
+    void startUpReplacesWhatWasInMemory() {
+        // given
+        TaxonomyRepository repo = Mockito.mock(TaxonomyRepository.class);
+        Mockito.when(repo.loadNewest()).thenReturn(Pair.of("N/A", new ArrayList<>()));
+        TaxonomyCache reloaded = new TaxonomyCache(repo);
+        reloaded.onStartUp();
+        reloaded.add(categorized(EAN_1, "CPU", 1));
+        Mockito.when(repo.loadNewest()).thenReturn(Pair.of("snapshot.csv", List.of(uncategorized(EAN_1, 5))));
+
+        // when
+        reloaded.onStartUp();
+
+        // then
+        assertNull(reloaded.findByEan(EAN_1).category());
+        assertEquals(1, reloaded.pendingCount());
     }
 
     @Test
@@ -325,14 +468,14 @@ class TaxonomyCacheTest {
     @Test
     void updateCategorySetsCategoryOnPendingEntryKeepingScoreAndWeights() {
         // given
-        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 7, 100, 200));
+        cache.add(new Taxonomy(EAN_1, "MFN-1", "Brand", "Name", null, 7, 100, 200));
 
         // when
-        boolean updated = cache.updateCategory("MFN-1", "CPU", "301");
+        boolean updated = cache.updateCategory(EAN_1, "CPU", "301");
 
         // then
         assertTrue(updated);
-        Taxonomy result = cache.findByMfn("MFN-1");
+        Taxonomy result = cache.findByEan(EAN_1);
         assertEquals("CPU", result.category());
         assertEquals("301", result.categoryId());
         assertEquals(7, result.dataAccuracyScore());
@@ -340,75 +483,91 @@ class TaxonomyCacheTest {
         assertEquals(200, result.grossWeightInGrams());
 
         // free-text categories are accepted, not limited to a whitelist
-        cache.add(uncategorized("MFN-2", 7));
-        assertTrue(cache.updateCategory("MFN-2", "Cokolwiek", "999"));
-        assertEquals("Cokolwiek", cache.findByMfn("MFN-2").category());
+        cache.add(uncategorized(EAN_2, 7));
+        assertTrue(cache.updateCategory(EAN_2, "Cokolwiek", "999"));
+        assertEquals("Cokolwiek", cache.findByEan(EAN_2).category());
     }
 
     @Test
-    void updateCategoryIgnoresBlankMfnAndNullCategory() {
+    void updateCategoryGoesOnlyToTheRecordOfItsEan() {
         // given
-        cache.add(uncategorized("MFN-1", 7));
+        cache.add(new Taxonomy(EAN_1, "920", "Logitech", "Mysz", null, 7, null, null));
+        cache.add(new Taxonomy(EAN_2, "920", "Genesis", "Kabel", null, 7, null, null));
+
+        // when
+        cache.updateCategory(EAN_1, "Myszki", "301");
+
+        // then
+        assertEquals("Myszki", cache.findByEan(EAN_1).category());
+        assertNull(cache.findByEan(EAN_2).category());
+        assertEquals(1, cache.pendingCount());
+    }
+
+    @Test
+    void updateCategoryIgnoresBlankEanAndNullCategory() {
+        // given
+        cache.add(uncategorized(EAN_1, 7));
 
         // when / then
         assertFalse(cache.updateCategory("", "CPU", null));
         assertFalse(cache.updateCategory("   ", "CPU", null));
-        assertFalse(cache.updateCategory("MFN-1", null, null));
-        assertFalse(cache.updateCategory("MFN-1", "", null));
-        assertNull(cache.findByMfn("MFN-1").category());
+        assertFalse(cache.updateCategory(null, "CPU", "301"));
+        assertFalse(cache.updateCategory(EAN_1, null, null));
+        assertFalse(cache.updateCategory(EAN_1, "", null));
+        assertNull(cache.findByEan(EAN_1).category());
     }
 
     @Test
     void updateCategoryRejectsResolutionWithoutCategoryIdAndLeavesRowPending() {
         // given
-        cache.add(uncategorized("MFN-1", 7));
+        cache.add(uncategorized(EAN_1, 7));
 
         // when
-        boolean updated = cache.updateCategory("MFN-1", "CPU", null);
+        boolean updated = cache.updateCategory(EAN_1, "CPU", null);
 
         // then
         assertFalse(updated);
         assertEquals(1, cache.pendingCount());
-        assertFalse(TaxonomyCache.hasCategory(cache.findByMfn("MFN-1")));
+        assertFalse(TaxonomyCache.hasCategory(cache.findByEan(EAN_1)));
     }
 
     @Test
     void rejectedResolutionCanBeRetriedLaterWithAnId() {
         // given
-        cache.add(uncategorized("MFN-1", 7));
-        cache.updateCategory("MFN-1", "CPU", " ");
+        cache.add(uncategorized(EAN_1, 7));
+        cache.updateCategory(EAN_1, "CPU", " ");
 
         // when
-        boolean updated = cache.updateCategory("MFN-1", "CPU", "989");
+        boolean updated = cache.updateCategory(EAN_1, "CPU", "989");
 
         // then
         assertTrue(updated);
         assertEquals(0, cache.pendingCount());
-        assertEquals("989", cache.findByMfn("MFN-1").categoryId());
+        assertEquals("989", cache.findByEan(EAN_1).categoryId());
     }
 
     @Test
     void updateCategoryIgnoresMissingEntry() {
         // when / then
-        assertFalse(cache.updateCategory("MFN-GONE", "CPU", "989"));
+        assertFalse(cache.updateCategory(EAN_3, "CPU", "989"));
     }
 
     @Test
     void updateCategoryDoesNotOverwriteAlreadyCategorizedEntry() {
         // given
-        cache.add(categorized("MFN-1", "GPU", 7));
+        cache.add(categorized(EAN_1, "GPU", 7));
 
         // when / then
-        assertFalse(cache.updateCategory("MFN-1", "CPU", "989"));
-        assertEquals("GPU", cache.findByMfn("MFN-1").category());
+        assertFalse(cache.updateCategory(EAN_1, "CPU", "989"));
+        assertEquals("GPU", cache.findByEan(EAN_1).category());
     }
 
     @Test
     void pendingCountTracksEntriesWithoutCategory() {
         // when
-        cache.add(uncategorized("MFN-1", 5));
-        cache.add(uncategorized("MFN-1", 3));
-        cache.add(categorized("MFN-2", "CPU", 5));
+        cache.add(uncategorized(EAN_1, 5));
+        cache.add(uncategorized(EAN_1, 3));
+        cache.add(categorized(EAN_2, "CPU", 5));
 
         // then
         assertEquals(1, cache.pendingCount());
@@ -417,11 +576,11 @@ class TaxonomyCacheTest {
     @Test
     void pendingCountDropsWhenCategorizedAddOvertakesPendingEntry() {
         // given
-        cache.add(uncategorized("MFN-1", 1));
+        cache.add(uncategorized(EAN_1, 1));
         assertEquals(1, cache.pendingCount());
 
         // when
-        cache.add(categorized("MFN-1", "CPU", 10));
+        cache.add(categorized(EAN_1, "CPU", 10));
 
         // then
         assertEquals(0, cache.pendingCount());
@@ -430,11 +589,11 @@ class TaxonomyCacheTest {
     @Test
     void pendingCountDropsOnceForRepeatedUpdateCategory() {
         // given
-        cache.add(uncategorized("MFN-1", 7));
+        cache.add(uncategorized(EAN_1, 7));
 
         // when
-        cache.updateCategory("MFN-1", "CPU", "989");
-        cache.updateCategory("MFN-1", "GPU", "170");
+        cache.updateCategory(EAN_1, "CPU", "989");
+        cache.updateCategory(EAN_1, "GPU", "170");
 
         // then
         assertEquals(0, cache.pendingCount());
@@ -442,17 +601,53 @@ class TaxonomyCacheTest {
 
     @Test
     void pendingCountIncludesSnapshotRowsLoadedWithoutCategory() {
-        // given
-        TaxonomyRepository repo = Mockito.mock(TaxonomyRepository.class);
-        Mockito.when(repo.loadNewest()).thenReturn(Pair.of("snapshot.csv",
-                List.of(uncategorized("MFN-1", 5), categorized("MFN-2", "CPU", 5))));
-        TaxonomyCache loaded = new TaxonomyCache(repo);
-
         // when
-        loaded.onStartUp();
+        TaxonomyCache loaded = loadedWith(List.of(uncategorized(EAN_1, 5), categorized(EAN_2, "CPU", 5)));
 
         // then
         assertEquals(1, loaded.pendingCount());
+    }
+
+    @Test
+    void losingRowLeavesTheStoredRecordUntouched() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "MFN-1", "Brand", "Name", "CPU", 1, 100, 200));
+        Taxonomy stored = cache.findByEan(EAN_1);
+        Taxonomy losing = new Taxonomy(EAN_1, "MFN-2", "Brand", "Other name", "GPU", 5, 300, 400);
+
+        // when
+        cache.add(losing);
+
+        // then
+        assertThat(cache.findByEan(EAN_1)).isSameAs(stored);
+    }
+
+    @Test
+    void rowEqualToTheStoredRecordDoesNotReplaceIt() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "MFN-1", "Brand", "Name", "CPU", 1, 100, 200, "Raw", "301"));
+        Taxonomy stored = cache.findByEan(EAN_1);
+
+        // when
+        cache.add(new Taxonomy(EAN_1, "MFN-1", new String("Brand"), "Name", new String("CPU"), 1, 100, 200,
+                "Raw", new String("301")));
+
+        // then
+        assertThat(cache.findByEan(EAN_1)).isSameAs(stored);
+    }
+
+    @Test
+    void storedRecordIsInternedOnlyWhenItWins() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "MFN-1", "Brand", "Name", "CPU", 1, 100, 200));
+        cache.add(new Taxonomy(EAN_1, "MFN-1", new String("Loser"), "Name", "CPU", 5, 100, 200));
+        String winnerBrand = new String("Loser");
+
+        // when
+        cache.add(new Taxonomy(EAN_2, "MFN-2", winnerBrand, "Name", "CPU", 1, 100, 200));
+
+        // then
+        assertThat(cache.findByEan(EAN_2).brand()).isSameAs(winnerBrand);
     }
 
     @ParameterizedTest(name = "{0}")
@@ -472,18 +667,15 @@ class TaxonomyCacheTest {
 
         // when
         if (viaStartUp) {
-            TaxonomyRepository repo = Mockito.mock(TaxonomyRepository.class);
-            Mockito.when(repo.loadNewest()).thenReturn(Pair.of("snapshot.csv", List.of(first, second)));
-            target = new TaxonomyCache(repo);
-            target.onStartUp();
+            target = loadedWith(List.of(first, second));
         } else {
             cache.add(first);
             cache.add(second);
         }
 
         // then
-        Taxonomy stored1 = target.findByMfn(firstMfn);
-        Taxonomy stored2 = target.findByMfn(secondMfn);
+        Taxonomy stored1 = target.findByEan(firstEan);
+        Taxonomy stored2 = target.findByEan(secondEan);
         assertThat(stored1.brand()).isSameAs(stored2.brand());
         assertThat(stored1.category()).isSameAs(stored2.category());
         assertThat(stored1.categoryId()).isSameAs(stored2.categoryId());
@@ -492,16 +684,16 @@ class TaxonomyCacheTest {
     @Test
     void updateCategoryInternsCategoryAndCategoryIdAcrossEntries() {
         // given
-        cache.add(uncategorized("MFN-1", 7));
-        cache.add(uncategorized("MFN-2", 7));
+        cache.add(uncategorized(EAN_1, 7));
+        cache.add(uncategorized(EAN_2, 7));
 
         // when
-        cache.updateCategory("MFN-1", new String("CPU"), new String("301"));
-        cache.updateCategory("MFN-2", new String("CPU"), new String("301"));
+        cache.updateCategory(EAN_1, new String("CPU"), new String("301"));
+        cache.updateCategory(EAN_2, new String("CPU"), new String("301"));
 
         // then
-        Taxonomy stored1 = cache.findByMfn("MFN-1");
-        Taxonomy stored2 = cache.findByMfn("MFN-2");
+        Taxonomy stored1 = cache.findByEan(EAN_1);
+        Taxonomy stored2 = cache.findByEan(EAN_2);
         assertThat(stored1.category()).isSameAs(stored2.category());
         assertThat(stored1.categoryId()).isSameAs(stored2.categoryId());
     }
@@ -509,25 +701,25 @@ class TaxonomyCacheTest {
     @Test
     void updateCategorySharesPoolWithValuesAddedViaAdd() {
         // given
-        cache.add(categorized("MFN-1", new String("CPU"), 10));
-        cache.add(uncategorized("MFN-2", 7));
+        cache.add(categorized(EAN_1, new String("CPU"), 10));
+        cache.add(uncategorized(EAN_2, 7));
 
         // when
-        cache.updateCategory("MFN-2", new String("CPU"), "301");
+        cache.updateCategory(EAN_2, new String("CPU"), "301");
 
         // then
-        Taxonomy stored1 = cache.findByMfn("MFN-1");
-        Taxonomy stored2 = cache.findByMfn("MFN-2");
+        Taxonomy stored1 = cache.findByEan(EAN_1);
+        Taxonomy stored2 = cache.findByEan(EAN_2);
         assertThat(stored1.category()).isSameAs(stored2.category());
     }
 
     @Test
     void poolingHandlesNullBrandCategoryAndCategoryIdWithoutThrowing() {
         // when
-        cache.add(new Taxonomy("1234567890123", "MFN-1", null, "Name", null, 1, null, null, null, null));
+        cache.add(new Taxonomy(EAN_1, "MFN-1", null, "Name", null, 1, null, null, null, null));
 
         // then
-        Taxonomy result = cache.findByMfn("MFN-1");
+        Taxonomy result = cache.findByEan(EAN_1);
         assertThat(result.brand()).isNull();
         assertThat(result.category()).isNull();
         assertThat(result.categoryId()).isNull();
@@ -543,25 +735,32 @@ class TaxonomyCacheTest {
         cache.add(input);
 
         // then
-        Taxonomy result = cache.findByMfn("MFN-ZERO");
+        Taxonomy result = cache.findByEan("0012345678905");
         assertThat(result.ean()).isEqualTo("0012345678905");
         assertThat(result).isEqualTo(input);
     }
 
-    private static Taxonomy taxonomy(String mfn, int score, Integer weight) {
-        return taxonomyNamed(mfn, score, weight, "Name");
+    private static TaxonomyCache loadedWith(List<Taxonomy> rows) {
+        TaxonomyRepository repo = Mockito.mock(TaxonomyRepository.class);
+        Mockito.when(repo.loadNewest()).thenReturn(Pair.of("snapshot.csv", rows));
+        TaxonomyCache loaded = new TaxonomyCache(repo);
+        loaded.onStartUp();
+        return loaded;
     }
 
-    private static Taxonomy taxonomyNamed(String mfn, int score, Integer weight, String name) {
-        return new Taxonomy("1234567890123", mfn, "Brand", name,
-                "Laptops", score, weight, null);
+    private static Taxonomy taxonomy(String ean, int score, Integer weight) {
+        return taxonomyNamed(ean, score, weight, "Name");
     }
 
-    private static Taxonomy categorized(String mfn, String category, int score) {
-        return new Taxonomy("1234567890123", mfn, "Brand", "Name", category, score, null, null);
+    private static Taxonomy taxonomyNamed(String ean, int score, Integer weight, String name) {
+        return new Taxonomy(ean, "MFN-1", "Brand", name, "Laptops", score, weight, null);
     }
 
-    private static Taxonomy uncategorized(String mfn, int score) {
-        return new Taxonomy("1234567890123", mfn, "Brand", "Name", null, score, null, null);
+    private static Taxonomy categorized(String ean, String category, int score) {
+        return new Taxonomy(ean, "MFN-1", "Brand", "Name", category, score, null, null);
+    }
+
+    private static Taxonomy uncategorized(String ean, int score) {
+        return new Taxonomy(ean, "MFN-1", "Brand", "Name", null, score, null, null);
     }
 }

@@ -51,9 +51,6 @@ public class TaxonomyGenerator {
         if (freshName == null || freshName.equals(taxonomy.category())) {
             return taxonomy;
         }
-        return new Taxonomy(taxonomy.ean(), taxonomy.mfn(), taxonomy.brand(), taxonomy.name(),
-                freshName, taxonomy.dataAccuracyScore(),
-                taxonomy.netWeightInGrams(), taxonomy.grossWeightInGrams(),
-                taxonomy.rawCategory(), taxonomy.categoryId());
+        return taxonomy.withCategory(freshName, taxonomy.categoryId());
     }
 }

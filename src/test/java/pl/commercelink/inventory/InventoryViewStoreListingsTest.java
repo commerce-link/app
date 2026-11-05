@@ -474,13 +474,14 @@ class InventoryViewStoreListingsTest {
 
     @Test
     void productReachableThroughTwoSelectedCategoriesAppearsExactlyOnce() {
-        // given — pre-merge lookup key carries only MFN-A (categoryId "194", worse score);
-        // a second InventorySource merges in MFN-B during assemble() (categoryId "195", better/lower score) —
-        // grouping must use the pre-merge taxonomy, landing the product in "194" and never in "195"
+        // given — pre-merge lookup key carries only EAN (categoryId "194", worse score);
+        // a second InventorySource merges in a second EAN of the same code during assemble() (categoryId "195",
+        // better/lower score) — grouping must use the pre-merge taxonomy, landing the product in "194" and never in "195"
+        String secondEan = "5901234567891";
         TaxonomyRepository taxonomyRepository = org.mockito.Mockito.mock(TaxonomyRepository.class);
         TaxonomyCache realCache = new TaxonomyCache(taxonomyRepository);
         realCache.add(new Taxonomy(EAN, "MFN-A", "Logitech", "K120", "Klawiatury", 2, null, null, null, "194"));
-        realCache.add(new Taxonomy(EAN, "MFN-B", "Logitech", "K120", "Myszki", 1, null, null, null, "195"));
+        realCache.add(new Taxonomy(secondEan, "MFN-A", "Logitech", "K120", "Myszki", 1, null, null, null, "195"));
 
         InventoryKey keyA = new InventoryKey(EAN, "MFN-A");
         MatchedInventory groupA = new MatchedInventory(keyA,
@@ -488,9 +489,9 @@ class InventoryViewStoreListingsTest {
                 realCache, supplierRegistry);
         InventoryIndex globalIndex = InventoryIndex.of(List.of(groupA));
 
-        InventoryKey keyB = new InventoryKey(EAN, "MFN-B");
+        InventoryKey keyB = new InventoryKey(secondEan, "MFN-A");
         MatchedInventory groupB = new MatchedInventory(keyB,
-                List.of(new InventoryItem(EAN, "MFN-B", 90.0, "PLN", 5, 1, "AB Group", true, true, false)),
+                List.of(new InventoryItem(secondEan, "MFN-A", 90.0, "PLN", 5, 1, "AB Group", true, true, false)),
                 realCache, supplierRegistry);
         InventoryIndex mergingIndex = InventoryIndex.of(List.of(groupB));
 
