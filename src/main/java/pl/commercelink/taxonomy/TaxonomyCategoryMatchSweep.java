@@ -10,6 +10,8 @@ import pl.commercelink.taxonomy.mapping.CategoryMappingCache;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
@@ -40,10 +42,10 @@ class TaxonomyCategoryMatchSweep {
                 resolvedFromMapping++;
                 continue;
             }
-            if (Math.floorMod(taxonomy.mfn().hashCode(), properties.buckets()) != bucket) {
+            if (slotOf(taxonomy, properties.buckets()) != bucket) {
                 continue;
             }
-            if (attempts.exhausted(taxonomy.mfn(), properties.maxAttempts())) {
+            if (attempts.exhausted(taxonomy.ean(), properties.maxAttempts())) {
                 givenUp++;
                 continue;
             }
@@ -51,7 +53,7 @@ class TaxonomyCategoryMatchSweep {
                 pimCatalog.submitCategoryMatch(new CategoryMatchRequest(
                         null, taxonomy.ean(), taxonomy.mfn(), taxonomy.brand(), taxonomy.name(), taxonomy.rawCategory()));
                 submitted++;
-                attempts.record(taxonomy.mfn());
+                attempts.record(taxonomy.ean());
             } catch (IllegalStateException e) {
                 log.warn("Category match sweep aborted: {}", e.getMessage());
                 return;
@@ -64,10 +66,10 @@ class TaxonomyCategoryMatchSweep {
     }
 
     private boolean resolveFromMapping(Taxonomy taxonomy) {
-        if (Math.floorMod(taxonomy.mfn().hashCode(), properties.mapping().trickleEvery()) == 0) {
+        if (slotOf(taxonomy, properties.mapping().trickleEvery()) == 0) {
             return false;
         }
-        String supplier = enrichment.supplierOf(taxonomy.mfn());
+        String supplier = enrichment.supplierOf(taxonomy.ean());
         if (supplier == null) {
             return false;
         }
@@ -75,8 +77,12 @@ class TaxonomyCategoryMatchSweep {
                 .map(mapping -> taxonomyCache.updateCategory(taxonomy.ean(), mapping.categoryName(), mapping.categoryId()))
                 .orElse(false);
         if (resolved) {
-            attempts.clear(taxonomy.mfn());
+            attempts.clear(taxonomy.ean());
         }
         return resolved;
+    }
+
+    private static int slotOf(Taxonomy taxonomy, int slots) {
+        return Math.floorMod(unifyEan(taxonomy.ean()).hashCode(), slots);
     }
 }

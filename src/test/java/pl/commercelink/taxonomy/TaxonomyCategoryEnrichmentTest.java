@@ -167,14 +167,53 @@ class TaxonomyCategoryEnrichmentTest {
     }
 
     @Test
-    void addPendingRecordsSupplierForMfn() {
+    void addPendingRecordsSupplierForEan() {
         // when
         enrichment.addPending(taxonomy(EAN_1, "MFN-1", null, 10), "Acme");
         enrichment.addPending(taxonomy(EAN_2, "MFN-2", null, 10), null);
 
         // then
-        assertEquals("Acme", enrichment.supplierOf("MFN-1"));
-        assertNull(enrichment.supplierOf("MFN-2"));
+        assertEquals("Acme", enrichment.supplierOf(EAN_1));
+        assertEquals("Acme", enrichment.supplierOf("0" + EAN_1));
+        assertNull(enrichment.supplierOf(EAN_2));
+    }
+
+    @Test
+    void twoEansUnderOneCodeKeepTheirOwnSuppliers() {
+        // when
+        enrichment.addPending(taxonomy(EAN_1, "3539", null, 10), "Acme");
+        enrichment.addPending(taxonomy(EAN_2, "3539", null, 10), "Kosatec");
+
+        // then
+        assertEquals("Acme", enrichment.supplierOf(EAN_1));
+        assertEquals("Kosatec", enrichment.supplierOf(EAN_2));
+    }
+
+    @Test
+    void mappingIsLearnedForTheSupplierOfTheMatchedEan() {
+        // given
+        enrichment.addPending(new Taxonomy(EAN_1, "3539", "SIKU", "Betoniarka 1:50", null, 10, null, null, "Pojazdy"), "Acme");
+        enrichment.addPending(new Taxonomy(EAN_2, "3539", "Bestway", "Basen", null, 10, null, null, "Baseny"), "Kosatec");
+
+        // when
+        enrichment.applyMatch(new CategoryMatchedEvent(EAN_1, "3539", "Modele pojazdów", "301", 0.95, "gemini"));
+
+        // then
+        verify(mappingCache).recordSample("Acme", "Pojazdy", "301", "Modele pojazdów");
+        assertEquals("Kosatec", enrichment.supplierOf(EAN_2));
+    }
+
+    @Test
+    void matchWithoutCodeStillGoesToItsEan() {
+        // given
+        enrichment.addPending(taxonomy(EAN_1, "MFN-1", null, 10), "Acme");
+
+        // when
+        enrichment.applyMatch(new CategoryMatchedEvent(EAN_1, null, "CPU", "301", 0.95, "gemini"));
+
+        // then
+        assertEquals("CPU", cache.findByEan(EAN_1).category());
+        assertEquals(0, enrichment.pendingCount());
     }
 
     @Test

@@ -8,6 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
 
 @Component
 public class TaxonomyCategoryEnrichment {
@@ -16,7 +17,7 @@ public class TaxonomyCategoryEnrichment {
     private final TaxonomyCategoryMatchProperties properties;
     private final CategoryMappingCache mappingCache;
     private final CategoryMatchAttempts attempts;
-    private final ConcurrentHashMap<String, String> supplierByMfn = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> supplierByEan = new ConcurrentHashMap<>();
 
     TaxonomyCategoryEnrichment(TaxonomyCache taxonomyCache, TaxonomyCategoryMatchProperties properties,
                                CategoryMappingCache mappingCache, CategoryMatchAttempts attempts) {
@@ -47,23 +48,22 @@ public class TaxonomyCategoryEnrichment {
     }
 
     public void addPending(Taxonomy taxonomy, String supplier) {
-        if (isNotBlank(supplier) && isNotBlank(taxonomy.mfn())) {
-            supplierByMfn.put(taxonomy.mfn(), supplier);
+        if (isNotBlank(supplier) && isNotBlank(taxonomy.ean())) {
+            supplierByEan.put(unifyEan(taxonomy.ean()), supplier);
         }
         taxonomyCache.add(taxonomy);
     }
 
-    public String supplierOf(String mfn) {
-        return supplierByMfn.get(mfn);
+    public String supplierOf(String ean) {
+        return supplierByEan.get(unifyEan(ean));
     }
 
     public void applyMatch(CategoryMatchedEvent event) {
-        if (event == null || event.mfn() == null
-                || event.category() == null || event.category().isBlank()) {
+        if (event == null || event.category() == null || event.category().isBlank()) {
             return;
         }
         if (taxonomyCache.updateCategory(event.ean(), event.category(), event.categoryId())) {
-            attempts.clear(event.mfn());
+            attempts.clear(event.ean());
             System.out.println("Category match applied: mfn=" + event.mfn()
                     + " category=" + event.category() + " source=" + event.source());
             learnMapping(event);
@@ -71,7 +71,7 @@ public class TaxonomyCategoryEnrichment {
     }
 
     private void learnMapping(CategoryMatchedEvent event) {
-        String supplier = supplierByMfn.remove(event.mfn());
+        String supplier = supplierByEan.remove(unifyEan(event.ean()));
         if (supplier == null || isBlank(event.categoryId())) {
             return;
         }

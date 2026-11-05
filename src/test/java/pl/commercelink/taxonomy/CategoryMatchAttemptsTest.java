@@ -6,14 +6,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CategoryMatchAttemptsTest {
 
+    private static final String EAN_1 = "5901234567801";
+    private static final String EAN_2 = "5901234567802";
+
     private final CategoryMatchAttempts attempts = new CategoryMatchAttempts();
 
     @Test
-    void recordIncrementsPerMfn() {
+    void recordIncrementsPerEan() {
         // when
-        int first = attempts.record("MFN-1");
-        int second = attempts.record("MFN-1");
-        int other = attempts.record("MFN-2");
+        int first = attempts.record(EAN_1);
+        int second = attempts.record(EAN_1);
+        int other = attempts.record(EAN_2);
 
         // then
         assertThat(first).isEqualTo(1);
@@ -23,44 +26,57 @@ class CategoryMatchAttemptsTest {
     }
 
     @Test
+    void eanWithLeadingZerosCountsAsTheSameProduct() {
+        // given
+        attempts.record("0" + EAN_1);
+
+        // when
+        int second = attempts.record(EAN_1);
+
+        // then
+        assertThat(second).isEqualTo(2);
+        assertThat(attempts.exhausted("00" + EAN_1, 2)).isTrue();
+    }
+
+    @Test
     void exhaustedRespectsThreshold() {
         // given
-        attempts.record("MFN-1");
-        attempts.record("MFN-1");
+        attempts.record(EAN_1);
+        attempts.record(EAN_1);
 
         // when / then
-        assertThat(attempts.exhausted("MFN-1", 3)).isFalse();
-        assertThat(attempts.exhausted("MFN-1", 2)).isTrue();
-        assertThat(attempts.exhausted("MFN-UNKNOWN", 2)).isFalse();
+        assertThat(attempts.exhausted(EAN_1, 3)).isFalse();
+        assertThat(attempts.exhausted(EAN_1, 2)).isTrue();
+        assertThat(attempts.exhausted(EAN_2, 2)).isFalse();
     }
 
     @Test
     void zeroMaxAttemptsNeverExhausts() {
         // given
-        attempts.record("MFN-1");
-        attempts.record("MFN-1");
+        attempts.record(EAN_1);
+        attempts.record(EAN_1);
 
         // when / then
-        assertThat(attempts.exhausted("MFN-1", 0)).isFalse();
+        assertThat(attempts.exhausted(EAN_1, 0)).isFalse();
     }
 
     @Test
     void clearResetsCounter() {
         // given
-        attempts.record("MFN-1");
-        attempts.record("MFN-1");
+        attempts.record(EAN_1);
+        attempts.record(EAN_1);
 
         // when
-        attempts.clear("MFN-1");
+        attempts.clear("0" + EAN_1);
 
         // then
-        assertThat(attempts.exhausted("MFN-1", 1)).isFalse();
+        assertThat(attempts.exhausted(EAN_1, 1)).isFalse();
         assertThat(attempts.trackedCount()).isZero();
-        assertThat(attempts.record("MFN-1")).isEqualTo(1);
+        assertThat(attempts.record(EAN_1)).isEqualTo(1);
     }
 
     @Test
-    void nullAndBlankMfnAreIgnored() {
+    void nullAndBlankEanAreIgnored() {
         // when / then
         assertThat(attempts.record(null)).isZero();
         assertThat(attempts.record("  ")).isZero();
