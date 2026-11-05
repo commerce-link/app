@@ -265,6 +265,56 @@ class TaxonomyCacheTest {
     }
 
     @Test
+    void findByEanPrefersTheRecordWithACategoryAmongTheCodesOfOneEan() {
+        // given
+        cache.add(new Taxonomy("5901234567890", "SM-G991B", "Samsung", "Galaxy S21", null, 1, null, null));
+        cache.add(new Taxonomy("5901234567890", "SM-G991BZADEUE", "Samsung", "Galaxy S21 EU", "Smartfony", 10, null, null));
+        cache.add(new Taxonomy("4006381333931", "OTHER-1", "Brand", "Other", "Smartfony", 1, null, null));
+
+        // when
+        Taxonomy result = cache.findByEan("5901234567890");
+
+        // then
+        assertThat(result.mfn()).isEqualTo("SM-G991BZADEUE");
+    }
+
+    @Test
+    void findByEanPrefersTheBetterScoreWhenBothHaveACategory() {
+        // given
+        cache.add(new Taxonomy("5901234567890", "SM-G991B", "Samsung", "Galaxy S21", "Smartfony", 7, null, null));
+        cache.add(new Taxonomy("5901234567890", "SM-G991BZADEUE", "Samsung", "Galaxy S21 EU", "Smartfony", 2, null, null));
+
+        // when
+        Taxonomy result = cache.findByEan("5901234567890");
+
+        // then
+        assertThat(result.mfn()).isEqualTo("SM-G991BZADEUE");
+    }
+
+    @Test
+    void findByEanMatchesARecordStoredWithLeadingZeros() {
+        // given
+        cache.add(new Taxonomy("0012345678905", "MFN-ZERO", "Brand", "Name", "Laptops", 5, null, null));
+
+        // when
+        Taxonomy result = cache.findByEan("012345678905");
+
+        // then
+        assertThat(result.mfn()).isEqualTo("MFN-ZERO");
+    }
+
+    @Test
+    void findByEanFindsNothingForAnUnknownOrBlankEan() {
+        // given
+        cache.add(new Taxonomy(null, "MFN-NO-EAN", "Brand", "Name", "Laptops", 5, null, null));
+
+        // when / then
+        assertThat(cache.findByEan("4006381333931")).isNull();
+        assertThat(cache.findByEan(null)).isNull();
+        assertThat(cache.findByEan(" ")).isNull();
+    }
+
+    @Test
     void hasCategoryRejectsNullAndBlank() {
         assertFalse(TaxonomyCache.hasCategory(new Taxonomy("E", "M", "B", "N", null, 1, null, null)));
         assertFalse(TaxonomyCache.hasCategory(new Taxonomy("E", "M", "B", "N", " ", 1, null, null)));

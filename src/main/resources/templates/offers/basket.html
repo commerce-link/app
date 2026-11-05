@@ -110,11 +110,11 @@
     <th scope="row" class="cl-table-key" th:attr="data-label=#{offers.basket.items.column.product}">
         <span th:text="${row.name()}"></span>
         <span th:if="${row.service()}" class="cl-table-marks"><span class="cl-status is-neutral" th:text="#{offers.basket.items.pill.service}"></span></span>
-        <span th:if="${row.category() != null or row.mfn() != null}" class="cl-table-sub">
+        <span th:if="${row.category() != null or row.sku() != null}" class="cl-table-sub">
             <span th:if="${row.category() != null}" th:text="${row.category()}"></span>
-            <th:block th:if="${row.mfn() != null}">
+            <th:block th:if="${row.sku() != null}">
                 <span th:if="${row.category() != null}" class="cl-table-sep">·</span>
-                <span th:text="#{order.items.mfn.prefix}"></span>&nbsp;<button type="button" class="cl-copy-inline" th:attr="data-cl-copy=${row.mfn()}, aria-label=#{offers.basket.mfn.copy(${row.mfn()})}"><span class="cl-copy-code"><span th:text="${row.mfn()}"></span><span class="cl-copy-icon" aria-hidden="true">&#8288;<i class="far fa-copy"></i></span></span></button>
+                <span th:text="#{order.items.sku.prefix}"></span>&nbsp;<button type="button" class="cl-copy-inline" th:attr="data-cl-copy=${row.sku()}, aria-label=#{order.items.copy.sku(${row.sku()})}"><span class="cl-copy-code"><span th:text="${row.sku()}"></span><span class="cl-copy-icon" aria-hidden="true">&#8288;<i class="far fa-copy"></i></span></span></button>
             </th:block>
         </span>
     </th>

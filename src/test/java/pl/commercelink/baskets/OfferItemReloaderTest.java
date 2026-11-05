@@ -58,17 +58,18 @@ class OfferItemReloaderTest {
     @BeforeEach
     void setupInventory() {
         when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.PRICING)).thenReturn(inventoryView);
+        when(inventoryView.findByEan(any())).thenReturn(MatchedInventory.empty(new InventoryKey()));
         when(inventoryView.findByProductCode(any())).thenReturn(MatchedInventory.empty(new InventoryKey()));
     }
 
     @Test
-    @DisplayName("recalculate refreshes basket item unit price and mfn from current pricelist")
+    @DisplayName("recalculate refreshes the unit price and the sku (the EAN) of an item from the current pricelist")
     void recalculateRefreshesBasketItemUnitPriceFromCurrentPricelist() {
         // given
         BasketItem item = basketItemWithCatalog("pim-1", "cat-1", "OLD-MFN", 100.0);
         Basket basket = basketWith(item);
         AvailabilityAndPrice freshPriceData = new AvailabilityAndPrice(
-                "pim-1", "EAN-1", "NEW-MFN", "Brand", "Label", "Test Product",
+                "pim-1", "5901234123457", "NEW-MFN", "Brand", "Label", "Test Product",
                 "Laptops", 250L, 5L, 3, 0L, false);
         Pricelist pricelist = new Pricelist("pricelist-1", List.of(freshPriceData));
         when(pricelistRepository.findNewestPricelistIdCached(STORE_ID, "cat-1")).thenReturn("pricelist-1");
@@ -79,7 +80,7 @@ class OfferItemReloaderTest {
 
         // then
         assertThat(item.getUnitPrice()).isEqualTo(250.0);
-        assertThat(item.getMfn()).isEqualTo("NEW-MFN");
+        assertThat(item.getSku()).isEqualTo("5901234123457");
     }
 
     @Test
@@ -87,7 +88,7 @@ class OfferItemReloaderTest {
         // given: the basket holds the source id, the newest pricelist is keyed by the store's clone
         BasketItem item = basketItemWithCatalog("pim-source", "cat-1", "OLD-MFN", 100.0);
         AvailabilityAndPrice fresh = new AvailabilityAndPrice(
-                "pim-clone", "EAN-1", "NEW-MFN", "Brand", "Label", "Test Product", "Laptops", 250L, 5L, 3, 0L, false);
+                "pim-clone", "5901234123457", "NEW-MFN", "Brand", "Label", "Test Product", "Laptops", 250L, 5L, 3, 0L, false);
         when(pricelistRepository.findNewestPricelistIdCached(STORE_ID, "cat-1")).thenReturn("pricelist-1");
         when(pricelistRepository.find(STORE_ID, "cat-1", "pricelist-1")).thenReturn(new Pricelist("pricelist-1", List.of(fresh)));
 
@@ -96,14 +97,14 @@ class OfferItemReloaderTest {
 
         // then: the price is updated, not left stale
         assertThat(item.getUnitPrice()).isEqualTo(250.0);
-        assertThat(item.getMfn()).isEqualTo("NEW-MFN");
+        assertThat(item.getSku()).isEqualTo("5901234123457");
     }
 
     @Test
-    @DisplayName("recalculate leaves unit cost untouched when inventory has no offers for the item mfn")
+    @DisplayName("recalculate leaves unit cost untouched when inventory has no offers for the item sku")
     void recalculateLeavesUnitCostUntouchedWhenInventoryHasNoOffers() {
         // given
-        BasketItem item = basketItemWithMfn("MFN-Z", 0.0); // unitCost=0, mfn set → eligible for updateCosts
+        BasketItem item = basketItemWithSku("MFN-Z", 0.0); // unitCost=0, sku set → eligible for updateCosts
         Basket basket = basketWith(item);
 
         // when
@@ -116,10 +117,10 @@ class OfferItemReloaderTest {
     @Test
     void recalculateNeverWritesACostWhenSuppliersOfferTheItem() {
         // given
-        BasketItem noCost = basketItemWithMfn("MFN-A", 0.0);
-        BasketItem costed = basketItemWithMfn("MFN-B", 412.30);
+        BasketItem noCost = basketItemWithSku("5900000000014", 0.0);
+        BasketItem costed = basketItemWithSku("5900000000021", 412.30);
         MatchedInventory offered = offeredAt(100, 200, 2);
-        when(inventoryView.findByProductCode(any())).thenReturn(offered);
+        when(inventoryView.findByEan(any())).thenReturn(offered);
         Basket basket = basketWith(noCost, costed);
 
         // when
@@ -129,6 +130,35 @@ class OfferItemReloaderTest {
         assertThat(noCost.getUnitCost()).isZero();
         assertThat(costed.getUnitCost()).isEqualTo(412.30);
         assertThat(noCost.getEstimatedDeliveryDays()).isEqualTo(2);
+    }
+
+    @Test
+    void chosenOfferIsLookedUpAgainByItsEan() {
+        // given
+        BasketItem item = basketItemWithSku("5900000000014", 0.0);
+        MatchedInventory offered = offeredAt(100, 200, 2);
+        when(inventoryView.findByEan("5900000000014")).thenReturn(offered);
+
+        // when
+        List<OfferItem> offerItems = offerItemReloader.reload(basketWith(item));
+
+        // then
+        assertThat(offerItems).singleElement().satisfies(o -> assertThat(o.isExistInInventory()).isTrue());
+    }
+
+    @Test
+    void anOlderLineWithTheManufacturerCodeIsStillFound() {
+        // given
+        BasketItem item = basketItemWithSku("MFN-A", 0.0);
+        MatchedInventory offered = offeredAt(100, 200, 2);
+        when(inventoryView.findByProductCode("MFN-A")).thenReturn(offered);
+        when(inventoryView.findByEan("5900000000014")).thenReturn(offered);
+
+        // when
+        List<OfferItem> offerItems = offerItemReloader.reload(basketWith(item));
+
+        // then
+        assertThat(offerItems).singleElement().satisfies(o -> assertThat(o.isExistInInventory()).isTrue());
     }
 
     @Test
@@ -145,9 +175,9 @@ class OfferItemReloaderTest {
         List<OfferItem> offerItems = offerItemReloader.reload(basket);
 
         // then
-        assertThat(offerItems).extracting(o -> o.getBasketItem().getMfn()).containsExactly("MFN-L", "MFN-C");
+        assertThat(offerItems).extracting(o -> o.getBasketItem().getSku()).containsExactly("MFN-L", "MFN-C");
         assertThat(offerItems).extracting(OfferItem::getSequenceNumber).containsExactly(0, 1);
-        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-L", "MFN-C");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-L", "MFN-C");
     }
 
     @Test
@@ -163,7 +193,7 @@ class OfferItemReloaderTest {
         List<OfferItem> offerItems = offerItemReloader.reload(basket);
 
         // then
-        assertThat(offerItems).extracting(o -> o.getBasketItem().getMfn()).containsExactly("SHIPPING", "MFN-L");
+        assertThat(offerItems).extracting(o -> o.getBasketItem().getSku()).containsExactly("Shipping", "MFN-L");
         assertThat(offerItems).extracting(OfferItem::getSequenceNumber).containsExactly(0, 1);
     }
 
@@ -186,7 +216,7 @@ class OfferItemReloaderTest {
         List<OfferItem> offerItems = offerItemReloader.reload(basket);
 
         // then
-        assertThat(offerItems).extracting(o -> o.getBasketItem().getMfn()).containsExactly("MFN-S", "MFN-C");
+        assertThat(offerItems).extracting(o -> o.getBasketItem().getSku()).containsExactly("MFN-S", "MFN-C");
         for (OfferItem offerItem : offerItems) {
             assertThat(basket.getBasketItems().get(offerItem.getSequenceNumber()))
                     .isSameAs(offerItem.getBasketItem());
@@ -222,8 +252,8 @@ class OfferItemReloaderTest {
         return item;
     }
 
-    private BasketItem basketItemWithMfn(String mfn, double unitCost) {
-        BasketItem item = new BasketItem("pim-id", "Other Product", mfn,
+    private BasketItem basketItemWithSku(String sku, double unitCost) {
+        BasketItem item = new BasketItem("pim-id", "Other Product", sku,
                 "Laptops", 100.0, unitCost, 1, null, 3, false);
         return item;
     }

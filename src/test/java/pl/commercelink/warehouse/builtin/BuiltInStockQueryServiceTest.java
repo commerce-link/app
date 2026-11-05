@@ -85,24 +85,6 @@ class BuiltInStockQueryServiceTest {
     }
 
     @Test
-    void returnsOnlyNotSealedItemsWithTheirCondition() {
-        // given
-        WarehouseItem sealed = anAvailableItem(20.0);
-        WarehouseItem damaged = anAvailableItem(20.0);
-        damaged.setCondition(ItemCondition.Damaged);
-        when(warehouseRepository.findAllAvailableByMfns("store-1", List.of("MFN-1"))).thenReturn(List.of(sealed, damaged));
-
-        // when
-        List<WarehouseItemView> views = new BuiltInStockQueryService(warehouseRepository)
-                .searchNotSealedAvailableByMfns("store-1", List.of("MFN-1"));
-
-        // then
-        assertEquals(1, views.size());
-        assertEquals(damaged.getItemId(), views.get(0).getItemId());
-        assertEquals(ItemCondition.Damaged, views.get(0).getCondition());
-    }
-
-    @Test
     void findsNotSealedItemById() {
         // given
         WarehouseItem openBox = anAvailableItem(20.0);
@@ -170,6 +152,22 @@ class BuiltInStockQueryServiceTest {
 
         // then
         assertThat(summary).isEqualTo(new StockSummary(2, 7, 2));
+    }
+
+    @Test
+    void excludesNotSealedItemsFromAvailableStockFoundByEans() {
+        // given
+        WarehouseItem sealed = anAvailableItem(20.0);
+        WarehouseItem openBox = anAvailableItem(20.0);
+        openBox.setCondition(ItemCondition.OpenBox);
+        when(warehouseRepository.findAllAvailableByEans("store-1", List.of("5901234123457"))).thenReturn(List.of(openBox, sealed));
+
+        // when
+        List<WarehouseItemView> views = new BuiltInStockQueryService(warehouseRepository)
+                .searchAvailableByEans("store-1", List.of("5901234123457"));
+
+        // then
+        assertThat(views).extracting(WarehouseItemView::getItemId).containsExactly(sealed.getItemId());
     }
 
     private InventoryItem firstInventoryItem() {

@@ -133,8 +133,16 @@ class WarehouseRepository extends DynamoDbRepository<WarehouseItem> {
         return dynamoDBMapper.scan(WarehouseItem.class, scanExpression);
     }
 
+    List<WarehouseItem> findAllAvailableByEans(String storeId, Collection<String> eans) {
+        return findAllAvailableBy(storeId, "ean", eans);
+    }
+
     List<WarehouseItem> findAllAvailableByMfns(String storeId, Collection<String> mfns) {
-        if (mfns == null || mfns.isEmpty()) {
+        return findAllAvailableBy(storeId, "mfn", mfns);
+    }
+
+    private List<WarehouseItem> findAllAvailableBy(String storeId, String attribute, Collection<String> values) {
+        if (values == null || values.isEmpty()) {
             return List.of();
         }
         Map<String, AttributeValue> eav = new HashMap<>();
@@ -146,9 +154,9 @@ class WarehouseRepository extends DynamoDbRepository<WarehouseItem> {
 
         StringBuilder inClause = new StringBuilder();
         int i = 0;
-        for (String mfn : mfns) {
-            String key = ":mfn" + i;
-            eav.put(key, new AttributeValue().withS(mfn));
+        for (String value : values) {
+            String key = ":" + attribute + i;
+            eav.put(key, new AttributeValue().withS(value));
             if (i > 0) {
                 inClause.append(", ");
             }
@@ -156,7 +164,7 @@ class WarehouseRepository extends DynamoDbRepository<WarehouseItem> {
             i++;
         }
 
-        String filterExpression = "storeId = :storeId AND mfn IN (" + inClause + ") AND (#status = :statusOrdered OR #status = :statusDelivered)";
+        String filterExpression = "storeId = :storeId AND " + attribute + " IN (" + inClause + ") AND (#status = :statusOrdered OR #status = :statusDelivered)";
 
         DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
                 .withFilterExpression(filterExpression)

@@ -314,7 +314,7 @@ class OrdersControllerNewOrderTest {
     private static Basket basket(BasketType type) {
         BasketItem item = new BasketItem();
         item.setName("Laptop");
-        item.setMfn("L-1");
+        item.setSku("L-1");
         item.setQty(1);
         item.setUnitPrice(100.0);
         Basket basket = new Basket.Builder(STORE_ID)

@@ -178,7 +178,7 @@ public class OfferDetailsPageFactory {
         double estimate = known ? estimatedCost(offer) : 0;
         boolean estimated = !service && item.getUnitCost() <= 0 && estimate > 0;
         double costForMargin = estimated ? estimate : item.getUnitCost();
-        return new Item(index, item.getId(), item.getCatalogId(), item.getName(), item.getCategory(), item.getMfn(),
+        return new Item(index, item.getId(), item.getCatalogId(), item.getName(), item.getCategory(), item.getSku(),
                 item.getQty(), Money.inputRounded(item.getUnitPrice()), Money.inputRounded(item.getUnitCost()),
                 item.getUnitPrice(), item.getUnitCost(), costForMargin, estimated, estimate, item.isConsolidated(), item.getVariantGroupId(),
                 item.isVariantSelected(), service, item.getEstimatedDeliveryDays(), droppedOnSave(item),
@@ -197,7 +197,7 @@ public class OfferDetailsPageFactory {
      * the name, the code, the quantity and the price can make the save drop it.
      */
     private static boolean droppedOnSave(BasketItem item) {
-        return StringUtils.isBlank(item.getName()) || StringUtils.isBlank(item.getMfn()) || item.getQty() <= 0
+        return StringUtils.isBlank(item.getName()) || StringUtils.isBlank(item.getSku()) || item.getQty() <= 0
                 || item.getUnitPrice() < 0;
     }
 

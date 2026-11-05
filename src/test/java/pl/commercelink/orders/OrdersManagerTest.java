@@ -108,7 +108,7 @@ class OrdersManagerTest {
         assertThat(itemCaptor.getValue().getName()).isEqualTo("test-product");
         assertThat(itemCaptor.getValue().getCategory()).isEqualTo("Laptops");
         assertThat(itemCaptor.getValue().getPrice()).isEqualTo(150.0);
-        assertThat(itemCaptor.getValue().getSku()).isEqualTo("MFN-1");
+        assertThat(itemCaptor.getValue().getSku()).isEqualTo("EAN-1");
 
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
         verify(ordersRepository).save(orderCaptor.capture());
@@ -136,11 +136,11 @@ class OrdersManagerTest {
         verify(orderItemsRepository).save(itemCaptor.capture());
         assertThat(itemCaptor.getValue().getCategory()).isEqualTo(Categories.UNCATEGORIZED);
         assertThat(itemCaptor.getValue().getName()).isEqualTo("no-category-product");
-        assertThat(itemCaptor.getValue().getSku()).isEqualTo("MFN-N");
+        assertThat(itemCaptor.getValue().getSku()).isEqualTo("EAN-N");
     }
 
     @Test
-    @DisplayName("addOrderItem from matched inventory with no offers falls back to Inne category and uses MFN from inventory key")
+    @DisplayName("addOrderItem from matched inventory with no offers falls back to Inne category and uses the EAN from inventory key")
     void addOrderItemFromMatchedInventoryWithoutOffersFallsBackToUncategorized() {
         // given
         Order order = orderWithTotalPrice(0.0);
@@ -160,7 +160,24 @@ class OrdersManagerTest {
         assertThat(itemCaptor.getValue().getCategory()).isEqualTo("Uncategorized");
         assertThat(itemCaptor.getValue().getName()).isEmpty();
         assertThat(itemCaptor.getValue().getPrice()).isEqualTo(0);
-        assertThat(itemCaptor.getValue().getSku()).isEqualTo("MFN-MISSING");
+        assertThat(itemCaptor.getValue().getSku()).isEqualTo("EAN-Z");
+    }
+
+    @Test
+    void addedItemOfAnEanOnlyGroupWithoutOffersGetsItsEan() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        when(matchedInventory.hasAnyOffers()).thenReturn(false);
+        when(matchedInventory.getInventoryKey()).thenReturn(InventoryKey.fromEan("5901234123457"));
+        when(store.isPositionConsolidationEnabled()).thenReturn(false);
+
+        // when
+        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(matchedInventory, 1)));
+
+        // then
+        ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository).save(itemCaptor.capture());
+        assertThat(itemCaptor.getValue().getSku()).isEqualTo("5901234123457");
     }
 
     @Test
@@ -211,7 +228,7 @@ class OrdersManagerTest {
         assertThat(itemCaptor.getValue().getName()).isEqualTo("product-name");
         assertThat(itemCaptor.getValue().getCategory()).isEqualTo("Laptops");
         assertThat(itemCaptor.getValue().getPrice()).isEqualTo(200.0);
-        assertThat(itemCaptor.getValue().getSku()).isEqualTo("MFN-2");
+        assertThat(itemCaptor.getValue().getSku()).isEqualTo("EAN-2");
 
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
         verify(ordersRepository).save(orderCaptor.capture());
@@ -987,7 +1004,7 @@ class OrdersManagerTest {
         ordersManager.assignFromWarehouse(STORE_ID, ORDER_ID, "item-1", "warehouse-item-1");
 
         // then
-        assertThat(orderItem.getSku()).isEqualTo("MFN-1");
+        assertThat(orderItem.getSku()).isEqualTo("5901234123457");
         verify(orderItemsRepository).save(orderItem);
         verify(manualWarehouseItemFulfilment).run(STORE_ID, orderItem, warehouseItem);
         verify(automatedOrderFulfilment, never()).run(any(), any());
@@ -1350,7 +1367,7 @@ class OrdersManagerTest {
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository, times(3)).save(itemCaptor.capture());
         List<OrderItem> saved = itemCaptor.getAllValues();
-        assertThat(saved).extracting(OrderItem::getSku).containsExactly("MFN-L", "MFN-M", "MFN-S");
+        assertThat(saved).extracting(OrderItem::getSku).containsExactly("EAN-MFN-L", "EAN-MFN-M", "EAN-MFN-S");
         assertThat(saved).extracting(OrderItem::getPosition).containsExactly(0, 2, PositionGroup.SERVICE_GROUP_START);
         assertThat(saved.get(2).isService()).isTrue();
         assertThat(saved.get(2).getStatus()).isNotEqualTo(FulfilmentStatus.New);

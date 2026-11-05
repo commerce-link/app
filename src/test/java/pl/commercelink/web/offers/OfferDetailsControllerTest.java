@@ -103,7 +103,7 @@ class OfferDetailsControllerTest {
 
         // then
         Basket saved = savedBasket();
-        assertThat(saved.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-NEW");
+        assertThat(saved.getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-NEW");
         assertThat(saved.getName()).isEqualTo("Gaming PC");
         assertThat(saved.getExpiresAt()).isEqualTo(EXPIRES);
         assertThat(saved.getDeliveryOptionId()).isEqualTo("courier");
@@ -127,7 +127,7 @@ class OfferDetailsControllerTest {
         saveItems(form, null);
 
         // then
-        assertThat(savedBasket().getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-OK");
+        assertThat(savedBasket().getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-OK");
     }
 
     @Test
@@ -143,7 +143,7 @@ class OfferDetailsControllerTest {
 
         // then
         List<BasketItem> saved = savedBasket().getBasketItems();
-        assertThat(saved).extracting(BasketItem::getMfn).containsExactly("MFN-B", "MFN-A", "MFN-C");
+        assertThat(saved).extracting(BasketItem::getSku).containsExactly("MFN-B", "MFN-A", "MFN-C");
         assertThat(saved).extracting(BasketItem::getPosition).containsExactly(0, 1, 2);
     }
 
@@ -184,8 +184,8 @@ class OfferDetailsControllerTest {
 
         // then
         List<BasketItem> saved = savedBasket().getBasketItems();
-        assertThat(saved).filteredOn(i -> i.getMfn().equals("MFN-S")).singleElement().satisfies(i -> assertThat(i.isService()).isTrue());
-        assertThat(saved).filteredOn(i -> i.getMfn().equals("MFN-P")).singleElement().satisfies(i -> assertThat(i.isService()).isFalse());
+        assertThat(saved).filteredOn(i -> i.getSku().equals("MFN-S")).singleElement().satisfies(i -> assertThat(i.isService()).isTrue());
+        assertThat(saved).filteredOn(i -> i.getSku().equals("MFN-P")).singleElement().satisfies(i -> assertThat(i.isService()).isFalse());
     }
 
     @Test
@@ -205,7 +205,7 @@ class OfferDetailsControllerTest {
         OfferItemForm itemForm = new OfferItemForm();
         itemForm.setName("Laptop");
         itemForm.setCategory("Laptops");
-        itemForm.setMfn("MFN-A");
+        itemForm.setSku("MFN-A");
 
         for (String hostile : List.of("https://evil.example", "//evil", "/dashboard/offers\r\nSet-Cookie: x=1",
                 "/dashboard/offers?q=a\r\nLocation: https://evil.example")) {
@@ -250,7 +250,7 @@ class OfferDetailsControllerTest {
         assertThat(saved.getExpiresAt()).isEqualTo(EXPIRES.plusDays(7));
         assertThat(saved.getDeliveryOptionId()).isEqualTo("pickup");
         assertThat(saved.getGclid()).isEqualTo("gclid-2");
-        assertThat(saved.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A");
+        assertThat(saved.getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-A");
         assertThat(saved.getContactDetails().getEmail()).isEqualTo("jan@test.local");
         assertThat(saved.getComment()).isEqualTo("Call back on Monday");
         assertThat(view).isEqualTo("redirect:/dashboard/offer/offer-1");
@@ -489,7 +489,7 @@ class OfferDetailsControllerTest {
         OfferItemForm form = new OfferItemForm();
         form.setName("Renamed item");
         form.setCategory("Laptops");
-        form.setMfn("MFN-B");
+        form.setSku("MFN-B");
         form.setUnitCost(42.5);
         form.setConsolidated(true);
 
@@ -519,7 +519,7 @@ class OfferDetailsControllerTest {
         WebDataBinder binder = new WebDataBinder(form, "form");
         MutablePropertyValues posted = new MutablePropertyValues();
         posted.add("name", "Laptop");
-        posted.add("mfn", "MFN-A");
+        posted.add("sku", "MFN-A");
         posted.add("unitCost", "");
 
         // when
@@ -543,7 +543,7 @@ class OfferDetailsControllerTest {
         OfferItemForm form = new OfferItemForm();
         form.setName(" ");
         form.setCategory("Laptops");
-        form.setMfn("MFN-A");
+        form.setSku("MFN-A");
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
@@ -564,7 +564,7 @@ class OfferDetailsControllerTest {
         OfferItemForm form = new OfferItemForm();
         form.setName("Laptop");
         form.setCategory(" ");
-        form.setMfn("MFN-A");
+        form.setSku("MFN-A");
 
         // when
         String view = controller.saveItem(OFFER_ID, 0, form, null, new ExtendedModelMap(), LOCALE,
@@ -579,14 +579,14 @@ class OfferDetailsControllerTest {
     }
 
     @Test
-    void itemEditWithBlankManufacturerCodeIsRejected() {
+    void itemEditWithBlankSkuIsRejected() {
         // given
         Basket stored = fullOffer(BasketType.Offer);
         stored.setBasketItems(List.of(item("MFN-A", 1)));
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(stored));
         OfferItemForm form = new OfferItemForm();
         form.setName("Laptop");
-        form.setMfn("");
+        form.setSku("");
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
@@ -594,7 +594,7 @@ class OfferDetailsControllerTest {
 
         // then
         assertThat(view).isEqualTo("offers/item-edit");
-        assertThat((Map<String, String>) model.getAttribute("errors")).containsOnlyKeys("mfn");
+        assertThat((Map<String, String>) model.getAttribute("errors")).containsOnlyKeys("sku");
         verify(basketsRepository, never()).save(any());
     }
 
@@ -657,7 +657,7 @@ class OfferDetailsControllerTest {
         OfferItemForm form = new OfferItemForm();
         form.setName("Renamed item");
         form.setCategory("Laptops");
-        form.setMfn("MFN-B");
+        form.setSku("MFN-B");
 
         // when
         controller.saveItem(OFFER_ID, 1, form, null, new ExtendedModelMap(), LOCALE, new RedirectAttributesModelMap());
@@ -675,7 +675,7 @@ class OfferDetailsControllerTest {
         OfferItemForm form = new OfferItemForm();
         form.setName("Renamed item");
         form.setCategory("Laptops");
-        form.setMfn("MFN-B");
+        form.setSku("MFN-B");
 
         // when
         controller.saveItem(OFFER_ID, 1, form, null, new ExtendedModelMap(), LOCALE, new RedirectAttributesModelMap());
@@ -708,7 +708,7 @@ class OfferDetailsControllerTest {
         assertThat(model.get("conflict")).isEqualTo(true);
         ArgumentCaptor<Basket> shown = ArgumentCaptor.forClass(Basket.class);
         verify(pageFactory).buildDraft(shown.capture(), any(), any(), any());
-        assertThat(shown.getValue().getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-MINE");
+        assertThat(shown.getValue().getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-MINE");
         assertThat(shown.getValue().getVersion()).isEqualTo(5L);
         verify(offerItemReloader, never()).recalculate(any());
     }
@@ -728,7 +728,7 @@ class OfferDetailsControllerTest {
 
         // then
         Basket saved = savedBasket();
-        assertThat(saved.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-MINE");
+        assertThat(saved.getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-MINE");
         assertThat(saved.getVersion()).isEqualTo(5L);
         assertThat(view).isEqualTo("redirect:/dashboard/offer/offer-1");
     }
@@ -766,7 +766,7 @@ class OfferDetailsControllerTest {
                 new MockHttpServletResponse(), new RedirectAttributesModelMap(), LOCALE);
 
         // then
-        assertThat(savedBasket().getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-MINE");
+        assertThat(savedBasket().getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-MINE");
         assertThat(view).isEqualTo("redirect:/dashboard/offer/offer-1");
     }
 
@@ -783,7 +783,7 @@ class OfferDetailsControllerTest {
         String view = saveItems(form, null);
 
         // then
-        assertThat(savedBasket().getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-MINE");
+        assertThat(savedBasket().getBasketItems()).extracting(BasketItem::getSku).containsExactly("MFN-MINE");
         assertThat(view).isEqualTo("redirect:/dashboard/offer/offer-1");
     }
 
@@ -827,7 +827,7 @@ class OfferDetailsControllerTest {
         assertThat(view).isEqualTo("offers/details :: itemsDraft");
         ArgumentCaptor<Basket> shown = ArgumentCaptor.forClass(Basket.class);
         verify(pageFactory).buildDraft(shown.capture(), any(), any(), any());
-        assertThat(shown.getValue().getBasketItems()).extracting(BasketItem::getMfn)
+        assertThat(shown.getValue().getBasketItems()).extracting(BasketItem::getSku)
                 .containsExactlyInAnyOrder("MFN-A", "MFN-B", "MFN-NEW");
         verify(basketsRepository, never()).save(any());
         verify(pageFactory, never()).build(any(), any(), any(), any());

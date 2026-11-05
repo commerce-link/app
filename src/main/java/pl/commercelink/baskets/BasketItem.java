@@ -15,14 +15,14 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 @DynamoDBDocument
 public class BasketItem {
 
-    public static final String SHIPPING_MFN_CODE = "Shipping";
+    public static final String SHIPPING_SKU = "Shipping";
 
     @DynamoDBAttribute(attributeName = "id")
     private  String id;
     @DynamoDBAttribute(attributeName = "name")
     private  String name;
-    @DynamoDBAttribute(attributeName = "mfn")
-    private String mfn;
+    @DynamoDBAttribute(attributeName = "sku")
+    private String sku;
     private String category;
     @DynamoDBAttribute(attributeName = "brand")
     private String brand;
@@ -49,12 +49,12 @@ public class BasketItem {
     public BasketItem() {
     }
 
-    public BasketItem(String id, String name, String mfn,
+    public BasketItem(String id, String name, String sku,
                       String category, double unitPrice, double unitCost, long qty,
                       String catalogId, int estimatedDeliveryDays, boolean consolidated) {
         this.id = id;
         this.name = name;
-        this.mfn = mfn;
+        this.sku = sku;
         this.category = category;
         this.qty = qty;
         this.unitPrice = unitPrice;
@@ -66,7 +66,7 @@ public class BasketItem {
 
     @DynamoDBIgnore
     public boolean isComplete() {
-        return isNotBlank(name) && isNotBlank(mfn) && (service || category != null) && qty > 0 && unitPrice >= 0;
+        return isNotBlank(name) && isNotBlank(sku) && (service || category != null) && qty > 0 && unitPrice >= 0;
     }
 
     public String getId() {
@@ -106,12 +106,12 @@ public class BasketItem {
         return qty;
     }
 
-    public String getMfn() {
-        return mfn;
+    public String getSku() {
+        return sku;
     }
 
-    public void setMfn(String mfn) {
-        this.mfn = mfn;
+    public void setSku(String sku) {
+        this.sku = sku;
     }
 
     public String getCatalogId() {
@@ -208,13 +208,13 @@ public class BasketItem {
 
     @DynamoDBIgnore
     public boolean isShippingItem() {
-        return SHIPPING_MFN_CODE.equals(mfn);
+        return SHIPPING_SKU.equals(sku);
     }
 
     public static BasketItem shipping(String name, double shippingPrice) {
         BasketItem item = new BasketItem(UniqueIdentifierGenerator.generate(),
                 name,
-                SHIPPING_MFN_CODE,
+                SHIPPING_SKU,
                 OrderItem.DELIVERY_CATEGORY,
                 shippingPrice,
                 0,
@@ -235,7 +235,7 @@ public class BasketItem {
         BasketItem item = new BasketItem(
                 availabilityAndPrice.getPimId(),
                 availabilityAndPrice.getName(),
-                availabilityAndPrice.getManufacturerCode(),
+                availabilityAndPrice.getEan(),
                 availabilityAndPrice.getCategory(),
                 availabilityAndPrice.getPrice(),
                 0,
@@ -251,13 +251,13 @@ public class BasketItem {
 
     public static BasketItem of(MatchedInventory matchedInventory, long qty, boolean consolidated) {
         if (!matchedInventory.hasAnyOffers()) {
-            return BasketItem.missing(matchedInventory.getInventoryKey().getProductCodes().iterator().next(), qty, consolidated);
+            return BasketItem.missing(matchedInventory.getInventoryKey().getProductEans().iterator().next(), qty, consolidated);
         } else {
             Taxonomy taxonomy = matchedInventory.getTaxonomy();
             return new BasketItem(
                     "",
                     taxonomy.name(),
-                    taxonomy.mfn(),
+                    taxonomy.ean(),
                     taxonomy.category(),
                     matchedInventory.getMedianPrice().grossValue(),
                     // client 2026-10-27: an item outside the price list costs the estimate, not the lowest price
@@ -271,10 +271,10 @@ public class BasketItem {
         }
     }
 
-    private static BasketItem missing(String mfn, long qty, boolean consolidated) {
+    private static BasketItem missing(String sku, long qty, boolean consolidated) {
         return new BasketItem(UniqueIdentifierGenerator.generate(),
                 "Brak produktu",
-                mfn,
+                sku,
                 Categories.UNCATEGORIZED,
                 0,
                 0,

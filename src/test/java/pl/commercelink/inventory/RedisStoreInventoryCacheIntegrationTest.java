@@ -114,7 +114,7 @@ class RedisStoreInventoryCacheIntegrationTest {
         cache.put("s1", sampleInventory(), Duration.ofMinutes(60));
 
         // then
-        Long ttl = redisTemplate.getExpire("store-inventory:s1");
+        Long ttl = redisTemplate.getExpire("store-inventory:v2:s1");
         assertTrue(ttl != null && ttl > 0 && ttl <= 3600);
     }
 
@@ -143,7 +143,7 @@ class RedisStoreInventoryCacheIntegrationTest {
         // then
         assertTrue(result.isPresent());
         assertEquals(entries, result.get().items().size());
-        int storedBytes = redisTemplate.opsForValue().get("store-inventory:big")
+        int storedBytes = redisTemplate.opsForValue().get("store-inventory:v2:big")
                 .getBytes(StandardCharsets.UTF_8).length;
         assertTrue(storedBytes < rawJsonBytes);
         assertTrue(storedBytes < 64 * 1024 * 1024);

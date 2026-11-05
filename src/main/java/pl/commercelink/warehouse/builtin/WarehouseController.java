@@ -328,7 +328,7 @@ class WarehouseController {
                         suggestion.getName(),
                         scope == RestockScope.ExpectedStockQty ? suggestion.getMissingQuantity() : 1,
                         getRestockPrice(suggestion, restockPrice),
-                        suggestion.getManufacturerCode(),
+                        suggestion.getEan(),
                         false
                 ))
                 .collect(Collectors.toList());

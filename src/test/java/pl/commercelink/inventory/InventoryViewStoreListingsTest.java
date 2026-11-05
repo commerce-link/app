@@ -399,6 +399,22 @@ class InventoryViewStoreListingsTest {
     }
 
     @Test
+    void itemOfAWarehouseOnlyProductIsFoundByEan() {
+        // given
+        StockQueryService stockQueryService = org.mockito.Mockito.mock(StockQueryService.class);
+        when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
+        WarehouseItemView view = org.mockito.Mockito.mock(WarehouseItemView.class);
+        when(view.toInventoryItem()).thenReturn(new InventoryItem(EAN, MFN, 1200.0, "PLN", 3, 1, "Warehouse", true, true, false));
+        when(stockQueryService.searchAvailableByEans(eq(STORE_ID), argThat(eans -> eans.contains(EAN)))).thenReturn(List.of(view));
+
+        // when
+        MatchedInventory matched = inventory.withWarehouseDataOnly(STORE_ID).findByEan(EAN);
+
+        // then
+        assertThat(matched.getSuppliers()).containsExactly("Warehouse");
+    }
+
+    @Test
     void findByProductCodeReturnsEmptyNonNullResultWhenNothingMatches() {
         // given
         Store store = org.mockito.Mockito.mock(Store.class);

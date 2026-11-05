@@ -56,7 +56,9 @@ import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.web.dtos.SplitGroupPreviewDto;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -68,6 +70,7 @@ import java.util.Locale;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -1707,6 +1710,24 @@ class OrderPageModelFactoryTest {
         assertThat(page.customer().billingLockedKey()).isEqualTo("order.customer.billing.locked");
         assertThat(page.documents().canAdd()).isFalse();
         assertThat(page.documents().addLockedKey()).isNull();
+    }
+
+    @Test
+    void theSplitPreviewNamesTheComponentsOfASetByTheirEans() {
+        // given
+        OrderItem set = item(FulfilmentStatus.New);
+        set.setSku("#1x5901234567890|2x4006381333931");
+        when(taxonomyCache.findByEan("5901234567890")).thenReturn(
+                new Taxonomy("5901234567890", "SM-G991B", "Samsung", "Galaxy S21", "Smartfony", 1, null, null));
+        when(taxonomyCache.findByEan("4006381333931")).thenReturn(null);
+
+        // when
+        OrderPageModel page = factory.build(order(OrderStatus.New), List.of(set), ADMIN, PL);
+
+        // then
+        assertThat(page.items().splitPreviews().get(set.getItemId()).components())
+                .extracting(SplitGroupPreviewDto.Component::sku, SplitGroupPreviewDto.Component::name)
+                .containsExactly(tuple("5901234567890", "Galaxy S21"), tuple("4006381333931", ""));
     }
 
     @Test

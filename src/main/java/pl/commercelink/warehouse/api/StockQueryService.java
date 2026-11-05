@@ -5,9 +5,9 @@ import java.util.List;
 
 public interface StockQueryService {
 
-    List<WarehouseItemView> searchAvailableByMfns(String storeId, Collection<String> mfns);
+    List<WarehouseItemView> searchAvailableByEans(String storeId, Collection<String> eans);
 
-    List<WarehouseItemView> searchNotSealedAvailableByMfns(String storeId, Collection<String> mfns);
+    List<WarehouseItemView> searchAvailableByMfns(String storeId, Collection<String> mfns);
 
     List<WarehouseItemView> searchByMfns(String storeId, Collection<String> mfns);
 

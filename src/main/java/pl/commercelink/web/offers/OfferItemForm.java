@@ -15,7 +15,7 @@ public class OfferItemForm {
 
     private String name;
     private String category;
-    private String mfn;
+    private String sku;
     private Double unitCost = 0.0;
     private boolean consolidated;
 
@@ -28,7 +28,7 @@ public class OfferItemForm {
         OfferItemForm form = new OfferItemForm();
         form.name = item.getName();
         form.category = item.getCategory();
-        form.mfn = item.getMfn();
+        form.sku = item.getSku();
         form.unitCost = item.getUnitCost();
         form.consolidated = item.isConsolidated();
         return form;
@@ -43,8 +43,8 @@ public class OfferItemForm {
         if (StringUtils.isBlank(name)) {
             errors.put("name", "offers.details.item.name.required");
         }
-        if (StringUtils.isBlank(mfn)) {
-            errors.put("mfn", "offers.details.item.mfn.required");
+        if (StringUtils.isBlank(sku)) {
+            errors.put("sku", "offers.details.item.sku.required");
         }
         return errors;
     }
@@ -52,7 +52,7 @@ public class OfferItemForm {
     void applyTo(BasketItem item) {
         item.setName(name);
         item.setCategory(StringUtils.isBlank(category) ? null : category);
-        item.setMfn(mfn);
+        item.setSku(sku);
         item.setUnitCost(unitCost);
         item.setConsolidated(consolidated);
     }

@@ -19,7 +19,7 @@ public record OrderItemDraft(String category, String name, int qty, double price
                 availabilityAndPrice.getName(),
                 qty,
                 availabilityAndPrice.getPrice(),
-                availabilityAndPrice.getManufacturerCode(),
+                availabilityAndPrice.getEan(),
                 availabilityAndPrice.isService(),
                 availabilityAndPrice.getEstimatedDeliveryDays()
         );
@@ -27,8 +27,8 @@ public record OrderItemDraft(String category, String name, int qty, double price
 
     public static OrderItemDraft of(MatchedInventory matchedInventory, int qty) {
         if (!matchedInventory.hasAnyOffers()) {
-            String mfn = matchedInventory.getInventoryKey().getProductCodes().iterator().next();
-            return new OrderItemDraft(Categories.UNCATEGORIZED, "", qty, 0, mfn, false,
+            String ean = matchedInventory.getInventoryKey().getProductEans().iterator().next();
+            return new OrderItemDraft(Categories.UNCATEGORIZED, "", qty, 0, ean, false,
                     matchedInventory.getEstimatedDeliveryDays());
         }
         Taxonomy taxonomy = matchedInventory.getTaxonomy();
@@ -37,7 +37,7 @@ public record OrderItemDraft(String category, String name, int qty, double price
                 taxonomy.name(),
                 qty,
                 matchedInventory.getMedianPrice().grossValue(),
-                taxonomy.mfn(),
+                taxonomy.ean(),
                 false,
                 matchedInventory.getEstimatedDeliveryDays()
         );

@@ -90,14 +90,19 @@ class ProductFormTest {
     }
 
     @Test
-    void eanMustBeDigitsWhenGiven() {
+    void eanIsTakenAsTyped() {
         // given
-        ProductForm form = valid();
-        form.setEan("12ab");
+        ProductForm lettersAndDigits = valid();
+        lettersAndDigits.setEan("12ab");
+        ProductForm set = valid();
+        set.setEan("#1x5901234123457|2xMZ-V9P1T0BW");
+        ProductForm preBuild = valid();
+        preBuild.setEan("5901234123457:5901234123464");
 
         // when / then
-        assertThat(form.validate(LABELS, GROUPS, MARKETPLACES))
-                .containsEntry("ean", "product.error.ean.invalid");
+        assertThat(lettersAndDigits.validate(LABELS, GROUPS, MARKETPLACES)).doesNotContainKey("ean");
+        assertThat(set.validate(LABELS, GROUPS, MARKETPLACES)).doesNotContainKey("ean");
+        assertThat(preBuild.validate(LABELS, GROUPS, MARKETPLACES)).doesNotContainKey("ean");
     }
 
     @Test
@@ -309,11 +314,10 @@ class ProductFormTest {
     }
 
     /**
-     * RF-4 (variant A): the 8--14 digit rule applies to an EAN being entered; a product saved before the rule existed
-     * keeps its EAN through a save that does not touch it. Both the EAN and the code are still required from every product.
+     * The EAN and the code are required from every product, whatever they hold.
      */
     @Test
-    void aLegacyEanIsCheckedOnlyOnceItIsChanged() {
+    void aSavedEanMayChangeToAnyTextButNotToNothing() {
         // given
         ProductForm unchanged = ProductForm.from(saved(null, "590 123", "LEGACY-1"));
         unchanged.setName("Renamed");
@@ -324,8 +328,7 @@ class ProductFormTest {
 
         // when / then
         assertThat(unchanged.validate(LABELS, GROUPS, MARKETPLACES)).isEmpty();
-        assertThat(changed.validate(LABELS, GROUPS, MARKETPLACES))
-                .containsEntry("ean", "product.error.ean.invalid");
+        assertThat(changed.validate(LABELS, GROUPS, MARKETPLACES)).isEmpty();
         assertThat(cleared.validate(LABELS, GROUPS, MARKETPLACES))
                 .containsEntry("ean", "product.error.ean.required");
     }

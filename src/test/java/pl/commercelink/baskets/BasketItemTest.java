@@ -1,6 +1,7 @@
 package pl.commercelink.baskets;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
@@ -48,6 +49,75 @@ class BasketItemTest {
 
         // then
         assertThat(item.getBrand()).isEqualTo("Acme");
+    }
+
+    @Test
+    void pricelistItemGetsTheEanAsSku() {
+        // given
+        AvailabilityAndPrice row = new AvailabilityAndPrice("pim-1", "5901234123457", "MZ-V9P1T0BW", "Samsung",
+                "Label", "Dysk", "Dyski", 100, 1, 1, 100, false);
+
+        // when
+        BasketItem item = BasketItem.of(row, 1, "cat-1", false);
+
+        // then
+        assertThat(item.getSku()).isEqualTo("5901234123457");
+    }
+
+    @Test
+    void skuIsTheEanWhateverTheManufacturerCode() {
+        // given
+        AvailabilityAndPrice row = new AvailabilityAndPrice("pim-1", "5901234123457", "#1xA-1|2xB-2",
+                "Acme", "Label", "Zestaw", "Zestawy", 100, 1, 1, 100, false);
+
+        // when
+        BasketItem item = BasketItem.of(row, 1, "cat-1", false);
+
+        // then
+        assertThat(item.getSku()).isEqualTo("5901234123457");
+    }
+
+    @Test
+    void compositeEanGoesToSkuAsItIs() {
+        // given
+        AvailabilityAndPrice set = new AvailabilityAndPrice("pim-1", "#1x5901234123464|2x5901234123471", "ZESTAW-1",
+                "Acme", "Label", "Zestaw", "Zestawy", 100, 1, 1, 100, false);
+        AvailabilityAndPrice preBuild = new AvailabilityAndPrice("pim-2", "5901234123464:5901234123471", "PC-1",
+                "Acme", "Label", "Komputer", "Komputery", 100, 1, 1, 100, false);
+
+        // when
+        BasketItem setItem = BasketItem.of(set, 1, "cat-1", false);
+        BasketItem preBuildItem = BasketItem.of(preBuild, 1, "cat-1", false);
+
+        // then
+        assertThat(setItem.getSku()).isEqualTo("#1x5901234123464|2x5901234123471");
+        assertThat(preBuildItem.getSku()).isEqualTo("5901234123464:5901234123471");
+    }
+
+    @Test
+    void inventoryItemGetsTheEanOfItsTaxonomy() {
+        // given
+        MatchedInventory matched = offeredProduct(new Taxonomy("5901234123457", "MZ-V9P1T0BW", "Samsung", "Dysk",
+                "Dyski", 0, null, null));
+
+        // when
+        BasketItem item = BasketItem.of(matched, 1, false);
+
+        // then
+        assertThat(item.getSku()).isEqualTo("5901234123457");
+    }
+
+    @Test
+    void missingProductLineGetsTheTypedEan() {
+        // given
+        MatchedInventory matched = MatchedInventory.empty(new InventoryKey("5901234123457", "MZ-V9P1T0BW"));
+
+        // when
+        BasketItem item = BasketItem.of(matched, 1, false);
+
+        // then
+        assertThat(item.getName()).isEqualTo("Brak produktu");
+        assertThat(item.getSku()).isEqualTo("5901234123457");
     }
 
     @Test
@@ -103,6 +173,15 @@ class BasketItemTest {
 
         // when / then
         assertThat(item.isComplete()).isFalse();
+    }
+
+    private static MatchedInventory offeredProduct(Taxonomy taxonomy) {
+        MatchedInventory matched = mock(MatchedInventory.class);
+        when(matched.hasAnyOffers()).thenReturn(true);
+        when(matched.getTaxonomy()).thenReturn(taxonomy);
+        when(matched.getLowestPrice()).thenReturn(Price.fromNet(100));
+        when(matched.getMedianPrice()).thenReturn(Price.fromNet(200));
+        return matched;
     }
 
     private AvailabilityAndPrice pricelistRow(String category) {

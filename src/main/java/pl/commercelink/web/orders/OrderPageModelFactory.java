@@ -390,8 +390,8 @@ public class OrderPageModelFactory {
         return links.forViewer(href);
     }
 
-    private String taxonomyName(String mfn) {
-        Taxonomy taxonomy = taxonomyCache.findByMfn(mfn);
+    private String taxonomyName(String ean) {
+        Taxonomy taxonomy = taxonomyCache.findByEan(ean);
         return taxonomy != null && taxonomy.name() != null ? taxonomy.name() : "";
     }
 

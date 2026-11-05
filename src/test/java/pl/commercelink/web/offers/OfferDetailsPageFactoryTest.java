@@ -91,7 +91,7 @@ class OfferDetailsPageFactoryTest {
     private static BasketItem item(String name, long qty, double price, double cost) {
         BasketItem item = new BasketItem();
         item.setName(name);
-        item.setMfn("MFN-" + name);
+        item.setSku("MFN-" + name);
         item.setCategory("laptops");
         item.setQty(qty);
         item.setUnitPrice(price);

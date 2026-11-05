@@ -92,7 +92,7 @@ public class OfferItemReloader {
                     if (op.isPresent()) {
                         AvailabilityAndPrice availability = op.get();
 
-                        i.setMfn(availability.getManufacturerCode());
+                        i.setSku(availability.getEan());
                         i.setUnitPrice((double) availability.getPrice());
                     }
                 });
@@ -104,7 +104,7 @@ public class OfferItemReloader {
      */
     private void updateDeliveryDays(InventoryView inventory, List<BasketItem> basketItems) {
         basketItems.stream()
-                .filter(i -> isNotBlank(i.getMfn()))
+                .filter(i -> isNotBlank(i.getSku()))
                 .filter(i -> i.getUnitCost() == 0)
                 .forEach(basketItem -> {
                     MatchedInventory matchedInventory = findMatchedInventoryLowestPricedSKU(inventory, basketItem);
@@ -117,7 +117,7 @@ public class OfferItemReloader {
     private MatchedInventory findMatchedInventoryLowestPricedSKU(InventoryView inventory, BasketItem basketItem) {
         FulfilmentItem lowestPricedFulfilmentItem = findLowestPricedFulfilmentCandidate(inventory, basketItem);
         if (lowestPricedFulfilmentItem != null) {
-            return inventory.findByProductCode(lowestPricedFulfilmentItem.getSource().getMfn());
+            return inventory.findByEan(lowestPricedFulfilmentItem.getSource().getEan());
         }
         return MatchedInventory.empty(new InventoryKey());
     }

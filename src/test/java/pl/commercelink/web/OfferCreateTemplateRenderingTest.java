@@ -168,7 +168,7 @@ class OfferCreateTemplateRenderingTest {
         // then
         assertThat(html).contains("id=\"offer-csv-format\"").contains("How to prepare the file?");
         assertThat(html).contains("1. Category").contains("4. Gross price (PLN)").contains("in whole zloty, no grosze").contains("7. Service");
-        assertThat(html).contains("class=\"cl-code-block\"").contains("category;name;quantity;price;cost;code;service\n");
+        assertThat(html).contains("class=\"cl-code-block\"").contains("category;name;quantity;price;cost;sku;service\n");
         assertThat(html).contains("href=\"/files/offer-import-example.csv\" download");
     }
 
@@ -225,7 +225,7 @@ class OfferCreateTemplateRenderingTest {
         String example = Files.readString(Path.of("src/main/resources/static/files/offer-import-example.csv"));
 
         // then
-        assertThat(example).startsWith("﻿kategoria;nazwa;ilosc;cena;koszt;kod;usluga");
+        assertThat(example).startsWith("﻿kategoria;nazwa;ilosc;cena;koszt;sku;usluga");
         assertThat(example.lines().skip(1)).allSatisfy(row -> assertThat(row.split(";", -1)).hasSize(7));
     }
 }

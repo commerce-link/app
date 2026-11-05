@@ -404,6 +404,23 @@ class DemoStoreSeederTest {
     }
 
     @Test
+    void demoOrderItemsCarryTheEanAsSku() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        DemoOrders demoOrders = DemoStoreSeeder.buildDemoOrders("store-1", rows);
+
+        // then
+        List<OrderItem> items = demoOrders.itemsByOrderId().values().stream().flatMap(List::stream).toList();
+        assertFalse(items.isEmpty());
+        items.forEach(item -> {
+            assertNotNull(item.getEan());
+            assertEquals(item.getEan(), item.getSku());
+        });
+    }
+
+    @Test
     void buildsOrdersWithCommonDemoDetails() {
         // given
         List<CatalogSeedRow> rows = CatalogSeed.load();
