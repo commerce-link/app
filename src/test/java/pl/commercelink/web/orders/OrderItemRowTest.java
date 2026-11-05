@@ -1,9 +1,9 @@
 package pl.commercelink.web.orders;
 
-import pl.commercelink.externaloffers.ResolvedOffer;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
+import pl.commercelink.externaloffers.ResolvedOffer;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;

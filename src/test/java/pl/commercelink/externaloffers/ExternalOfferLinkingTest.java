@@ -482,6 +482,24 @@ class ExternalOfferLinkingTest {
     }
 
     @Test
+    void anItemRecognisedByManufacturerCodeIsFilledWithTheLinkToo() {
+        // given another line of the key that the PIM recognised by code: no category, sku still the raw code
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        Order other = marketplaceOrder("o2", EMPIK, OrderStatus.New, 2);
+        unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        OrderItem byCode = unlinkedItem("o2", "i2", FulfilmentStatus.New);
+        byCode.setExternalOfferSource(ResolvedOffer.Source.MFN);
+        openOrders(order, other);
+
+        // when
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+
+        // then the next import would resolve the line by the link, which outranks the code
+        assertThat(byCode.getExternalOfferSource()).isEqualTo(ResolvedOffer.Source.LINK);
+        assertThat(byCode.getSku()).isEqualTo("2001000000043");
+    }
+
+    @Test
     void changingALinkAlsoCorrectsOtherItemsTheOldLinkFilled() {
         // given a wrong EAN linked earlier gave both items its codes
         Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);

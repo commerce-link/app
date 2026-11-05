@@ -171,7 +171,9 @@ public class ExternalOfferLinking {
                 continue;
             }
             boolean isChosen = item.getItemId().equals(chosen.getItemId());
-            if (!isChosen && !item.hasUnlinkedExternalOffer()
+            // a link outranks a manufacturer code in the resolver, so the next import would give such a line the link
+            boolean recognisedByManufacturerCode = item.getExternalOfferSource() == ResolvedOffer.Source.MFN;
+            if (!isChosen && !item.hasUnlinkedExternalOffer() && !recognisedByManufacturerCode
                     && (replacedSku == null || !replacedSku.equals(item.getSku()))) {
                 continue;
             }

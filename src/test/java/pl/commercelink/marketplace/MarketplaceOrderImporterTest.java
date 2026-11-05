@@ -30,6 +30,7 @@ import pl.commercelink.stores.Store;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -496,7 +497,7 @@ class MarketplaceOrderImporterTest {
         importer.importOrder(storeWithId("store-1"), "Empik", order);
 
         // then
-        Map<String, ResolvedOffer.Source> sourceByKey = new java.util.HashMap<>();
+        Map<String, ResolvedOffer.Source> sourceByKey = new HashMap<>();
         capturedOrderItems().stream().filter(i -> !i.isService())
                 .forEach(i -> sourceByKey.put(i.getExternalOfferKey(), i.getExternalOfferSource()));
         assertEquals(ResolvedOffer.Source.LINK, sourceByKey.get("K1"));
