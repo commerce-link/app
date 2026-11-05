@@ -65,15 +65,11 @@ public class InventoryKey {
             matched = id.equals(other.id);
         }
 
-        return matched || hasAnyEan(other.eans) || hasAnyProductCode(other.productCodes);
+        return matched || hasAnyEan(other.eans);
     }
 
     public boolean hasAnyEan(Collection<String> eans) {
         return eans.stream().anyMatch(this.eans::contains);
-    }
-
-    public boolean hasAnyProductCode(Collection<String> productCodes) {
-        return productCodes.stream().anyMatch(this.productCodes::contains);
     }
 
     public String getId() {

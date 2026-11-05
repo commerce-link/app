@@ -108,23 +108,20 @@ class ProductLabelsDynamoDbIntegrationTest {
     }
 
     @Test
-    void codesOfReadsBothCodesConsistentlyAcrossEveryPage() {
+    void eansOfReadsTheEanConsistentlyAcrossEveryPage() {
         // given
         save("cat-codes", "A", "B", "C");
         AmazonDynamoDB spy = Mockito.mock(AmazonDynamoDB.class, AdditionalAnswers.delegatesTo(client));
 
         // when: two items a page, so two pages
-        List<ProductRepository.ProductCodes> codes = new ProductRepository(spy).codesOf("cat-codes", 2);
+        List<String> eans = new ProductRepository(spy).eansOf("cat-codes", 2);
 
         // then
-        assertThat(codes).hasSize(3).allSatisfy(product -> {
-            assertThat(product.ean()).isEqualTo("5900000000008");
-            assertThat(product.manufacturerCode()).isEqualTo("MFN");
-        });
+        assertThat(eans).containsExactly("5900000000008", "5900000000008", "5900000000008");
         ArgumentCaptor<QueryRequest> request = ArgumentCaptor.forClass(QueryRequest.class);
         verify(spy, times(2)).query(request.capture());
         assertThat(request.getAllValues()).allSatisfy(query -> {
-            assertThat(query.getProjectionExpression()).isEqualTo("ean, mfn");
+            assertThat(query.getProjectionExpression()).isEqualTo("ean");
             assertThat(query.getConsistentRead()).isTrue();
         });
     }

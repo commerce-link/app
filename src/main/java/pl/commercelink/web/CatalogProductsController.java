@@ -458,7 +458,7 @@ public class CatalogProductsController {
         // A pending product is looked up in the PIM on every save, the way an added one is: the EAN may have been
         // corrected just now, or the PIM may have created the entry since. A product the PIM knows keeps its entry.
         // Asked with the EAN as it will be saved, before anything of the form reaches the product.
-        InventoryKey key = new InventoryKey(StringUtils.trimToNull(form.getEan()), StringUtils.trimToNull(form.getManufacturerCode()));
+        InventoryKey key = InventoryKey.fromEan(StringUtils.trimToNull(form.getEan()));
         Optional<PimEntry> joined = Optional.empty();
         if (!form.identifiersLocked()) {
             Product asSaved = new Product();

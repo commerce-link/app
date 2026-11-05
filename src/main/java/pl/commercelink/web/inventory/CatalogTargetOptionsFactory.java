@@ -7,7 +7,6 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.pim.api.PimCategory;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.PimCategoryTree;
@@ -44,7 +43,7 @@ public class CatalogTargetOptionsFactory {
             if (matched == null || matched.isEmpty()) {
                 continue;
             }
-            keys.add(BrowseRow.catalogKey(matched.getInventoryKey(), ean, mfnOfOfferWith(matched, ean)));
+            keys.add(BrowseRow.catalogKey(matched.getInventoryKey(), ean));
             categoryIds.add(Objects.requireNonNullElse(matched.getTaxonomy().categoryId(), ""));
         }
         CatalogPlacement.StorePlacement placement = catalogPlacement.forStore(storeId);
@@ -77,15 +76,6 @@ public class CatalogTargetOptionsFactory {
                 .findFirst()
                 .or(() -> matching.stream().findFirst())
                 .map(CatalogTargetOptions.Option::value)
-                .orElse(null);
-    }
-
-    /** The row adds by the EAN of its cheapest offer and shows that offer's MFN; the offer carrying the EAN has it. */
-    private static String mfnOfOfferWith(MatchedInventory matched, String ean) {
-        return matched.getInventoryItems().stream()
-                .filter(offer -> ean.equals(offer.ean()) && offer.mfn() != null)
-                .map(InventoryItem::mfn)
-                .findFirst()
                 .orElse(null);
     }
 }

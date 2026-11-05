@@ -135,16 +135,16 @@ class CatalogTargetOptionsFactoryTest {
     }
 
     @Test
-    void productInTheCatalogUnderTheMfnOfTheOfferCarryingTheEanCountsAsThere() {
+    void productInTheCatalogUnderTheMfnOfTheOfferOnlyDoesNotCount() {
         // given
         mergedProduct("5901000000077", "OWN-77");
-        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", new InventoryKey(null, "OWN-77")));
+        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", new InventoryKey("5901000000078", "OWN-77")));
 
         // when
         CatalogTargetOptions options = factory.build(STORE_ID, List.of("5901000000077"));
 
         // then
-        assertThat(options.matching()).extracting(CatalogTargetOptions.Option::alreadyIn).containsExactly(1, 0);
+        assertThat(options.matching()).extracting(CatalogTargetOptions.Option::alreadyIn).containsExactly(0, 0);
     }
 
     @Test
@@ -204,9 +204,6 @@ class CatalogTargetOptionsFactoryTest {
         group.addManufacturerCode("GLOBAL-98");
         when(merged.isEmpty()).thenReturn(false);
         when(merged.getInventoryKey()).thenReturn(group);
-        when(merged.getInventoryItems()).thenReturn(List.of(
-                new InventoryItem("5909999999998", "GLOBAL-98", 120.0, "PLN", 5, 1, "AB"),
-                new InventoryItem(ownEan, ownMfn, 100.0, "PLN", 3, 1, "Own")));
         when(merged.getTaxonomy()).thenReturn(new Taxonomy(ownEan, ownMfn, "Brand", "Merged", "x", 1, null, null, null, "11"));
         when(view.findByEan(ownEan)).thenReturn(merged);
     }
