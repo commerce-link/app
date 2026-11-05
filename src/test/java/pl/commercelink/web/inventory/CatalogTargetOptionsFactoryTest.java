@@ -138,7 +138,7 @@ class CatalogTargetOptionsFactoryTest {
     void productInTheCatalogUnderTheMfnOfTheOfferCarryingTheEanCountsAsThere() {
         // given
         mergedProduct("5901000000077", "OWN-77");
-        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", InventoryKey.fromMfn("OWN-77")));
+        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", new InventoryKey(null, "OWN-77")));
 
         // when
         CatalogTargetOptions options = factory.build(STORE_ID, List.of("5901000000077"));

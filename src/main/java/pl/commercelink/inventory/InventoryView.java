@@ -36,10 +36,6 @@ public class InventoryView {
         return findByInventoryKey(InventoryKey.fromEan(ean));
     }
 
-    public MatchedInventory findByProductCode(String productCode) {
-        return findByInventoryKey(InventoryKey.fromMfn(productCode));
-    }
-
     public MatchedInventory findByProduct(Product product) {
         return findByInventoryKey(InventoryKey.fromProduct(product));
     }

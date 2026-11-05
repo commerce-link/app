@@ -57,7 +57,7 @@ class CatalogPlacementTest {
         // when / then
         assertThat(store.existing(InventoryKey.fromEan("5901000000001"))).extracting(CatalogPlacement.Existing::categoryId)
                 .containsExactly("cat-gpu");
-        assertThat(store.existing(InventoryKey.fromMfn("GPU-1"))).hasSize(1);
+        assertThat(store.existing(new InventoryKey(null, "GPU-1"))).hasSize(1);
         assertThat(store.isIn("cat-gpu", InventoryKey.fromEan("5901000000001"))).isTrue();
         assertThat(store.isIn("cat-b2b", InventoryKey.fromEan("5901000000001"))).isFalse();
         assertThat(store.existing(InventoryKey.fromEan("5909999999999"))).isEmpty();

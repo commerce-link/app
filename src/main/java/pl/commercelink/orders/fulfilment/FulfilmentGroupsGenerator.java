@@ -97,19 +97,13 @@ public class FulfilmentGroupsGenerator {
     }
 
     private List<FulfilmentItem> createFulfilmentBasedOnSku(OrderItem orderItem, String sku) {
-        Collection<InventoryItem> offers = findOffersByEanThenManufacturerCode(sku);
+        Collection<InventoryItem> offers = inventory.findByEan(sku).getInventoryItems();
         List<FulfilmentItem> candidates = FulfilmentItem.fromInventory(orderItem, offers);
         if (!offers.isEmpty() && candidates.stream().noneMatch(candidateFilter)) {
             // a routed order must not stall on warehouse stock it is not allowed to use
             return FulfilmentItem.fromProviders(orderItem, offers);
         }
         return candidates;
-    }
-
-    // TODO remove search by manufacturer sku when all products have EAN codes
-    private Collection<InventoryItem> findOffersByEanThenManufacturerCode(String sku) {
-        Collection<InventoryItem> byEan = inventory.findByEan(sku).getInventoryItems();
-        return byEan.isEmpty() ? inventory.findByProductCode(sku).getInventoryItems() : byEan;
     }
 
     public static Builder builder() {

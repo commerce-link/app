@@ -3,6 +3,7 @@ package pl.commercelink.warehouse;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.Inventory;
+import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.InventoryItem;
@@ -86,7 +87,7 @@ public class RestockSuggestionService {
                     continue;
                 }
 
-                MatchedInventory matched = enabledInventory.findByProductCode(level.getManufacturerCode());
+                MatchedInventory matched = enabledInventory.findByInventoryKey(InventoryKey.fromPimIdAndEan(level.getPimId(), level.getEan()));
                 InventoryItem offer = findCheapestOffer(matched, supplier);
 
                 suggestionsByMfn.put(mfn, new RestockSuggestion(level, offer, categorize(level, offer)));

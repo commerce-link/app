@@ -246,7 +246,7 @@ class StoreInventoryProviderTest {
         InventoryIndex result = provider.ownIndex(store);
 
         // then
-        assertThat(result.findMatching(InventoryKey.fromMfn("M1"))).containsExactly(matched);
+        assertThat(result.findMatching(InventoryKey.fromEan("E1"))).containsExactly(matched);
         verify(storesRepository, never()).findById(any());
     }
 

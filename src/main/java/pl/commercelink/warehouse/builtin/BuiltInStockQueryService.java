@@ -22,15 +22,6 @@ class BuiltInStockQueryService implements StockQueryService {
     }
 
     @Override
-    public List<WarehouseItemView> searchAvailableByMfns(String storeId, Collection<String> mfns) {
-        return warehouseRepository.findAllAvailableByMfns(storeId, mfns)
-                .stream()
-                .filter(WarehouseItem::isSealed)
-                .map(this::fromInternal)
-                .collect(Collectors.toList());
-    }
-
-    @Override
     public List<WarehouseItemView> searchAvailableByEans(String storeId, Collection<String> eans) {
         return warehouseRepository.findAllAvailableByEans(storeId, eans)
                 .stream()
@@ -73,8 +64,8 @@ class BuiltInStockQueryService implements StockQueryService {
     }
 
     @Override
-    public List<WarehouseItemView> searchAllAvailableByMfns(String storeId, Collection<String> mfns) {
-        return warehouseRepository.findAllAvailableByMfns(storeId, mfns)
+    public List<WarehouseItemView> searchAllAvailableByEans(String storeId, Collection<String> eans) {
+        return warehouseRepository.findAllAvailableByEans(storeId, eans)
                 .stream()
                 .map(this::fromInternal)
                 .collect(Collectors.toList());

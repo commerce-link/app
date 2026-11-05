@@ -34,13 +34,21 @@ class InventoryIndexTest {
     }
 
     @Test
-    void findsGroupByProductCode() {
+    void keyWithEanFindsNoGroupByCode() {
         // given
-        MatchedInventory matched = group(new InventoryKey("5901234567890", "MFN-1"));
-        InventoryIndex index = InventoryIndex.of(List.of(matched));
+        InventoryIndex index = InventoryIndex.of(List.of(group(new InventoryKey("5901234567890", "MFN-1"))));
 
         // when / then
-        assertThat(index.findMatching(new InventoryKey("0000000000000", "MFN-1"))).containsExactly(matched);
+        assertThat(index.findMatching(new InventoryKey("0000000000000", "MFN-1"))).isEmpty();
+    }
+
+    @Test
+    void containsIgnoresTheCodeOfAKeyWithEan() {
+        // given
+        InventoryIndex index = InventoryIndex.of(List.of(group(new InventoryKey("5901234567890", "MFN-1"))));
+
+        // when / then
+        assertThat(index.contains(new InventoryKey("0000000000000", "MFN-1"))).isFalse();
     }
 
     @Test
@@ -65,14 +73,14 @@ class InventoryIndexTest {
     }
 
     @Test
-    void returnsAllGroupsSharingTheLookupCode() {
+    void returnsAllGroupsSharingTheLookupEan() {
         // given
         MatchedInventory first = group(new InventoryKey("5901234567890", "MFN-1"));
-        MatchedInventory second = group(new InventoryKey("4000000000009", "MFN-1"));
+        MatchedInventory second = group(new InventoryKey("5901234567890", "MFN-2"));
         InventoryIndex index = InventoryIndex.of(List.of(first, second));
 
         // when / then
-        assertThat(index.findMatching(new InventoryKey("0000000000000", "MFN-1"))).containsExactlyInAnyOrder(first, second);
+        assertThat(index.findMatching(InventoryKey.fromEan("5901234567890"))).containsExactlyInAnyOrder(first, second);
     }
 
     @Test

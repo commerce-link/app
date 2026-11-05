@@ -2,10 +2,12 @@ package pl.commercelink.warehouse;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.Inventory;
+import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.InventoryItem;
@@ -22,8 +24,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -54,12 +56,16 @@ class RestockSuggestionServiceTest {
     @Mock
     private MatchedInventory matched;
 
+    private static StockProductLevel level(String category, String mfn, String name, double promo) {
+        return new StockProductLevel(category, "PIM-" + mfn, "EAN-" + mfn, mfn, name, promo, 0, 3);
+    }
+
     @Test
     void sortsDeliverySuggestionsByCategoryThenName() {
         // given
-        StockProductLevel gpu = new StockProductLevel("GPU", "MFN-GPU", "Zotac RTX", 1_000_000, 0, 3);
-        StockProductLevel cpuAmd = new StockProductLevel("CPU", "MFN-CPU-AMD", "AMD Ryzen", 1_000_000, 0, 3);
-        StockProductLevel cpuIntel = new StockProductLevel("CPU", "MFN-CPU-INTEL", "Intel Core", 1_000_000, 0, 3);
+        StockProductLevel gpu = level("GPU", "MFN-GPU", "Zotac RTX", 1_000_000);
+        StockProductLevel cpuAmd = level("CPU", "MFN-CPU-AMD", "AMD Ryzen", 1_000_000);
+        StockProductLevel cpuIntel = level("CPU", "MFN-CPU-INTEL", "Intel Core", 1_000_000);
 
         InventoryItem offer = new InventoryItem("EAN", "MFN", 100.0, "PLN", 5, 1, "Action");
 
@@ -70,7 +76,7 @@ class RestockSuggestionServiceTest {
         when(catalog.getCatalogId()).thenReturn("cat");
         when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false, true))
                 .thenReturn(List.of(gpu, cpuAmd, cpuIntel));
-        when(enabledInventory.findByProductCode(anyString())).thenReturn(matched);
+        when(enabledInventory.findByInventoryKey(any())).thenReturn(matched);
         when(matched.isEmpty()).thenReturn(false);
         when(matched.getInventoryItemsFromSupplier("Action")).thenReturn(List.of(offer));
         when(warehouse.stockQueryService("store")).thenReturn(stockQueryService);
@@ -92,8 +98,8 @@ class RestockSuggestionServiceTest {
     @Test
     void sortsDeliverySuggestionsByPriceCategoryAttractiveness() {
         // given
-        StockProductLevel goodDeal = new StockProductLevel("CPU", "MFN-1", "AAA", 1_000_000, 0, 3);
-        StockProductLevel hotDeal = new StockProductLevel("CPU", "MFN-2", "ZZZ", 1_000_000, 0, 3);
+        StockProductLevel goodDeal = level("CPU", "MFN-1", "AAA", 1_000_000);
+        StockProductLevel hotDeal = level("CPU", "MFN-2", "ZZZ", 1_000_000);
         hotDeal.setRestockPriceHotDeal(1_000_000);
 
         InventoryItem offer = new InventoryItem("EAN", "MFN", 100.0, "PLN", 5, 1, "Action");
@@ -105,7 +111,7 @@ class RestockSuggestionServiceTest {
         when(catalog.getCatalogId()).thenReturn("cat");
         when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false, true))
                 .thenReturn(List.of(goodDeal, hotDeal));
-        when(enabledInventory.findByProductCode(anyString())).thenReturn(matched);
+        when(enabledInventory.findByInventoryKey(any())).thenReturn(matched);
         when(matched.isEmpty()).thenReturn(false);
         when(matched.getInventoryItemsFromSupplier("Action")).thenReturn(List.of(offer));
         when(warehouse.stockQueryService("store")).thenReturn(stockQueryService);
@@ -124,7 +130,7 @@ class RestockSuggestionServiceTest {
     @Test
     void skipsOffersWithoutHistoricalThresholds() {
         // given
-        StockProductLevel level = new StockProductLevel("CPU", "MFN-1", "AMD Ryzen", 0, 0, 3);
+        StockProductLevel level = level("CPU", "MFN-1", "AMD Ryzen", 0);
         InventoryItem offer = new InventoryItem("EAN", "MFN", 100.0, "PLN", 5, 1, "Action");
 
         when(storesRepository.findById("store")).thenReturn(store);
@@ -134,7 +140,7 @@ class RestockSuggestionServiceTest {
         when(catalog.getCatalogId()).thenReturn("cat");
         when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false, true))
                 .thenReturn(List.of(level));
-        when(enabledInventory.findByProductCode(anyString())).thenReturn(matched);
+        when(enabledInventory.findByInventoryKey(any())).thenReturn(matched);
         when(matched.isEmpty()).thenReturn(false);
         when(matched.getInventoryItemsFromSupplier("Action")).thenReturn(List.of(offer));
 
@@ -148,15 +154,15 @@ class RestockSuggestionServiceTest {
     @Test
     void restockWithBudgetKeepsOnlyOffersWithinThreshold() {
         // given
-        StockProductLevel affordable = new StockProductLevel("CPU", "MFN-1", "AMD Ryzen", 200, 0, 3);
-        StockProductLevel tooExpensive = new StockProductLevel("CPU", "MFN-2", "Intel Core", 99, 0, 3);
+        StockProductLevel affordable = level("CPU", "MFN-1", "AMD Ryzen", 200);
+        StockProductLevel tooExpensive = level("CPU", "MFN-2", "Intel Core", 99);
 
         InventoryItem offer = new InventoryItem("EAN", "MFN", 100.0, "PLN", 5, 1, "Action");
 
         when(inventory.withEnabledSuppliersOnly("store", SupplierScope.FULFILMENT)).thenReturn(enabledInventory);
         when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false, false))
                 .thenReturn(List.of(affordable, tooExpensive));
-        when(enabledInventory.findByProductCode(anyString())).thenReturn(matched);
+        when(enabledInventory.findByInventoryKey(any())).thenReturn(matched);
         when(matched.isEmpty()).thenReturn(false);
         when(matched.getInventoryItems()).thenReturn(List.of(offer));
 
@@ -170,13 +176,13 @@ class RestockSuggestionServiceTest {
     @Test
     void restockComparesTheOfferNetPriceWithTheNetLimit() {
         // given
-        StockProductLevel level = new StockProductLevel("CPU", "MFN-1", "AMD Ryzen", 100, 0, 3);
+        StockProductLevel level = level("CPU", "MFN-1", "AMD Ryzen", 100);
         InventoryItem offer = new InventoryItem("EAN", "MFN", 90.0, "PLN", 5, 1, "Action");
 
         when(inventory.withEnabledSuppliersOnly("store", SupplierScope.FULFILMENT)).thenReturn(enabledInventory);
         when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false, false))
                 .thenReturn(List.of(level));
-        when(enabledInventory.findByProductCode(anyString())).thenReturn(matched);
+        when(enabledInventory.findByInventoryKey(any())).thenReturn(matched);
         when(matched.isEmpty()).thenReturn(false);
         when(matched.getInventoryItems()).thenReturn(List.of(offer));
 
@@ -190,12 +196,12 @@ class RestockSuggestionServiceTest {
     @Test
     void restockWithoutBudgetIncludesItemsWithoutOffers() {
         // given
-        StockProductLevel level = new StockProductLevel("CPU", "MFN-1", "AMD Ryzen", 0, 0, 3);
+        StockProductLevel level = level("CPU", "MFN-1", "AMD Ryzen", 0);
 
         when(inventory.withEnabledSuppliersOnly("store", SupplierScope.FULFILMENT)).thenReturn(enabledInventory);
         when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false, false))
                 .thenReturn(List.of(level));
-        when(enabledInventory.findByProductCode(anyString())).thenReturn(null);
+        when(enabledInventory.findByInventoryKey(any())).thenReturn(null);
 
         // when
         List<RestockSuggestion> result = service.suggestForRestock("store", "cat", null, RestockScope.WholeCatalog, false, null);
@@ -204,5 +210,26 @@ class RestockSuggestionServiceTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).hasOffer()).isFalse();
         assertThat(result.get(0).getPriceCategory()).isNull();
+    }
+
+    @Test
+    void suggestionLooksUpTheGroupOfTheProduct() {
+        // given
+        StockProductLevel level = new StockProductLevel("CPU", "PIM-1", "5900000000014", "MFN-1", "AMD Ryzen", 0, 0, 3);
+
+        when(inventory.withEnabledSuppliersOnly("store", SupplierScope.FULFILMENT)).thenReturn(enabledInventory);
+        when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false, false))
+                .thenReturn(List.of(level));
+        when(enabledInventory.findByInventoryKey(any())).thenReturn(null);
+
+        // when
+        service.suggestForRestock("store", "cat", null, RestockScope.WholeCatalog, false, null);
+
+        // then
+        ArgumentCaptor<InventoryKey> key = ArgumentCaptor.forClass(InventoryKey.class);
+        verify(enabledInventory).findByInventoryKey(key.capture());
+        assertThat(key.getValue().getId()).isEqualTo("PIM-1");
+        assertThat(key.getValue().getProductEans()).containsExactly("5900000000014");
+        assertThat(key.getValue().getProductCodes()).isEmpty();
     }
 }

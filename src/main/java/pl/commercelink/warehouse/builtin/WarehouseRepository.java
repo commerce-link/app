@@ -137,10 +137,6 @@ class WarehouseRepository extends DynamoDbRepository<WarehouseItem> {
         return findAllAvailableBy(storeId, "ean", eans);
     }
 
-    List<WarehouseItem> findAllAvailableByMfns(String storeId, Collection<String> mfns) {
-        return findAllAvailableBy(storeId, "mfn", mfns);
-    }
-
     private List<WarehouseItem> findAllAvailableBy(String storeId, String attribute, Collection<String> values) {
         if (values == null || values.isEmpty()) {
             return List.of();

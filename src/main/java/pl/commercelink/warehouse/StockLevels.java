@@ -99,6 +99,8 @@ public class StockLevels {
                 } else {
                     StockProductLevel spl = new StockProductLevel(
                             category.getName(),
+                            product.getPimId(),
+                            product.getEan(),
                             product.getManufacturerCode(),
                             product.getName(),
                             restockPricePromo,

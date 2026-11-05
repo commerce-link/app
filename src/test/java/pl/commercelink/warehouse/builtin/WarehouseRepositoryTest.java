@@ -18,9 +18,9 @@ class WarehouseRepositoryTest {
     private final WarehouseRepository repository = new WarehouseRepository(amazonDynamoDB);
 
     @Test
-    void findAllAvailableByMfnsReturnsEmptyWithoutQueryingForEmptyMfns() {
+    void findAllAvailableByEansReturnsEmptyWithoutQueryingForEmptyEans() {
         // given / when
-        List<WarehouseItem> result = repository.findAllAvailableByMfns("store-1", List.of());
+        List<WarehouseItem> result = repository.findAllAvailableByEans("store-1", List.of());
 
         // then
         assertThat(result).isEmpty();

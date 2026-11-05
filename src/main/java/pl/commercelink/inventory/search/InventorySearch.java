@@ -6,14 +6,14 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
-import pl.commercelink.pim.api.PimView;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
@@ -24,18 +24,11 @@ import pl.commercelink.warehouse.api.StockQueryService;
 import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.warehouse.api.WarehouseItemView;
 
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
 
 @Component
 @RequiredArgsConstructor
@@ -73,11 +66,11 @@ public class InventorySearch {
         Match match = firstMatch(query, view, pim);
         List<WarehouseItemView> warehouseItems = stock == null
                 ? List.of()
-                : stock.searchAllAvailableByMfns(storeId, warehouseCodes(match, query));
+                : stock.searchAllAvailableByEans(storeId, warehouseEans(match, query));
         if (match == null && warehouseItems.isEmpty()) {
             return known(query, pim);
         }
-        MatchedBy matchedBy = match == null ? MatchedBy.MFN : match.by();
+        MatchedBy matchedBy = match == null ? MatchedBy.EAN : match.by();
         List<InventoryItem> items = match == null ? List.of() : match.inventory().getInventoryItems();
         ProductCodes codes = ProductCodes.resolve(matchedBy, query,
                 items.isEmpty() ? warehouseItems.stream().map(WarehouseItemView::getEan).toList() : items.stream().map(InventoryItem::ean).toList(),
@@ -94,10 +87,6 @@ public class InventorySearch {
         if (byEan.hasAnyOffers()) {
             return new Match(MatchedBy.EAN, byEan);
         }
-        MatchedInventory byMfn = view.findByProductCode(query);
-        if (byMfn.hasAnyOffers()) {
-            return new Match(MatchedBy.MFN, byMfn);
-        }
         Optional<PimEntry> pimEntry = pim.findByPimId(query);
         if (pimEntry.isPresent()) {
             MatchedInventory byPimId = view.findByInventoryKey(InventoryKey.fromPimEntry(pimEntry.get()));
@@ -108,13 +97,12 @@ public class InventorySearch {
         return null;
     }
 
-    private Collection<String> warehouseCodes(Match match, String query) {
+    private Collection<String> warehouseEans(Match match, String query) {
         if (match != null) {
-            return match.inventory().getInventoryKey().getProductCodes();
+            return match.inventory().getInventoryKey().getProductEans();
         }
-        // a product nobody offers can still sit in the warehouse, which is only searchable by manufacturer code
-        String mfn = unifyMfn(query);
-        return mfn == null ? List.of() : List.of(mfn);
+        String ean = unifyEan(query);
+        return ean == null ? List.of() : List.of(ean);
     }
 
     private List<OfferRow> offers(List<InventoryItem> items, Function<String, ConnectionMode> modeOf,
@@ -209,13 +197,12 @@ public class InventorySearch {
         // the composite lookup, as recommendations use it: in a store whose own entry shadows the key's global entry
         // the header names the store's entry
         Optional<PimEntry> pimEntry = key.getId() == null ? Optional.empty()
-                : pim.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
+                : pim.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), List.of());
         return new ProductHeader(pimEntry.map(PimEntry::name).orElse(null), pimEntry.map(PimEntry::brand).orElse(null), codes.ean(), codes.code());
     }
 
     private ProductHeader warehouseHeader(String query, ProductCodes codes) {
-        String mfn = unifyMfn(query);
-        Taxonomy taxonomy = mfn == null ? null : taxonomyCache.findByMfn(mfn);
+        Taxonomy taxonomy = taxonomyCache.findByEan(query);
         if (taxonomy != null) {
             ProductCodes shown = codes.orElse(taxonomy.ean(), taxonomy.mfn());
             return new ProductHeader(taxonomy.name(), taxonomy.brand(), shown.ean(), shown.code());
@@ -224,10 +211,9 @@ public class InventorySearch {
     }
 
     private InventorySearchResult known(String query, PimView pim) {
-        String mfn = unifyMfn(query);
-        Taxonomy taxonomy = mfn == null ? null : taxonomyCache.findByMfn(mfn);
+        Taxonomy taxonomy = taxonomyCache.findByEan(query);
         if (taxonomy != null) {
-            return new InventorySearchResult.KnownWithoutOffers(MatchedBy.MFN,
+            return new InventorySearchResult.KnownWithoutOffers(MatchedBy.EAN,
                     new ProductHeader(taxonomy.name(), taxonomy.brand(), taxonomy.ean(), taxonomy.mfn()));
         }
         Optional<PimEntry> byGtin = pim.findByGtin(query);

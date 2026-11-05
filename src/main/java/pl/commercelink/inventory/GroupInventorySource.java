@@ -59,20 +59,20 @@ class GroupInventorySource implements InventorySource {
                 .toList();
     }
 
-    // prioritize lookup by mfn as it's more reliable
     private MatchedInventory selectBest(List<MatchedInventory> candidates, InventoryKey lookupKey) {
-        List<MatchedInventory> matchedByMfn = candidates.stream()
-                .filter(group -> group.matchedByMfn(lookupKey))
-                .toList();
-        MatchedInventory best = largest(matchedByMfn);
-        return best != null ? best : largest(candidates);
+        MatchedInventory byPimId = largest(candidates,
+                group -> lookupKey.getId() != null && lookupKey.getId().equals(group.getInventoryKey().getId()));
+        if (byPimId != null) {
+            return byPimId;
+        }
+        return largest(candidates, group -> group.getInventoryKey().hasAnyEan(lookupKey.getProductEans()));
     }
 
-    private MatchedInventory largest(List<MatchedInventory> groups) {
+    private MatchedInventory largest(List<MatchedInventory> groups, Predicate<MatchedInventory> level) {
         MatchedInventory best = null;
         int bestSize = 0;
         for (MatchedInventory group : groups) {
-            if (group.size() > bestSize) {
+            if (level.test(group) && group.size() > bestSize) {
                 bestSize = group.size();
                 best = group;
             }

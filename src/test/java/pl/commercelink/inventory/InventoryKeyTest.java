@@ -1,6 +1,7 @@
 package pl.commercelink.inventory;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.products.Product;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,5 +43,17 @@ class InventoryKeyTest {
         assertThat(key.matches(new InventoryKey("4000000000009", null))).isTrue();
         assertThat(key.matches(new InventoryKey(null, "MFN-2"))).isTrue();
         assertThat(key.matches(new InventoryKey("5901234567890", null))).isTrue();
+    }
+
+    @Test
+    void productKeyCarriesItsPimId() {
+        // given
+        Product product = new Product("cat-1", "P1", "5901234567890", "MFN-1", "Acme", null, "Product", null);
+
+        // when
+        InventoryKey key = InventoryKey.fromProduct(product);
+
+        // then
+        assertThat(key.getId()).isEqualTo("P1");
     }
 }

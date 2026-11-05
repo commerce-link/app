@@ -48,10 +48,6 @@ public class MatchedInventory {
         return key != null && key.matches(otherKey);
     }
 
-    public boolean matchedByMfn(InventoryKey otherKey) {
-        return key != null && key.hasAnyProductCode(otherKey.getProductCodes());
-    }
-
     public boolean isEmpty() {
         return inventoryItems.isEmpty();
     }

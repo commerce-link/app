@@ -601,7 +601,7 @@ class BrowsePageFactoryTest {
     }
 
     private static BrowseRow mfnRow(String mfn) {
-        return new BrowseRow(InventoryKey.fromMfn(mfn), "Produkt " + mfn, "Brand", null, mfn, "11", "Karty graficzne",
+        return new BrowseRow(new InventoryKey(null, mfn), "Produkt " + mfn, "Brand", null, mfn, "11", "Karty graficzne",
                 120.0, true, "AB", 5, 2);
     }
 

@@ -261,7 +261,6 @@ class InventoryViewStoreListingsTest {
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 1, null, null, null, "989"));
         StockQueryService stockQueryService = org.mockito.Mockito.mock(StockQueryService.class);
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
-        when(stockQueryService.searchAvailableByMfns(any(), any())).thenReturn(List.of());
 
         // when
         Collection<MatchedInventory> result =
@@ -273,19 +272,19 @@ class InventoryViewStoreListingsTest {
     }
 
     @Test
-    void findByProductCodeSelectsLargestOfDuplicateGlobalGroups() {
+    void findByEanSelectsLargestOfGlobalGroupsSharingTheEan() {
         // given
-        MatchedInventory smaller = new MatchedInventory(new InventoryKey("5900000000001", MFN),
-                List.of(new InventoryItem("5900000000001", MFN, 100.0, "PLN", 5, 1, "SupplierX", true, true, false)),
+        MatchedInventory smaller = new MatchedInventory(new InventoryKey(EAN, "MFN-A"),
+                List.of(new InventoryItem(EAN, "MFN-A", 100.0, "PLN", 5, 1, "SupplierX", true, true, false)),
                 taxonomyCache, supplierRegistry);
-        MatchedInventory bigger = new MatchedInventory(new InventoryKey("5900000000002", MFN),
-                List.of(new InventoryItem("5900000000002", MFN, 90.0, "PLN", 5, 1, "SupplierY", true, true, false),
-                        new InventoryItem("5900000000002", MFN, 95.0, "PLN", 5, 1, "SupplierZ", true, true, false)),
+        MatchedInventory bigger = new MatchedInventory(new InventoryKey(EAN, "MFN-B"),
+                List.of(new InventoryItem(EAN, "MFN-B", 90.0, "PLN", 5, 1, "SupplierY", true, true, false),
+                        new InventoryItem(EAN, "MFN-B", 95.0, "PLN", 5, 1, "SupplierZ", true, true, false)),
                 taxonomyCache, supplierRegistry);
         stubGlobalIndex(List.of(smaller, bigger));
 
         // when
-        MatchedInventory result = inventory.withGlobalData().findByProductCode(MFN);
+        MatchedInventory result = inventory.withGlobalData().findByEan(EAN);
 
         // then
         assertThat(result.getSuppliers()).containsExactlyInAnyOrder("SupplierY", "SupplierZ");
@@ -303,7 +302,7 @@ class InventoryViewStoreListingsTest {
                 List.of(item("AB Group", 1399.0), item("Action", 1450.0)), taxonomyCache, supplierRegistry)));
 
         // when
-        MatchedInventory matched = inventory.withEnabledSuppliersOnly(STORE_ID).findByProductCode(MFN);
+        MatchedInventory matched = inventory.withEnabledSuppliersOnly(STORE_ID).findByEan(EAN);
 
         // then
         assertThat(matched.getSuppliers()).containsExactlyInAnyOrder("AB Group", "Action");
@@ -334,7 +333,7 @@ class InventoryViewStoreListingsTest {
     }
 
     @Test
-    void findByEanSurfacesWarehouseStockViaMfnResolvedFromGlobal() {
+    void findByEanSurfacesWarehouseStock() {
         // given
         Store store = org.mockito.Mockito.mock(Store.class);
         when(store.getGlobalSupplierNames()).thenReturn(List.of("AB Group"));
@@ -347,7 +346,7 @@ class InventoryViewStoreListingsTest {
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
         WarehouseItemView view = org.mockito.Mockito.mock(WarehouseItemView.class);
         when(view.toInventoryItem()).thenReturn(new InventoryItem(EAN, MFN, 1200.0, "PLN", 3, 1, "Warehouse", true, true, false));
-        when(stockQueryService.searchAvailableByMfns(eq(STORE_ID), argThat(mfns -> mfns.contains(MFN)))).thenReturn(List.of(view));
+        when(stockQueryService.searchAvailableByEans(eq(STORE_ID), argThat(eans -> eans.contains(EAN)))).thenReturn(List.of(view));
 
         // when
         MatchedInventory matched = inventory.withEnabledSuppliersAndWarehouseData(STORE_ID).findByEan(EAN);
@@ -371,7 +370,7 @@ class InventoryViewStoreListingsTest {
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
         WarehouseItemView view = org.mockito.Mockito.mock(WarehouseItemView.class);
         when(view.toInventoryItem()).thenReturn(new InventoryItem(EAN, MFN, 1200.0, "PLN", 3, 1, "Warehouse", true, true, false));
-        when(stockQueryService.searchAvailableByMfns(eq(STORE_ID), argThat(mfns -> mfns.contains(MFN)))).thenReturn(List.of(view));
+        when(stockQueryService.searchAvailableByEans(eq(STORE_ID), argThat(eans -> eans.contains(EAN)))).thenReturn(List.of(view));
 
         // when
         Collection<MatchedInventory> result =
@@ -380,22 +379,6 @@ class InventoryViewStoreListingsTest {
         // then
         assertThat(result).hasSize(1);
         assertThat(result.iterator().next().getSuppliers()).containsExactlyInAnyOrder("AB Group", "Warehouse");
-    }
-
-    @Test
-    void withWarehouseDataOnlySurfacesWarehouseStock() {
-        // given
-        StockQueryService stockQueryService = org.mockito.Mockito.mock(StockQueryService.class);
-        when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
-        WarehouseItemView view = org.mockito.Mockito.mock(WarehouseItemView.class);
-        when(view.toInventoryItem()).thenReturn(new InventoryItem(EAN, MFN, 1200.0, "PLN", 3, 1, "Warehouse", true, true, false));
-        when(stockQueryService.searchAvailableByMfns(eq(STORE_ID), argThat(mfns -> mfns.contains(MFN)))).thenReturn(List.of(view));
-
-        // when
-        MatchedInventory matched = inventory.withWarehouseDataOnly(STORE_ID).findByProductCode(MFN);
-
-        // then
-        assertThat(matched.getSuppliers()).containsExactly("Warehouse");
     }
 
     @Test
@@ -415,7 +398,7 @@ class InventoryViewStoreListingsTest {
     }
 
     @Test
-    void findByProductCodeReturnsEmptyNonNullResultWhenNothingMatches() {
+    void findByEanReturnsEmptyNonNullResultWhenNothingMatches() {
         // given
         Store store = org.mockito.Mockito.mock(Store.class);
         when(store.getGlobalSupplierNames()).thenReturn(List.of("AB Group"));
@@ -425,12 +408,12 @@ class InventoryViewStoreListingsTest {
         stubGlobalIndex(List.of());
 
         // when
-        MatchedInventory matched = inventory.withEnabledSuppliersOnly(STORE_ID).findByProductCode("UNKNOWN");
+        MatchedInventory matched = inventory.withEnabledSuppliersOnly(STORE_ID).findByEan("5900000000999");
 
         // then
         assertThat(matched).isNotNull();
         assertThat(matched.isEmpty()).isTrue();
-        assertThat(matched.getMfnCodes()).contains("UNKNOWN");
+        assertThat(matched.getEans()).contains("5900000000999");
     }
 
     @Test
