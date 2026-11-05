@@ -1,5 +1,6 @@
 package pl.commercelink.warehouse;
 
+import pl.commercelink.externaloffers.ResolvedOffer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -133,6 +134,27 @@ class WarehouseFulfilmentServiceTest {
         // then
         assertEquals(2, fulfilledItems.size());
         fulfilledItems.forEach(item -> assertEquals("local-seed-0051", item.getExternalItemId()));
+    }
+
+    @Test
+    void theRemainderKeepsTheResolutionSource() {
+        // given a qty-3 linked marketplace line of which the warehouse can reserve only 2
+        OrderItem orderItem = new OrderItem("order-1", Categories.UNCATEGORIZED, "Widget", 3, 199.0, "SKU-1", false);
+        orderItem.setManufacturerCode("MFN-1");
+        orderItem.setDeliveryId(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+        orderItem.setExternalOfferSource(ResolvedOffer.Source.LINK);
+
+        when(order.getStoreId()).thenReturn("store-1");
+        when(order.getDocumentByType(DocumentType.Reservation)).thenReturn(Optional.empty());
+        when(warehouse.reservationService("store-1")).thenReturn(reservationService);
+        when(reservationService.create(any())).thenAnswer(invocation -> confirmOnly(invocation.getArgument(0), 2));
+
+        // when
+        List<OrderItem> fulfilledItems = warehouseFulfilmentService.run(order, List.of(orderItem));
+
+        // then
+        assertEquals(2, fulfilledItems.size());
+        fulfilledItems.forEach(item -> assertEquals(ResolvedOffer.Source.LINK, item.getExternalOfferSource()));
     }
 
     private Reservation confirmOnly(Reservation reservation, int qty) {

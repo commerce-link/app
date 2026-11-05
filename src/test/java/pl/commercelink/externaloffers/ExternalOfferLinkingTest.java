@@ -324,6 +324,25 @@ class ExternalOfferLinkingTest {
     }
 
     @Test
+    void linkingAnItemMarksItLinked() {
+        // given a marketplace whose product code is the EAN itself and goods without a category
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        item.setSku("2001000000043");
+        item.setExternalItemId("2001000000043");
+        item.setExternalOfferKey("2001000000043");
+        openOrders(order);
+        assertThat(item.hasUnlinkedExternalOffer()).isTrue();
+
+        // when
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+
+        // then
+        assertThat(item.getExternalOfferSource()).isEqualTo(ResolvedOffer.Source.LINK);
+        assertThat(item.hasUnlinkedExternalOffer()).isFalse();
+    }
+
+    @Test
     void linkEanRejectsWhatIsNotAnEan() {
         // given
         Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);

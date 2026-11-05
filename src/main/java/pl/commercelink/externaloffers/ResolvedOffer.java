@@ -70,6 +70,7 @@ public record ResolvedOffer(String pimId, String ean, String mfn, String categor
         item.setEan(StringUtils.trimToNull(ean));
         item.setManufacturerCode(StringUtils.trimToNull(mfn));
         item.setCategory(StringUtils.isNotBlank(category) ? category : Categories.UNCATEGORIZED);
+        item.setExternalOfferSource(source);
     }
 
     /**
@@ -78,6 +79,7 @@ public record ResolvedOffer(String pimId, String ean, String mfn, String categor
      * match on it); a missing value leaves the item's own.
      */
     public void fill(OrderItem item) {
+        item.setExternalOfferSource(source);
         if (sku() != null) {
             item.setSku(sku());
         }

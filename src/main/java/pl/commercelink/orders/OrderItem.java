@@ -3,6 +3,7 @@ package pl.commercelink.orders;
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.baskets.BasketItem;
+import pl.commercelink.externaloffers.ResolvedOffer;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.stores.DeliveryOption;
@@ -31,6 +32,10 @@ public class OrderItem extends Item {
     private String externalItemId;
     @DynamoDBAttribute(attributeName = "externalOfferKey")
     private String externalOfferKey;
+    // empty on items imported before it was stored and on lines nothing recognised
+    @DynamoDBAttribute(attributeName = "externalOfferSource")
+    @DynamoDBTypeConvertedEnum
+    private ResolvedOffer.Source externalOfferSource;
     @DynamoDBAttribute(attributeName = "position")
     private int position;
     @DynamoDBVersionAttribute
@@ -69,6 +74,7 @@ public class OrderItem extends Item {
         this.consolidated = source.isConsolidated();
         this.externalItemId = source.getExternalItemId();
         this.externalOfferKey = source.getExternalOfferKey();
+        this.externalOfferSource = source.getExternalOfferSource();
         this.position = source.getPosition();
         this.setCondition(source.getCondition());
 
@@ -234,18 +240,26 @@ public class OrderItem extends Item {
         this.externalOfferKey = externalOfferKey;
     }
 
+    public ResolvedOffer.Source getExternalOfferSource() {
+        return externalOfferSource;
+    }
+
+    public void setExternalOfferSource(ResolvedOffer.Source externalOfferSource) {
+        this.externalOfferSource = externalOfferSource;
+    }
+
     /**
-     * An imported marketplace line whose seller offer could not be tied to goods yet: no category, and its sku is still
-     * the marketplace's own code, which the import gives a line nothing recognised (stored raw in externalItemId, the
-     * basket strips its spaces). A linked offer gives the line its EANs as the sku, "Assign SKU" or the warehouse another
-     * code. The EAN does not decide: it belongs to fulfilment, and removing the supplier clears it.
-     *
-     * <p>Accepted gap (user's decision): a marketplace whose product code is the EAN itself, linked to that same EAN,
-     * leaves a line without a category looking unlinked.
+     * An imported marketplace line whose seller offer could not be tied to goods yet: nothing recognised it (no
+     * externalOfferSource), it has no category, and its sku is still the marketplace's own code (stored raw in
+     * externalItemId, the basket strips its spaces). The source decides first because a marketplace whose product code
+     * is the EAN itself, linked to that same EAN, leaves the sku equal to the raw code; items stored before the source
+     * existed have none and keep the text comparison alone. "Assign SKU" or the warehouse changing the sku also ends it.
+     * The EAN does not decide: it belongs to fulfilment, and removing the supplier clears it.
      */
     @DynamoDBIgnore
     public boolean hasUnlinkedExternalOffer() {
         return externalOfferKey != null && Categories.UNCATEGORIZED.equals(getCategory()) && !isService()
+                && externalOfferSource == null
                 && StringUtils.defaultString(StringUtils.deleteWhitespace(externalItemId))
                 .equals(StringUtils.defaultString(getSku()));
     }

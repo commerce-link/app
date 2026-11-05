@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import pl.commercelink.baskets.BasketItem;
+import pl.commercelink.externaloffers.ResolvedOffer;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.warehouse.api.ItemCondition;
@@ -366,6 +367,55 @@ class OrderItemTest {
 
         // then
         assertThat(item.hasUnlinkedExternalOffer()).isFalse();
+    }
+
+    @Test
+    void aLinkedItemWhoseSkuEqualsTheRawCodeIsNotUnlinked() {
+        // given a marketplace whose product code is the EAN itself, linked to that same EAN
+        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, "2000000000015", false);
+        item.setExternalItemId("2000000000015");
+        item.setExternalOfferKey("2000000000015");
+        item.setExternalOfferSource(ResolvedOffer.Source.LINK);
+
+        // when / then
+        assertThat(item.hasUnlinkedExternalOffer()).isFalse();
+    }
+
+    @Test
+    void anItemRecognisedByManufacturerCodeWithoutCategoryIsNotUnlinked() {
+        // given the PIM knew the code but the goods have no category, so the sku stays the raw code
+        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, "DMW-1001", false);
+        item.setExternalItemId("DMW-1001");
+        item.setExternalOfferKey("PS-1");
+        item.setExternalOfferSource(ResolvedOffer.Source.MFN);
+
+        // when / then
+        assertThat(item.hasUnlinkedExternalOffer()).isFalse();
+    }
+
+    @Test
+    void anItemWithoutSourceKeepsTheTextRule() {
+        // given an item imported before the source was stored
+        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, "DMW-1001", false);
+        item.setExternalItemId("DMW-1001");
+        item.setExternalOfferKey("PS-1");
+
+        // when / then
+        assertThat(item.getExternalOfferSource()).isNull();
+        assertThat(item.hasUnlinkedExternalOffer()).isTrue();
+    }
+
+    @Test
+    void theCopyConstructorKeepsTheSource() {
+        // given
+        OrderItem source = orderItem("MFN-1");
+        source.setExternalOfferSource(ResolvedOffer.Source.OWN_OFFER);
+
+        // when
+        OrderItem copy = new OrderItem(ORDER_ID, source, 1);
+
+        // then
+        assertThat(copy.getExternalOfferSource()).isEqualTo(ResolvedOffer.Source.OWN_OFFER);
     }
 
     private OrderItem linkedLine() {
