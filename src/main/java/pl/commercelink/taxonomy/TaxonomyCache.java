@@ -2,28 +2,29 @@ package pl.commercelink.taxonomy;
 
 import com.nimbusds.oauth2.sdk.util.StringUtils;
 import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.InventoryKey;
 
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
-import java.util.stream.Stream;
 
-import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.areEansEq;
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
 
+@Slf4j
 @Component
 public class TaxonomyCache {
 
     private final TaxonomyRepository taxonomyRepository;
 
     private String fileName = "N/A";
-    private ConcurrentHashMap<String, Taxonomy> taxonomyByMfn = new ConcurrentHashMap<>();
+
+    private final ConcurrentHashMap<String, Taxonomy> taxonomyByEan = new ConcurrentHashMap<>();
+    private final TaxonomyCodeIndex codeIndex = new TaxonomyCodeIndex();
     private final AtomicInteger pendingCount = new AtomicInteger();
     private final ConcurrentHashMap<String, String> stringPool = new ConcurrentHashMap<>();
 
@@ -36,23 +37,27 @@ public class TaxonomyCache {
         Pair<String, List<Taxonomy>> result = taxonomyRepository.loadNewest();
 
         this.fileName = result.getLeft();
-        result.getRight().forEach(cachedTaxonomy -> {
-            Taxonomy interned = internLowCardinalityFields(cachedTaxonomy);
-            taxonomyByMfn.put(interned.mfn(), interned);
-        });
-        pendingCount.set((int) taxonomyByMfn.values().stream().filter(taxonomy -> !hasCategory(taxonomy)).count());
+        taxonomyByEan.clear();
+        codeIndex.clear();
+        result.getRight().forEach(this::add);
+        pendingCount.set((int) taxonomyByEan.values().stream().filter(taxonomy -> !hasCategory(taxonomy)).count());
 
-        System.out.println("Loaded " + taxonomyByMfn.size() + " taxonomies by mfn into cache from file: " + fileName);
+        log.info("Loaded {} taxonomies by ean into cache from file: {}", taxonomyByEan.size(), fileName);
     }
 
     public void add(Taxonomy taxonomy) {
-        if (StringUtils.isBlank(taxonomy.mfn())) return;
-        Taxonomy candidate = internLowCardinalityFields(taxonomy);
-        taxonomyByMfn.compute(candidate.mfn(), (mfn, current) -> {
-            Taxonomy merged = mergeOf(current, candidate);
-            pendingCount.addAndGet(pendingDelta(current, merged));
-            return merged;
+        String ean = unifyEan(taxonomy.ean());
+        if (StringUtils.isBlank(ean)) return;
+        taxonomyByEan.compute(ean, (key, current) -> {
+            Taxonomy merged = current == null ? taxonomy : current.mergedWith(taxonomy);
+            if (merged.equals(current)) {
+                return current;
+            }
+            Taxonomy stored = internLowCardinalityFields(merged);
+            pendingCount.addAndGet(pendingDelta(current, stored));
+            return stored;
         });
+        codeIndex.link(taxonomy.mfn(), taxonomy.brand(), ean);
     }
 
     private static int pendingDelta(Taxonomy current, Taxonomy merged) {
@@ -66,76 +71,32 @@ public class TaxonomyCache {
     }
 
     public static boolean hasCategory(Taxonomy taxonomy) {
-        return taxonomy != null
-                && taxonomy.category() != null
-                && !taxonomy.category().isBlank();
+        return taxonomy != null && taxonomy.hasCategory();
     }
 
-    public boolean updateCategory(String mfn, String category, String categoryId) {
-        if (StringUtils.isBlank(mfn) || category == null || category.isBlank()
+    public boolean updateCategory(String ean, String category, String categoryId) {
+        String key = unifyEan(ean);
+        if (StringUtils.isBlank(key) || category == null || category.isBlank()
                 || categoryId == null || categoryId.isBlank()) {
             return false;
         }
         boolean[] updated = {false};
-        taxonomyByMfn.computeIfPresent(mfn, (key, current) -> {
+        taxonomyByEan.computeIfPresent(key, (k, current) -> {
             if (hasCategory(current)) {
                 return current;
             }
             updated[0] = true;
             pendingCount.decrementAndGet();
-            return new Taxonomy(current.ean(), current.mfn(), current.brand(), current.name(),
-                    pooled(category), current.dataAccuracyScore(),
-                    current.netWeightInGrams(), current.grossWeightInGrams(),
-                    current.rawCategory(), pooled(categoryId));
+            return current.withCategory(pooled(category), pooled(categoryId));
         });
         return updated[0];
-    }
-
-    private static Taxonomy mergeOf(Taxonomy current, Taxonomy incoming) {
-        if (current == null) return incoming;
-
-        Taxonomy winner = bestByCategoryThenScore(current, incoming);
-        Integer net = bestWeightOf(current, incoming, Taxonomy::netWeightInGrams);
-        Integer gross = bestWeightOf(current, incoming, Taxonomy::grossWeightInGrams);
-
-        return needsRebuild(winner, net, gross) ? withWeights(winner, net, gross) : winner;
-    }
-
-    private static Taxonomy bestByCategoryThenScore(Taxonomy current, Taxonomy incoming) {
-        if (hasCategory(current) != hasCategory(incoming)) {
-            return hasCategory(current) ? current : incoming;
-        }
-        return bestByScore(current, incoming);
-    }
-
-    private static Taxonomy bestByScore(Taxonomy a, Taxonomy b) {
-        return b.dataAccuracyScore() <= a.dataAccuracyScore() ? b : a;
-    }
-
-    private static Integer bestWeightOf(Taxonomy a, Taxonomy b, Function<Taxonomy, Integer> picker) {
-        return Stream.of(b, a)
-                .filter(t -> picker.apply(t) != null)
-                .min(Comparator.comparingInt(Taxonomy::dataAccuracyScore))
-                .map(picker)
-                .orElse(null);
-    }
-
-    private static boolean needsRebuild(Taxonomy winner, Integer net, Integer gross) {
-        return !Objects.equals(net, winner.netWeightInGrams())
-                || !Objects.equals(gross, winner.grossWeightInGrams());
-    }
-
-    private static Taxonomy withWeights(Taxonomy t, Integer net, Integer gross) {
-        return new Taxonomy(t.ean(), t.mfn(), t.brand(), t.name(),
-                            t.category(), t.dataAccuracyScore(), net, gross, t.rawCategory(), t.categoryId());
     }
 
     public Taxonomy find(InventoryKey inventoryKey) {
         Taxonomy taxonomy = Taxonomy.EMPTY;
 
-        for (String productCode : inventoryKey.getProductCodes()) {
-            Taxonomy t = taxonomyByMfn.get(productCode);
-            if (t != null && preferredOver(t, taxonomy)) {
+        for (Taxonomy t : recordsOf(inventoryKey.getProductEans())) {
+            if (t.isPreferredOver(taxonomy)) {
                 taxonomy = t;
             }
         }
@@ -143,24 +104,41 @@ public class TaxonomyCache {
         return taxonomy;
     }
 
-    private static boolean preferredOver(Taxonomy candidate, Taxonomy current) {
-        if (hasCategory(candidate) != hasCategory(current)) {
-            return hasCategory(candidate);
-        }
-        return candidate.dataAccuracyScore() < current.dataAccuracyScore();
+    @Deprecated
+    public Taxonomy findByMfn(String mfn) {
+        return best(recordsOf(codeIndex.eansOfSingleBrand(mfn)));
     }
 
-    public Taxonomy findByMfn(String mfn) {
-        return taxonomyByMfn.get(mfn);
+    public Taxonomy findCategorySource(Taxonomy row) {
+        Taxonomy own = findByEan(row.ean());
+        if (hasCategory(own)) {
+            return own;
+        }
+        return best(recordsOf(codeIndex.eansOf(row.mfn(), row.brand())).stream()
+                .filter(Taxonomy::hasCategory)
+                .toList());
     }
 
     public Taxonomy findByEan(String ean) {
-        if (StringUtils.isBlank(ean)) {
+        String key = unifyEan(ean);
+        if (StringUtils.isBlank(key)) {
             return null;
         }
+        return taxonomyByEan.get(key);
+    }
+
+    private List<Taxonomy> recordsOf(Collection<String> eans) {
+        return eans.stream()
+                .filter(Objects::nonNull)
+                .map(taxonomyByEan::get)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private static Taxonomy best(List<Taxonomy> records) {
         Taxonomy best = null;
-        for (Taxonomy t : taxonomyByMfn.values()) {
-            if (areEansEq(t.ean(), ean) && (best == null || preferredOver(t, best))) {
+        for (Taxonomy t : records) {
+            if (best == null || t.isPreferredOver(best)) {
                 best = t;
             }
         }
@@ -172,11 +150,11 @@ public class TaxonomyCache {
     }
 
     public Collection<Taxonomy> getTaxonomies() {
-        return taxonomyByMfn.values();
+        return taxonomyByEan.values();
     }
 
     public int size() {
-        return taxonomyByMfn.size();
+        return taxonomyByEan.size();
     }
 
     private String pooled(String value) {

@@ -11,6 +11,7 @@ public class TaxonomyResolver {
         this.taxonomyCache = taxonomyCache;
     }
 
+    @Deprecated
     public ResolvedProduct resolve(String mfn, String fallbackName, String fallbackCategory) {
         Taxonomy taxonomy = taxonomyCache.findByMfn(mfn);
 
