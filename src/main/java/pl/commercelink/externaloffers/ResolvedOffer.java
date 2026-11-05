@@ -35,6 +35,7 @@ public record ResolvedOffer(String pimId, String ean, String mfn, String categor
         return new ResolvedOffer(null, eans.get(0), null, category, Source.LINK, eans.subList(1, eans.size()));
     }
 
+    // persisted by name on OrderItem.externalOfferSource: do not rename the values
     public enum Source {
         /**
          * An explicit link from the seller offer key to EANs: the EANs and, where the taxonomy knows the goods, their

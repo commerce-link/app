@@ -1297,6 +1297,8 @@ public class OrdersController extends BaseController {
         orderItem.setSku(sku);
         // a New item's EAN can only come from its offer link; the typed codes replace that link's codes
         orderItem.setEan(null);
+        // the operator's code replaces whatever recognised the item, so a later link does not re-fill it
+        orderItem.setExternalOfferSource(null);
         orderItemsRepository.save(orderItem);
         return details(orderId);
     }

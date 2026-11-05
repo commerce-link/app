@@ -500,6 +500,66 @@ class ExternalOfferLinkingTest {
     }
 
     @Test
+    void aCategorisedItemRecognisedByManufacturerCodeIsNotRefilled() {
+        // given another line of the key recognised by code whose goods the taxonomy categorised
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        Order other = marketplaceOrder("o2", EMPIK, OrderStatus.New, 2);
+        unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        OrderItem byCode = unlinkedItem("o2", "i2", FulfilmentStatus.New);
+        byCode.setExternalOfferSource(ResolvedOffer.Source.MFN);
+        byCode.setCategory("Dom i kuchnia");
+        openOrders(order, other);
+
+        // when
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+
+        // then
+        assertThat(byCode.getExternalOfferSource()).isEqualTo(ResolvedOffer.Source.MFN);
+        assertThat(byCode.getSku()).isEqualTo("RAW-1");
+        assertThat(byCode.getCategory()).isEqualTo("Dom i kuchnia");
+        verify(orderItemsRepository, never()).save(byCode);
+    }
+
+    @Test
+    void anItemWithAHandAssignedSkuIsNotRefilled() {
+        // given another line of the key recognised by code whose sku the operator changed by hand
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        Order other = marketplaceOrder("o2", EMPIK, OrderStatus.New, 2);
+        unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        OrderItem byHand = unlinkedItem("o2", "i2", FulfilmentStatus.New);
+        byHand.setExternalOfferSource(ResolvedOffer.Source.MFN);
+        byHand.setSku("DMW-9");
+        openOrders(order, other);
+
+        // when
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+
+        // then
+        assertThat(byHand.getSku()).isEqualTo("DMW-9");
+        assertThat(byHand.getExternalOfferSource()).isEqualTo(ResolvedOffer.Source.MFN);
+        verify(orderItemsRepository, never()).save(byHand);
+    }
+
+    @Test
+    void anOwnOfferItemIsNotRefilled() {
+        // given another line of the key that CommerceLink's own offer recognised
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        Order other = marketplaceOrder("o2", EMPIK, OrderStatus.New, 2);
+        unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        OrderItem own = unlinkedItem("o2", "i2", FulfilmentStatus.New);
+        own.setExternalOfferSource(ResolvedOffer.Source.OWN_OFFER);
+        openOrders(order, other);
+
+        // when
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+
+        // then
+        assertThat(own.getSku()).isEqualTo("RAW-1");
+        assertThat(own.getExternalOfferSource()).isEqualTo(ResolvedOffer.Source.OWN_OFFER);
+        verify(orderItemsRepository, never()).save(own);
+    }
+
+    @Test
     void changingALinkAlsoCorrectsOtherItemsTheOldLinkFilled() {
         // given a wrong EAN linked earlier gave both items its codes
         Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);

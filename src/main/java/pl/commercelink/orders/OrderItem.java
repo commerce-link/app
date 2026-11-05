@@ -258,8 +258,17 @@ public class OrderItem extends Item {
      */
     @DynamoDBIgnore
     public boolean hasUnlinkedExternalOffer() {
+        return looksUnlinkedByCode() && externalOfferSource == null;
+    }
+
+    /**
+     * The text-only rule that decided "unlinked" before the resolution source was stored: an offer key, no category,
+     * not a service, and the sku still equal to the marketplace's raw code. A line recognised by manufacturer code
+     * that still matches it is one the operator never touched, so a later link may re-fill it.
+     */
+    @DynamoDBIgnore
+    public boolean looksUnlinkedByCode() {
         return externalOfferKey != null && Categories.UNCATEGORIZED.equals(getCategory()) && !isService()
-                && externalOfferSource == null
                 && StringUtils.defaultString(StringUtils.deleteWhitespace(externalItemId))
                 .equals(StringUtils.defaultString(getSku()));
     }
