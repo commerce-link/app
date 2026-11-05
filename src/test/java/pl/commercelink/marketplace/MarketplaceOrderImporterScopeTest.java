@@ -12,7 +12,7 @@ import org.mockito.quality.Strictness;
 import pl.commercelink.marketplace.api.MarketplaceCustomer;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProduct;
-import pl.commercelink.marketplace.links.MarketplaceOfferResolver;
+import pl.commercelink.externaloffers.ExternalOfferResolver;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.pim.ScopedPimCatalog;
@@ -39,7 +39,7 @@ class MarketplaceOrderImporterScopeTest {
     @InjectMocks private MarketplaceOrderImporter importer;
 
     private String importedLineCategory(String storeId) {
-        org.springframework.test.util.ReflectionTestUtils.setField(importer, "offerResolver", new MarketplaceOfferResolver(
+        org.springframework.test.util.ReflectionTestUtils.setField(importer, "offerResolver", new ExternalOfferResolver(
                 null, ScopedPimCatalog.of(ScopedPimCatalog.storeEntry("s1-2", "s1", ScopedPimCatalog.STORE_GTIN, MPN, "Monitors")),
                 null, null, null, null, null));
         Store store = new Store();

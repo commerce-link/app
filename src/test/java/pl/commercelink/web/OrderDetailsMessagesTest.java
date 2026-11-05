@@ -1,7 +1,7 @@
 package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
-import pl.commercelink.marketplace.links.MarketplaceOfferLinking;
+import pl.commercelink.externaloffers.ExternalOfferLinking;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -69,11 +69,11 @@ class OrderDetailsMessagesTest {
         // given
         Properties pl = load("messages_pl.properties"), en = load("messages_en.properties");
         List<String> keys = List.of(
-                MarketplaceOfferLinking.NO_OFFER_KEY,
-                MarketplaceOfferLinking.NOT_A_MARKETPLACE_ORDER,
-                MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG,
-                MarketplaceOfferLinking.INVALID_EAN,
-                MarketplaceOfferLinking.OWN_OFFER,
+                ExternalOfferLinking.NO_OFFER_KEY,
+                ExternalOfferLinking.NOT_A_MARKETPLACE_ORDER,
+                ExternalOfferLinking.PRODUCT_NOT_IN_CATALOG,
+                ExternalOfferLinking.INVALID_EAN,
+                ExternalOfferLinking.OWN_OFFER,
                 "order.item.menu.change.offer.link",
                 "order.item.link.offer.change.title",
                 "order.item.link.offer.current",

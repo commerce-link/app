@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
+import pl.commercelink.externaloffers.ExternalOfferResolver;
 import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierChoice;
@@ -132,7 +133,7 @@ class OrderDetailsTemplateTest {
         OrderPageModelFactory factory = new OrderPageModelFactory(stores, events, dropship, new DeliveryRedirectResolver(),
                 pl.commercelink.web.orders.DropshipEligibilityStubs.acceptingEverySupplier(), labels, carrierOptions, mock(ProductCatalogRepository.class), mock(TaxonomyCache.class), messages,
                 receiptService, mock(ReceiptAlerts.class), courierAvailable(),
-                pl.commercelink.shipping.ShippingIntegrationNamesFixture.names(), mock(pl.commercelink.marketplace.links.MarketplaceOfferResolver.class));
+                pl.commercelink.shipping.ShippingIntegrationNamesFixture.names(), mock(pl.commercelink.externaloffers.ExternalOfferResolver.class));
         ReflectionTestUtils.setField(factory, "appDomain", "https://app.example");
         return factory;
     }
@@ -2795,7 +2796,7 @@ class OrderDetailsTemplateTest {
                 "Krzesło biurowe Ergo", 1, 499, "DMW-1001", false, 0);
         item.setStatus(status);
         item.setExternalItemId("DMW-1001");
-        item.setMarketplaceOfferKey("PS-1001");
+        item.setExternalOfferKey("PS-1001");
         return item;
     }
 

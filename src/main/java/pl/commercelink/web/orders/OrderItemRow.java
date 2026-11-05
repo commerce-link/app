@@ -24,7 +24,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                            ItemMargin margin, String statusKey, String statusTone, String deliveryLabel, String deliveryHref,
                            boolean deliveryToCreate, boolean readyForAllocation, boolean allocatedProduct, boolean deliveredProduct, boolean movable,
                            boolean removable, List<ItemAction.State> actions, String editHref, double price, double tax,
-                           boolean group, String viewHref, boolean unlinkedOffer, String marketplaceOfferKey) {
+                           boolean group, String viewHref, boolean unlinkedOffer, String externalOfferKey) {
 
     /**
      * {@code superAdmin} matters on its own besides {@code readOnly}: a closed order is read-only too, but only the
@@ -82,8 +82,8 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 // without the item menu a closed order would have no way to its item page (EAN, VAT, delivery dates)
                 context.readOnly() && !context.superAdmin() ? itemHref : null,
                 // the badge asks for a link, which only a New item of an open order can still take
-                linkable(item, context.ownOffer()) && item.isUnlinkedMarketplaceItem() && item.isNew() && !context.order().isClosed(),
-                item.getMarketplaceOfferKey());
+                linkable(item, context.ownOffer()) && item.hasUnlinkedExternalOffer() && item.isNew() && !context.order().isClosed(),
+                item.getExternalOfferKey());
     }
 
     /**
@@ -123,7 +123,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
      */
     // a line imported with a seller offer key that is not one of CommerceLink's own offers
     private static boolean linkable(OrderItem item, Predicate<String> ownOffer) {
-        return StringUtils.isNotBlank(item.getMarketplaceOfferKey()) && !ownOffer.test(item.getMarketplaceOfferKey());
+        return StringUtils.isNotBlank(item.getExternalOfferKey()) && !ownOffer.test(item.getExternalOfferKey());
     }
 
     public static List<ItemAction.State> actions(OrderItem item, Order order) {
@@ -167,7 +167,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
             // A line already recognised can have its link changed, e.g. a mistyped EAN
             if (!linkable(item, ownOffer)) {
                 // an offer CommerceLink published, or a line without an offer key: no link to make or change
-            } else if (item.isUnlinkedMarketplaceItem()) {
+            } else if (item.hasUnlinkedExternalOffer()) {
                 states.add(ItemAction.State.of(ItemAction.LINK_OFFER, assignReason, null));
             } else if (!item.isService()) {
                 states.add(ItemAction.State.of(ItemAction.CHANGE_OFFER_LINK, assignReason, null));

@@ -8,7 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.discounts.DiscountCode;
-import pl.commercelink.marketplace.links.MarketplaceOfferLink;
+import pl.commercelink.externaloffers.ExternalOfferLink;
 import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.orders.Order;
@@ -435,13 +435,13 @@ class StoreDeletionServiceTest {
     }
 
     @Test
-    void deletesStoreMarketplaceOfferLinks() {
+    void deletesStoreExternalOfferLinks() {
         // given
         Store store = regularStore();
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         stubEmptyCascade();
-        MarketplaceOfferLink link = new MarketplaceOfferLink();
-        when(wipeRepository.findMarketplaceOfferLinks(STORE_ID)).thenReturn(List.of(link));
+        ExternalOfferLink link = new ExternalOfferLink();
+        when(wipeRepository.findExternalOfferLinks(STORE_ID)).thenReturn(List.of(link));
 
         // when
         boolean deleted = service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
@@ -453,12 +453,12 @@ class StoreDeletionServiceTest {
     }
 
     @Test
-    void keepsStoreRecordWhenMarketplaceOfferLinksCannotBeDeleted() {
+    void keepsStoreRecordWhenExternalOfferLinksCannotBeDeleted() {
         // given
         Store store = regularStore();
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         stubEmptyCascade();
-        when(wipeRepository.findMarketplaceOfferLinks(STORE_ID)).thenThrow(new RuntimeException("throttled"));
+        when(wipeRepository.findExternalOfferLinks(STORE_ID)).thenThrow(new RuntimeException("throttled"));
 
         // when
         boolean deleted = service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);

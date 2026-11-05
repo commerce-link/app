@@ -1,8 +1,8 @@
 package pl.commercelink.web.settings;
 
 import org.junit.jupiter.api.Test;
-import pl.commercelink.marketplace.links.OfferMatchResult;
-import pl.commercelink.marketplace.links.OfferMatchResult.Row;
+import pl.commercelink.marketplace.offermatching.OfferMatchResult;
+import pl.commercelink.marketplace.offermatching.OfferMatchResult.Row;
 
 import java.time.Instant;
 import java.util.List;

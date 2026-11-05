@@ -69,7 +69,7 @@ class V016_EnableTableRecoveryProtectionTest {
     }
 
     @Test
-    void protectsTheMarketplaceOfferLinksTable() {
+    void protectsTheExternalOfferLinksTable() {
         // given
         pitrStatus(PointInTimeRecoveryStatus.DISABLED);
         deletionProtection(false);
@@ -79,8 +79,8 @@ class V016_EnableTableRecoveryProtectionTest {
 
         // then
         verify(dynamoDB).updateContinuousBackups(argThat((UpdateContinuousBackupsRequest r) ->
-                "MarketplaceOfferLinks".equals(r.getTableName())));
-        verify(dynamoDB).updateTable(argThat((UpdateTableRequest r) -> "MarketplaceOfferLinks".equals(r.getTableName())));
+                "ExternalOfferLinks".equals(r.getTableName())));
+        verify(dynamoDB).updateTable(argThat((UpdateTableRequest r) -> "ExternalOfferLinks".equals(r.getTableName())));
     }
 
     @Test

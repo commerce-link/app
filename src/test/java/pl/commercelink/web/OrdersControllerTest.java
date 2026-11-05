@@ -17,6 +17,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
+import pl.commercelink.externaloffers.ExternalOfferLinking;
 import pl.commercelink.products.Product;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierChoice;
@@ -213,7 +214,7 @@ class OrdersControllerTest {
     @Mock
     private ReceiptAttemptService receiptAttemptService;
     @Mock
-    private pl.commercelink.marketplace.links.MarketplaceOfferLinking marketplaceOfferLinking;
+    private pl.commercelink.externaloffers.ExternalOfferLinking externalOfferLinking;
 
     // Real resolver over the test classpath registry (`Stub` is a registered supplier type).
     @Spy
@@ -3944,7 +3945,7 @@ class OrdersControllerTest {
             Order order = order(OrderStatus.Assembly);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
             OrderItem ordered = item("i1", FulfilmentStatus.Ordered, "RAW-1");
-            ordered.setMarketplaceOfferKey("XS-1");
+            ordered.setExternalOfferKey("XS-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(ordered);
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
@@ -3954,7 +3955,7 @@ class OrdersControllerTest {
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
             assertThat(flash(redirect)).containsEntry("errorMessage", "order.item.link.offer.locked");
-            verifyNoInteractions(marketplaceOfferLinking);
+            verifyNoInteractions(externalOfferLinking);
         }
 
         @Test
@@ -3963,7 +3964,7 @@ class OrdersControllerTest {
             Order order = order(OrderStatus.Cancelled);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
-            fresh.setMarketplaceOfferKey("XS-1");
+            fresh.setExternalOfferKey("XS-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
@@ -3973,7 +3974,7 @@ class OrdersControllerTest {
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
             assertThat(flash(redirect)).containsEntry("errorMessage", "order.item.error.closed");
-            verifyNoInteractions(marketplaceOfferLinking);
+            verifyNoInteractions(externalOfferLinking);
             verify(orderItemsRepository, never()).save(any());
         }
 
@@ -3983,10 +3984,10 @@ class OrdersControllerTest {
             Order order = order(OrderStatus.New);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
-            fresh.setMarketplaceOfferKey("XS-1");
+            fresh.setExternalOfferKey("XS-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
-            when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "c1", "p1", null))
-                    .thenReturn(new pl.commercelink.marketplace.links.MarketplaceOfferLinking.LinkResult(3));
+            when(externalOfferLinking.link(STORE_ID, order, "i1", "c1", "p1", null))
+                    .thenReturn(new pl.commercelink.externaloffers.ExternalOfferLinking.LinkResult(3));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
@@ -4003,10 +4004,10 @@ class OrdersControllerTest {
             Order order = order(OrderStatus.New);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
-            fresh.setMarketplaceOfferKey("XS-1");
+            fresh.setExternalOfferKey("XS-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
-            when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "c-foreign", "p1", null)).thenThrow(
-                    new IllegalArgumentException(pl.commercelink.marketplace.links.MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG));
+            when(externalOfferLinking.link(STORE_ID, order, "i1", "c-foreign", "p1", null)).thenThrow(
+                    new IllegalArgumentException(pl.commercelink.externaloffers.ExternalOfferLinking.PRODUCT_NOT_IN_CATALOG));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
@@ -4014,7 +4015,7 @@ class OrdersControllerTest {
 
             // then
             assertThat(flash(redirect)).containsEntry("errorMessage",
-                    pl.commercelink.marketplace.links.MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG);
+                    pl.commercelink.externaloffers.ExternalOfferLinking.PRODUCT_NOT_IN_CATALOG);
         }
 
         @Test
@@ -4023,10 +4024,10 @@ class OrdersControllerTest {
             Order order = order(OrderStatus.New);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
-            fresh.setMarketplaceOfferKey("PS-1");
+            fresh.setExternalOfferKey("PS-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
-            when(marketplaceOfferLinking.linkEan(STORE_ID, order, "i1", "2001000000043", null))
-                    .thenReturn(new pl.commercelink.marketplace.links.MarketplaceOfferLinking.LinkResult(1));
+            when(externalOfferLinking.linkEan(STORE_ID, order, "i1", "2001000000043", null))
+                    .thenReturn(new pl.commercelink.externaloffers.ExternalOfferLinking.LinkResult(1));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
@@ -4034,7 +4035,7 @@ class OrdersControllerTest {
 
             // then
             assertThat(notice(redirect).text()).isEqualTo("order.item.link.offer.done [1]");
-            verify(marketplaceOfferLinking, never()).link(any(), any(), any(), any(), any(), any());
+            verify(externalOfferLinking, never()).link(any(), any(), any(), any(), any(), any());
         }
 
         @Test
@@ -4043,10 +4044,10 @@ class OrdersControllerTest {
             Order order = order(OrderStatus.New);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
-            fresh.setMarketplaceOfferKey("PS-1");
+            fresh.setExternalOfferKey("PS-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
-            when(marketplaceOfferLinking.linkEan(STORE_ID, order, "i1", "   ", null)).thenThrow(new IllegalArgumentException(
-                    pl.commercelink.marketplace.links.MarketplaceOfferLinking.INVALID_EAN));
+            when(externalOfferLinking.linkEan(STORE_ID, order, "i1", "   ", null)).thenThrow(new IllegalArgumentException(
+                    pl.commercelink.externaloffers.ExternalOfferLinking.INVALID_EAN));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
@@ -4054,8 +4055,8 @@ class OrdersControllerTest {
 
             // then
             assertThat(flash(redirect)).containsEntry("errorMessage",
-                    pl.commercelink.marketplace.links.MarketplaceOfferLinking.INVALID_EAN);
-            verify(marketplaceOfferLinking, never()).link(any(), any(), any(), any(), any(), any());
+                    pl.commercelink.externaloffers.ExternalOfferLinking.INVALID_EAN);
+            verify(externalOfferLinking, never()).link(any(), any(), any(), any(), any(), any());
         }
 
         @Test
@@ -4064,10 +4065,10 @@ class OrdersControllerTest {
             Order order = order(OrderStatus.New);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
-            fresh.setMarketplaceOfferKey("PS-1");
+            fresh.setExternalOfferKey("PS-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
-            when(marketplaceOfferLinking.linkEan(STORE_ID, order, "i1", "12AB", null)).thenThrow(
-                    new IllegalArgumentException(pl.commercelink.marketplace.links.MarketplaceOfferLinking.INVALID_EAN));
+            when(externalOfferLinking.linkEan(STORE_ID, order, "i1", "12AB", null)).thenThrow(
+                    new IllegalArgumentException(pl.commercelink.externaloffers.ExternalOfferLinking.INVALID_EAN));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
@@ -4075,7 +4076,7 @@ class OrdersControllerTest {
 
             // then
             assertThat(flash(redirect)).containsEntry("errorMessage",
-                    pl.commercelink.marketplace.links.MarketplaceOfferLinking.INVALID_EAN);
+                    pl.commercelink.externaloffers.ExternalOfferLinking.INVALID_EAN);
         }
 
         @Test

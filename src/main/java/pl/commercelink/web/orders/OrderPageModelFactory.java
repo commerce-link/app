@@ -15,7 +15,7 @@ import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.marketplace.links.MarketplaceOfferResolver;
+import pl.commercelink.externaloffers.ExternalOfferResolver;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
@@ -90,7 +90,7 @@ public class OrderPageModelFactory {
     private final ReceiptAlerts receiptAlerts;
     private final ShippingService shippingService;
     private final ShippingIntegrationNames shippingIntegrationNames;
-    private final MarketplaceOfferResolver marketplaceOfferResolver;
+    private final ExternalOfferResolver externalOfferResolver;
 
     /** Fiscal dates are Polish dates, whatever zone the server runs in (as ReceiptEffects dates the document). */
     private static final ZoneId WARSAW = ZoneId.of("Europe/Warsaw");
@@ -269,7 +269,7 @@ public class OrderPageModelFactory {
                 item -> SupplierRegistry.WAREHOUSE.equalsIgnoreCase(item.getDeliveryId()) ? null
                         : deliveryHref(order, item, viewer, links, dropship),
                 serial -> viewer.superAdmin() ? null : OrderLinks.itemHistory(serial),
-                receiptLock, hasDropshipItems, key -> marketplaceOfferResolver.isOwnOffer(order.getStoreId(), key));
+                receiptLock, hasDropshipItems, key -> externalOfferResolver.isOwnOffer(order.getStoreId(), key));
         List<OrderItem> sorted = items.stream().sorted(Comparator.comparingInt(OrderItem::getPosition)).toList();
         List<OrderItemRow> products = new ArrayList<>();
         List<OrderItemRow> services = new ArrayList<>();

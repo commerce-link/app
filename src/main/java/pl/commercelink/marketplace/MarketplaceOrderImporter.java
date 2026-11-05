@@ -9,8 +9,8 @@ import pl.commercelink.marketplace.api.MarketplaceCustomer;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProduct;
 import pl.commercelink.marketplace.api.PickupPoint;
-import pl.commercelink.marketplace.links.MarketplaceOfferResolver;
-import pl.commercelink.marketplace.links.ResolvedOffer;
+import pl.commercelink.externaloffers.ExternalOfferResolver;
+import pl.commercelink.externaloffers.ResolvedOffer;
 import pl.commercelink.orders.*;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.shipping.CarrierDictionary;
@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 public class MarketplaceOrderImporter {
 
     @Autowired
-    private MarketplaceOfferResolver offerResolver;
+    private ExternalOfferResolver offerResolver;
 
     @Autowired
     private OrdersManager ordersManager;
@@ -35,14 +35,14 @@ public class MarketplaceOrderImporter {
     private CarrierDictionary carrierDictionary;
 
     /**
-     * Imports one fetch of a marketplace's orders in one {@link MarketplaceOfferResolver.StoreOffers} scope, not one per
+     * Imports one fetch of a marketplace's orders in one {@link ExternalOfferResolver.StoreOffers} scope, not one per
      * order: what the scope reads (the store's catalog list, at most twice, and the taxonomy category of each EAN) is
      * read for the whole fetch, since repeating it for every new order of a backlog could outlast the queue message.
      *
      * @return how many orders were new and saved
      */
     public int importOrders(Store store, String marketplaceName, List<MarketplaceOrder> marketplaceOrders) {
-        MarketplaceOfferResolver.StoreOffers offers = offerResolver.forStore(store.getStoreId());
+        ExternalOfferResolver.StoreOffers offers = offerResolver.forStore(store.getStoreId());
         int imported = 0;
         for (MarketplaceOrder marketplaceOrder : marketplaceOrders) {
             if (importOrder(store, marketplaceName, marketplaceOrder, offers)) {
@@ -58,7 +58,7 @@ public class MarketplaceOrderImporter {
     }
 
     private boolean importOrder(Store store, String marketplaceName, MarketplaceOrder marketplaceOrder,
-                                MarketplaceOfferResolver.StoreOffers offers) {
+                                ExternalOfferResolver.StoreOffers offers) {
         // every poll fetches orders already imported; resolving their lines would read the catalogs for nothing.
         // saveWithFulfilment checks again, against an import running at the same time.
         if (ordersManager.isAlreadyImported(store.getStoreId(), marketplaceOrder.externalOrderId())) {
@@ -136,7 +136,7 @@ public class MarketplaceOrderImporter {
                     if (!i.isService()) {
                         orderItem.setExternalItemId(rawKeysByBasketItemId.get(i.getId()));
                         ResolvedLine line = resolvedByBasketItemId.get(i.getId());
-                        orderItem.setMarketplaceOfferKey(line.sellerOfferKey());
+                        orderItem.setExternalOfferKey(line.sellerOfferKey());
                         // the same fill as "Link to product", so both give a resolved line the same codes
                         if (line.offer() != null) {
                             line.offer().fill(orderItem);

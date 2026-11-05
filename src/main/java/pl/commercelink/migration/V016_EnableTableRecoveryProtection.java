@@ -17,7 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import pl.commercelink.discounts.DiscountCode;
-import pl.commercelink.marketplace.links.MarketplaceOfferLink;
+import pl.commercelink.externaloffers.ExternalOfferLink;
 import pl.commercelink.notifications.StoreNotificationRecord;
 import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.scheduling.DailyScheduleExecutionCount;
@@ -53,7 +53,7 @@ public class V016_EnableTableRecoveryProtection {
             "OrderItems",
             "Orders",
             "Products",
-            MarketplaceOfferLink.TABLE_NAME,
+            ExternalOfferLink.TABLE_NAME,
             ReceiptAttempt.TABLE_NAME,
             "RMA",
             "RMACenters",

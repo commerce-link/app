@@ -1,6 +1,6 @@
 package pl.commercelink.web.settings;
 
-import pl.commercelink.marketplace.links.OfferMatchResult;
+import pl.commercelink.marketplace.offermatching.OfferMatchResult;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;

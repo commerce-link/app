@@ -13,8 +13,8 @@ import org.mockito.quality.Strictness;
 import pl.commercelink.marketplace.api.MarketplaceCustomer;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProduct;
-import pl.commercelink.marketplace.links.MarketplaceOfferResolver;
-import pl.commercelink.marketplace.links.ResolvedOffer;
+import pl.commercelink.externaloffers.ExternalOfferResolver;
+import pl.commercelink.externaloffers.ResolvedOffer;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.Order;
@@ -56,9 +56,9 @@ class MarketplaceOrderImporterTest {
     private OrdersManager ordersManager;
 
     @Mock
-    private MarketplaceOfferResolver offerResolver;
+    private ExternalOfferResolver offerResolver;
     @Mock
-    private MarketplaceOfferResolver.StoreOffers storeOffers;
+    private ExternalOfferResolver.StoreOffers storeOffers;
 
     @InjectMocks
     private MarketplaceOrderImporter importer;
@@ -301,7 +301,7 @@ class MarketplaceOrderImporterTest {
         assertEquals("2000000001012", item.getEan());
         assertEquals("Lampy", item.getCategory());
         assertEquals("DMW-2001", item.getExternalItemId());
-        assertEquals("PS-8001", item.getMarketplaceOfferKey());
+        assertEquals("PS-8001", item.getExternalOfferKey());
     }
 
     @Test
@@ -320,7 +320,7 @@ class MarketplaceOrderImporterTest {
         assertNull(item.getManufacturerCode());
         assertEquals(Categories.UNCATEGORIZED, item.getCategory());
         assertEquals("DMW-2001", item.getExternalItemId());
-        assertFalse(item.isUnlinkedMarketplaceItem());
+        assertFalse(item.hasUnlinkedExternalOffer());
     }
 
     @Test
@@ -348,8 +348,8 @@ class MarketplaceOrderImporterTest {
         assertEquals("2000000001029", lines.get(1).getEan());
         assertEquals("AB12", lines.get(1).getManufacturerCode());
         assertEquals("ab 12", lines.get(1).getExternalItemId());
-        assertNull(lines.get(1).getMarketplaceOfferKey());
-        assertFalse(lines.get(1).isUnlinkedMarketplaceItem());
+        assertNull(lines.get(1).getExternalOfferKey());
+        assertFalse(lines.get(1).hasUnlinkedExternalOffer());
     }
 
     @Test
@@ -380,8 +380,8 @@ class MarketplaceOrderImporterTest {
         OrderItem item = productItem();
         assertEquals(Categories.UNCATEGORIZED, item.getCategory());
         assertEquals("DMW-2001", item.getSku());
-        assertEquals("PS-8001", item.getMarketplaceOfferKey());
-        assertTrue(item.isUnlinkedMarketplaceItem());
+        assertEquals("PS-8001", item.getExternalOfferKey());
+        assertTrue(item.hasUnlinkedExternalOffer());
     }
 
     @Test
@@ -469,8 +469,8 @@ class MarketplaceOrderImporterTest {
 
         // then
         OrderItem item = productItem();
-        assertNull(item.getMarketplaceOfferKey());
-        assertFalse(item.isUnlinkedMarketplaceItem());
+        assertNull(item.getExternalOfferKey());
+        assertFalse(item.hasUnlinkedExternalOffer());
     }
 
     private OrderItem productItem() {

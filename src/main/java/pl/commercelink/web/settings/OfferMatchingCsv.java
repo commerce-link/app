@@ -1,7 +1,7 @@
 package pl.commercelink.web.settings;
 
 import org.springframework.context.MessageSource;
-import pl.commercelink.marketplace.links.OfferMatchResult;
+import pl.commercelink.marketplace.offermatching.OfferMatchResult;
 import pl.commercelink.starter.csv.CSVReady;
 import pl.commercelink.starter.csv.CSVWriter;
 

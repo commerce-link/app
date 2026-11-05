@@ -23,12 +23,12 @@ import pl.commercelink.marketplace.api.MarketplaceExportReport;
 import pl.commercelink.marketplace.api.MarketplaceListedOffer;
 import pl.commercelink.marketplace.api.MarketplaceOffer;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
-import pl.commercelink.marketplace.links.MarketplaceOfferLink;
-import pl.commercelink.marketplace.links.MarketplaceOfferLinkRepository;
-import pl.commercelink.marketplace.links.MarketplaceOfferLinkSource;
+import pl.commercelink.externaloffers.ExternalOfferLink;
+import pl.commercelink.externaloffers.ExternalOfferLinkRepository;
+import pl.commercelink.externaloffers.ExternalOfferLinkSource;
 import pl.commercelink.marketplace.api.MarketplaceOffersPage;
-import pl.commercelink.marketplace.links.MarketplaceOfferMatching;
-import pl.commercelink.marketplace.links.OfferMatchProgress;
+import pl.commercelink.marketplace.offermatching.MarketplaceOfferMatching;
+import pl.commercelink.marketplace.offermatching.OfferMatchProgress;
 import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
@@ -93,7 +93,7 @@ class MarketplaceOfferExportEventListenerTest {
     @Mock private MarketplaceProvider provider;
     @Mock private StoreActivity storeActivity;
     @Mock private StorePimAliases aliases;
-    @Mock private MarketplaceOfferLinkRepository offerLinks;
+    @Mock private ExternalOfferLinkRepository offerLinks;
 
     @InjectMocks
     private MarketplaceOfferExportEventListener listener;
@@ -1027,7 +1027,7 @@ class MarketplaceOfferExportEventListenerTest {
         Product product = product("pim-1", "5901234123457");
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
-        MarketplaceOfferLink padded = link("PS-8001", "5901234123457");
+        ExternalOfferLink padded = link("PS-8001", "5901234123457");
         padded.setEans(List.of("05901234123457"));
         linksOnTheMarketplace(padded);
 
@@ -1069,7 +1069,7 @@ class MarketplaceOfferExportEventListenerTest {
         PimCatalog pim = ScopedPimCatalog.of(
                 ScopedPimCatalog.globalEntry("local-seed-0101", "730143315289", "100-100001084WOF", "CPU"),
                 ScopedPimCatalog.storeEntry("local-store-0001", STORE_ID, "730143315289", "STORE-OWN-01", "CPU"));
-        MarketplaceOfferLink matched = matchedLink(pim,
+        ExternalOfferLink matched = matchedLink(pim,
                 new MarketplaceListedOffer("PS-8001", List.of("730143315289"), "Procesor z innego systemu", 3, new BigDecimal("19.99"), true));
         linksOnTheMarketplace(matched);
 
@@ -1083,8 +1083,8 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     // the link a real matching run saves for the offer
-    private MarketplaceOfferLink matchedLink(PimCatalog pim, MarketplaceListedOffer offer) {
-        MarketplaceOfferLinkRepository matchingLinks = mock(MarketplaceOfferLinkRepository.class);
+    private ExternalOfferLink matchedLink(PimCatalog pim, MarketplaceListedOffer offer) {
+        ExternalOfferLinkRepository matchingLinks = mock(ExternalOfferLinkRepository.class);
         when(matchingLinks.saveUnlessManual(any())).thenReturn(true);
         Store matchingStore = new Store();
         matchingStore.setStoreId(STORE_ID);
@@ -1093,7 +1093,7 @@ class MarketplaceOfferExportEventListenerTest {
                 .resume(matchingStore, MARKETPLACE, cursor -> new MarketplaceOffersPage(List.of(offer), null, 1),
                         OfferMatchProgress.start("run-1", Instant.now()));
 
-        ArgumentCaptor<MarketplaceOfferLink> saved = ArgumentCaptor.forClass(MarketplaceOfferLink.class);
+        ArgumentCaptor<ExternalOfferLink> saved = ArgumentCaptor.forClass(ExternalOfferLink.class);
         verify(matchingLinks).saveUnlessManual(saved.capture());
         return saved.getValue();
     }
@@ -1237,8 +1237,8 @@ class MarketplaceOfferExportEventListenerTest {
         Product product = product("pim-1", "730143315289");
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
-        linksOnTheMarketplace(MarketplaceOfferLink.of(STORE_ID, MARKETPLACE, "PS-8001", List.of("730143315289"),
-                MarketplaceOfferLinkSource.MANUAL, "operator", Instant.parse("2026-11-01T10:00:00Z")));
+        linksOnTheMarketplace(ExternalOfferLink.of(STORE_ID, MARKETPLACE, "PS-8001", List.of("730143315289"),
+                ExternalOfferLinkSource.MANUAL, "operator", Instant.parse("2026-11-01T10:00:00Z")));
 
         // when
         listener.handleMessage(request());
@@ -1268,7 +1268,7 @@ class MarketplaceOfferExportEventListenerTest {
         Product product = product("pim-1", "EAN-1");
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
-        MarketplaceOfferLink empty = link("PS-8001", "EAN-X");
+        ExternalOfferLink empty = link("PS-8001", "EAN-X");
         empty.setEans(null);
         linksOnTheMarketplace(empty);
 
@@ -1294,12 +1294,12 @@ class MarketplaceOfferExportEventListenerTest {
         verify(provider, never()).exportOffers(any(), any(), any());
     }
 
-    private MarketplaceOfferLink link(String sellerOfferKey, String... eans) {
-        return MarketplaceOfferLink.of(STORE_ID, MARKETPLACE, sellerOfferKey, List.of(eans), MarketplaceOfferLinkSource.EAN,
+    private ExternalOfferLink link(String sellerOfferKey, String... eans) {
+        return ExternalOfferLink.of(STORE_ID, MARKETPLACE, sellerOfferKey, List.of(eans), ExternalOfferLinkSource.EAN,
                 "matching", Instant.parse("2026-11-01T10:00:00Z"));
     }
 
-    private void linksOnTheMarketplace(MarketplaceOfferLink... links) {
+    private void linksOnTheMarketplace(ExternalOfferLink... links) {
         when(offerLinks.findAll(STORE_ID, MARKETPLACE)).thenReturn(List.of(links));
     }
 

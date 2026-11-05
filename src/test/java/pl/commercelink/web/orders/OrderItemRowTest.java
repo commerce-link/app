@@ -170,9 +170,9 @@ class OrderItemRowTest {
     void aLineOfAnOfferCommerceLinkPublishedHasNoLinkAction() {
         // given
         OrderItem own = item(FulfilmentStatus.New, "5900000000011");
-        own.setMarketplaceOfferKey("k7m2xq9pz4");
+        own.setExternalOfferKey("k7m2xq9pz4");
         OrderItem foreign = item(FulfilmentStatus.New, "2001000000043");
-        foreign.setMarketplaceOfferKey("PS-1010");
+        foreign.setExternalOfferKey("PS-1010");
         OrderItemRow.Context context = new OrderItemRow.Context(ORDER, false, false,
                 new SupplierLabels(mock(StoresRepository.class)).forStore(null), item -> null, serial -> null,
                 ReceiptLock.NONE, false, "k7m2xq9pz4"::equals);

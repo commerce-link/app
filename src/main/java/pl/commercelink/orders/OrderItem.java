@@ -29,8 +29,8 @@ public class OrderItem extends Item {
     private boolean consolidated;
     @DynamoDBAttribute(attributeName = "externalItemId")
     private String externalItemId;
-    @DynamoDBAttribute(attributeName = "marketplaceOfferKey")
-    private String marketplaceOfferKey;
+    @DynamoDBAttribute(attributeName = "externalOfferKey")
+    private String externalOfferKey;
     @DynamoDBAttribute(attributeName = "position")
     private int position;
     @DynamoDBVersionAttribute
@@ -68,7 +68,7 @@ public class OrderItem extends Item {
         this.price = source.getPrice();
         this.consolidated = source.isConsolidated();
         this.externalItemId = source.getExternalItemId();
-        this.marketplaceOfferKey = source.getMarketplaceOfferKey();
+        this.externalOfferKey = source.getExternalOfferKey();
         this.position = source.getPosition();
         this.setCondition(source.getCondition());
 
@@ -226,12 +226,12 @@ public class OrderItem extends Item {
         this.externalItemId = externalItemId;
     }
 
-    public String getMarketplaceOfferKey() {
-        return marketplaceOfferKey;
+    public String getExternalOfferKey() {
+        return externalOfferKey;
     }
 
-    public void setMarketplaceOfferKey(String marketplaceOfferKey) {
-        this.marketplaceOfferKey = marketplaceOfferKey;
+    public void setExternalOfferKey(String externalOfferKey) {
+        this.externalOfferKey = externalOfferKey;
     }
 
     /**
@@ -244,8 +244,8 @@ public class OrderItem extends Item {
      * leaves a line without a category looking unlinked.
      */
     @DynamoDBIgnore
-    public boolean isUnlinkedMarketplaceItem() {
-        return marketplaceOfferKey != null && Categories.UNCATEGORIZED.equals(getCategory()) && !isService()
+    public boolean hasUnlinkedExternalOffer() {
+        return externalOfferKey != null && Categories.UNCATEGORIZED.equals(getCategory()) && !isService()
                 && StringUtils.defaultString(StringUtils.deleteWhitespace(externalItemId))
                 .equals(StringUtils.defaultString(getSku()));
     }

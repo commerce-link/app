@@ -1,7 +1,7 @@
 package pl.commercelink.web.settings;
 
-import pl.commercelink.marketplace.links.OfferMatchError;
-import pl.commercelink.marketplace.links.OfferMatchProgress;
+import pl.commercelink.marketplace.offermatching.OfferMatchError;
+import pl.commercelink.marketplace.offermatching.OfferMatchProgress;
 
 import java.time.Instant;
 import java.time.ZoneId;

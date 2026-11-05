@@ -69,7 +69,7 @@ public class WarehouseFulfilmentService {
                 );
                 remainingItem.setComment(orderItem.getComment());
                 remainingItem.setExternalItemId(orderItem.getExternalItemId());
-                remainingItem.setMarketplaceOfferKey(orderItem.getMarketplaceOfferKey());
+                remainingItem.setExternalOfferKey(orderItem.getExternalOfferKey());
                 fulfilledOrderItems.add(remainingItem);
             }
 
@@ -99,7 +99,7 @@ public class WarehouseFulfilmentService {
         );
         newItem.setComment(orderItem.getComment());
         newItem.setExternalItemId(orderItem.getExternalItemId());
-        newItem.setMarketplaceOfferKey(orderItem.getMarketplaceOfferKey());
+        newItem.setExternalOfferKey(orderItem.getExternalOfferKey());
         newItem.copyFulfilmentFrom(confirmation);
         return newItem;
     }

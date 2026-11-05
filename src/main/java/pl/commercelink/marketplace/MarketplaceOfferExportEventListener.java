@@ -11,9 +11,9 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.marketplace.api.MarketplaceOffer;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
-import pl.commercelink.marketplace.links.MarketplaceOfferLink;
-import pl.commercelink.marketplace.links.MarketplaceOfferLinkRepository;
-import pl.commercelink.marketplace.links.OfferEans;
+import pl.commercelink.externaloffers.ExternalOfferLink;
+import pl.commercelink.externaloffers.ExternalOfferLinkRepository;
+import pl.commercelink.externaloffers.OfferEans;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
@@ -52,7 +52,7 @@ public class MarketplaceOfferExportEventListener {
     private final MarketplaceExportRunService marketplaceExportRunService;
     private final StoreActivity storeActivity;
     private final StorePimAliases aliases;
-    private final MarketplaceOfferLinkRepository offerLinks;
+    private final ExternalOfferLinkRepository offerLinks;
 
     @Value("${marketplace.export.removalAttempts:3}")
     private int removalRetryCount;
@@ -243,14 +243,14 @@ public class MarketplaceOfferExportEventListener {
         private final Map<String, Set<String>> offerKeysByEan = new HashMap<>();
         private int skippedProducts;
 
-        ForeignOffers(List<MarketplaceOfferLink> links) {
-            for (MarketplaceOfferLink link : links) {
+        ForeignOffers(List<ExternalOfferLink> links) {
+            for (ExternalOfferLink link : links) {
                 if (link.getEans() == null) {
                     continue;
                 }
                 for (String linkEan : link.getEans()) {
                     unifiedEan(linkEan).ifPresent(ean ->
-                            offerKeysByEan.computeIfAbsent(ean, key -> new HashSet<>()).add(link.getSellerOfferKey()));
+                            offerKeysByEan.computeIfAbsent(ean, key -> new HashSet<>()).add(link.getOfferKey()));
                 }
             }
         }

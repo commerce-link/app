@@ -270,23 +270,23 @@ class OrderItemTest {
     }
 
     @Test
-    void splitCopyKeepsTheMarketplaceOfferKey() {
+    void splitCopyKeepsTheExternalOfferKey() {
         // given
         OrderItem source = orderItem("MFN-1");
-        source.setMarketplaceOfferKey("PS-8001");
+        source.setExternalOfferKey("PS-8001");
 
         // when
         OrderItem split = new OrderItem(ORDER_ID, source, 1);
 
         // then
-        assertThat(split.getMarketplaceOfferKey()).isEqualTo("PS-8001");
+        assertThat(split.getExternalOfferKey()).isEqualTo("PS-8001");
     }
 
     @Test
     void updatingANewItemFromAFormWithoutTheOfferKeyKeepsTheStoredKey() {
         // given
         OrderItem stored = orderItem("MFN-1");
-        stored.setMarketplaceOfferKey("PS-8001");
+        stored.setExternalOfferKey("PS-8001");
         OrderItem fromForm = orderItem("MFN-2");
 
         // when
@@ -294,7 +294,7 @@ class OrderItemTest {
         stored.update(fromForm);
 
         // then
-        assertThat(stored.getMarketplaceOfferKey()).isEqualTo("PS-8001");
+        assertThat(stored.getExternalOfferKey()).isEqualTo("PS-8001");
     }
 
     @Test
@@ -304,11 +304,11 @@ class OrderItemTest {
         item.setExternalItemId("DMW-1001");
 
         // when / then
-        assertThat(item.isUnlinkedMarketplaceItem()).isFalse();
-        item.setMarketplaceOfferKey("PS-1");
-        assertThat(item.isUnlinkedMarketplaceItem()).isTrue();
+        assertThat(item.hasUnlinkedExternalOffer()).isFalse();
+        item.setExternalOfferKey("PS-1");
+        assertThat(item.hasUnlinkedExternalOffer()).isTrue();
         item.setService(true);
-        assertThat(item.isUnlinkedMarketplaceItem()).isFalse();
+        assertThat(item.hasUnlinkedExternalOffer()).isFalse();
     }
 
     @Test
@@ -316,20 +316,20 @@ class OrderItemTest {
         // given
         OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, "DMW1001", false);
         item.setExternalItemId("DMW 1001");
-        item.setMarketplaceOfferKey("PS-1");
+        item.setExternalOfferKey("PS-1");
 
         // when / then
-        assertThat(item.isUnlinkedMarketplaceItem()).isTrue();
+        assertThat(item.hasUnlinkedExternalOffer()).isTrue();
     }
 
     @Test
     void aLineWithoutAMarketplaceCodeIsUnlinkedWhileItHasNoSku() {
         // given
         OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, null, false);
-        item.setMarketplaceOfferKey("PS-1");
+        item.setExternalOfferKey("PS-1");
 
         // when / then
-        assertThat(item.isUnlinkedMarketplaceItem()).isTrue();
+        assertThat(item.hasUnlinkedExternalOffer()).isTrue();
     }
 
     @Test
@@ -338,7 +338,7 @@ class OrderItemTest {
         OrderItem item = linkedLine();
 
         // when / then
-        assertThat(item.isUnlinkedMarketplaceItem()).isFalse();
+        assertThat(item.hasUnlinkedExternalOffer()).isFalse();
     }
 
     @Test
@@ -351,7 +351,7 @@ class OrderItemTest {
 
         // then
         assertThat(item.getEan()).isNull();
-        assertThat(item.isUnlinkedMarketplaceItem()).isFalse();
+        assertThat(item.hasUnlinkedExternalOffer()).isFalse();
     }
 
     @Test
@@ -359,20 +359,20 @@ class OrderItemTest {
         // given
         OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, "DMW-1001", false);
         item.setExternalItemId("DMW-1001");
-        item.setMarketplaceOfferKey("PS-1");
+        item.setExternalOfferKey("PS-1");
 
         // when
         item.setSku("2001000000043");
 
         // then
-        assertThat(item.isUnlinkedMarketplaceItem()).isFalse();
+        assertThat(item.hasUnlinkedExternalOffer()).isFalse();
     }
 
     private OrderItem linkedLine() {
         OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0,
                 "2001000000012:2001000000029", false);
         item.setExternalItemId("DMW-1001");
-        item.setMarketplaceOfferKey("PS-1");
+        item.setExternalOfferKey("PS-1");
         item.setEan("2001000000012");
         return item;
     }

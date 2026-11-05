@@ -7,7 +7,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import pl.commercelink.marketplace.links.OfferEans;
+import pl.commercelink.externaloffers.OfferEans;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.PricelistFinder;
 import pl.commercelink.products.CategoryDefinition;
