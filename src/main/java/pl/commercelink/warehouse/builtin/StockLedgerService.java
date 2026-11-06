@@ -55,7 +55,7 @@ public class StockLedgerService {
             ));
         }
 
-        rows.sort(Comparator.comparing(StockLedgerRow::mfn, Comparator.nullsLast(Comparator.naturalOrder())));
+        rows.sort(Comparator.comparing(StockLedgerRow::ean));
         return rows;
     }
 
@@ -67,7 +67,7 @@ public class StockLedgerService {
             return aggregates;
         }
 
-        closing.get().balances().forEach((mfn, balance) -> aggregates.put(mfn, Aggregate.opening(balance)));
+        closing.get().balances().forEach((ean, balance) -> aggregates.put(ean, Aggregate.opening(balance)));
         LocalDateTime afterClosedPeriod = closing.get().period().to().plusDays(1).atStartOfDay();
         if (afterClosedPeriod.isBefore(periodStart)) {
             List<WarehouseDocument> sinceClosing =
@@ -99,9 +99,9 @@ public class StockLedgerService {
 
             List<WarehouseDocumentItem> items = warehouseDocumentItemRepository.findByDocumentId(document.getDocumentId());
             for (WarehouseDocumentItem item : items) {
-                if (item.getMfn() == null || item.getMfn().isBlank()) continue;
+                if (item.getEan() == null || item.getEan().isBlank()) continue;
 
-                Aggregate a = aggregates.computeIfAbsent(item.getMfn(), k -> new Aggregate());
+                Aggregate a = aggregates.computeIfAbsent(item.getEan(), k -> new Aggregate());
                 if (item.getName() != null && !item.getName().isBlank()) {
                     a.latestName = item.getName();
                 }

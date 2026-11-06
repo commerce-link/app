@@ -183,7 +183,7 @@ class DestroyedListServiceTest {
         DestroyedPageModel.Row row = page("period", "month").rows().get(0);
 
         // then
-        assertThat(row.documentsHref()).contains("/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=d-A&mfn=MFN-A&from=item&itemId=");
+        assertThat(row.documentsHref()).contains("/dashboard/warehouse-documents/item-history?deliveryId=d-A&ean=880&from=item&itemId=");
         assertThat(row.historyHref()).isEqualTo("/dashboard/item/history?serialNo=S1");
         assertThat(row.item().href()).contains("?back=%2Fdashboard%2Fwarehouse%2Fitems%2Fdestroyed%3Fperiod%3Dmonth");
     }
@@ -200,9 +200,21 @@ class DestroyedListServiceTest {
         List<DestroyedPageModel.Row> rows = page("sort", "name").rows();
 
         // then
-        assertThat(rows.get(0).documentsHref()).contains("delivery-mfn-history?deliveryId=Unknown&mfn=MFN-A");
-        assertThat(rows.get(1).documentsHref()).contains("delivery-mfn-history?deliveryId=Acme&mfn=MFN-B");
+        assertThat(rows.get(0).documentsHref()).contains("warehouse-documents/item-history?deliveryId=Unknown&ean=880");
+        assertThat(rows.get(1).documentsHref()).contains("warehouse-documents/item-history?deliveryId=Acme&ean=880");
         assertThat(rows.get(2).documentsHref()).isNull();
+    }
+
+    @Test
+    void anItemWithoutEanLinksNoDocuments() {
+        // given
+        destroyed("A", "SSD", TODAY, 1, 1).setEan(null);
+
+        // when
+        DestroyedPageModel.Row row = page().rows().get(0);
+
+        // then
+        assertThat(row.documentsHref()).isNull();
     }
 
     @Test

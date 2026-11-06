@@ -940,9 +940,9 @@ public class DeliveriesController {
     public String showDeliveryDetails(@RequestParam String deliveryId,
                                       @RequestParam(required = false) String returnTo,
                                       @RequestParam(required = false) String open,
-                                      @RequestParam(required = false) String mfn,
+                                      @RequestParam(required = false) String ean,
                                       Model model, RedirectAttributes redirectAttributes, Locale locale) {
-        return showDeliveryDetails(getStoreId(), deliveryId, returnTo, open, mfn, Set.of(), model, redirectAttributes, locale);
+        return showDeliveryDetails(getStoreId(), deliveryId, returnTo, open, ean, Set.of(), model, redirectAttributes, locale);
     }
 
     @GetMapping("/dashboard/store/{storeId}/deliveries/details")
@@ -950,12 +950,12 @@ public class DeliveriesController {
     public String showDeliveryDetailsForSuperAdmin(@PathVariable("storeId") String storeId, @RequestParam String deliveryId,
                                                    @RequestParam(required = false) String returnTo,
                                                    @RequestParam(required = false) String open,
-                                                   @RequestParam(required = false) String mfn,
+                                                   @RequestParam(required = false) String ean,
                                                    Model model, RedirectAttributes redirectAttributes, Locale locale) {
-        return showDeliveryDetails(storeId, deliveryId, returnTo, open, mfn, Set.of(), model, redirectAttributes, locale);
+        return showDeliveryDetails(storeId, deliveryId, returnTo, open, ean, Set.of(), model, redirectAttributes, locale);
     }
 
-    private String showDeliveryDetails(String storeId, String deliveryId, String returnTo, String open, String mfn,
+    private String showDeliveryDetails(String storeId, String deliveryId, String returnTo, String open, String ean,
                                        Set<Integer> preselected, Model model, RedirectAttributes redirectAttributes,
                                        Locale locale) {
         Delivery delivery = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, deliveryId);
@@ -965,7 +965,7 @@ public class DeliveriesController {
             return "redirect:/dashboard/deliveries";
         }
         DeliveryViewer viewer = new DeliveryViewer(isSuperAdmin(), isAdmin(), returnTo);
-        DeliveryPageModel page = DeliveryPageModelFactory.build(pageData(storeId, delivery, preselected, open, mfn), viewer);
+        DeliveryPageModel page = DeliveryPageModelFactory.build(pageData(storeId, delivery, preselected, open, ean), viewer);
         model.addAttribute("page", page);
         if (!model.containsAttribute("termsDialog")) {
             model.addAttribute("termsDialog", TermsDialog.of(delivery, page.links()));
@@ -973,7 +973,7 @@ public class DeliveriesController {
         return DETAILS_VIEW;
     }
 
-    private DeliveryPageData pageData(String storeId, Delivery delivery, Set<Integer> preselected, String open, String mfn) {
+    private DeliveryPageData pageData(String storeId, Delivery delivery, Set<Integer> preselected, String open, String ean) {
         // a dropship delivery is never moved, so the partition scan for merge targets is skipped for it (side task 11);
         // the merge itself refuses a target in another order status, so the page does not offer one
         List<Delivery> mergeTargets = delivery.isDropship() ? List.of()
@@ -988,7 +988,7 @@ public class DeliveriesController {
         String externalId = StringUtils.trimToNull(delivery.getExternalDeliveryId());
         String partnerSiteUrl = externalId == null ? null : supplierRegistry.getPartnerSiteUrl(delivery.getProvider(), externalId);
         return new DeliveryPageData(delivery, supplierLabels.forStoreId(storeId).of(delivery.getProvider()), partnerSiteUrl,
-                mergeTargets, dropshipOrder, carrierOptions, suggested, preselected, open, mfn, LocalDateTime.now());
+                mergeTargets, dropshipOrder, carrierOptions, suggested, preselected, open, ean, LocalDateTime.now());
     }
 
     private Order resolveDropshipOrder(String storeId, Delivery delivery) {
@@ -1146,7 +1146,7 @@ public class DeliveriesController {
     @PreAuthorize("hasRole('ADMIN')")
     public String updateDeliveryItemQty(
             @RequestParam String deliveryId,
-            @RequestParam String mfn,
+            @RequestParam String ean,
             @RequestParam int qty,
             RedirectAttributes redirectAttributes,
             Locale locale) {
@@ -1156,7 +1156,7 @@ public class DeliveriesController {
         if (isOrderPending(getStoreId(), deliveryId)) {
             return redirectOrderingInProgress(getStoreId(), deliveryId, redirectAttributes, locale);
         }
-        return updateItemQty(getStoreId(), deliveryId, mfn, qty, redirectAttributes, locale);
+        return updateItemQty(getStoreId(), deliveryId, ean, qty, redirectAttributes, locale);
     }
 
     @PostMapping("/dashboard/store/{storeId}/deliveries/updateItemQty")
@@ -1164,18 +1164,18 @@ public class DeliveriesController {
     public String updateDeliveryItemQtyForSuperAdmin(
             @PathVariable("storeId") String storeId,
             @RequestParam String deliveryId,
-            @RequestParam String mfn,
+            @RequestParam String ean,
             @RequestParam int qty,
             RedirectAttributes redirectAttributes,
             Locale locale) {
         if (isOrderPending(storeId, deliveryId)) {
             return redirectOrderingInProgress(storeId, deliveryId, redirectAttributes, locale);
         }
-        return updateItemQty(storeId, deliveryId, mfn, qty, redirectAttributes, locale);
+        return updateItemQty(storeId, deliveryId, ean, qty, redirectAttributes, locale);
     }
 
-    private String updateItemQty(String storeId, String deliveryId, String mfn, int qty, RedirectAttributes redirectAttributes, Locale locale) {
-        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(storeId, deliveryId, mfn, qty);
+    private String updateItemQty(String storeId, String deliveryId, String ean, int qty, RedirectAttributes redirectAttributes, Locale locale) {
+        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(storeId, deliveryId, ean, qty);
 
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage",

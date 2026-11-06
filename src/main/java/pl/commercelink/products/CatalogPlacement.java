@@ -24,7 +24,7 @@ import java.util.concurrent.Executors;
 
 /**
  * The store's manual catalog categories by the PIM categories they take, and the products already in them. Read once
- * per two minutes per store (one query per category, a few at a time, the two codes only). A save of products or
+ * per two minutes per store (one query per category, a few at a time, the EAN only). A save of products or
  * categories evicts it on the instance that saved; the inventory page reads it fresh after "Uzupełnij dane", which may
  * have saved on another instance.
  */
@@ -87,9 +87,8 @@ public class CatalogPlacement {
     }
 
     private List<Existing> existingIn(Target target) {
-        return productRepository.codesOf(target.categoryId()).stream()
-                .map(product -> new Existing(target.catalogId(), target.categoryId(),
-                        new InventoryKey(product.ean(), product.manufacturerCode())))
+        return productRepository.eansOf(target.categoryId()).stream()
+                .map(ean -> new Existing(target.catalogId(), target.categoryId(), InventoryKey.fromEan(ean)))
                 .toList();
     }
 
@@ -123,13 +122,11 @@ public class CatalogPlacement {
 
         private final List<Target> targets;
         private final Map<String, List<Existing>> byEan = new HashMap<>();
-        private final Map<String, List<Existing>> byCode = new HashMap<>();
 
         public StorePlacement(List<Target> targets, List<Existing> existing) {
             this.targets = List.copyOf(targets);
             for (Existing product : existing) {
                 product.key().getProductEans().forEach(ean -> byEan.computeIfAbsent(ean, e -> new ArrayList<>()).add(product));
-                product.key().getProductCodes().forEach(code -> byCode.computeIfAbsent(code, c -> new ArrayList<>()).add(product));
             }
         }
 
@@ -144,7 +141,6 @@ public class CatalogPlacement {
         public List<Existing> existing(InventoryKey key) {
             Set<Existing> found = new LinkedHashSet<>();
             key.getProductEans().forEach(ean -> found.addAll(byEan.getOrDefault(ean, List.of())));
-            key.getProductCodes().forEach(code -> found.addAll(byCode.getOrDefault(code, List.of())));
             return List.copyOf(found);
         }
 

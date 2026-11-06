@@ -500,7 +500,7 @@ class DeliveryDetailsTemplateTest {
 
         // then
         assertThat(html).doesNotContain("href=\"/dashboard/orders/").doesNotContain("href=\"/dashboard/warehouse/items/")
-                .doesNotContain("delivery-mfn-history");
+                .doesNotContain("warehouse-documents/item-history");
     }
 
     @Test
@@ -693,14 +693,15 @@ class DeliveryDetailsTemplateTest {
     void theQuantityDialogIsFilledForTheProductNamedInTheAddress() {
         // given
         DeliveryPageData data = new DeliveryPageData(warehouse(), "Manual-Hurt", null, List.of(), null, List.of(), null,
-                Set.of(), "qty", "MFN-MIRAGE-01", NOW);
+                Set.of(), "qty", "5900000000006", NOW);
 
         // when
         String html = render(data, ADMIN);
 
         // then
         assertThat(html).containsPattern("id=\"qty-dialog\"[^>]*open=\"open\"")
-                .contains("name=\"mfn\" id=\"qty-mfn\" value=\"MFN-MIRAGE-01\"")
+                .contains("name=\"ean\" id=\"qty-ean\" value=\"5900000000006\"")
+                .contains("5900000000006 · MFN-MIRAGE-01")
                 .contains("action=\"/dashboard/deliveries/updateItemQty\"").contains("min=\"1\"").contains("value=\"2\"")
                 .contains("Najmniej: 1 — sztuki zarezerwowane dla zamówień i odebrane.")
                 .contains("data-up=\"+{n} szt. — stan magazynowy wzrośnie\"");

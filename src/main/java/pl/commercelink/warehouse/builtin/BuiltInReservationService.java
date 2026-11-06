@@ -85,8 +85,8 @@ class BuiltInReservationService implements ReservationService {
             if (item.hasWarehouseItemId()) {
                 continue;
             }
-            List<WarehouseItem> inStockItems = warehouseRepository.findAllByMfnAndStatus(
-                            reservation.getStoreId(), item.getMfn(), fulfilmentStatus
+            List<WarehouseItem> inStockItems = warehouseRepository.findAllByEanAndStatus(
+                            reservation.getStoreId(), item.getEan(), fulfilmentStatus
                     ).stream()
                     .filter(WarehouseItem::isSealed)
                     .sorted(fifoSortOrder(reservation.getStoreId()))

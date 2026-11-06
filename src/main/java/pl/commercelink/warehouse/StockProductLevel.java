@@ -1,5 +1,6 @@
 package pl.commercelink.warehouse;
 
+import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.warehouse.api.WarehouseItemView;
 
 import java.util.List;
@@ -7,6 +8,9 @@ import java.util.List;
 public class StockProductLevel {
 
     private String category;
+    private String pimId;
+    private String ean;
+    private final InventoryKey inventoryKey;
     private String manufacturerCode;
     private String name;
     private double restockPriceLowest;
@@ -20,8 +24,12 @@ public class StockProductLevel {
     private int tolerance;
     private int diff;
 
-    public StockProductLevel(String category, String manufacturerCode, String name, double restockPricePromo, double restockPriceStandard, int expectedQuantity) {
+    public StockProductLevel(String category, String pimId, String ean, String manufacturerCode, String name,
+                             double restockPricePromo, double restockPriceStandard, int expectedQuantity) {
         this.category = category;
+        this.pimId = pimId;
+        this.ean = ean;
+        this.inventoryKey = InventoryKey.fromPimIdAndEan(pimId, ean);
         this.manufacturerCode = manufacturerCode;
         this.name = name;
         this.restockPricePromo = restockPricePromo;
@@ -78,6 +86,14 @@ public class StockProductLevel {
         return category;
     }
 
+    public String getPimId() {
+        return pimId;
+    }
+
+    public String getEan() {
+        return ean;
+    }
+
     public String getManufacturerCode() {
         return manufacturerCode;
     }
@@ -106,8 +122,8 @@ public class StockProductLevel {
         return restockPriceStandard;
     }
 
-    public boolean hasManufacturerCode(String other) {
-        return this.manufacturerCode.equalsIgnoreCase(other);
+    InventoryKey inventoryKey() {
+        return inventoryKey;
     }
 
     public void setRestockPricePromo(double restockPricePromo) {

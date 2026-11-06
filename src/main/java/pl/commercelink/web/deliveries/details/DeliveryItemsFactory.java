@@ -27,7 +27,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * The items card (spec §6): one row per product (allocations grouped by manufacturer code, in the order the delivery
+ * The items card (spec §6): one row per product (allocations grouped by EAN, in the order the delivery
  * lists them, unlike DeliveryItem.groupAndUnify's hash order), its allocations under it, and the selection row.
  */
 final class DeliveryItemsFactory {
@@ -54,11 +54,11 @@ final class DeliveryItemsFactory {
                 rows.add(allocationRow(index, allocation, delivery, links, selectable, checked.contains(index)));
             }
             ActionState changeQty = DeliveryRules.changeQty(viewer, delivery, received, ordered);
-            String history = links.mfnHistory(first.getMfn());
+            String history = links.itemHistory(first.getEan());
             products.add(new ProductRow(first.getName(), first.getEan(), first.getMfn(), received, ordered,
                     ordered > 0 && received >= ordered, Money.format(first.getUnitCost() * ordered),
                     Money.format(first.getUnitCost()), Math.max(1, ordered - adjustable), changeQty,
-                    links.openQty(first.getMfn()), history, changeQty.visible() || history != null, rows));
+                    links.openQty(first.getEan()), history, changeQty.visible() || history != null, rows));
         }
         double goods = goodsNet(delivery);
         List<MergeTarget> targets = data.mergeTargets().stream()
@@ -96,11 +96,11 @@ final class DeliveryItemsFactory {
     }
 
     private static Map<String, List<Integer>> byProduct(List<Allocation> all) {
-        Map<String, List<Integer>> byMfn = new LinkedHashMap<>();
+        Map<String, List<Integer>> byEan = new LinkedHashMap<>();
         for (int i = 0; i < all.size(); i++) {
-            byMfn.computeIfAbsent(Objects.toString(all.get(i).getMfn(), ""), mfn -> new ArrayList<>()).add(i);
+            byEan.computeIfAbsent(Objects.toString(all.get(i).getEan(), ""), ean -> new ArrayList<>()).add(i);
         }
-        return byMfn;
+        return byEan;
     }
 
     private static AllocationRow allocationRow(int index, Allocation allocation, Delivery delivery, DeliveryLinks links,

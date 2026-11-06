@@ -31,7 +31,7 @@ class DeliveryCostSyncTest {
     @Test
     void applySumsOrderAndWarehouseDeltas() {
         // given
-        Map<String, Double> costs = Map.of("MFN-1", 12.0);
+        Map<String, Double> costs = Map.of("5901234123457", 12.0);
         when(warehouseAllocationsManager.updateUnitCosts("store-1", "delivery-1", costs)).thenReturn(7.5);
         when(orderAllocationsManager.updateUnitCosts("delivery-1", costs)).thenReturn(20.0);
 

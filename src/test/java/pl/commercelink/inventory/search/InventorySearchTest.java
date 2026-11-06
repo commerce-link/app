@@ -109,11 +109,10 @@ class InventorySearchTest {
         when(inventory.withGlobalData()).thenReturn(view);
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stock);
         when(view.findByEan(anyString())).thenReturn(empty());
-        when(view.findByProductCode(anyString())).thenReturn(empty());
         when(view.findByInventoryKey(any())).thenReturn(empty());
         when(pimView.findByPimId(anyString())).thenReturn(Optional.empty());
         when(pimView.findByGtin(anyString())).thenReturn(Optional.empty());
-        when(stock.searchAllAvailableByMfns(eq(STORE_ID), anyCollection())).thenReturn(List.of());
+        when(stock.searchAllAvailableByEans(eq(STORE_ID), anyCollection())).thenReturn(List.of());
     }
 
     private static SupplierInfo supplierShipping(ShippingCostPolicy policy, int arrivalDays) {
@@ -145,7 +144,6 @@ class InventorySearchTest {
     void matchesByEanBeforeOtherIdentifiers() {
         // given
         when(view.findByEan(EAN)).thenReturn(offers(offer("Elko", 100.0, 5)));
-        when(view.findByProductCode(EAN)).thenReturn(offers(offer("AB", 90.0, 5)));
 
         // when
         InventorySearchResult result = search.search(STORE_ID, EAN);
@@ -328,15 +326,50 @@ class InventorySearchTest {
     }
 
     @Test
-    void fallsBackToManufacturerCode() {
+    void manufacturerCodeFindsNothing() {
         // given
-        when(view.findByProductCode(MFN)).thenReturn(offers(offer("Elko", 100.0, 5)));
+        when(taxonomyCache.findByMfn(anyString())).thenReturn(new Taxonomy(EAN, MFN, "Logitech", "MX Keys S", "Keyboards", 1, null, null, null, "1"));
 
         // when
         InventorySearchResult result = search.search(STORE_ID, MFN);
 
         // then
-        assertThat(((InventorySearchResult.Found) result).matchedBy()).isEqualTo(MatchedBy.MFN);
+        assertThat(result).isEqualTo(new InventorySearchResult.NotFound(MFN));
+    }
+
+    @Test
+    void eanWinsOverPimId() {
+        // given
+        when(view.findByEan(EAN)).thenReturn(offers(offer("Elko", 100.0, 5)));
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.pimId()).thenReturn(EAN);
+        when(pimView.findByPimId(EAN)).thenReturn(Optional.of(entry));
+        when(view.findByInventoryKey(any())).thenReturn(offers(offer("AB", 90.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(found.matchedBy()).isEqualTo(MatchedBy.EAN);
+        assertThat(found.supplierOffers()).extracting(OfferRow::supplier).containsExactly("Elko");
+    }
+
+    @Test
+    void headerTakesNoEntryByCode() {
+        // given
+        InventoryKey key = new InventoryKey("PIM-1");
+        key.addEan(EAN);
+        key.addManufacturerCode(MFN);
+        when(view.findByEan(EAN)).thenReturn(new MatchedInventory(key, List.of(offer("Elko", 100.0, 5)), taxonomyCache, supplierRegistry));
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.name()).thenReturn("Logitech MX Keys S");
+        when(pimView.findByPimIdOrGtinsOrMpns(eq("PIM-1"), any(), eq(List.of()))).thenReturn(Optional.of(entry));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(found.product().name()).isEqualTo("Logitech MX Keys S");
     }
 
     @Test
@@ -357,7 +390,7 @@ class InventorySearchTest {
     }
 
     @Test
-    void queriesTheWarehouseExactlyOnceWithTheMatchedManufacturerCodes() {
+    void queriesTheWarehouseExactlyOnceWithTheMatchedEans() {
         // given
         when(view.findByEan(EAN)).thenReturn(offers(offer("Elko", 100.0, 5)));
 
@@ -365,8 +398,8 @@ class InventorySearchTest {
         search.search(STORE_ID, EAN);
 
         // then
-        verify(stock, times(1)).searchAllAvailableByMfns(STORE_ID, new InventoryKey(EAN, MFN).getProductCodes());
-        verify(stock, times(1)).searchAllAvailableByMfns(anyString(), anyCollection());
+        verify(stock, times(1)).searchAllAvailableByEans(STORE_ID, new InventoryKey(EAN, MFN).getProductEans());
+        verify(stock, times(1)).searchAllAvailableByEans(anyString(), anyCollection());
     }
 
     @Test
@@ -376,39 +409,41 @@ class InventorySearchTest {
 
         // then
         assertThat(result).isEqualTo(new InventorySearchResult.NotFound("ABC-123-XX"));
-        verify(stock, times(1)).searchAllAvailableByMfns(anyString(), anyCollection());
+        verify(stock, times(1)).searchAllAvailableByEans(anyString(), anyCollection());
     }
 
     @Test
-    void productOnlyInTheWarehouseIsFoundByManufacturerCode() {
+    void warehouseOnlyProductIsFoundByEan() {
         // given
-        when(stock.searchAllAvailableByMfns(eq(STORE_ID), anyCollection()))
+        when(stock.searchAllAvailableByEans(STORE_ID, List.of(EAN)))
                 .thenReturn(List.of(warehouseItem(80.0, 3, FulfilmentStatus.Delivered, ItemCondition.Sealed)));
 
         // when
-        InventorySearchResult result = search.search(STORE_ID, MFN);
+        InventorySearchResult result = search.search(STORE_ID, EAN);
 
         // then
         InventorySearchResult.Found found = (InventorySearchResult.Found) result;
-        assertThat(found.matchedBy()).isEqualTo(MatchedBy.MFN);
+        assertThat(found.matchedBy()).isEqualTo(MatchedBy.EAN);
         assertThat(found.supplierOffers()).isEmpty();
         assertThat(found.prices().warehouseInStockQty()).isEqualTo(3);
         assertThat(found.prices().hasLowestPrice()).isFalse();
-        assertThat(found.product().mfn()).isEqualTo(MFN);
+        assertThat(found.product().ean()).isEqualTo(EAN);
         assertThat(found.warehouseRows()).extracting(WarehouseRow::codeMatch).containsExactly(CodeMatch.SAME);
     }
 
     @Test
-    void productKnownFromTaxonomyWithoutOffersIsReportedAsKnown() {
+    void productWithoutOffersIsFoundByEan() {
         // given
-        when(taxonomyCache.findByMfn(anyString())).thenReturn(new Taxonomy(EAN, MFN, "Logitech", "MX Keys S", "Keyboards", 1, null, null, null, "1"));
+        when(taxonomyCache.findByEan(EAN)).thenReturn(new Taxonomy(EAN, MFN, "Logitech", "MX Keys S", "Keyboards", 1, null, null, null, "1"));
 
         // when
-        InventorySearchResult result = search.search(STORE_ID, MFN);
+        InventorySearchResult result = search.search(STORE_ID, EAN);
 
         // then
         assertThat(result).isInstanceOf(InventorySearchResult.KnownWithoutOffers.class);
-        assertThat(((InventorySearchResult.KnownWithoutOffers) result).product().name()).isEqualTo("MX Keys S");
+        InventorySearchResult.KnownWithoutOffers known = (InventorySearchResult.KnownWithoutOffers) result;
+        assertThat(known.matchedBy()).isEqualTo(MatchedBy.EAN);
+        assertThat(known.product().name()).isEqualTo("MX Keys S");
     }
 
     @Test
@@ -416,7 +451,7 @@ class InventorySearchTest {
         // given
         when(view.findByEan(EAN)).thenReturn(offers(
                 offer("AB", 110.0, 80), offer("Nowak", 0.0, 0), offer("Elko", 100.0, 58)));
-        when(stock.searchAllAvailableByMfns(eq(STORE_ID), anyCollection())).thenReturn(List.of(
+        when(stock.searchAllAvailableByEans(eq(STORE_ID), anyCollection())).thenReturn(List.of(
                 warehouseItem(50.0, 2, FulfilmentStatus.Ordered, ItemCondition.Damaged),
                 warehouseItem(50.0, 3, FulfilmentStatus.Delivered, ItemCondition.Sealed)));
 
@@ -573,12 +608,15 @@ class InventorySearchTest {
     @Test
     void productHeaderCodesDoNotDependOnOfferOrderWhenCountsTie() {
         // given
-        when(view.findByProductCode(MFN)).thenReturn(offers(offer("Elko", "5900000000002", MFN, 100.0, 5), offer("AB", "5900000000001", MFN, 101.0, 5)));
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.pimId()).thenReturn("PIM-7");
+        when(pimView.findByPimId("PIM-7")).thenReturn(Optional.of(entry));
+        when(view.findByInventoryKey(any())).thenReturn(offers(offer("Elko", "5900000000002", MFN, 100.0, 5), offer("AB", "5900000000001", MFN, 101.0, 5)));
 
         // when
-        InventorySearchResult.Found first = (InventorySearchResult.Found) search.search(STORE_ID, MFN);
-        when(view.findByProductCode(MFN)).thenReturn(offers(offer("AB", "5900000000001", MFN, 101.0, 5), offer("Elko", "5900000000002", MFN, 100.0, 5)));
-        InventorySearchResult.Found second = (InventorySearchResult.Found) search.search(STORE_ID, MFN);
+        InventorySearchResult.Found first = (InventorySearchResult.Found) search.search(STORE_ID, "PIM-7");
+        when(view.findByInventoryKey(any())).thenReturn(offers(offer("AB", "5900000000001", MFN, 101.0, 5), offer("Elko", "5900000000002", MFN, 100.0, 5)));
+        InventorySearchResult.Found second = (InventorySearchResult.Found) search.search(STORE_ID, "PIM-7");
 
         // then
         assertThat(first.product().ean()).isEqualTo("5900000000001").isEqualTo(second.product().ean());

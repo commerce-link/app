@@ -95,14 +95,15 @@ class WarehouseDocumentPageMapperTest {
     }
 
     @Test
-    void itemWithDeliveryAndMfnLinksItsHistoryForAStoreUserOnly() {
+    void itemWithDeliveryAndEanLinksItsHistoryForAStoreUserOnly() {
         // when
         WarehouseDocumentPage user = mapper.page(receipt(), items(), List.of(), false);
         WarehouseDocumentPage superAdmin = mapper.page(receipt(), items(), List.of(), true);
 
         // then
         assertThat(user.items().get(1).historyHref())
-                .isEqualTo("/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=del-1&mfn=MZ-V9P2T0BW&from=document&documentId=doc-1");
+                .isEqualTo("/dashboard/warehouse-documents/item-history?deliveryId=del-1&ean=8806094215038&from=document&documentId=doc-1");
+        assertThat(user.items().get(0).historyHref()).isNull();
         assertThat(user.anyItemMenu()).isTrue();
         assertThat(superAdmin.anyItemMenu()).isFalse();
     }

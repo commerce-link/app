@@ -315,7 +315,7 @@ class TaxonomyCacheTest {
         cache.add(categorized(EAN_1, "CPU", 1));
 
         // when
-        Taxonomy result = cache.find(InventoryKey.fromMfn("MFN-1"));
+        Taxonomy result = cache.find(new InventoryKey(null, "MFN-1"));
 
         // then
         assertThat(result).isSameAs(Taxonomy.EMPTY);

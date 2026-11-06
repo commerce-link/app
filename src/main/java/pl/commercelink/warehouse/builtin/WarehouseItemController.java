@@ -128,7 +128,8 @@ class WarehouseItemController {
         String category = known ? StringUtils.defaultIfBlank(taxonomy.category(), Categories.UNCATEGORIZED)
                 : StringUtils.defaultIfBlank(form.getCategory(), Categories.UNCATEGORIZED);
         WarehouseItem item = new WarehouseItem(getStoreId(), supplier.identity(), category,
-                known ? taxonomy.name() : form.getName().trim(), known ? taxonomy.ean() : form.getEan().trim(),
+                known ? taxonomy.name() : form.getName().trim(),
+                UnifiedProductIdentifiers.unifyEan(known ? taxonomy.ean() : form.getEan().trim()),
                 UnifiedProductIdentifiers.unifyMfn(form.getManufacturerCode()), form.netCost(), form.quantity());
         item.setStatus(form.statusValue());
 

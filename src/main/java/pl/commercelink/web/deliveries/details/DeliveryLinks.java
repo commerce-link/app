@@ -31,8 +31,8 @@ public record DeliveryLinks(boolean superAdmin, String storeId, String deliveryI
         return details() + "&open=" + dialog + "#" + DeliveryPageModelFactory.dialogId(dialog);
     }
 
-    public String openQty(String mfn) {
-        return details() + "&open=qty&mfn=" + encode(mfn) + "#qty-dialog";
+    public String openQty(String ean) {
+        return details() + "&open=qty&ean=" + encode(ean) + "#qty-dialog";
     }
 
     public String saveTerms() {
@@ -129,9 +129,9 @@ public record DeliveryLinks(boolean superAdmin, String storeId, String deliveryI
         return superAdmin ? null : "/dashboard/warehouse/items/" + itemId;
     }
 
-    public String mfnHistory(String mfn) {
+    public String itemHistory(String ean) {
         return superAdmin ? null
-                : "/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=" + deliveryId + "&mfn=" + encode(mfn);
+                : "/dashboard/warehouse-documents/item-history?deliveryId=" + deliveryId + "&ean=" + encode(ean);
     }
 
     private static String encode(String value) {

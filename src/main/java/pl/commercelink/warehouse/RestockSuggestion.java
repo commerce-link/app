@@ -4,12 +4,19 @@ import lombok.RequiredArgsConstructor;
 import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.invoicing.api.Price;
 
+import java.util.Collection;
+
 @RequiredArgsConstructor
 public class RestockSuggestion {
 
     private final StockProductLevel level;
     private final InventoryItem offer;
     private final RestockPriceCategory priceCategory;
+    private final Collection<String> productEans;
+
+    Collection<String> productEans() {
+        return productEans;
+    }
 
     public String getCategory() {
         return level.getCategory();

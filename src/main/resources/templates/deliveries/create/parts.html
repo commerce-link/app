@@ -130,16 +130,16 @@
                 <td th:attr="data-label=#{deliveries.create.col.qty}">
                     <input class="cl-input is-qty" type="number" inputmode="numeric" step="1" data-cl-requested-qty
                            th:id="|items${i}.requestedQty|" th:name="|items[${i}].requestedQty|"
-                           th:value="${item.requestedQty}" th:min="${item.minQty}" th:classappend="${invalidFields != null and invalidFields.contains(item.mfn + '|requestedQty')} ? 'is-invalid'"
-                           th:aria-invalid="${invalidFields != null and invalidFields.contains(item.mfn + '|requestedQty')} ? 'true' : null"
+                           th:value="${item.requestedQty}" th:min="${item.minQty}" th:classappend="${invalidFields != null and invalidFields.contains(item.ean + '|requestedQty')} ? 'is-invalid'"
+                           th:aria-invalid="${invalidFields != null and invalidFields.contains(item.ean + '|requestedQty')} ? 'true' : null"
                            th:attr="aria-label=#{deliveries.create.qty.label(${item.name})}, aria-describedby=|min-${i}|"/>
                     <span class="cl-min" th:id="|min-${i}|" data-cl-min th:attr="data-min=${item.minQty}"
                           th:text="#{deliveries.create.min(${item.minQty})}"></span>
                 </td>
                 <td th:attr="data-label=#{deliveries.create.col.unitCost}">
                     <input class="cl-input is-price" type="number" inputmode="decimal" step="0.01" min="0" data-cl-unit-cost
-                           th:name="|items[${i}].unitCost|" th:value="${T(pl.commercelink.web.orders.Money).inputRounded(item.unitCost)}" th:classappend="${invalidFields != null and invalidFields.contains(item.mfn + '|unitCost')} ? 'is-invalid'"
-                           th:aria-invalid="${invalidFields != null and invalidFields.contains(item.mfn + '|unitCost')} ? 'true' : null"
+                           th:name="|items[${i}].unitCost|" th:value="${T(pl.commercelink.web.orders.Money).inputRounded(item.unitCost)}" th:classappend="${invalidFields != null and invalidFields.contains(item.ean + '|unitCost')} ? 'is-invalid'"
+                           th:aria-invalid="${invalidFields != null and invalidFields.contains(item.ean + '|unitCost')} ? 'true' : null"
                            th:attr="aria-label=#{deliveries.create.unitCost.label(${item.name})}"/>
                 </td>
                 <td class="is-numeric" th:attr="data-label=#{deliveries.create.col.value}">
@@ -378,7 +378,7 @@
 </table>
 
 <!--/* One suggestion; data-cl-suggestion holds its code, which the page matches a fetched row against. */-->
-<tr th:fragment="suggestionRow(suggested, k)" data-cl-delivery-item th:attr="data-cl-suggestion=${suggested.mfn}">
+<tr th:fragment="suggestionRow(suggested, k)" data-cl-delivery-item th:attr="data-cl-suggestion=${suggested.ean}">
     <th scope="row" class="cl-table-key" th:attr="data-label=#{general.product}">
         <span th:text="${suggested.name}"></span>
         <span class="cl-table-sub" th:if="${suggested.availableAtSupplier > 0}"
@@ -393,14 +393,14 @@
     <td class="is-numeric" th:attr="data-label=#{deliveries.create.col.targetStock}" th:text="${suggested.expectedQty > 0} ? ${suggested.expectedQty} : '—'"></td>
     <td th:attr="data-label=#{deliveries.create.col.qty}">
         <input class="cl-input is-qty" type="number" inputmode="numeric" step="1" min="0" data-cl-requested-qty
-               th:name="|suggestedItems[${k}].requestedQty|" th:value="${suggested.requestedQty}" th:classappend="${invalidFields != null and invalidFields.contains(suggested.mfn + '|requestedQty')} ? 'is-invalid'"
-               th:aria-invalid="${invalidFields != null and invalidFields.contains(suggested.mfn + '|requestedQty')} ? 'true' : null"
+               th:name="|suggestedItems[${k}].requestedQty|" th:value="${suggested.requestedQty}" th:classappend="${invalidFields != null and invalidFields.contains(suggested.ean + '|requestedQty')} ? 'is-invalid'"
+               th:aria-invalid="${invalidFields != null and invalidFields.contains(suggested.ean + '|requestedQty')} ? 'true' : null"
                th:attr="aria-label=#{deliveries.create.qty.label(${suggested.name})}"/>
     </td>
     <td th:attr="data-label=#{deliveries.create.col.unitCost}">
         <input class="cl-input is-price" type="number" inputmode="decimal" step="0.01" min="0" data-cl-unit-cost
-               th:name="|suggestedItems[${k}].unitCost|" th:value="${T(pl.commercelink.web.orders.Money).inputRounded(suggested.unitCost)}" th:classappend="${invalidFields != null and invalidFields.contains(suggested.mfn + '|unitCost')} ? 'is-invalid'"
-               th:aria-invalid="${invalidFields != null and invalidFields.contains(suggested.mfn + '|unitCost')} ? 'true' : null"
+               th:name="|suggestedItems[${k}].unitCost|" th:value="${T(pl.commercelink.web.orders.Money).inputRounded(suggested.unitCost)}" th:classappend="${invalidFields != null and invalidFields.contains(suggested.ean + '|unitCost')} ? 'is-invalid'"
+               th:aria-invalid="${invalidFields != null and invalidFields.contains(suggested.ean + '|unitCost')} ? 'true' : null"
                th:attr="aria-label=#{deliveries.create.unitCost.label(${suggested.name})}"/>
     </td>
 </tr>

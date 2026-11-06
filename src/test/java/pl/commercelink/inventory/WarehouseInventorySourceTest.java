@@ -18,8 +18,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,13 +41,13 @@ class WarehouseInventorySourceTest {
     }
 
     @Test
-    void appendsWarehouseOffersForLookupProductCodes() {
+    void appendsWarehouseOffersForLookupEans() {
         // given
         WarehouseItemView view = mock(WarehouseItemView.class);
-        when(view.toInventoryItem()).thenReturn(item("E1", "M1", "Warehouse", 1200.0));
-        when(stockQueryService.searchAvailableByMfns(eq(STORE_ID), any())).thenReturn(List.of(view));
+        when(view.toInventoryItem()).thenReturn(item("5900000000014", "M1", "Warehouse", 1200.0));
+        when(stockQueryService.searchAvailableByEans(eq(STORE_ID), argThat(eans -> eans.contains("5900000000014")))).thenReturn(List.of(view));
         WarehouseInventorySource source = new WarehouseInventorySource(STORE_ID, stockQueryService);
-        InventoryKey lookupKey = InventoryKey.fromMfn("M1");
+        InventoryKey lookupKey = InventoryKey.fromEan("5900000000014");
         MatchedInventory result = accumulator(lookupKey);
 
         // when
@@ -75,16 +73,12 @@ class WarehouseInventorySourceTest {
 
         // then
         assertThat(result.getSuppliers()).containsExactly("Warehouse");
-        verify(stockQueryService, never()).searchAvailableByMfns(any(), any());
     }
 
     @Test
-    void itemsAreLookedUpByManufacturerCodeWhenNoneHasTheEan() {
+    void itemsAreNotLookedUpByManufacturerCode() {
         // given
-        WarehouseItemView view = mock(WarehouseItemView.class);
-        when(view.toInventoryItem()).thenReturn(item("5900000000014", "M1", "Warehouse", 1200.0));
         when(stockQueryService.searchAvailableByEans(eq(STORE_ID), any())).thenReturn(List.of());
-        when(stockQueryService.searchAvailableByMfns(eq(STORE_ID), argThat(mfns -> mfns.contains("M1")))).thenReturn(List.of(view));
         WarehouseInventorySource source = new WarehouseInventorySource(STORE_ID, stockQueryService);
         InventoryKey lookupKey = new InventoryKey("5900000000021", "M1");
         MatchedInventory result = accumulator(lookupKey);
@@ -93,15 +87,15 @@ class WarehouseInventorySourceTest {
         source.mergeInto(result, lookupKey);
 
         // then
-        assertThat(result.getSuppliers()).containsExactly("Warehouse");
+        assertThat(result.isEmpty()).isTrue();
     }
 
     @Test
     void mergesNothingWhenWarehouseHasNoStock() {
         // given
-        when(stockQueryService.searchAvailableByMfns(eq(STORE_ID), any())).thenReturn(List.of());
+        when(stockQueryService.searchAvailableByEans(eq(STORE_ID), any())).thenReturn(List.of());
         WarehouseInventorySource source = new WarehouseInventorySource(STORE_ID, stockQueryService);
-        InventoryKey lookupKey = InventoryKey.fromMfn("M1");
+        InventoryKey lookupKey = InventoryKey.fromEan("5900000000014");
         MatchedInventory result = accumulator(lookupKey);
 
         // when

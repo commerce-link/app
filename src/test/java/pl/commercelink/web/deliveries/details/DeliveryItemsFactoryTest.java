@@ -52,6 +52,38 @@ class DeliveryItemsFactoryTest {
     }
 
     @Test
+    void twoProductsUnderOneCodeAreTwoRowsOnThePage() {
+        // given
+        Delivery delivery = withAllocations(warehouse(),
+                warehouseAllocation("Dysk 2TB", "5900000000001", "MFN-X", 300.0, 2),
+                orderAllocation("Dysk 4TB", "5900000000002", "MFN-X", 500.0, 1, false));
+
+        // when
+        DeliveryPageModel.ItemsCard card = items(delivery, ADMIN);
+
+        // then
+        assertThat(card.products()).extracting(DeliveryPageModel.ProductRow::name).containsExactly("Dysk 2TB", "Dysk 4TB");
+        assertThat(card.products()).extracting(DeliveryPageModel.ProductRow::ean).containsExactly("5900000000001", "5900000000002");
+        assertThat(card.products()).extracting(DeliveryPageModel.ProductRow::unitCost).containsExactly("300,00", "500,00");
+        assertThat(card.products().get(1).qtyHref()).contains("&open=qty&ean=5900000000002#qty-dialog");
+        assertThat(card.products().get(1).historyHref()).endsWith("/dashboard/warehouse-documents/item-history?deliveryId=" + DELIVERY_ID + "&ean=5900000000002");
+    }
+
+    @Test
+    void goodsValueCountsEachEanAtItsOwnCost() {
+        // given
+        Delivery delivery = withAllocations(warehouse(),
+                warehouseAllocation("Dysk 2TB", "5900000000001", "MFN-X", 300.0, 2),
+                orderAllocation("Dysk 4TB", "5900000000002", "MFN-X", 500.0, 1, false));
+
+        // when
+        DeliveryPageModel.ItemsCard card = items(delivery, ADMIN);
+
+        // then
+        assertThat(card.goodsNet()).isEqualTo("1 100,00");
+    }
+
+    @Test
     void theDirectToConsumerMarkerAppearsOnlyOnAWarehouseDelivery() {
         // given
         Delivery dropship = dropship();
@@ -233,7 +265,7 @@ class DeliveryItemsFactoryTest {
         assertThat(items(partly, ADMIN).products().get(0).changeQty()).isEqualTo(ActionState.off("deliveries.details.reason.allReceived"));
         assertThat(items(partly, ADMIN).products().get(1).changeQty()).isEqualTo(ActionState.on());
         assertThat(items(partly, ADMIN).products().get(1).qtyHref())
-                .isEqualTo("/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID + "&open=qty&mfn=MFN-MIRAGE-01#qty-dialog");
+                .isEqualTo("/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID + "&open=qty&ean=5900000000006#qty-dialog");
     }
 
     @Test

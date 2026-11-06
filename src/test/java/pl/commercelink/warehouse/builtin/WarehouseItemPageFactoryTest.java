@@ -81,7 +81,7 @@ class WarehouseItemPageFactoryTest {
         assertThat(page.totalNet()).isEqualTo("2\u00A0067,00 PLN");
         assertThat(page.origin().deliveryHref()).isEqualTo("/dashboard/deliveries/details?deliveryId=3f2a9c1e-0000");
         assertThat(page.origin().documentsHref()).isEqualTo(
-                "/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=3f2a9c1e-0000&mfn=MZ-V9P2T0BW&from=item&itemId=7c1e5a20-1111-2222-3333-444444444444");
+                "/dashboard/warehouse-documents/item-history?deliveryId=3f2a9c1e-0000&ean=8806094215038&from=item&itemId=7c1e5a20-1111-2222-3333-444444444444");
         assertThat(page.delete()).isNull();
         assertThat(page.form().getBack()).isEqualTo("/dashboard/warehouse?q=ssd");
     }
@@ -173,7 +173,7 @@ class WarehouseItemPageFactoryTest {
 
         // then
         assertThat(page.origin().documentsHref()).isEqualTo(
-                "/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=Unknown&mfn=MZ-V9P2T0BW&from=item&itemId=7c1e5a20-1111-2222-3333-444444444444");
+                "/dashboard/warehouse-documents/item-history?deliveryId=Unknown&ean=8806094215038&from=item&itemId=7c1e5a20-1111-2222-3333-444444444444");
         assertThat(page.origin().deliveryHref()).isNull();
     }
 
@@ -189,7 +189,7 @@ class WarehouseItemPageFactoryTest {
         WarehouseItemPage page = factory.page(item, null, false, null, Map.of(), null, PL);
 
         // then
-        assertThat(page.origin().documentsHref()).startsWith("/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=Acme&mfn=MZ-V9P2T0BW");
+        assertThat(page.origin().documentsHref()).startsWith("/dashboard/warehouse-documents/item-history?deliveryId=Acme&ean=8806094215038");
         assertThat(page.origin().deliveryHref()).isNull();
     }
 
@@ -198,6 +198,16 @@ class WarehouseItemPageFactoryTest {
         // given
         WarehouseItem item = item(FulfilmentStatus.Delivered);
         item.setDeliveryId(null);
+
+        // when / then
+        assertThat(factory.page(item, null, false, null, Map.of(), null, PL).origin().documentsHref()).isNull();
+    }
+
+    @Test
+    void itemWithoutEanHasNoDocumentsLink() {
+        // given
+        WarehouseItem item = item(FulfilmentStatus.Delivered);
+        item.setEan(null);
 
         // when / then
         assertThat(factory.page(item, null, false, null, Map.of(), null, PL).origin().documentsHref()).isNull();

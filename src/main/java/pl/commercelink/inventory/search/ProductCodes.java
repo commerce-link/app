@@ -11,14 +11,14 @@ import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
 
 /**
- * The EAN and manufacturer code a search result is anchored to: the searched value itself, otherwise the value most
+ * The EAN and manufacturer code a search result is anchored to: the searched EAN itself, otherwise the value most
  * offers carry. Rows are compared against it, and the product header shows its display form.
  */
 record ProductCodes(String ean, String code) {
 
     static ProductCodes resolve(MatchedBy matchedBy, String query, Collection<String> rowEans, Collection<String> rowCodes) {
         String ean = matchedBy == MatchedBy.EAN ? displayOf(query, rowEans, ProductCodes::unifiedEanOf) : mostCommon(rowEans, ProductCodes::unifiedEanOf);
-        String code = matchedBy == MatchedBy.MFN ? displayOf(query, rowCodes, ProductCodes::unifiedCodeOf) : mostCommon(rowCodes, ProductCodes::unifiedCodeOf);
+        String code = mostCommon(rowCodes, ProductCodes::unifiedCodeOf);
         return new ProductCodes(ean, code);
     }
 

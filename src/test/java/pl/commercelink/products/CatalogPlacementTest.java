@@ -35,8 +35,8 @@ class CatalogPlacementTest {
         ProductCatalog parts = catalog("c-1", "Podzespoły komputerowe", gpus, auto);
         ProductCatalog shop = catalog("c-2", "Sklep B2B", b2b);
         when(catalogs.findAll(STORE_ID)).thenReturn(List.of(shop, parts));
-        when(products.codesOf("cat-gpu")).thenReturn(List.of(new ProductRepository.ProductCodes("5901000000001", "GPU-1")));
-        when(products.codesOf("cat-b2b")).thenReturn(List.of());
+        when(products.eansOf("cat-gpu")).thenReturn(List.of("5901000000001"));
+        when(products.eansOf("cat-b2b")).thenReturn(List.of());
     }
 
     @Test
@@ -50,17 +50,25 @@ class CatalogPlacementTest {
     }
 
     @Test
-    void existingFindsAProductByEanOrByManufacturerCode() {
+    void existingFindsAProductByEan() {
         // given
         CatalogPlacement.StorePlacement store = placement.forStore(STORE_ID);
 
         // when / then
         assertThat(store.existing(InventoryKey.fromEan("5901000000001"))).extracting(CatalogPlacement.Existing::categoryId)
                 .containsExactly("cat-gpu");
-        assertThat(store.existing(InventoryKey.fromMfn("GPU-1"))).hasSize(1);
         assertThat(store.isIn("cat-gpu", InventoryKey.fromEan("5901000000001"))).isTrue();
         assertThat(store.isIn("cat-b2b", InventoryKey.fromEan("5901000000001"))).isFalse();
         assertThat(store.existing(InventoryKey.fromEan("5909999999999"))).isEmpty();
+    }
+
+    @Test
+    void catalogPlacementIgnoresAProductSharingOnlyTheCode() {
+        // given
+        CatalogPlacement.StorePlacement store = placement.forStore(STORE_ID);
+
+        // when / then
+        assertThat(store.existing(new InventoryKey("5909999999999", "GPU-1"))).isEmpty();
     }
 
     @Test
@@ -87,7 +95,7 @@ class CatalogPlacementTest {
     void freshReadBypassesTheCachedPlacementAndReplacesIt() {
         // given
         placement.forStore(STORE_ID);
-        when(products.codesOf("cat-b2b")).thenReturn(List.of(new ProductRepository.ProductCodes("5902000000002", null)));
+        when(products.eansOf("cat-b2b")).thenReturn(List.of("5902000000002"));
 
         // when
         CatalogPlacement.StorePlacement fresh = placement.forStoreFresh(STORE_ID);
@@ -105,14 +113,14 @@ class CatalogPlacementTest {
         placement.forStore(STORE_ID);
 
         // then
-        verify(products, never()).codesOf("cat-auto");
+        verify(products, never()).eansOf("cat-auto");
         verify(products, never()).findAll(anyString());
     }
 
     @Test
     void failedReadOfACategoryFailsThePlacementWithItsOwnException() {
         // given
-        when(products.codesOf("cat-b2b")).thenThrow(new IllegalStateException("throttled"));
+        when(products.eansOf("cat-b2b")).thenThrow(new IllegalStateException("throttled"));
 
         // when / then
         assertThatThrownBy(() -> placement.forStore(STORE_ID)).isInstanceOf(IllegalStateException.class)

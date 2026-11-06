@@ -83,6 +83,25 @@ class StockLevelsMergeTest {
         assertThat(level.getRestockPriceStandard()).isZero();
     }
 
+    @Test
+    void productsOfTwoBrandsSharingACodeKeepTwoLevels() {
+        // given
+        when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
+        when(catalog.getCategories()).thenReturn(List.of(category("cat-1", "Karty graficzne")));
+        when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
+        when(productRepository.findAll("cat-1")).thenReturn(List.of(
+                new Product("cat-1", null, "5901000000011", "X1", "Asus", "l", "Asus X1", "Default"),
+                new Product("cat-1", null, "5901000000028", "X1", "Gigabyte", "l", "Gigabyte X1", "Default")));
+        when(rollingPriceAggregateRepository.loadForStore(STORE_ID)).thenReturn(Map.of());
+
+        // when
+        List<StockProductLevel> levels =
+                stockLevels.calculate(STORE_ID, CATALOG_ID, null, RestockScope.WholeCatalog, false, false);
+
+        // then
+        assertThat(levels).extracting(StockProductLevel::getName).containsExactlyInAnyOrder("Asus X1", "Gigabyte X1");
+    }
+
     private StockProductLevel mergeCopiesWithThresholds(int firstCopyThreshold, int secondCopyThreshold) {
         when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
         when(catalog.getCategories()).thenReturn(List.of(category("cat-1", "Karty graficzne"), category("cat-2", "Promocje")));
@@ -107,6 +126,7 @@ class StockLevelsMergeTest {
     private static Product copy(String categoryId, int threshold) {
         Product product = new Product(categoryId);
         product.setName("GPU");
+        product.setEan("5901234123457");
         product.setManufacturerCode("MFN-1");
         product.setStockExpectedQty(1);
         product.setRestockPricePromo(threshold);

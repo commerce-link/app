@@ -28,11 +28,11 @@ class BuiltInInvoiceSyncHandler implements InvoiceSyncHandler {
             updateGoodsReceiptCounterparty(request);
         }
 
-        if (request.costsByMfn().isEmpty()) {
+        if (request.costsByEan().isEmpty()) {
             return;
         }
 
-        updateWarehouseDocumentItems(request.deliveryId(), request.costsByMfn());
+        updateWarehouseDocumentItems(request.deliveryId(), request.costsByEan());
     }
 
     private void updateGoodsReceiptCounterparty(InvoiceSyncRequest request) {
@@ -45,10 +45,10 @@ class BuiltInInvoiceSyncHandler implements InvoiceSyncHandler {
         }
     }
 
-    private void updateWarehouseDocumentItems(String deliveryId, Map<String, Double> costsByMfn) {
+    private void updateWarehouseDocumentItems(String deliveryId, Map<String, Double> costsByEan) {
         for (WarehouseDocumentItem item : warehouseDocumentItemRepository.findByDeliveryId(deliveryId)) {
-            if (costsByMfn.containsKey(item.getMfn())) {
-                double delta = item.updateUnitPrice(costsByMfn.get(item.getMfn()));
+            if (costsByEan.containsKey(item.getEan())) {
+                double delta = item.updateUnitPrice(costsByEan.get(item.getEan()));
                 if (delta != 0) {
                     warehouseDocumentItemRepository.save(item);
                 }

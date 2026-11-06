@@ -114,31 +114,27 @@ class WarehouseRepository extends DynamoDbRepository<WarehouseItem> {
         return new ArrayList<>(dynamoDBMapper.scan(WarehouseItem.class, scanExpression));
     }
 
-    List<WarehouseItem> findAllByMfnAndStatus(String storeId, String mfn, FulfilmentStatus status) {
+    List<WarehouseItem> findAllByEanAndStatus(String storeId, String ean, FulfilmentStatus status) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));
-        eav.put(":mfn", new AttributeValue().withS(mfn));
+        eav.put(":ean", new AttributeValue().withS(ean));
         eav.put(":status", new AttributeValue().withS(status.name()));
 
-        Map<String, String> ean = new HashMap<>();
-        ean.put("#status", "status");
+        Map<String, String> names = new HashMap<>();
+        names.put("#status", "status");
 
-        String filterExpression = "storeId = :storeId AND mfn = :mfn AND #status = :status";
+        String filterExpression = "storeId = :storeId AND ean = :ean AND #status = :status";
 
         DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
                 .withFilterExpression(filterExpression)
                 .withExpressionAttributeValues(eav)
-                .withExpressionAttributeNames(ean);
+                .withExpressionAttributeNames(names);
 
         return dynamoDBMapper.scan(WarehouseItem.class, scanExpression);
     }
 
     List<WarehouseItem> findAllAvailableByEans(String storeId, Collection<String> eans) {
         return findAllAvailableBy(storeId, "ean", eans);
-    }
-
-    List<WarehouseItem> findAllAvailableByMfns(String storeId, Collection<String> mfns) {
-        return findAllAvailableBy(storeId, "mfn", mfns);
     }
 
     private List<WarehouseItem> findAllAvailableBy(String storeId, String attribute, Collection<String> values) {
@@ -174,8 +170,8 @@ class WarehouseRepository extends DynamoDbRepository<WarehouseItem> {
         return dynamoDBMapper.scan(WarehouseItem.class, scanExpression);
     }
 
-    List<WarehouseItem> findAllByMfns(String storeId, Collection<String> mfns) {
-        if (mfns == null || mfns.isEmpty()) {
+    List<WarehouseItem> findAllByEans(String storeId, Collection<String> eans) {
+        if (eans.isEmpty()) {
             return List.of();
         }
         Map<String, AttributeValue> eav = new HashMap<>();
@@ -183,9 +179,9 @@ class WarehouseRepository extends DynamoDbRepository<WarehouseItem> {
 
         StringBuilder inClause = new StringBuilder();
         int i = 0;
-        for (String mfn : mfns) {
-            String key = ":mfn" + i;
-            eav.put(key, new AttributeValue().withS(mfn));
+        for (String ean : eans) {
+            String key = ":ean" + i;
+            eav.put(key, new AttributeValue().withS(ean));
             if (i > 0) {
                 inClause.append(", ");
             }
@@ -193,10 +189,8 @@ class WarehouseRepository extends DynamoDbRepository<WarehouseItem> {
             i++;
         }
 
-        String filterExpression = "storeId = :storeId AND mfn IN (" + inClause + ")";
-
         DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-                .withFilterExpression(filterExpression)
+                .withFilterExpression("storeId = :storeId AND ean IN (" + inClause + ")")
                 .withExpressionAttributeValues(eav);
 
         return dynamoDBMapper.scan(WarehouseItem.class, scanExpression);

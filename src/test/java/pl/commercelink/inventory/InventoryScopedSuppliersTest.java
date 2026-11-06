@@ -87,7 +87,7 @@ class InventoryScopedSuppliersTest {
         when(globalInventory.index()).thenReturn(InventoryIndex.of(List.of(globalGroup)));
 
         // when
-        MatchedInventory result = inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.PRICING).findByProductCode(MFN);
+        MatchedInventory result = inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.PRICING).findByEan(EAN);
 
         // then
         assertThat(result.getSuppliers()).containsExactly("AB Group");
@@ -108,7 +108,7 @@ class InventoryScopedSuppliersTest {
         when(globalInventory.index()).thenReturn(InventoryIndex.of(List.of(globalGroup)));
 
         // when
-        MatchedInventory result = inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT).findByProductCode(MFN);
+        MatchedInventory result = inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT).findByEan(EAN);
 
         // then
         assertThat(result.getSuppliers()).containsExactly("Elko");
@@ -126,8 +126,8 @@ class InventoryScopedSuppliersTest {
         when(globalInventory.index()).thenReturn(InventoryIndex.of(List.of()));
 
         // when
-        MatchedInventory pricingResult = inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.PRICING).findByProductCode(MFN);
-        MatchedInventory fulfilmentResult = inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT).findByProductCode(MFN);
+        MatchedInventory pricingResult = inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.PRICING).findByEan(EAN);
+        MatchedInventory fulfilmentResult = inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT).findByEan(EAN);
 
         // then
         assertThat(pricingResult.getSuppliers()).containsExactly("Action");
@@ -149,10 +149,10 @@ class InventoryScopedSuppliersTest {
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
         WarehouseItemView warehouseView = mock(WarehouseItemView.class);
         when(warehouseView.toInventoryItem()).thenReturn(new InventoryItem(EAN, MFN, 1200.0, "PLN", 3, 1, "Warehouse", true, true, false));
-        when(stockQueryService.searchAvailableByMfns(eq(STORE_ID), argThat(mfns -> mfns.contains(MFN)))).thenReturn(List.of(warehouseView));
+        when(stockQueryService.searchAvailableByEans(eq(STORE_ID), argThat(eans -> eans.contains(EAN)))).thenReturn(List.of(warehouseView));
 
         // when
-        MatchedInventory matched = inventory.withEnabledSuppliersAndWarehouseData(STORE_ID, SupplierScope.FULFILMENT).findByProductCode(MFN);
+        MatchedInventory matched = inventory.withEnabledSuppliersAndWarehouseData(STORE_ID, SupplierScope.FULFILMENT).findByEan(EAN);
 
         // then
         assertThat(matched.getSuppliers()).containsExactlyInAnyOrder("AB Group", "Warehouse");

@@ -122,6 +122,7 @@ class DeliveryDetailsScriptsContractTest {
         // then
         assertThat(js).contains("data-cl-validate").contains("stopImmediatePropagation").contains("'PickupPoint'")
                 .contains("qty-delta").contains("data-min-qty").contains("linkMode").contains("data-cl-remove-payment")
+                .contains("getElementById('qty-ean').value = ean")
                 .contains("CL_confirmBulk")
                 // a refused check must stop the listener that marks the dialog as sent, so it is registered first
                 .containsPattern("initValidation\\(\\);\\s*initDialogs\\(\\);")

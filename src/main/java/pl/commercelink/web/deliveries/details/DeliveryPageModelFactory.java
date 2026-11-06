@@ -69,7 +69,7 @@ public final class DeliveryPageModelFactory {
             case "remove" -> items.selectable() && bar.remove().enabled() && anyChecked;
             case "remove-all" -> items.selectable() && bar.remove().enabled();
             case "qty" -> items.products().stream()
-                    .anyMatch(product -> product.changeQty().enabled() && Objects.equals(product.mfn(), data.openMfn()));
+                    .anyMatch(product -> product.changeQty().enabled() && Objects.equals(product.ean(), data.openEan()));
             case "terms", "comment" -> terms.edit().visible();
             case "invoice" -> documents.link().visible();
             case "complete" -> repairable && !delivery.isAwaitingSupplierConfirmation()

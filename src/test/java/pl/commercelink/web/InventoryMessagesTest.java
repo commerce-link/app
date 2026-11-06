@@ -34,7 +34,7 @@ class InventoryMessagesTest {
     void everyMatchModeAndConnectionModeHasALabel() throws Exception {
         // given / when / then
         assertThat(inventoryKeys("messages_en.properties")).contains(
-                "inventory.matchedBy.EAN", "inventory.matchedBy.MFN", "inventory.matchedBy.PIM_ID",
+                "inventory.matchedBy.EAN", "inventory.matchedBy.PIM_ID",
                 "inventory.mode.GLOBAL", "inventory.mode.OWN", "inventory.mode.MANUAL");
     }
 

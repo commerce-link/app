@@ -7,12 +7,12 @@ import java.util.Comparator;
 import java.util.List;
 
 @Service
-class WarehouseDocumentMfnHistoryService {
+class WarehouseDocumentItemHistoryService {
 
     private final WarehouseDocumentItemRepository warehouseDocumentItemRepository;
     private final WarehouseDocumentRepository warehouseDocumentRepository;
 
-    WarehouseDocumentMfnHistoryService(
+    WarehouseDocumentItemHistoryService(
             WarehouseDocumentItemRepository warehouseDocumentItemRepository,
             WarehouseDocumentRepository warehouseDocumentRepository
     ) {
@@ -22,9 +22,9 @@ class WarehouseDocumentMfnHistoryService {
 
     /** Every document of one delivery that moved this product, oldest first, with the stock after each move. Items
      *  whose document is not in the store are skipped: items are read by delivery id alone, which is not store-scoped. */
-    MfnHistory history(String storeId, String deliveryId, String mfn) {
+    MfnHistory history(String storeId, String deliveryId, String ean) {
         List<WarehouseDocumentItem> items = warehouseDocumentItemRepository.findByDeliveryId(deliveryId).stream()
-                .filter(item -> mfn.equals(item.getMfn()))
+                .filter(item -> ean.equals(item.getEan()))
                 .sorted(Comparator.comparing(WarehouseDocumentItem::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
 

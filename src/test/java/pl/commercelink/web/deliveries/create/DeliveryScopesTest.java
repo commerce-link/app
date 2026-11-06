@@ -117,7 +117,7 @@ class DeliveryScopesTest {
         scope.suggestions();
 
         // then
-        verify(restockSuggestions).suggestForDelivery(STORE_ID, PROVIDER, java.util.Set.of("mfn-1"));
+        verify(restockSuggestions).suggestForDelivery(STORE_ID, PROVIDER, java.util.Set.of("5900000000001"));
     }
 
     @Test
