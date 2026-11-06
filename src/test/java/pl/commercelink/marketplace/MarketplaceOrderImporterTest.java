@@ -21,10 +21,10 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.ShippingDetails;
-import pl.commercelink.shipping.CarrierDictionary;
+import pl.commercelink.carriers.CarrierDictionary;
+import pl.commercelink.carriers.CarrierTranslator;
+import pl.commercelink.carriers.InMemoryCarrierDictionaries;
 import pl.commercelink.stores.FulfilmentConfiguration;
-import pl.commercelink.stores.Integration;
-import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 
 import java.math.BigDecimal;
@@ -51,7 +51,9 @@ import static org.mockito.Mockito.when;
 class MarketplaceOrderImporterTest {
 
     @Spy
-    private CarrierDictionary carrierDictionary = dictionaryForMorele();
+    private CarrierTranslator carrierTranslator = new InMemoryCarrierDictionaries()
+            .with(CarrierDictionary.marketplaceOrderCarrierTexts("Morele"), "2=InPost", "6=Zabka", "4=Orlen")
+            .translator();
 
     @Mock
     private OrdersManager ordersManager;
@@ -69,17 +71,6 @@ class MarketplaceOrderImporterTest {
         when(offerResolver.forStore(any())).thenReturn(storeOffers);
     }
 
-    private static CarrierDictionary dictionaryForMorele() {
-        CarrierDictionary dictionary = new CarrierDictionary();
-        dictionary.setCarriers(Map.of("Morele", Map.of("furgonetka", "{\"2\":\"InPost\",\"6\":\"Zabka\"}")));
-        return dictionary;
-    }
-
-    private static Store storeShippingWith(String shippingProvider) {
-        Store store = new Store();
-        store.setIntegrations(List.of(new Integration(IntegrationType.SHIPPING_PROVIDER, shippingProvider)));
-        return store;
-    }
 
     @Test
     void keepsTheDeliveryStreetIntactForPointOrders() {
@@ -148,24 +139,24 @@ class MarketplaceOrderImporterTest {
     }
 
     @Test
-    void storesTheShippingProviderCarrierNameInsteadOfTheMarketplaceCode() {
+    void storesOurCarrierNameInsteadOfTheMarketplaceCode() {
         // when / then
-        assertEquals("InPost", importer.toCarrierName(storeShippingWith("furgonetka"), "Morele", "2"));
-        assertEquals("Zabka", importer.toCarrierName(storeShippingWith("furgonetka"), "Morele", "6"));
+        assertEquals("InPost", importer.carrierFor("Morele", "2"));
+        assertEquals("Zabka", importer.carrierFor("Morele", "6"));
     }
 
     @Test
     void keepsTheMarketplaceValueWhenNothingMapsIt() {
         // when / then
-        assertEquals("99", importer.toCarrierName(storeShippingWith("furgonetka"), "Morele", "99"));
-        assertEquals("2", importer.toCarrierName(storeShippingWith("apaczka"), "Morele", "2"));
-        assertNull(importer.toCarrierName(storeShippingWith("furgonetka"), "Morele", null));
+        assertEquals("99", importer.carrierFor("Morele", "99"));
+        assertEquals("2", importer.carrierFor("Empik", "2"));
+        assertNull(importer.carrierFor("Morele", null));
     }
 
     @Test
-    void toleratesAStoreWithoutAShippingProvider() {
+    void doesNotReadADigitCodeInsideALongerOne() {
         // when / then
-        assertEquals("2", importer.toCarrierName(new Store(), "Morele", "2"));
+        assertEquals("14", importer.carrierFor("Morele", "14"));
     }
 
     @Test

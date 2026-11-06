@@ -1,5 +1,7 @@
 package pl.commercelink.shipping;
 
+import pl.commercelink.carriers.CarrierDictionary;
+import pl.commercelink.carriers.InMemoryCarrierDictionaries;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,7 +57,8 @@ class ShipmentCreationSettlerTest {
                 trackingSubscriber, orderLifecycle, lifecycleEventPublisher);
         when(owners.get(ShipmentOwnerType.ORDER)).thenReturn(owner);
         when(owners.get(ShipmentOwnerType.RMA_RETURN)).thenReturn(returnOwner);
-        settler = new ShipmentCreationSettler(owners, immediatePickup);
+        settler = new ShipmentCreationSettler(owners, immediatePickup, new InMemoryCarrierDictionaries()
+                .with(CarrierDictionary.shippingLabelCarrierCodes("furgonetka"), "dpd=DPD", "inpost_courier=InPost Kurier").translator());
     }
 
     private static ShipmentCreationCheckRequest request() {
@@ -81,6 +84,28 @@ class ShipmentCreationSettlerTest {
         verify(trackingSubscriber).subscribe(eq("store-1"), any(Order.class));
         verify(orderLifecycle).update(any(Order.class));
         verify(lifecycleEventPublisher).publish(any(Order.class), eq(OrderLifecycleEventType.ShipmentCreated));
+    }
+
+    @Test
+    void theLabelCodeBecomesOurCarrierName() {
+        // when
+        settler.succeeded(request(), result());
+
+        // then
+        assertThat(order.getShipments().get(0).getCarrier()).isEqualTo("DPD");
+    }
+
+    @Test
+    void anUnknownLabelCodeIsKeptAsItCame() {
+        // given
+        ShipmentResult result = new ShipmentResult("21480003",
+                List.of(new ShipmentResult.ShipmentParcelResult("A", "meest", "https://t/A", true, null)), null);
+
+        // when
+        settler.succeeded(request(), result);
+
+        // then
+        assertThat(order.getShipments().get(0).getCarrier()).isEqualTo("meest");
     }
 
     @Test

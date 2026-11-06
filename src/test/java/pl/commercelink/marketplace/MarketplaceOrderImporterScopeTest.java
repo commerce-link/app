@@ -16,7 +16,8 @@ import pl.commercelink.externaloffers.ExternalOfferResolver;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.pim.ScopedPimCatalog;
-import pl.commercelink.shipping.CarrierDictionary;
+import pl.commercelink.carriers.CarrierTranslator;
+import pl.commercelink.carriers.InMemoryCarrierDictionaries;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.taxonomy.Categories;
@@ -34,7 +35,7 @@ class MarketplaceOrderImporterScopeTest {
 
     private static final String MPN = "MPN-ONLY-S1";
 
-    @Spy private CarrierDictionary carrierDictionary = new CarrierDictionary();
+    @Spy private CarrierTranslator carrierTranslator = InMemoryCarrierDictionaries.none();
     @Mock private OrdersManager ordersManager;
     @InjectMocks private MarketplaceOrderImporter importer;
 

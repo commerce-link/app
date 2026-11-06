@@ -1199,6 +1199,12 @@ body.cl-drawer-open .cl-sidebar {
     border-top: 1px solid var(--cl-line);
 }
 
+/* The add-carrier form sits under the carriers list in the same card, so it spans the card like the list does. */
+.cl-page .cl-carrier-create {
+    max-width: none;
+    border-top: 1px solid var(--cl-line);
+}
+
 /* A floated legend leaves the fieldset border and joins normal flow, so it lays out like a heading. */
 .cl-page .cl-fieldset-title {
     float: left;

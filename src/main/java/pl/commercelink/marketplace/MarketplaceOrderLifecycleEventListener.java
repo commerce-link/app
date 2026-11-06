@@ -4,11 +4,12 @@ import io.awspring.cloud.sqs.annotation.SqsListener;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import pl.commercelink.carriers.CarrierDictionary;
+import pl.commercelink.carriers.CarrierTranslator;
 import pl.commercelink.documents.Document;
 import pl.commercelink.marketplace.api.InvoiceUpdate;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.ShipmentUpdate;
-import pl.commercelink.shipping.CarrierDictionary;
 import pl.commercelink.shipping.ShippingProviders;
 import pl.commercelink.orders.*;
 import pl.commercelink.stores.MarketplaceIntegration;
@@ -28,7 +29,7 @@ public class MarketplaceOrderLifecycleEventListener {
     private final StoresRepository storesRepository;
     private final OrdersRepository ordersRepository;
     private final MarketplaceProviderFactory providerFactory;
-    private final CarrierDictionary carrierDictionary;
+    private final CarrierTranslator carrierTranslator;
 
     @SqsListener(
             value = "marketplace-order-lifecycle-queue",
@@ -116,7 +117,7 @@ public class MarketplaceOrderLifecycleEventListener {
                 .filter(s -> !attachedByMarketplace(s, marketplace))
                 .findFirst()
                 .map(s -> new ShipmentUpdate(s.getTrackingNo(),
-                        carrierDictionary.translate(store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER), marketplace, s.getCarrier()).orElse(null),
+                        marketplaceCarrierCodeFor(s, store, marketplace),
                         s.getCarrier(),
                         s.getTrackingUrl()));
 
@@ -133,6 +134,18 @@ public class MarketplaceOrderLifecycleEventListener {
         }
 
         return Optional.empty();
+    }
+
+    private String marketplaceCarrierCodeFor(Shipment shipment, Store store, String marketplace) {
+        String integration = shipment.getProvider() != null
+                ? shipment.getProvider()
+                : store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
+        List<String> sources = integration != null
+                ? List.of(CarrierDictionary.shippingLabelCarrierCodes(integration), CarrierDictionary.marketplaceOrderCarrierTexts(marketplace))
+                : List.of(CarrierDictionary.marketplaceOrderCarrierTexts(marketplace));
+        return carrierTranslator.externalTextForShipmentCarrier(CarrierDictionary.marketplaceStatusCarrierCodes(marketplace),
+                shipment.getCarrier(), sources)
+                .orElse(null);
     }
 
     // Allegro attaches the waybill of its own shipments; posting it again is refused (422) and duplicates it otherwise

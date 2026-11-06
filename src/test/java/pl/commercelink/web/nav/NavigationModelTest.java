@@ -50,7 +50,7 @@ class NavigationModelTest {
 
         // then
         assertThat(itemKeys(model)).containsExactly("fulfilmentQueue", "deliveriesQueue", "inventory",
-                "inventoryPrices", "stores", "rmaCenters");
+                "inventoryPrices", "stores", "rmaCenters", "carriers");
         assertThat(itemKeys(model)).doesNotContain("offers", "orders");
     }
 

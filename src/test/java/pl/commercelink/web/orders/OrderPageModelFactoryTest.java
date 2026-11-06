@@ -49,7 +49,7 @@ import pl.commercelink.receipts.ReceiptOrderView;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptOrderState;
 import pl.commercelink.receipts.ReceiptPageProblem;
-import pl.commercelink.shipping.CarrierDictionary;
+import pl.commercelink.carriers.CarriersRepository;
 import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.shipping.ShippingProviders;
 import pl.commercelink.shipping.ShippingService;
@@ -953,7 +953,7 @@ class OrderPageModelFactoryTest {
         ReflectionTestUtils.setField(realShipping, "shippingProviders", mock(ShippingProviders.class));
         OrderPageModelFactory withRealShipping = new OrderPageModelFactory(storesRepository, orderEventsRepository,
                 dropshipItemLookup, deliveryRedirectResolver, dropshipEligibility, supplierLabels,
-                new ShipmentCarrierOptions(new CarrierDictionary()), productCatalogRepository, taxonomyCache,
+                new ShipmentCarrierOptions(mock(CarriersRepository.class)), productCatalogRepository, taxonomyCache,
                 messageSource, receiptAttemptService, receiptAlerts, realShipping,
                 ShippingIntegrationNamesFixture.names(), mock(pl.commercelink.externaloffers.ExternalOfferResolver.class));
         ReflectionTestUtils.setField(withRealShipping, "appDomain", "https://app.example");

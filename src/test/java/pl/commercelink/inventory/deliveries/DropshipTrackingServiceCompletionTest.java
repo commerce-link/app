@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.deliveries;
 
+import pl.commercelink.carriers.InMemoryCarrierDictionaries;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -89,7 +90,7 @@ class DropshipTrackingServiceCompletionTest {
                 orderItemsRepository, orderLifecycle, orderLifecycleEventPublisher, shipmentTrackingSubscriber);
         service = new DropshipTrackingService(deliveriesQueryService, deliveriesRepository, ordersRepository,
                 providerResolver, completion, DropshipTrackingProperties.defaults(),
-                Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE));
+                InMemoryCarrierDictionaries.none(), Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE));
         order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);
         order.setStatus(OrderStatus.Assembly);

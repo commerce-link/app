@@ -16,7 +16,9 @@ import pl.commercelink.documents.DocumentType;
 import pl.commercelink.marketplace.api.InvoiceUpdate;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.ShipmentUpdate;
-import pl.commercelink.shipping.CarrierDictionary;
+import pl.commercelink.carriers.CarrierDictionary;
+import pl.commercelink.carriers.CarrierTranslator;
+import pl.commercelink.carriers.InMemoryCarrierDictionaries;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderLifecycleEvent;
 import pl.commercelink.orders.OrderLifecycleEventType;
@@ -44,12 +46,6 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class MarketplaceOrderLifecycleEventListenerTest {
 
-    private static CarrierDictionary dictionaryWithDpd() {
-        CarrierDictionary dictionary = new CarrierDictionary();
-        dictionary.setCarriers(java.util.Map.of("furgonetka", java.util.Map.of("Empik", "{\"DPD\":\"dpd-1\"}")));
-        return dictionary;
-    }
-
     private static final String STORE_ID = "store-1";
     private static final String ORDER_ID = "order-1";
     private static final String EXTERNAL_ORDER_ID = "EXT-1";
@@ -58,7 +54,11 @@ class MarketplaceOrderLifecycleEventListenerTest {
     @Mock private StoresRepository storesRepository;
     @Mock private OrdersRepository ordersRepository;
     @Mock private MarketplaceProviderFactory providerFactory;
-    @Spy private CarrierDictionary carrierDictionary = dictionaryWithDpd();
+    @Spy private CarrierTranslator carrierTranslator = new InMemoryCarrierDictionaries()
+            .with(CarrierDictionary.marketplaceStatusCarrierCodes("Allegro"), "INPOST=InPost", "INPOST=InPost Kurier", "DPD=DPD")
+            .with(CarrierDictionary.shippingLabelCarrierCodes("furgonetka"), "inpost=InPost", "inpost_courier=InPost Kurier")
+            .with(CarrierDictionary.marketplaceOrderCarrierTexts("Empik"), "DPD=DPD")
+            .translator();
 
     @Mock private Store store;
     @Mock private Order order;
@@ -140,7 +140,8 @@ class MarketplaceOrderLifecycleEventListenerTest {
         handle(OrderLifecycleEventType.ShipmentCreated);
 
         // then
-        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("TRACK-9", "dpd-1", "DPD", "https://track.example/TRACK-9"));
+        // Empik has no status dictionary: its adapter reads the carrier name only
+        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("TRACK-9", null, "DPD", "https://track.example/TRACK-9"));
         verifyNoMoreInteractions(provider);
     }
 
@@ -456,7 +457,7 @@ class MarketplaceOrderLifecycleEventListenerTest {
         handle(OrderLifecycleEventType.ShipmentCreated);
 
         // then
-        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("FURG-1", null, "DPD", null));
+        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("FURG-1", "DPD", "DPD", null));
     }
 
     @Test
@@ -471,7 +472,37 @@ class MarketplaceOrderLifecycleEventListenerTest {
         handle(OrderLifecycleEventType.ShipmentCreated);
 
         // then
-        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("FURG-2", null, "DPD", null));
+        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("FURG-2", "DPD", "DPD", null));
+    }
+
+    @Test
+    void olderShipmentWithALabelCodeGetsTheMarketplaceCodeThroughTheDefaultIntegration() {
+        // given: no provider on the shipment, so the store's default integration (furgonetka) reads the label code
+        allegroOrder();
+        Shipment shipment = trackedShipment(null, "FURG-3");
+        when(shipment.getCarrier()).thenReturn("inpost_courier");
+        when(order.getShipments()).thenReturn(List.of(shipment));
+
+        // when
+        handle(OrderLifecycleEventType.ShipmentCreated);
+
+        // then
+        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("FURG-3", "INPOST", "inpost_courier", null));
+    }
+
+    @Test
+    void unknownCarrierGoesWithoutACode() {
+        // given
+        allegroOrder();
+        Shipment shipment = trackedShipment("furgonetka", "FURG-4");
+        when(shipment.getCarrier()).thenReturn("my");
+        when(order.getShipments()).thenReturn(List.of(shipment));
+
+        // when
+        handle(OrderLifecycleEventType.ShipmentCreated);
+
+        // then
+        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("FURG-4", null, "my", null));
     }
 
     private void handle(OrderLifecycleEventType type) {

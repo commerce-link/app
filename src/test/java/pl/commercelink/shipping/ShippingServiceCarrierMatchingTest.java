@@ -4,58 +4,41 @@ import org.junit.jupiter.api.Test;
 import pl.commercelink.stores.AuthorizedCarrier;
 
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ShippingServiceCarrierMatchingTest {
 
     private static final AuthorizedCarrier INPOST = new AuthorizedCarrier("1", "inpost", "InPost Paczkomaty");
+    private static final AuthorizedCarrier INPOST_COURIER = new AuthorizedCarrier("4", "inpost_courier", "InPost Kurier");
     private static final AuthorizedCarrier DPD = new AuthorizedCarrier("2", "dpd", "DPD Kurier");
     private static final AuthorizedCarrier POCZTA = new AuthorizedCarrier("3", "poczta", "Poczta Polska");
 
-    private final List<AuthorizedCarrier> authorized = List.of(INPOST, DPD, POCZTA);
-
-    private final CarrierDictionary dictionary = dictionaryWithDefaults();
-
-    private static CarrierDictionary dictionaryWithDefaults() {
-        CarrierDictionary dictionary = new CarrierDictionary();
-        dictionary.setCarriers(Map.of("Morele", Map.of("furgonetka",
-                "{\"2\":\"InPost\",\"3\":\"Poczta Polska\"}")));
-        return dictionary;
-    }
+    private final List<AuthorizedCarrier> authorized = List.of(INPOST, INPOST_COURIER, DPD, POCZTA);
 
     @Test
-    void narrowsToTheCarrierChosenByTheBuyer() {
+    void narrowsToTheServicesOfTheCode() {
         // when
-        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(dictionary, "furgonetka", "Morele", authorized, "2");
+        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(authorized, Optional.of("inpost"));
 
         // then
         assertEquals(List.of(INPOST), matching);
     }
 
     @Test
-    void matchesMultiWordCarrierNames() {
+    void keepsEveryServiceWithoutACode() {
         // when
-        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(dictionary, "furgonetka", "Morele", authorized, "3");
-
-        // then
-        assertEquals(List.of(POCZTA), matching);
-    }
-
-    @Test
-    void keepsEveryCarrierWhenBuyerChoiceIsUnknown() {
-        // when
-        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(dictionary, "furgonetka", "Morele", authorized, null);
+        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(authorized, Optional.empty());
 
         // then
         assertEquals(authorized, matching);
     }
 
     @Test
-    void fallsBackToEveryCarrierWhenChoiceCannotBeMatched() {
+    void fallsBackToEveryServiceWhenNoneHasTheCode() {
         // when
-        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(dictionary, "furgonetka", "Morele", authorized, "99");
+        List<AuthorizedCarrier> matching = ShippingService.carriersMatching(authorized, Optional.of("gls"));
 
         // then
         assertEquals(authorized, matching);

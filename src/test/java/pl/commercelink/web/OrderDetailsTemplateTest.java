@@ -123,7 +123,7 @@ class OrderDetailsTemplateTest {
         OrderEventsRepository events = mock(OrderEventsRepository.class);
         when(events.findByOrderId(anyString())).thenReturn(orderEvents);
         ShipmentCarrierOptions carrierOptions = mock(ShipmentCarrierOptions.class);
-        when(carrierOptions.forOrder(any(), any())).thenReturn(List.of("DPD", "InPost"));
+        when(carrierOptions.forOrder(any())).thenReturn(List.of("DPD", "InPost"));
         ResourceBundleMessageSource messages = new ResourceBundleMessageSource();
         messages.setBasename("messages");
         messages.setDefaultEncoding("UTF-8");
