@@ -31,8 +31,8 @@ public record DeliveryLinks(boolean superAdmin, String storeId, String deliveryI
         return details() + "&open=" + dialog + "#" + DeliveryPageModelFactory.dialogId(dialog);
     }
 
-    public String openQty(String mfn) {
-        return details() + "&open=qty&mfn=" + encode(mfn) + "#qty-dialog";
+    public String openQty(String ean) {
+        return details() + "&open=qty&ean=" + encode(ean) + "#qty-dialog";
     }
 
     public String saveTerms() {

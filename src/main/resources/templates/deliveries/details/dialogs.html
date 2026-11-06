@@ -195,7 +195,7 @@
                 th:attr="open=${page.openDialog() == 'qty'} ? 'open' : null">
             <form method="post" th:action="@{${page.links().updateItemQty()}}">
                 <input type="hidden" name="deliveryId" th:value="${page.deliveryId()}">
-                <input type="hidden" name="mfn" id="qty-mfn" th:value="${q != null} ? ${q.mfn()} : ''">
+                <input type="hidden" name="ean" id="qty-ean" th:value="${q != null} ? ${q.ean()} : ''">
                 <h2 class="cl-dialog-title" id="qty-dialog-title" th:text="#{deliveries.details.qty.title}"></h2>
                 <div class="cl-dialog-body">
                     <dl class="cl-kv">

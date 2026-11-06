@@ -70,6 +70,15 @@ class DeliveryCreateScriptsContractTest {
     }
 
     @Test
+    void aProductSavedWithTheEanOfAnotherRowReloadsThePage() throws Exception {
+        // when
+        String js = read("src/main/resources/static/js/delivery-fulfilment.js");
+
+        // then: the server joins the rows of one EAN on the next load
+        assertThat(js).contains("other.getAttribute('data-ean') === answer.ean");
+    }
+
+    @Test
     void suggestionsAreFetchedAfterThePageAndKeepWhatWasTyped() throws Exception {
         // when
         String js = read("src/main/resources/static/js/delivery-items.js");

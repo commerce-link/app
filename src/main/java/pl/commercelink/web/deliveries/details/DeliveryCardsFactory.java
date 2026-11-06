@@ -275,7 +275,7 @@ final class DeliveryCardsFactory {
                         .map(row -> new PendingLine(product.name(), row.qty(), row.warehouse(), row.orderShortId(), row.customer())))
                 .toList();
         ProductRow qtyProduct = "qty".equals(data.openDialog())
-                ? items.products().stream().filter(product -> Objects.equals(product.mfn(), data.openMfn())).findFirst().orElse(null)
+                ? items.products().stream().filter(product -> Objects.equals(product.ean(), data.openEan())).findFirst().orElse(null)
                 : null;
         ShipmentType type = shipment != null && shipment.getType() == ShipmentType.PickupPoint
                 ? ShipmentType.PickupPoint : ShipmentType.Courier;

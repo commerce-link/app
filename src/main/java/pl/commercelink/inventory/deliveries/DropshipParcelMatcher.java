@@ -23,11 +23,7 @@ final class DropshipParcelMatcher {
     }
 
     private static boolean matches(SupplierOrderLine line, Allocation allocation) {
-        if (StringUtils.isNotBlank(line.ean()) && StringUtils.isNotBlank(allocation.getEan())
-                && unifyEan(line.ean()).equals(unifyEan(allocation.getEan()))) {
-            return true;
-        }
-        return StringUtils.isNotBlank(line.mfn()) && StringUtils.isNotBlank(allocation.getMfn())
-                && line.mfn().trim().equalsIgnoreCase(allocation.getMfn().trim());
+        return StringUtils.isNotBlank(line.ean()) && StringUtils.isNotBlank(allocation.getEan())
+                && unifyEan(line.ean()).equals(unifyEan(allocation.getEan()));
     }
 }
