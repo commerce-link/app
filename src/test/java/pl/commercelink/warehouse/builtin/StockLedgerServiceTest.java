@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -36,6 +37,8 @@ class StockLedgerServiceTest {
     private static final LocalDate TO = LocalDate.of(2026, 5, 31);
     private static final LocalDateTime IN_PERIOD = LocalDateTime.of(2026, 5, 10, 12, 0);
     private static final LocalDateTime BEFORE = LocalDateTime.of(2026, 4, 15, 12, 0);
+    private static final String EAN_A = "5901234567890";
+    private static final String EAN_B = "5901234567906";
 
     @Mock private WarehouseDocumentRepository documentRepository;
     @Mock private WarehouseDocumentItemRepository itemRepository;
@@ -54,7 +57,7 @@ class StockLedgerServiceTest {
     void receiptIsCategorizedAsPurchase() {
         WarehouseDocument pz = doc("pz", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, IN_PERIOD);
         inPeriod(pz);
-        items("pz", item("pz", "MFN-A", "Widget", 10, 100.0));
+        items("pz", item("pz", EAN_A, "Widget", 10, 100.0));
 
         StockLedgerRow row = single();
         assertThat(row.qtyByCategory().getOrDefault(LedgerCategory.PURCHASE, 0)).isEqualTo(10);
@@ -69,15 +72,15 @@ class StockLedgerServiceTest {
     @Test
     void issueReasonsLandInTheirOwnColumns() {
         historical(doc("bo", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, BEFORE));
-        items("bo", item("bo", "MFN-A", "Widget", 10, 50.0));
+        items("bo", item("bo", EAN_A, "Widget", 10, 50.0));
 
         WarehouseDocument sale = doc("wz", DocumentType.GoodsIssue, DocumentReason.CustomerOrder, IN_PERIOD);
         WarehouseDocument destruction = doc("rw1", DocumentType.InternalIssue, DocumentReason.Destruction, IN_PERIOD);
         WarehouseDocument theft = doc("rw2", DocumentType.InternalIssue, DocumentReason.Theft, IN_PERIOD);
         inPeriod(sale, destruction, theft);
-        items("wz", item("wz", "MFN-A", "Widget", 4, 50.0));
-        items("rw1", item("rw1", "MFN-A", "Widget", 2, 50.0));
-        items("rw2", item("rw2", "MFN-A", "Widget", 1, 50.0));
+        items("wz", item("wz", EAN_A, "Widget", 4, 50.0));
+        items("rw1", item("rw1", EAN_A, "Widget", 2, 50.0));
+        items("rw2", item("rw2", EAN_A, "Widget", 1, 50.0));
 
         StockLedgerRow row = single();
         assertThat(qty(row, "Sprzedaż ilość")).isEqualTo(4);
@@ -94,8 +97,8 @@ class StockLedgerServiceTest {
         WarehouseDocument surplus = doc("pw", DocumentType.InternalReceipt, DocumentReason.StockAdjustment, IN_PERIOD);
         WarehouseDocument shortage = doc("rw", DocumentType.InternalIssue, DocumentReason.StockAdjustment, IN_PERIOD);
         inPeriod(surplus, shortage);
-        items("pw", item("pw", "MFN-A", "Widget", 5, 10.0));
-        items("rw", item("rw", "MFN-A", "Widget", 2, 10.0));
+        items("pw", item("pw", EAN_A, "Widget", 5, 10.0));
+        items("rw", item("rw", EAN_A, "Widget", 2, 10.0));
 
         StockLedgerRow row = single();
         assertThat(qty(row, "Nadwyżka ilość")).isEqualTo(5);
@@ -114,10 +117,10 @@ class StockLedgerServiceTest {
         WarehouseDocument wz = doc("wz", DocumentType.GoodsIssue, null, IN_PERIOD);
         WarehouseDocument rw = doc("rw", DocumentType.InternalIssue, null, IN_PERIOD);
         inPeriod(pz, pw, wz, rw);
-        items("pz", item("pz", "MFN-A", "Widget", 3, 100.0));
-        items("pw", item("pw", "MFN-A", "Widget", 1, 100.0));
-        items("wz", item("wz", "MFN-A", "Widget", 2, 100.0));
-        items("rw", item("rw", "MFN-A", "Widget", 1, 100.0));
+        items("pz", item("pz", EAN_A, "Widget", 3, 100.0));
+        items("pw", item("pw", EAN_A, "Widget", 1, 100.0));
+        items("wz", item("wz", EAN_A, "Widget", 2, 100.0));
+        items("rw", item("rw", EAN_A, "Widget", 1, 100.0));
 
         StockLedgerRow row = single();
         assertThat(qty(row, "Zakup ilość")).isEqualTo(3);
@@ -131,8 +134,8 @@ class StockLedgerServiceTest {
         WarehouseDocument receipt = doc("h-pz", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, BEFORE);
         WarehouseDocument issue = doc("h-wz", DocumentType.GoodsIssue, DocumentReason.CustomerOrder, BEFORE);
         historical(receipt, issue);
-        items("h-pz", item("h-pz", "MFN-A", "Widget", 10, 100.0));
-        items("h-wz", item("h-wz", "MFN-A", "Widget", 4, 100.0));
+        items("h-pz", item("h-pz", EAN_A, "Widget", 10, 100.0));
+        items("h-wz", item("h-wz", EAN_A, "Widget", 4, 100.0));
 
         StockLedgerRow row = single();
         assertThat(qty(row, "BO ilość")).isEqualTo(6);
@@ -146,7 +149,7 @@ class StockLedgerServiceTest {
     @Test
     void closingBalanceEqualsOpeningPlusReceiptsMinusIssues() {
         historical(doc("bo", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, BEFORE));
-        items("bo", item("bo", "MFN-A", "Widget", 20, 10.0));
+        items("bo", item("bo", EAN_A, "Widget", 20, 10.0));
 
         WarehouseDocument purchase = doc("pz", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, IN_PERIOD);
         WarehouseDocument customerReturn = doc("pz-ret", DocumentType.GoodsReceipt, DocumentReason.CustomerReturn, IN_PERIOD);
@@ -155,12 +158,12 @@ class StockLedgerServiceTest {
         WarehouseDocument destruction = doc("rw1", DocumentType.InternalIssue, DocumentReason.Destruction, IN_PERIOD);
         WarehouseDocument theft = doc("rw2", DocumentType.InternalIssue, DocumentReason.Theft, IN_PERIOD);
         inPeriod(purchase, customerReturn, surplus, sale, destruction, theft);
-        items("pz", item("pz", "MFN-A", "Widget", 5, 10.0));
-        items("pz-ret", item("pz-ret", "MFN-A", "Widget", 3, 10.0));
-        items("pw", item("pw", "MFN-A", "Widget", 2, 10.0));
-        items("wz", item("wz", "MFN-A", "Widget", 6, 10.0));
-        items("rw1", item("rw1", "MFN-A", "Widget", 1, 10.0));
-        items("rw2", item("rw2", "MFN-A", "Widget", 1, 10.0));
+        items("pz", item("pz", EAN_A, "Widget", 5, 10.0));
+        items("pz-ret", item("pz-ret", EAN_A, "Widget", 3, 10.0));
+        items("pw", item("pw", EAN_A, "Widget", 2, 10.0));
+        items("wz", item("wz", EAN_A, "Widget", 6, 10.0));
+        items("rw1", item("rw1", EAN_A, "Widget", 1, 10.0));
+        items("rw2", item("rw2", EAN_A, "Widget", 1, 10.0));
 
         StockLedgerRow row = single();
 
@@ -187,8 +190,8 @@ class StockLedgerServiceTest {
         WarehouseDocument receipt = doc("h-pz", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, BEFORE);
         WarehouseDocument issue = doc("h-wz", DocumentType.GoodsIssue, DocumentReason.CustomerOrder, BEFORE);
         historical(receipt, issue);
-        items("h-pz", item("h-pz", "MFN-A", "Widget", 5, 100.0));
-        items("h-wz", item("h-wz", "MFN-A", "Widget", 5, 100.0));
+        items("h-pz", item("h-pz", EAN_A, "Widget", 5, 100.0));
+        items("h-wz", item("h-wz", EAN_A, "Widget", 5, 100.0));
 
         assertThat(service.generate(STORE_ID, FROM, TO)).isEmpty();
     }
@@ -203,35 +206,103 @@ class StockLedgerServiceTest {
     }
 
     @Test
-    void skipsItemsWithBlankOrNullMfn() {
+    void itemWithoutEanIsSkipped() {
+        // given
         WarehouseDocument pz = doc("pz", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, IN_PERIOD);
         inPeriod(pz);
         items("pz",
-                item("pz", "", "Blank", 3, 100.0),
-                item("pz", null, "Null", 2, 100.0));
+                item("pz", "", "MFN-A", "Blank", 3, 100.0),
+                item("pz", null, "MFN-A", "Null", 2, 100.0));
 
-        assertThat(service.generate(STORE_ID, FROM, TO)).isEmpty();
+        // when
+        List<StockLedgerRow> rows = service.generate(STORE_ID, FROM, TO);
+
+        // then
+        assertThat(rows).isEmpty();
     }
 
     @Test
-    void sortsRowsByMfn() {
+    void sortsRowsByEan() {
+        // given
         WarehouseDocument b = doc("pz-b", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, IN_PERIOD);
         WarehouseDocument a = doc("pz-a", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, IN_PERIOD);
         inPeriod(b, a);
-        items("pz-b", item("pz-b", "MFN-B", "B", 1, 10.0));
-        items("pz-a", item("pz-a", "MFN-A", "A", 1, 10.0));
+        items("pz-b", item("pz-b", EAN_B, "MFN-A", "B", 1, 10.0));
+        items("pz-a", item("pz-a", EAN_A, "MFN-B", "A", 1, 10.0));
 
+        // when
         List<StockLedgerRow> rows = service.generate(STORE_ID, FROM, TO);
-        assertThat(rows).extracting(StockLedgerRow::mfn).containsExactly("MFN-A", "MFN-B");
+
+        // then
+        assertThat(rows).extracting(StockLedgerRow::ean).containsExactly(EAN_A, EAN_B);
+    }
+
+    @Test
+    void twoProductsUnderOneCodeGiveTwoRows() {
+        // given
+        WarehouseDocument pz = doc("pz", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, IN_PERIOD);
+        inPeriod(pz);
+        items("pz",
+                item("pz", EAN_A, "KB-100", "Klawiatura PL", 3, 100.0),
+                item("pz", EAN_B, "KB-100", "Klawiatura US", 2, 120.0));
+
+        // when
+        List<StockLedgerRow> rows = service.generate(STORE_ID, FROM, TO);
+
+        // then
+        assertThat(rows).extracting(StockLedgerRow::ean, StockLedgerRow::name).containsExactly(
+                tuple(EAN_A, "Klawiatura PL"),
+                tuple(EAN_B, "Klawiatura US"));
+        assertThat(qty(rows.get(0), "BZ ilość")).isEqualTo(3);
+        assertThat(money(rows.get(0), "BZ wartość")).isEqualTo(300.0);
+        assertThat(qty(rows.get(1), "BZ ilość")).isEqualTo(2);
+        assertThat(money(rows.get(1), "BZ wartość")).isEqualTo(240.0);
+    }
+
+    @Test
+    void twoEansOfOneProductGiveTwoRows() {
+        // given
+        WarehouseDocument pz = doc("pz", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, IN_PERIOD);
+        WarehouseDocument wz = doc("wz", DocumentType.GoodsIssue, DocumentReason.CustomerOrder, IN_PERIOD.plusDays(1));
+        inPeriod(pz, wz);
+        items("pz", item("pz", EAN_A, "MFN-A", "Widget", 3, 10.0));
+        items("wz", item("wz", EAN_B, "MFN-A", "Widget", 1, 10.0));
+
+        // when
+        List<StockLedgerRow> rows = service.generate(STORE_ID, FROM, TO);
+
+        // then
+        assertThat(rows).extracting(StockLedgerRow::ean).containsExactly(EAN_A, EAN_B);
+        assertThat(qty(rows.get(0), "BZ ilość")).isEqualTo(3);
+        assertThat(qty(rows.get(1), "BZ ilość")).isEqualTo(-1);
+    }
+
+    @Test
+    void oneEanUnderTwoCodesGivesOneRowWithTheNameOfTheLatestLine() {
+        // given
+        WarehouseDocument older = doc("pz-1", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, IN_PERIOD);
+        WarehouseDocument newer = doc("pz-2", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, IN_PERIOD.plusDays(1));
+        inPeriod(newer, older);
+        items("pz-1", item("pz-1", EAN_A, "OLD-1", "Widget", 1, 10.0));
+        items("pz-2", item("pz-2", EAN_A, "NEW-1", "Widget v2", 2, 10.0));
+
+        // when
+        StockLedgerRow row = single();
+
+        // then
+        assertThat(cell(row, "SKU (EAN)")).isEqualTo(EAN_A);
+        assertThat(cell(row, "Nazwa")).isEqualTo("Widget v2");
+        assertThat(qty(row, "BZ ilość")).isEqualTo(3);
     }
 
     @Test
     void headerAndDataColumnsAreAligned() {
         WarehouseDocument pz = doc("pz", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, IN_PERIOD);
         inPeriod(pz);
-        items("pz", item("pz", "MFN-A", "Widget", 1, 10.0));
+        items("pz", item("pz", EAN_A, "Widget", 1, 10.0));
 
         StockLedgerRow row = single();
+        assertThat(StockLedgerRow.headers()).startsWith("SKU (EAN)", "Nazwa", "J.m.");
         assertThat(StockLedgerRow.headers()).hasSize(36);
         assertThat(row.asStringArray()).hasSameSizeAs(StockLedgerRow.headers());
         assertThat(row.asStringArray()[row.asStringArray().length - 1]).isEqualTo("PLN");
@@ -240,9 +311,9 @@ class StockLedgerServiceTest {
     @Test
     void openingBalanceComesFromTheLastClosedPeriodInsteadOfTheHistory() {
         // given
-        closed(month(2026, 4), Map.of("MFN-A", new ClosingBalance("Widget", 10, 500.0)));
+        closed(month(2026, 4), Map.of(EAN_A, new ClosingBalance("Widget", 10, 500.0)));
         inPeriod(doc("pz", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, IN_PERIOD));
-        items("pz", item("pz", "MFN-A", "Widget", 5, 50.0));
+        items("pz", item("pz", EAN_A, "Widget", 5, 50.0));
 
         // when
         StockLedgerRow row = single();
@@ -258,10 +329,10 @@ class StockLedgerServiceTest {
     @Test
     void daysBetweenTheClosedPeriodAndTheReportAreAddedToTheOpeningBalance() {
         // given
-        closed(month(2026, 3), Map.of("MFN-A", new ClosingBalance("Widget", 10, 500.0)));
+        closed(month(2026, 3), Map.of(EAN_A, new ClosingBalance("Widget", 10, 500.0)));
         when(documentRepository.findAllInDateRange(STORE_ID, LocalDate.of(2026, 4, 1).atStartOfDay(), FROM.atStartOfDay().minusNanos(1)))
                 .thenReturn(new ArrayList<>(List.of(doc("wz", DocumentType.GoodsIssue, DocumentReason.CustomerOrder, BEFORE))));
-        items("wz", item("wz", "MFN-A", "Widget", 4, 50.0));
+        items("wz", item("wz", EAN_A, "Widget", 4, 50.0));
 
         // when
         StockLedgerRow row = single();
@@ -275,10 +346,10 @@ class StockLedgerServiceTest {
     void periodStartingMidMonthAddsTheDaysBeforeItToTheOpeningBalance() {
         // given
         LocalDate from = LocalDate.of(2026, 5, 15);
-        closed(month(2026, 4), Map.of("MFN-A", new ClosingBalance("Widget", 10, 500.0)));
+        closed(month(2026, 4), Map.of(EAN_A, new ClosingBalance("Widget", 10, 500.0)));
         when(documentRepository.findAllInDateRange(STORE_ID, LocalDate.of(2026, 5, 1).atStartOfDay(), from.atStartOfDay().minusNanos(1)))
                 .thenReturn(new ArrayList<>(List.of(doc("pz", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, IN_PERIOD))));
-        items("pz", item("pz", "MFN-A", "Widget", 2, 50.0));
+        items("pz", item("pz", EAN_A, "Widget", 2, 50.0));
 
         // when
         List<StockLedgerRow> rows = service.generate(STORE_ID, from, TO);
@@ -294,10 +365,10 @@ class StockLedgerServiceTest {
         // given
         StockLedgerPeriod firstTwentyDays = new StockLedgerPeriod(LocalDate.of(2026, 4, 1), LocalDate.of(2026, 4, 20));
         when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(month(2026, 3), firstTwentyDays));
-        when(closings.closingBalances(STORE_ID, firstTwentyDays)).thenReturn(Map.of("MFN-A", new ClosingBalance("Widget", 10, 500.0)));
+        when(closings.closingBalances(STORE_ID, firstTwentyDays)).thenReturn(Map.of(EAN_A, new ClosingBalance("Widget", 10, 500.0)));
         when(documentRepository.findAllInDateRange(STORE_ID, LocalDate.of(2026, 4, 21).atStartOfDay(), FROM.atStartOfDay().minusNanos(1)))
                 .thenReturn(new ArrayList<>(List.of(doc("wz", DocumentType.GoodsIssue, DocumentReason.CustomerOrder, LocalDateTime.of(2026, 4, 25, 9, 0)))));
-        items("wz", item("wz", "MFN-A", "Widget", 1, 50.0));
+        items("wz", item("wz", EAN_A, "Widget", 1, 50.0));
 
         // when
         StockLedgerRow row = single();
@@ -313,7 +384,7 @@ class StockLedgerServiceTest {
         // given
         when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(month(2026, 5)));
         historical(doc("bo", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, BEFORE));
-        items("bo", item("bo", "MFN-A", "Widget", 3, 10.0));
+        items("bo", item("bo", EAN_A, "Widget", 3, 10.0));
 
         // when
         StockLedgerRow row = single();
@@ -329,7 +400,7 @@ class StockLedgerServiceTest {
         when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(month(2026, 4)));
         when(closings.closingBalances(STORE_ID, month(2026, 4))).thenThrow(new IllegalStateException("broken file"));
         historical(doc("bo", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, BEFORE));
-        items("bo", item("bo", "MFN-A", "Widget", 3, 10.0));
+        items("bo", item("bo", EAN_A, "Widget", 3, 10.0));
 
         // when
         StockLedgerRow row = single();
@@ -348,8 +419,8 @@ class StockLedgerServiceTest {
                 .thenReturn(new ArrayList<>(List.of(doc("march", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, LocalDateTime.of(2026, 3, 10, 9, 0)))));
         when(documentRepository.findAllInDateRange(STORE_ID, aprilFirst.atStartOfDay(), aprilLast.atTime(LocalTime.MAX)))
                 .thenReturn(new ArrayList<>(List.of(doc("april", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, BEFORE))));
-        items("march", item("march", "MFN-A", "Widget", 1, 10.004));
-        items("april", item("april", "MFN-A", "Widget", 1, 10.004));
+        items("march", item("march", EAN_A, "Widget", 1, 10.004));
+        items("april", item("april", EAN_A, "Widget", 1, 10.004));
         StockLedgerRow april = service.generate(STORE_ID, aprilFirst, aprilLast).get(0);
         closed(month(2026, 4), StockLedgerClosings.parse(StockLedgerRow.toCsv(List.of(april))));
 
@@ -357,6 +428,8 @@ class StockLedgerServiceTest {
         StockLedgerRow may = single();
 
         // then
+        assertThat(may.ean()).isEqualTo(EAN_A);
+        assertThat(may.name()).isEqualTo("Widget");
         assertThat(cell(may, "BO ilość")).isEqualTo(cell(april, "BZ ilość"));
         assertThat(cell(may, "BO wartość")).isEqualTo(cell(april, "BZ wartość")).isEqualTo("20,00");
     }
@@ -418,10 +491,15 @@ class StockLedgerServiceTest {
         return document;
     }
 
-    private static WarehouseDocumentItem item(String documentId, String mfn, String name, int qty, double unitPrice) {
+    private static WarehouseDocumentItem item(String documentId, String ean, String name, int qty, double unitPrice) {
+        return item(documentId, ean, "MFN-A", name, qty, unitPrice);
+    }
+
+    private static WarehouseDocumentItem item(String documentId, String ean, String mfn, String name, int qty, double unitPrice) {
         WarehouseDocumentItem item = new WarehouseDocumentItem();
         item.setDocumentId(documentId);
-        item.setItemId("item-" + documentId + "-" + mfn);
+        item.setItemId("item-" + documentId + "-" + ean);
+        item.setEan(ean);
         item.setMfn(mfn);
         item.setName(name);
         item.setQty(qty);

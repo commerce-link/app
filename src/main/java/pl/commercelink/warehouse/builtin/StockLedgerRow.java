@@ -10,7 +10,7 @@ import java.util.Locale;
 import java.util.Map;
 
 public record StockLedgerRow(
-        String mfn,
+        String ean,
         String name,
         int boQty,
         double boValue,
@@ -18,7 +18,7 @@ public record StockLedgerRow(
         Map<LedgerCategory, Double> valueByCategory
 ) implements CSVReady {
 
-    static final String MFN_HEADER = "SKU (MFN)";
+    static final String EAN_HEADER = "SKU (EAN)";
     static final String NAME_HEADER = "Nazwa";
     static final String CLOSING_QTY_HEADER = "BZ ilość";
     static final String CLOSING_VALUE_HEADER = "BZ wartość";
@@ -26,7 +26,7 @@ public record StockLedgerRow(
     @Override
     public String[] asStringArray() {
         List<String> cells = new ArrayList<>();
-        cells.add(mfn);
+        cells.add(ean);
         cells.add(name != null ? name : "");
         cells.add("szt.");
         cells.add(String.valueOf(boQty));
@@ -75,7 +75,7 @@ public record StockLedgerRow(
 
     public static String[] headers() {
         List<String> headers = new ArrayList<>();
-        headers.add(MFN_HEADER);
+        headers.add(EAN_HEADER);
         headers.add(NAME_HEADER);
         headers.add("J.m.");
         headers.add("BO ilość");
