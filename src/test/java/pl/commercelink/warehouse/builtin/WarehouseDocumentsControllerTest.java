@@ -53,7 +53,7 @@ class WarehouseDocumentsControllerTest {
     @Mock
     private WarehouseDocumentItemRepository warehouseDocumentItemRepository;
     @Mock
-    private WarehouseDocumentMfnHistoryService historyService;
+    private WarehouseDocumentItemHistoryService historyService;
     @Mock
     private WarehouseRepository warehouseRepository;
     @Mock
@@ -183,12 +183,12 @@ class WarehouseDocumentsControllerTest {
     void itemHistoryWithoutFromGoesBackToTheDelivery() throws Exception {
         // given
         securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
-        when(historyService.history("s1", "del-1", "MZ-1")).thenReturn(new MfnHistory(null, List.of()));
+        when(historyService.history("s1", "del-1", "880")).thenReturn(new MfnHistory(null, List.of()));
 
         // when
-        var result = mockMvc.perform(get("/dashboard/warehouse-documents/delivery-mfn-history")
-                .param("deliveryId", "del-1").param("mfn", "MZ-1")).andExpect(status().isOk())
-                .andExpect(view().name("warehouse-document-mfn-history")).andReturn();
+        var result = mockMvc.perform(get("/dashboard/warehouse-documents/item-history")
+                .param("deliveryId", "del-1").param("ean", "880")).andExpect(status().isOk())
+                .andExpect(view().name("warehouse-document-item-history")).andReturn();
 
         // then
         var page = (pl.commercelink.web.warehousedocuments.ItemHistoryPage) result.getModelAndView().getModel().get("page");
@@ -199,12 +199,12 @@ class WarehouseDocumentsControllerTest {
     void itemHistoryFromADocumentOfTheStoreGoesBackToTheDocument() throws Exception {
         // given
         securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
-        when(historyService.history("s1", "del-1", "MZ-1")).thenReturn(new MfnHistory(null, List.of()));
+        when(historyService.history("s1", "del-1", "880")).thenReturn(new MfnHistory(null, List.of()));
         when(warehouseDocumentRepository.findByDocumentId("s1", "doc-1")).thenReturn(receipt());
 
         // when
-        var result = mockMvc.perform(get("/dashboard/warehouse-documents/delivery-mfn-history")
-                .param("deliveryId", "del-1").param("mfn", "MZ-1").param("from", "document").param("documentId", "doc-1"))
+        var result = mockMvc.perform(get("/dashboard/warehouse-documents/item-history")
+                .param("deliveryId", "del-1").param("ean", "880").param("from", "document").param("documentId", "doc-1"))
                 .andReturn();
 
         // then
@@ -217,12 +217,12 @@ class WarehouseDocumentsControllerTest {
     void itemHistoryFromAForeignDocumentFallsBackToTheDelivery() throws Exception {
         // given
         securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
-        when(historyService.history("s1", "del-1", "MZ-1")).thenReturn(new MfnHistory(null, List.of()));
+        when(historyService.history("s1", "del-1", "880")).thenReturn(new MfnHistory(null, List.of()));
         when(warehouseDocumentRepository.findByDocumentId("s1", "foreign")).thenReturn(null);
 
         // when
-        var result = mockMvc.perform(get("/dashboard/warehouse-documents/delivery-mfn-history")
-                .param("deliveryId", "del-1").param("mfn", "MZ-1").param("from", "document").param("documentId", "foreign"))
+        var result = mockMvc.perform(get("/dashboard/warehouse-documents/item-history")
+                .param("deliveryId", "del-1").param("ean", "880").param("from", "document").param("documentId", "foreign"))
                 .andReturn();
 
         // then
@@ -234,14 +234,14 @@ class WarehouseDocumentsControllerTest {
     void itemHistoryOpenedFromAnItemLeadsBackToIt() throws Exception {
         // given
         securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
-        when(historyService.history("s1", "del-1", "MZ-1")).thenReturn(new MfnHistory(null, List.of()));
+        when(historyService.history("s1", "del-1", "880")).thenReturn(new MfnHistory(null, List.of()));
         WarehouseItem item = new WarehouseItem("s1", "del-1", "SSD", "Samsung 990", "880", "MZ-1", 1.0, 1);
         item.setItemId("w-1");
         when(warehouseRepository.findById("s1", "w-1")).thenReturn(item);
 
         // when
-        var result = mockMvc.perform(get("/dashboard/warehouse-documents/delivery-mfn-history")
-                .param("deliveryId", "del-1").param("mfn", "MZ-1").param("from", "item").param("itemId", "w-1"))
+        var result = mockMvc.perform(get("/dashboard/warehouse-documents/item-history")
+                .param("deliveryId", "del-1").param("ean", "880").param("from", "item").param("itemId", "w-1"))
                 .andReturn();
 
         // then
@@ -254,15 +254,15 @@ class WarehouseDocumentsControllerTest {
     void itemHistoryOpenedFromAnItemWithoutADeliveryLinksNoDelivery() throws Exception {
         // given
         securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
-        when(historyService.history("s1", "Acme", "MZ-1")).thenReturn(new MfnHistory(null, List.of()));
+        when(historyService.history("s1", "Acme", "880")).thenReturn(new MfnHistory(null, List.of()));
         WarehouseItem item = new WarehouseItem("s1", "Acme", "SSD", "Kabel", "880", "MZ-1", 1.0, 1);
         item.setItemId("w-2");
         when(warehouseRepository.findById("s1", "w-2")).thenReturn(item);
         when(itemPages.deliveryHref(eq(item), anyBoolean(), any())).thenReturn(null);
 
         // when
-        var result = mockMvc.perform(get("/dashboard/warehouse-documents/delivery-mfn-history")
-                .param("deliveryId", "Acme").param("mfn", "MZ-1").param("from", "item").param("itemId", "w-2"))
+        var result = mockMvc.perform(get("/dashboard/warehouse-documents/item-history")
+                .param("deliveryId", "Acme").param("ean", "880").param("from", "item").param("itemId", "w-2"))
                 .andReturn();
 
         // then
@@ -275,15 +275,15 @@ class WarehouseDocumentsControllerTest {
     void itemHistoryOpenedFromAnItemWithADeliveryLinksIt() throws Exception {
         // given
         securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
-        when(historyService.history("s1", "del-1", "MZ-1")).thenReturn(new MfnHistory(null, List.of()));
+        when(historyService.history("s1", "del-1", "880")).thenReturn(new MfnHistory(null, List.of()));
         WarehouseItem item = new WarehouseItem("s1", "del-1", "SSD", "Samsung 990", "880", "MZ-1", 1.0, 1);
         item.setItemId("w-1");
         when(warehouseRepository.findById("s1", "w-1")).thenReturn(item);
         when(itemPages.deliveryHref(eq(item), anyBoolean(), any())).thenReturn("/dashboard/deliveries/details?deliveryId=del-1");
 
         // when
-        var result = mockMvc.perform(get("/dashboard/warehouse-documents/delivery-mfn-history")
-                .param("deliveryId", "del-1").param("mfn", "MZ-1").param("from", "item").param("itemId", "w-1"))
+        var result = mockMvc.perform(get("/dashboard/warehouse-documents/item-history")
+                .param("deliveryId", "del-1").param("ean", "880").param("from", "item").param("itemId", "w-1"))
                 .andReturn();
 
         // then
@@ -295,12 +295,12 @@ class WarehouseDocumentsControllerTest {
     void itemHistoryFromAForeignItemFallsBackToTheDelivery() throws Exception {
         // given
         securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
-        when(historyService.history("s1", "del-1", "MZ-1")).thenReturn(new MfnHistory(null, List.of()));
+        when(historyService.history("s1", "del-1", "880")).thenReturn(new MfnHistory(null, List.of()));
         when(warehouseRepository.findById("s1", "w-x")).thenReturn(null);
 
         // when
-        var result = mockMvc.perform(get("/dashboard/warehouse-documents/delivery-mfn-history")
-                .param("deliveryId", "del-1").param("mfn", "MZ-1").param("from", "item").param("itemId", "w-x"))
+        var result = mockMvc.perform(get("/dashboard/warehouse-documents/item-history")
+                .param("deliveryId", "del-1").param("ean", "880").param("from", "item").param("itemId", "w-x"))
                 .andReturn();
 
         // then

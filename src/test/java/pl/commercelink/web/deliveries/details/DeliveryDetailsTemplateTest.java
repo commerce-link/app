@@ -500,7 +500,7 @@ class DeliveryDetailsTemplateTest {
 
         // then
         assertThat(html).doesNotContain("href=\"/dashboard/orders/").doesNotContain("href=\"/dashboard/warehouse/items/")
-                .doesNotContain("delivery-mfn-history");
+                .doesNotContain("warehouse-documents/item-history");
     }
 
     @Test

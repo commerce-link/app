@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ItemHistoryRenderingTest {
 
-    private static final String BODY = "<div th:replace=\"~{warehouse-document-mfn-history :: body}\"></div>";
+    private static final String BODY = "<div th:replace=\"~{warehouse-document-item-history :: body}\"></div>";
 
     @Test
     void movesShowSignedChangesSummaryAndBackToTheDelivery() {
@@ -32,7 +32,7 @@ class ItemHistoryRenderingTest {
         assertThat(html).contains("class=\"cl-qty-change is-in\">+5<").contains("class=\"cl-qty-change is-out\">−2<")
                 .contains("Przyjęto 5 szt. · wydano 2 szt. · zostało 3 szt.")
                 .contains("class=\"cl-back\" href=\"/dashboard/deliveries/details?deliveryId=del-1\"")
-                .contains("MFN MZ-V9P2T0BW").contains("3 szt.")
+                .contains("EAN 8806094215038").doesNotContain("MFN").contains("3 szt.")
                 .contains(">PZ/<wbr>MAG1/<wbr>2026/<wbr>000210</a>")
                 .doesNotContain("has-text-danger").doesNotContain("style=").doesNotContain("??");
         assertThat(html.split("<h1", -1).length - 1).isEqualTo(1);
@@ -129,7 +129,7 @@ class ItemHistoryRenderingTest {
     }
 
     private static ItemHistoryPage page(MfnHistory history) {
-        return ItemHistoryPage.of(history, "del-1", "MZ-V9P2T0BW", "/dashboard/deliveries/details?deliveryId=del-1",
+        return ItemHistoryPage.of(history, "del-1", "8806094215038", "/dashboard/deliveries/details?deliveryId=del-1",
                 "Dostawa del-1", TestMessages.polish(), java.util.Locale.forLanguageTag("pl"));
     }
 }

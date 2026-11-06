@@ -129,9 +129,9 @@ public record DeliveryLinks(boolean superAdmin, String storeId, String deliveryI
         return superAdmin ? null : "/dashboard/warehouse/items/" + itemId;
     }
 
-    public String mfnHistory(String mfn) {
+    public String itemHistory(String ean) {
         return superAdmin ? null
-                : "/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=" + deliveryId + "&mfn=" + encode(mfn);
+                : "/dashboard/warehouse-documents/item-history?deliveryId=" + deliveryId + "&ean=" + encode(ean);
     }
 
     private static String encode(String value) {

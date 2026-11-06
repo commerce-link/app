@@ -17,14 +17,34 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class WarehouseDocumentMfnHistoryServiceTest {
+class WarehouseDocumentItemHistoryServiceTest {
 
     @Mock
     WarehouseDocumentItemRepository items;
     @Mock
     WarehouseDocumentRepository documents;
     @InjectMocks
-    WarehouseDocumentMfnHistoryService service;
+    WarehouseDocumentItemHistoryService service;
+
+    private static final String EAN = "5901234567890";
+
+    @Test
+    void historyOfALineIsByEan() {
+        // given - two products under one manufacturer code in the same delivery
+        WarehouseDocumentItem other = new WarehouseDocumentItem("d2", DocumentType.GoodsReceipt, LocalDateTime.of(2026, 10, 2, 9, 0),
+                "del-1", "5901234567883", "MZ-V9P2T0BW", "Samsung 990 PRO 4TB", 3, 10.0);
+        when(items.findByDeliveryId("del-1")).thenReturn(List.of(
+                item("d1", DocumentType.GoodsReceipt, 5, LocalDateTime.of(2026, 10, 2, 8, 0)), other));
+        when(documents.findByDocumentId("s1", "d1")).thenReturn(doc("d1", "PZ/MAG1/2026/000210"));
+
+        // when
+        MfnHistory history = service.history("s1", "del-1", EAN);
+
+        // then
+        assertThat(history.rows()).extracting(MfnHistoryRow::documentNo).containsExactly("PZ/MAG1/2026/000210");
+        assertThat(history.rows()).extracting(MfnHistoryRow::stockAfter).containsExactly(5);
+        assertThat(history.productName()).isEqualTo("Samsung 990 PRO");
+    }
 
     @Test
     void movesAreChronologicalWithRunningStockAndTheProductName() {
@@ -36,7 +56,7 @@ class WarehouseDocumentMfnHistoryServiceTest {
         when(documents.findByDocumentId("s1", "d2")).thenReturn(doc("d2", "WZ/MAG1/2026/001179"));
 
         // when
-        MfnHistory history = service.history("s1", "del-1", "MZ-V9P2T0BW");
+        MfnHistory history = service.history("s1", "del-1", EAN);
 
         // then
         assertThat(history.productName()).isEqualTo("Samsung 990 PRO");
@@ -51,7 +71,7 @@ class WarehouseDocumentMfnHistoryServiceTest {
         when(documents.findByDocumentId("s1", "dx")).thenReturn(null);
 
         // when
-        MfnHistory history = service.history("s1", "del-x", "MZ-V9P2T0BW");
+        MfnHistory history = service.history("s1", "del-x", EAN);
 
         // then
         assertThat(history.rows()).isEmpty();
@@ -65,7 +85,7 @@ class WarehouseDocumentMfnHistoryServiceTest {
         when(documents.findByDocumentId("s1", "d1")).thenReturn(doc("d1", "X/1"));
 
         // when
-        MfnHistory history = service.history("s1", "del-1", "MZ-V9P2T0BW");
+        MfnHistory history = service.history("s1", "del-1", EAN);
 
         // then
         assertThat(history.rows()).extracting(MfnHistoryRow::stockChange).containsExactly(0);
@@ -85,7 +105,7 @@ class WarehouseDocumentMfnHistoryServiceTest {
         when(documents.findByDocumentId("s1", "d2")).thenReturn(destruction);
 
         // when
-        MfnHistory history = service.history("s1", "del-1", "MZ-V9P2T0BW");
+        MfnHistory history = service.history("s1", "del-1", EAN);
 
         // then
         assertThat(history.rows()).extracting(MfnHistoryRow::reason).containsExactly(null, DocumentReason.Destruction);
@@ -94,7 +114,7 @@ class WarehouseDocumentMfnHistoryServiceTest {
     }
 
     private static WarehouseDocumentItem item(String documentId, DocumentType type, int qty, LocalDateTime at) {
-        return new WarehouseDocumentItem(documentId, type, at, "del-1", "5901234567890", "MZ-V9P2T0BW", "Samsung 990 PRO", qty, 10.0);
+        return new WarehouseDocumentItem(documentId, type, at, "del-1", EAN, "MZ-V9P2T0BW", "Samsung 990 PRO", qty, 10.0);
     }
 
     private static WarehouseDocument doc(String id, String no) {

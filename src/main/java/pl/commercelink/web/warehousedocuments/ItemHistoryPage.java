@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Locale;
 
 /** The history of one item in one delivery (spec §4), every text resolved. */
-public record ItemHistoryPage(String backHref, String backLabel, String productName, String mfn, String deliveryShortId,
+public record ItemHistoryPage(String backHref, String backLabel, String productName, String ean, String deliveryShortId,
                               String deliveryHref, String movesTitle, List<Move> moves, String summary, String emptyText) {
 
     public record Move(String documentNo, String documentHref, String typeName, boolean incoming, String date,
@@ -23,10 +23,10 @@ public record ItemHistoryPage(String backHref, String backLabel, String productN
 
     /** The same page with another delivery link; null names the delivery id without a link (an item without a delivery). */
     public ItemHistoryPage withDeliveryHref(String href) {
-        return new ItemHistoryPage(backHref, backLabel, productName, mfn, deliveryShortId, href, movesTitle, moves, summary, emptyText);
+        return new ItemHistoryPage(backHref, backLabel, productName, ean, deliveryShortId, href, movesTitle, moves, summary, emptyText);
     }
 
-    public static ItemHistoryPage of(MfnHistory history, String deliveryId, String mfn, String backHref, String backLabel,
+    public static ItemHistoryPage of(MfnHistory history, String deliveryId, String ean, String backHref, String backLabel,
                                      MessageSource messages, Locale locale) {
         int in = 0, out = 0, after = 0;
         List<Move> moves = new ArrayList<>();
@@ -43,7 +43,7 @@ public record ItemHistoryPage(String backHref, String backLabel, String productN
                     r.reason() == null ? null : messages.getMessage("DocumentReason." + r.reason().name(), null, locale),
                     r.note() == null || r.note().isBlank() ? null : r.note().trim()));
         }
-        return new ItemHistoryPage(backHref, backLabel, history.productName(), mfn, DocumentRowMapper.shortId(deliveryId),
+        return new ItemHistoryPage(backHref, backLabel, history.productName(), ean, DocumentRowMapper.shortId(deliveryId),
                 DeliveryLinks.of(false, null, URLEncoder.encode(deliveryId, StandardCharsets.UTF_8)).details(),
                 messages.getMessage("warehouse.documents.history.moves", new Object[]{moves.size()}, locale), moves,
                 moves.isEmpty() ? null : messages.getMessage("warehouse.documents.history.summary", new Object[]{in, out, after}, locale),

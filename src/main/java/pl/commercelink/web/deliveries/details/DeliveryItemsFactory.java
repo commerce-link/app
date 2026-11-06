@@ -54,7 +54,7 @@ final class DeliveryItemsFactory {
                 rows.add(allocationRow(index, allocation, delivery, links, selectable, checked.contains(index)));
             }
             ActionState changeQty = DeliveryRules.changeQty(viewer, delivery, received, ordered);
-            String history = links.mfnHistory(first.getMfn());
+            String history = links.itemHistory(first.getEan());
             products.add(new ProductRow(first.getName(), first.getEan(), first.getMfn(), received, ordered,
                     ordered > 0 && received >= ordered, Money.format(first.getUnitCost() * ordered),
                     Money.format(first.getUnitCost()), Math.max(1, ordered - adjustable), changeQty,

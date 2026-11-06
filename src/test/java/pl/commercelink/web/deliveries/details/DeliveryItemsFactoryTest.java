@@ -66,6 +66,7 @@ class DeliveryItemsFactoryTest {
         assertThat(card.products()).extracting(DeliveryPageModel.ProductRow::ean).containsExactly("5900000000001", "5900000000002");
         assertThat(card.products()).extracting(DeliveryPageModel.ProductRow::unitCost).containsExactly("300,00", "500,00");
         assertThat(card.products().get(1).qtyHref()).contains("&open=qty&ean=5900000000002#qty-dialog");
+        assertThat(card.products().get(1).historyHref()).endsWith("/dashboard/warehouse-documents/item-history?deliveryId=" + DELIVERY_ID + "&ean=5900000000002");
     }
 
     @Test
