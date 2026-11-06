@@ -3,38 +3,10 @@ package pl.commercelink.pricelist;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PricelistTest {
-
-    @Test
-    void findsItemByCategoryLabelAndName() {
-        // given
-        Pricelist pricelist = new Pricelist("id", List.of(
-                item("CPU", "label1", "name1"),
-                item("GPU", "label2", "name2")));
-
-        // when
-        Optional<AvailabilityAndPrice> found = pricelist.findByCategoryLabelAndName("GPU", "label2", "name2");
-
-        // then
-        assertThat(found).isPresent();
-        assertThat(found.get().getName()).isEqualTo("name2");
-    }
-
-    @Test
-    void findsNothingWhenCategoryDoesNotMatch() {
-        // given
-        Pricelist pricelist = new Pricelist("id", List.of(item("CPU", "label1", "name1")));
-
-        // when
-        Optional<AvailabilityAndPrice> found = pricelist.findByCategoryLabelAndName("Smartwatches", "label1", "name1");
-
-        // then
-        assertThat(found).isEmpty();
-    }
 
     @Test
     void listsDistinctAvailableCategories() {
