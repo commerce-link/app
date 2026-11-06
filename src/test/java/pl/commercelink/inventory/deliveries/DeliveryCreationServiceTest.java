@@ -50,6 +50,9 @@ class DeliveryCreationServiceTest {
 
     private static final String STORE_ID = "store-1";
     private static final String PROVIDER = "Elko";
+    private static final String EAN_A = "5901234123457";
+    private static final String EAN_B = "5901234123464";
+    private static final String SHARED_MFN = "SHOE-1";
 
     @Mock
     private DeliveriesRepository deliveriesRepository;
@@ -81,12 +84,8 @@ class DeliveryCreationServiceTest {
         form.setShippingCost(20.0);
         form.setPaymentCost(5.0);
         form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 15));
-        DeliveryItem item = new DeliveryItem();
-        item.setMfn("MFN-1");
-        item.setRequestedQty(2);
-        item.setUnitCost(8.5);
-        form.setItems(List.of(item));
-        when(deliveryCostSync.apply(STORE_ID, delivery.getDeliveryId(), Map.of("MFN-1", 8.5))).thenReturn(3.0);
+        form.setItems(List.of(requested(EAN_A, 2, 8.5)));
+        when(deliveryCostSync.apply(STORE_ID, delivery.getDeliveryId(), Map.of(EAN_A, 8.5))).thenReturn(3.0);
 
         // when
         service.completePending(STORE_ID, delivery, form);
@@ -115,7 +114,7 @@ class DeliveryCreationServiceTest {
         current.increaseTotalCost(100.0);
         current.setComment("edited meanwhile");
         DeliveryCreationForm form = pendingForm();
-        when(deliveryCostSync.apply(STORE_ID, delivery.getDeliveryId(), Map.of("MFN-1", 8.5))).thenReturn(-30.0);
+        when(deliveryCostSync.apply(STORE_ID, delivery.getDeliveryId(), Map.of(EAN_A, 8.5))).thenReturn(-30.0);
         doThrow(new ConditionalCheckFailedException("version changed")).when(deliveriesRepository).save(delivery);
         when(deliveriesRepository.findByIdConsistently(STORE_ID, delivery.getDeliveryId())).thenReturn(current);
 
@@ -268,12 +267,17 @@ class DeliveryCreationServiceTest {
         form.setShippingCost(0.0);
         form.setPaymentCost(0.0);
         form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 15));
-        DeliveryItem item = new DeliveryItem();
-        item.setMfn("MFN-1");
-        item.setRequestedQty(2);
-        item.setUnitCost(8.5);
-        form.setItems(List.of(item));
+        form.setItems(List.of(requested(EAN_A, 2, 8.5)));
         return form;
+    }
+
+    private static DeliveryItem requested(String ean, int qty, double unitCost) {
+        DeliveryItem item = new DeliveryItem();
+        item.setEan(ean);
+        item.setMfn(SHARED_MFN);
+        item.setRequestedQty(qty);
+        item.setUnitCost(unitCost);
+        return item;
     }
 
     @Test
@@ -364,18 +368,14 @@ class DeliveryCreationServiceTest {
         form.setProvider("Acme");
         form.setExternalDeliveryId("EXT-9");
         form.setEstimatedDeliveryAt(LocalDate.of(2026, 9, 25));
-        DeliveryItem item = new DeliveryItem();
-        item.setMfn("MFN-1");
-        item.setRequestedQty(2);
-        item.setUnitCost(8.5);
-        form.setItems(List.of(item));
+        form.setItems(List.of(requested(EAN_A, 2, 8.5)));
 
         // when
         service.completePending(STORE_ID, delivery, form);
 
         // then
         InOrder inOrder = inOrder(deliveryCostSync, deliveriesRepository, orderAllocationsManager, warehouseAllocationsManager);
-        inOrder.verify(deliveryCostSync).apply(STORE_ID, delivery.getDeliveryId(), Map.of("MFN-1", 8.5));
+        inOrder.verify(deliveryCostSync).apply(STORE_ID, delivery.getDeliveryId(), Map.of(EAN_A, 8.5));
         inOrder.verify(deliveriesRepository).save(delivery);
         inOrder.verify(orderAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 25));
         inOrder.verify(warehouseAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId());
@@ -421,21 +421,28 @@ class DeliveryCreationServiceTest {
         Delivery delivery = new Delivery(STORE_ID, null, "Acme");
         DeliveryCreationForm form = new DeliveryCreationForm();
         form.setProvider("Acme");
-        DeliveryItem ordered = new DeliveryItem();
-        ordered.setMfn("MFN-1");
-        ordered.setRequestedQty(1);
-        ordered.setUnitCost(8.5);
-        DeliveryItem skipped = new DeliveryItem();
-        skipped.setMfn("MFN-2");
-        skipped.setRequestedQty(0);
-        skipped.setUnitCost(4.0);
-        form.setItems(List.of(ordered, skipped));
+        form.setItems(List.of(requested(EAN_A, 1, 8.5), requested(EAN_B, 0, 4.0)));
 
         // when
         service.completePending(STORE_ID, delivery, form);
 
         // then
-        verify(deliveryCostSync).apply(STORE_ID, delivery.getDeliveryId(), Map.of("MFN-1", 8.5));
+        verify(deliveryCostSync).apply(STORE_ID, delivery.getDeliveryId(), Map.of(EAN_A, 8.5));
+    }
+
+    @Test
+    void twoProductsUnderOneCodeKeepTheirOwnConfirmedPrices() {
+        // given
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        form.setItems(List.of(requested(EAN_A, 1, 100.0), requested(EAN_B, 1, 120.0)));
+
+        // when
+        service.completePending(STORE_ID, delivery, form);
+
+        // then
+        verify(deliveryCostSync).apply(STORE_ID, delivery.getDeliveryId(), Map.of(EAN_A, 100.0, EAN_B, 120.0));
     }
 
     @Test

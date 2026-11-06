@@ -120,13 +120,13 @@ public class OrderAllocationsManager {
                 ordersManager.returnOrderItemsToSupplierAllocation(storeId, orderId, deliveryId, provider, itemIds));
     }
 
-    public double updateUnitCosts(String deliveryId, Map<String, Double> unitCostsByMfn) {
+    public double updateUnitCosts(String deliveryId, Map<String, Double> unitCostsByEan) {
         double delta = 0;
         for (OrderItem item : orderItemsRepository.findByDeliveryId(deliveryId)) {
-            if (item.isReturned() || !unitCostsByMfn.containsKey(item.getManufacturerCode())) {
+            if (item.isReturned() || !unitCostsByEan.containsKey(item.getEan())) {
                 continue;
             }
-            double itemDelta = item.updateCost(unitCostsByMfn.get(item.getManufacturerCode()));
+            double itemDelta = item.updateCost(unitCostsByEan.get(item.getEan()));
             if (itemDelta == 0) {
                 continue;
             }

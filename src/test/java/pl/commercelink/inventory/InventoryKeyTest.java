@@ -41,8 +41,27 @@ class InventoryKeyTest {
 
         // then
         assertThat(key.matches(new InventoryKey("4000000000009", null))).isTrue();
-        assertThat(key.matches(new InventoryKey(null, "MFN-2"))).isTrue();
+        assertThat(key.getProductCodes()).containsExactlyInAnyOrder("MFN-1", "MFN-2");
         assertThat(key.matches(new InventoryKey("5901234567890", null))).isTrue();
+    }
+
+    @Test
+    void sameCodeWithAnotherEanIsAnotherProduct() {
+        // given
+        InventoryKey size42 = new InventoryKey("5901000000042", "SHOE-1");
+
+        // when / then
+        assertThat(size42.matches(new InventoryKey("5901000000043", "SHOE-1"))).isFalse();
+    }
+
+    @Test
+    void sameEanOrPimIdIsTheSameProduct() {
+        // given
+        InventoryKey key = InventoryKey.fromPimIdAndEan("P1", "5901000000001");
+
+        // when / then
+        assertThat(key.matches(new InventoryKey("5901000000001", "OTHER-1"))).isTrue();
+        assertThat(key.matches(InventoryKey.fromPimIdAndEan("P1", "5903000000003"))).isTrue();
     }
 
     @Test

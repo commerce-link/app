@@ -117,9 +117,9 @@ public class InvoiceSyncPreviewBuilder {
 
     // DeliveryItem.groupAndUnify lists the products in hash order; the rows follow the delivery, like its details page
     private List<DeliveryItem> inDeliveryOrder(Delivery delivery) {
-        List<String> mfns = delivery.getAllocations().stream().map(Allocation::getMfn).distinct().toList();
+        List<String> eans = delivery.getAllocations().stream().map(Allocation::getEan).distinct().toList();
         return delivery.getItems().stream()
-                .sorted(Comparator.comparingInt(item -> mfns.indexOf(item.getMfn())))
+                .sorted(Comparator.comparingInt(item -> eans.indexOf(item.getEan())))
                 .toList();
     }
 
@@ -128,6 +128,7 @@ public class InvoiceSyncPreviewBuilder {
         for (DeliveryItem item : deliveryItems) {
             InvoiceSyncPreview.Mapping mapping = new InvoiceSyncPreview.Mapping();
             mapping.setName(item.getName());
+            mapping.setEan(item.getEan());
             mapping.setMfn(item.getMfn());
             mapping.setQty(item.getOrderedQty());
             mapping.setUnitCost(item.getUnitCost());

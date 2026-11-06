@@ -61,14 +61,14 @@ class DropshipParcelMatcherTest {
     }
 
     @Test
-    void matchesByManufacturerCodeIgnoringCase() {
+    void parcelLineMatchesOnlyByEan() {
         // given
-        Allocation first = allocation("1", null, "MFN-1");
-        Allocation second = allocation("2", null, "MFN-2");
+        Allocation first = allocation("1", "5900000000001", "MFN-1");
+        Allocation second = allocation("2", "5900000000002", "MFN-1");
 
         // when
         List<Allocation> selected = DropshipParcelMatcher.select(
-                parcel(new SupplierOrderLine(null, null, " mfn-1 ", 1)), List.of(first, second), false);
+                parcel(new SupplierOrderLine(null, "5900000000001", "MFN-1", 1)), List.of(first, second), false);
 
         // then
         assertThat(selected).containsExactly(first);

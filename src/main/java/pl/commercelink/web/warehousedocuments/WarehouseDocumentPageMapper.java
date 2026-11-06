@@ -75,9 +75,9 @@ public class WarehouseDocumentPageMapper {
     }
 
     private ItemLine line(WarehouseDocument d, WarehouseDocumentItem i, boolean superAdmin) {
-        String history = !superAdmin && StringUtils.isNoneBlank(i.getDeliveryId(), i.getMfn())
-                ? "/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=" + encode(i.getDeliveryId())
-                  + "&mfn=" + encode(i.getMfn()) + "&from=document&documentId=" + encode(d.getDocumentId())
+        String history = !superAdmin && StringUtils.isNoneBlank(i.getDeliveryId(), i.getEan())
+                ? "/dashboard/warehouse-documents/item-history?deliveryId=" + encode(i.getDeliveryId())
+                  + "&ean=" + encode(i.getEan()) + "&from=document&documentId=" + encode(d.getDocumentId())
                 : null;
         return new ItemLine(i.getName(), StringUtils.trimToNull(i.getEan()), StringUtils.trimToNull(i.getMfn()),
                 text("warehouse.documents.details.qty", i.getQty()), amount(i.getUnitPrice()),

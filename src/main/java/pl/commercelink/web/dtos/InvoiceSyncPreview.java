@@ -551,11 +551,20 @@ public class InvoiceSyncPreview {
     }
 
     public static class Mapping {
+        private String ean;
         private String mfn;
         private String name;
         private int qty;
         private double unitCost;
         private String selectedPositionId;
+
+        public String getEan() {
+            return ean;
+        }
+
+        public void setEan(String ean) {
+            this.ean = ean;
+        }
 
         public String getMfn() {
             return mfn;

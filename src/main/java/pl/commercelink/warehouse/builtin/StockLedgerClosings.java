@@ -20,8 +20,8 @@ import java.util.Optional;
 
 /**
  * The stock ledger of every closed period, kept as the report generated when the period was closed
- * ({@code <from>_<to>.csv}): a period is closed while its file exists, and the BZ columns of the file are the opening
- * balance of the reports starting after it.
+ * ({@code <from>_<to>.csv}): a period is closed while its file exists, and the BZ columns of the file, by EAN, are the
+ * opening balance of the reports starting after it.
  */
 @Repository
 class StockLedgerClosings {
@@ -70,14 +70,14 @@ class StockLedgerClosings {
                 new InputStreamReader(new ByteArrayInputStream(report), StandardCharsets.UTF_8))
                 .readHeadersAndRows(CSVLoader.DEFAULT_SEPARATOR);
         List<String> headers = Arrays.asList(table.getFirst());
-        int mfn = column(headers, StockLedgerRow.MFN_HEADER);
+        int ean = column(headers, StockLedgerRow.EAN_HEADER);
         int name = column(headers, StockLedgerRow.NAME_HEADER);
         int qty = column(headers, StockLedgerRow.CLOSING_QTY_HEADER);
         int value = column(headers, StockLedgerRow.CLOSING_VALUE_HEADER);
 
         Map<String, ClosingBalance> balances = new HashMap<>();
         for (String[] row : table.getSecond()) {
-            balances.put(row[mfn], new ClosingBalance(row[name], Integer.parseInt(row[qty]), StockLedgerRow.parseMoney(row[value])));
+            balances.put(row[ean], new ClosingBalance(row[name], Integer.parseInt(row[qty]), StockLedgerRow.parseMoney(row[value])));
         }
         return balances;
     }

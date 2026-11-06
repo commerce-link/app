@@ -1,7 +1,7 @@
 // The edit-product dialog of step 1 (deliveries/create/parts.html :: fulfilmentDialog). Opening it from a row's pencil
 // fills EAN, manufacturer code, cost and the sources it changes; saving posts with fetch (Accept: application/json)
-// and updates the row in place, so nothing the operator typed elsewhere on the page is lost. A product whose new code
-// equals another row's code would be merged by the server on the next load, so the page reloads in that case.
+// and updates the row in place, so nothing the operator typed elsewhere on the page is lost. A product whose new EAN
+// equals another row's EAN would be merged by the server on the next load, so the page reloads in that case.
 (function () {
     'use strict';
 
@@ -48,7 +48,7 @@
         var row = trigger.closest('tr');
         var tbody = row.closest('tbody');
         var duplicate = Array.prototype.some.call(document.querySelectorAll('.cl-table-edit'), function (other) {
-            return other !== trigger && other.getAttribute('data-mfn') === answer.mfn;
+            return other !== trigger && other.getAttribute('data-ean') === answer.ean;
         });
         if (duplicate) {
             window.location.reload();

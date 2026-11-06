@@ -177,7 +177,7 @@ class MarketplaceOfferMatchTemplateTest {
         // then
         assertThat(html).contains("cl-alert is-warn").contains("Połączenie z Empik nie działa.")
                 .contains("href=\"/dashboard/store/marketplaces/Empik\"");
-        assertThat(html).doesNotContain("method=\"post\"").doesNotContain("??");
+        assertThat(html).doesNotContain("action=\"" + ACTION + "\"").doesNotContain("??");
     }
 
     @Test
@@ -212,7 +212,7 @@ class MarketplaceOfferMatchTemplateTest {
         // then
         assertThat(html).contains("cl-spinner").contains("Dopasowanie trwa").containsPattern("400 z 6.150 ofert")
                 .contains("10:59").contains("aria-live=\"polite\"");
-        assertThat(html).doesNotContain("method=\"post\"").doesNotContain("??");
+        assertThat(html).doesNotContain("action=\"" + ACTION + "\"").doesNotContain("??");
     }
 
     @Test
@@ -260,6 +260,65 @@ class MarketplaceOfferMatchTemplateTest {
         }
     }
 
+    @Test
+    void dailyMatchingSwitchedOffOffersToSwitchItOnAndSaysWhenItRuns() {
+        // when
+        String html = render(null, null, Map.of("scheduled", false));
+
+        // then
+        assertThat(html).contains("<form id=\"offer-matching-schedule\"")
+                .contains("action=\"" + ACTION + "/schedule\"")
+                .contains("data-cl-async")
+                .contains("<input type=\"hidden\" name=\"scheduled\" value=\"true\"")
+                .containsPattern("<button type=\"submit\" class=\"cl-switch\" id=\"offer-matching-schedule-switch\" role=\"switch\"\\s+aria-labelledby=\"offer-matching-schedule-title\" aria-checked=\"false\">")
+                .contains(">Dopasowuj codziennie<")
+                .contains("między 22:00 a 22:15")
+                .contains("/js/async-form.js")
+                .doesNotContain("??");
+    }
+
+    @Test
+    void dailyMatchingSwitchedOnOffersToSwitchItOff() {
+        // when
+        String html = render(null, null, Map.of("scheduled", true));
+
+        // then
+        assertThat(html).contains("aria-checked=\"true\"")
+                .contains("<input type=\"hidden\" name=\"scheduled\" value=\"false\"")
+                .contains("cl-swap is-swapped");
+    }
+
+    @Test
+    void theSwitchStaysWhenARunCannotBeOrdered() {
+        // when
+        String html = render(null, null, Map.of("scheduled", true,
+                "runBlockedMessage", "Połączenie z Empik nie działa."));
+
+        // then
+        assertThat(html).contains("id=\"offer-matching-schedule-switch\"").contains("aria-checked=\"true\"");
+    }
+
+    @Test
+    void theSwitchCardRendersAloneForASaveWithoutReload() {
+        // given
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("scheduled", true);
+        variables.put("scheduleFormAction", ACTION + "/schedule");
+        variables.put("displayName", "Empik");
+        variables.put("savedMessage", "Codzienne dopasowanie ofert z Empik włączone.");
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{store-marketplace-offer-matching :: scheduleForm}\"></div>", variables);
+
+        // then
+        assertThat(html).contains("<form id=\"offer-matching-schedule\"")
+                .contains("data-success-message=\"Codzienne dopasowanie ofert z Empik włączone.\"")
+                .contains("aria-checked=\"true\"")
+                .doesNotContain("Dopasowanie ofert po EAN")
+                .doesNotContain("??");
+    }
+
     private static String render(OfferMatchingView matching, String savedMessage) {
         return render(matching, savedMessage, Map.of());
     }
@@ -270,6 +329,8 @@ class MarketplaceOfferMatchTemplateTest {
         variables.put("settingsSavedMessage", savedMessage);
         variables.put("displayName", "Empik");
         variables.put("formAction", ACTION);
+        variables.putIfAbsent("scheduled", false);
+        variables.put("scheduleFormAction", ACTION + "/schedule");
         variables.put("csvHrefBase", ACTION);
         variables.put("marketplacesHref", "/dashboard/store/marketplaces");
         variables.put("backLabel", "Marketplace'y");

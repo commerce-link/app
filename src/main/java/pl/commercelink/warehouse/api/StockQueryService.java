@@ -7,7 +7,7 @@ public interface StockQueryService {
 
     List<WarehouseItemView> searchAvailableByEans(String storeId, Collection<String> eans);
 
-    List<WarehouseItemView> searchByMfns(String storeId, Collection<String> mfns);
+    List<WarehouseItemView> searchByEans(String storeId, Collection<String> eans);
 
     /** Items of the store whose serial-number list holds exactly this number. */
     List<WarehouseItemView> findAllBySerialNo(String storeId, String serialNo);

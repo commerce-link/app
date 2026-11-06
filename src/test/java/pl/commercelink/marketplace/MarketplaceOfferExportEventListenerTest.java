@@ -196,8 +196,8 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     @Test
-    void afterDeletingTheCloneTheOfferIdIsUnchanged() {
-        // given the product is back on S, the pricelist was built while the clone existed and still carries a C row
+    void productWithoutItsPricelistRowIsNotOfferedInThisRun() {
+        // given the product is back on S, the pricelist was built while the clone existed and carries only a C row
         Product product = product("source-S", "EAN-A");
         configureCategoryWith(warehouseDefinition(5), product, 10);
         usePricelist(new Pricelist(PRICELIST_ID, List.of(row("clone-C", product, 100))));
@@ -207,10 +207,10 @@ class MarketplaceOfferExportEventListenerTest {
         listener.handleMessage(request());
 
         // then
-        assertThat(captureRemovedOffers()).isEmpty();
-        assertThat(capturePublishedOffers()).singleElement().satisfies(offer -> {
+        assertThat(capturePublishedOffers()).isEmpty();
+        assertThat(captureRemovedOffers()).singleElement().satisfies(offer -> {
             assertThat(offer.productId()).isEqualTo("source-S");
-            assertThat(offer.price()).isEqualTo(100L);
+            assertThat(offer.quantity()).isZero();
         });
     }
 
@@ -450,23 +450,43 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     @Test
-    void aSkippedProductWithoutEanShieldsAPreviousOfferWithoutEanByManufacturerCode() {
+    void previousOfferIsProtectedOnlyByEan() {
         // given
-        Product product = product("clone-C", null);
+        Product product = product("clone-C", "5900000000011");
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
         when(aliases.knows(STORE_ID, "clone-C")).thenReturn(false);
-        MarketplaceOfferSnapshot withoutEan = MarketplaceOfferSnapshot.published("source-S", 100L, 10L, null, " mfn-clone-c ");
-        previousSnapshotContains(withoutEan,
-                // a snapshot with an EAN is matched by its EAN only, even when the manufacturer code is the same
-                MarketplaceOfferSnapshot.published("pim-Y", 100L, 10L, "5900000000099", "MFN-clone-C"));
+        MarketplaceOfferSnapshot withEan = MarketplaceOfferSnapshot.published("source-S", 100L, 10L, "5900000000011", "MFN-S");
+        previousSnapshotContains(withEan,
+                MarketplaceOfferSnapshot.published("pim-Y", 100L, 10L, null, " mfn-clone-c "));
 
         // when
         listener.handleMessage(request());
 
-        // then
+        // then the offer with the product's EAN waits; the one sharing only its manufacturer code is taken off
         assertThat(captureRemovedOffers()).extracting(MarketplaceOffer::productId).containsExactly("pim-Y");
-        assertThat(captureSavedRows()).contains(withoutEan.withWaitingRuns(1));
+        assertThat(captureSavedRows()).contains(withEan.withWaitingRuns(1));
+    }
+
+    @Test
+    void previousOfferWithoutEanProtectsNothing() {
+        // given the only previous offer carries the product's manufacturer code but no EAN
+        Product product = product("clone-C", "5900000000011");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        when(aliases.knows(STORE_ID, "clone-C")).thenReturn(false);
+        previousSnapshotContains(MarketplaceOfferSnapshot.published("source-S", 100L, 10L, null, "MFN-clone-C"));
+
+        try (LogCapture logs = LogCapture.start()) {
+            // when
+            listener.handleMessage(request());
+
+            // then
+            assertThat(capturePublishedOffers()).extracting(MarketplaceOffer::productId).containsExactly("clone-C");
+            assertThat(captureRemovedOffers()).extracting(MarketplaceOffer::productId).containsExactly("source-S");
+            assertThat(logs.warnings()).singleElement().satisfies(warning -> assertThat(warning)
+                    .contains("clone-C").contains("re-pin"));
+        }
     }
 
     @Test

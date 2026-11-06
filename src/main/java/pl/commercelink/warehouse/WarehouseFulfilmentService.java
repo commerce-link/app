@@ -24,7 +24,7 @@ public class WarehouseFulfilmentService {
         List<OrderItem> warehouseFulfillableItems = orderItems.stream().filter(OrderItem::isWarehouseFulfilled).toList();
 
         List<ReservationItem> reservationItems = warehouseFulfillableItems.stream()
-                .map(i -> new ReservationItem(i.getItemId(), i.getManufacturerCode(), i.getQty(), i.getWarehouseItemId()))
+                .map(i -> new ReservationItem(i.getItemId(), i.getEan(), i.getQty(), i.getWarehouseItemId()))
                 .collect(Collectors.toList());
 
         Reservation reservation = Reservation.orderFulfilment(

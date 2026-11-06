@@ -21,7 +21,7 @@ public class DeliveryOrderedQtyUpdateService {
     @Autowired
     private WarehouseAllocationsManager warehouseAllocationsManager;
 
-    public OperationResult<Void> run(String storeId, String deliveryId, String mfn, int requestedQty) {
+    public OperationResult<Void> run(String storeId, String deliveryId, String ean, int requestedQty) {
         Delivery delivery = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, deliveryId);
         if (delivery.isDropship()) {
             // the ordered quantity edit adds the surplus to warehouse stock; dropship goods never get there
@@ -32,7 +32,7 @@ public class DeliveryOrderedQtyUpdateService {
         }
 
         DeliveryItem item = delivery.getItems().stream()
-                .filter(i -> StringUtils.equals(i.getMfn(), mfn))
+                .filter(i -> StringUtils.equals(i.getEan(), ean))
                 .findFirst()
                 .orElse(null);
         if (item == null) {

@@ -336,13 +336,13 @@
         };
         dialog.addEventListener('cl:dialog-open', function (event) {
             var trigger = event.detail && event.detail.trigger;
-            if (!trigger || !trigger.hasAttribute('data-mfn')) {
+            if (!trigger || !trigger.hasAttribute('data-ean')) {
                 return;
             }
             var min = trigger.getAttribute('data-min-qty');
             var ean = trigger.getAttribute('data-ean');
             original = parseInt(trigger.getAttribute('data-qty'), 10) || 0;
-            document.getElementById('qty-mfn').value = trigger.getAttribute('data-mfn');
+            document.getElementById('qty-ean').value = ean;
             document.getElementById('qty-name').textContent = trigger.getAttribute('data-name');
             document.getElementById('qty-codes').textContent = (ean ? ean + ' · ' : '') + trigger.getAttribute('data-mfn');
             input.value = String(original);

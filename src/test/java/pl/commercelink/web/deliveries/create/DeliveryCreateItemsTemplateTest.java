@@ -348,7 +348,7 @@ class DeliveryCreateItemsTemplateTest {
         // given
         Map<String, Object> model = model(warehousePage(false, true, false), warehouseForm());
         model.put("stepError", "deliveries.create.error.itemNumber");
-        model.put("invalidFields", java.util.Set.of("100-100001084WOF|unitCost", "MFN-FURY-16|requestedQty"));
+        model.put("invalidFields", java.util.Set.of("5901234123457|unitCost", "5900000000011|requestedQty"));
 
         // when
         String html = render("deliveries/create/items", model);

@@ -425,13 +425,14 @@ class BrowsePageFactoryTest {
     void rowsShowTheStoresInStockQuantityFromOneWarehouseCallForThePage() {
         // given
         when(inventoryBrowse.browse(eq(STORE_ID), any())).thenReturn(new BrowseResult(List.of(
-                mfnRow("MFN-A"), mfnRow("MFN-B"), mfnRow("MFN-C")), 3, false));
+                row("5901000000001", "11", "Karty graficzne"), row("5901000000002", "11", "Karty graficzne"),
+                row("5901000000003", "11", "Karty graficzne")), 3, false));
         when(stock.searchAllAvailable(STORE_ID)).thenReturn(List.of(
-                warehouseItem("mfn-a", 4, FulfilmentStatus.Delivered),
-                warehouseItem("MFN-A", 2, FulfilmentStatus.Delivered),
-                warehouseItem("MFN-A", 7, FulfilmentStatus.Ordered),
-                warehouseItem("MFN-B", 3, FulfilmentStatus.Ordered),
-                warehouseItem("MFN-Z", 9, FulfilmentStatus.Delivered)));
+                warehouseItem("05901000000001", "MFN-A", 4, FulfilmentStatus.Delivered),
+                warehouseItem("5901000000001", "MFN-A", 2, FulfilmentStatus.Delivered),
+                warehouseItem("5901000000001", "MFN-A", 7, FulfilmentStatus.Ordered),
+                warehouseItem("5901000000002", "MFN-B", 3, FulfilmentStatus.Ordered),
+                warehouseItem("5901000000009", "MFN-Z", 9, FulfilmentStatus.Delivered)));
 
         // when
         BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("11"), true, false);
@@ -443,9 +444,45 @@ class BrowsePageFactoryTest {
     }
 
     @Test
+    void stockColumnCountsItemsByTheGroupsEans() {
+        // given
+        InventoryKey group = new InventoryKey(Set.of("5901000000001", "5901000000002"), Set.of("MFN-A"));
+        when(inventoryBrowse.browse(eq(STORE_ID), any())).thenReturn(new BrowseResult(List.of(
+                new BrowseRow(group, "Produkt", "Brand", "5901000000001", "MFN-A", "11", "Karty graficzne",
+                        120.0, true, "AB", 5, 2)), 1, false));
+        when(stock.searchAllAvailable(STORE_ID)).thenReturn(List.of(
+                warehouseItem("5901000000001", "MFN-A", 2, FulfilmentStatus.Delivered),
+                warehouseItem("5901000000002", "MFN-A-PL", 3, FulfilmentStatus.Delivered)));
+
+        // when
+        BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("11"), true, false);
+
+        // then
+        assertThat(page.rows()).extracting(BrowsePage.RowView::warehouseQty).containsExactly(5L);
+    }
+
+    @Test
+    void itemOfAnotherProductWithTheSameCodeIsNotCounted() {
+        // given
+        when(inventoryBrowse.browse(eq(STORE_ID), any())).thenReturn(new BrowseResult(List.of(
+                new BrowseRow(new InventoryKey("5901000000001", "MFN-A"), "Produkt", "Brand", "5901000000001", "MFN-A",
+                        "11", "Karty graficzne", 120.0, true, "AB", 5, 2)), 1, false));
+        when(stock.searchAllAvailable(STORE_ID)).thenReturn(List.of(
+                warehouseItem("5901000000001", "MFN-A", 2, FulfilmentStatus.Delivered),
+                warehouseItem("5901000000009", "MFN-A", 4, FulfilmentStatus.Delivered)));
+
+        // when
+        BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("11"), true, false);
+
+        // then
+        assertThat(page.rows()).extracting(BrowsePage.RowView::warehouseQty).containsExactly(2L);
+    }
+
+    @Test
     void superAdminGetsNoWarehouseLine() {
         // given
-        when(inventoryBrowse.browse(any(), any())).thenReturn(new BrowseResult(List.of(mfnRow("MFN-A")), 1, false));
+        when(inventoryBrowse.browse(any(), any())).thenReturn(new BrowseResult(List.of(
+                row("5901000000001", "11", "Karty graficzne")), 1, false));
 
         // when
         BrowsePage page = factory.build(null, BrowseQuery.start().withCategory("11"), true, true);
@@ -461,7 +498,8 @@ class BrowsePageFactoryTest {
         Store store = store();
         store.setIntegrations(new ArrayList<>(List.of(new Integration(IntegrationType.WMS_PROVIDER, "wms"))));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(inventoryBrowse.browse(eq(STORE_ID), any())).thenReturn(new BrowseResult(List.of(mfnRow("MFN-A")), 1, false));
+        when(inventoryBrowse.browse(eq(STORE_ID), any())).thenReturn(new BrowseResult(List.of(
+                row("5901000000001", "11", "Karty graficzne")), 1, false));
 
         // when
         BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("11"), true, false);
@@ -474,7 +512,8 @@ class BrowsePageFactoryTest {
     @Test
     void failingWarehouseLeavesThePageWithoutTheLine() {
         // given
-        when(inventoryBrowse.browse(eq(STORE_ID), any())).thenReturn(new BrowseResult(List.of(mfnRow("MFN-A")), 1, false));
+        when(inventoryBrowse.browse(eq(STORE_ID), any())).thenReturn(new BrowseResult(List.of(
+                row("5901000000001", "11", "Karty graficzne")), 1, false));
         when(stock.searchAllAvailable(STORE_ID)).thenThrow(new IllegalStateException("scan failed"));
 
         // when
@@ -605,8 +644,8 @@ class BrowsePageFactoryTest {
                 120.0, true, "AB", 5, 2);
     }
 
-    private static WarehouseItemView warehouseItem(String mfn, int qty, FulfilmentStatus status) {
-        return new WarehouseItemView(STORE_ID, "item-" + mfn + qty, "Produkt", "5900000000011", mfn, Price.fromNet(100.0),
+    private static WarehouseItemView warehouseItem(String ean, String mfn, int qty, FulfilmentStatus status) {
+        return new WarehouseItemView(STORE_ID, "item-" + ean + mfn + qty, "Produkt", ean, mfn, Price.fromNet(100.0),
                 qty, status, ItemCondition.Sealed);
     }
 

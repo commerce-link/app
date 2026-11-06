@@ -112,11 +112,13 @@ class DeliveryCreationFormTest {
         // given: step 2 merged the suggestion into the items, so it comes back as an item without allocations
         DeliveryCreationForm fresh = new DeliveryCreationForm();
         SuggestedDeliveryItem suggested = new SuggestedDeliveryItem();
+        suggested.setEan("5900000000005");
         suggested.setMfn("MFN-S");
         suggested.setUnitCost(100.0);
         fresh.setSuggestedItems(new ArrayList<>(List.of(suggested)));
         DeliveryCreationForm posted = new DeliveryCreationForm();
         DeliveryItem merged = new DeliveryItem();
+        merged.setEan("5900000000005");
         merged.setMfn("MFN-S");
         merged.setRequestedQty(3);
         merged.setUnitCost(89.5);
@@ -135,11 +137,13 @@ class DeliveryCreationFormTest {
         // given: step 1 came back before step 2 merged the suggestions, so they are still suggestions
         DeliveryCreationForm fresh = new DeliveryCreationForm();
         SuggestedDeliveryItem planned = new SuggestedDeliveryItem();
+        planned.setEan("5900000000005");
         planned.setMfn("MFN-S");
         planned.setUnitCost(100.0);
         fresh.setSuggestedItems(new ArrayList<>(List.of(planned)));
         DeliveryCreationForm posted = new DeliveryCreationForm();
         SuggestedDeliveryItem typed = new SuggestedDeliveryItem();
+        typed.setEan("5900000000005");
         typed.setMfn("MFN-S");
         typed.setRequestedQty(5);
         typed.setUnitCost(92.0);
@@ -154,10 +158,10 @@ class DeliveryCreationFormTest {
     }
 
     @Test
-    void overlayCopiesRequestedQtyAndUnitCostByMfn() {
+    void overlayCopiesRequestedQtyAndUnitCostByEan() {
         // given
-        DeliveryCreationForm fresh = formWithItem("MFN-1", 1, 10.0);
-        DeliveryCreationForm posted = formWithItem("MFN-1", 5, 12.5);
+        DeliveryCreationForm fresh = formWithItem("5900000000001", 1, 10.0);
+        DeliveryCreationForm posted = formWithItem("5900000000001", 5, 12.5);
 
         // when
         fresh.applyUserSelections(posted);
@@ -169,10 +173,26 @@ class DeliveryCreationFormTest {
     }
 
     @Test
+    void twoProductsUnderOneCodeKeepTheirOwnQtyAndCost() {
+        // given
+        DeliveryCreationForm fresh = formWithItems(List.of(
+                deliveryItem("5900000000001", 1, 10.0), deliveryItem("5900000000002", 1, 4.0)));
+        DeliveryCreationForm posted = formWithItems(List.of(
+                deliveryItem("5900000000001", 5, 12.5), deliveryItem("5900000000002", 7, 3.5)));
+
+        // when
+        fresh.applyUserSelections(posted);
+
+        // then
+        assertThat(fresh.getItems()).extracting(DeliveryItem::getRequestedQty).containsExactly(5, 7);
+        assertThat(fresh.getItems()).extracting(DeliveryItem::getUnitCost).containsExactly(12.5, 3.5);
+    }
+
+    @Test
     void overlayCopiesDeliveryHeaderFields() {
         // given
-        DeliveryCreationForm fresh = formWithItem("MFN-1", 1, 10.0);
-        DeliveryCreationForm posted = formWithItem("MFN-1", 1, 10.0);
+        DeliveryCreationForm fresh = formWithItem("5900000000001", 1, 10.0);
+        DeliveryCreationForm posted = formWithItem("5900000000001", 1, 10.0);
         posted.setExternalDeliveryId("FV-77");
         posted.setEstimatedDeliveryAt(java.time.LocalDate.of(2026, 8, 20));
         posted.setSourceCurrency("EUR");
@@ -202,11 +222,11 @@ class DeliveryCreationFormTest {
     void overlayCopiesAllocationSelectedFlagByOrderIdAndItemId() {
         // given
         Allocation freshAllocation = allocation("order-1", "item-1", false);
-        DeliveryItem freshItem = deliveryItem("MFN-1", 1, 10.0, freshAllocation);
+        DeliveryItem freshItem = deliveryItem("5900000000001", 1, 10.0, freshAllocation);
         DeliveryCreationForm fresh = formWithItems(List.of(freshItem));
 
         Allocation postedAllocation = allocation("order-1", "item-1", true);
-        DeliveryItem postedItem = deliveryItem("MFN-1", 1, 10.0, postedAllocation);
+        DeliveryItem postedItem = deliveryItem("5900000000001", 1, 10.0, postedAllocation);
         DeliveryCreationForm posted = formWithItems(List.of(postedItem));
 
         // when
@@ -217,34 +237,36 @@ class DeliveryCreationFormTest {
     }
 
     @Test
-    void postedItemUnmatchedInItemsLandsInSuggestedItemsByMfn() {
+    void postedItemUnmatchedInItemsLandsInSuggestedItemsByEan() {
         // given
         DeliveryCreationForm fresh = new DeliveryCreationForm();
+        SuggestedDeliveryItem other = new SuggestedDeliveryItem();
+        other.setEan("5900000000003");
+        other.setMfn("MFN-1");
         SuggestedDeliveryItem suggested = new SuggestedDeliveryItem();
-        suggested.setMfn("MFN-2");
+        suggested.setEan("5900000000002");
+        suggested.setMfn("MFN-1");
         suggested.setRequestedQty(0);
-        fresh.setSuggestedItems(List.of(suggested));
+        fresh.setSuggestedItems(List.of(other, suggested));
 
-        DeliveryCreationForm posted = formWithItem("MFN-2", 3, 20.0);
+        DeliveryCreationForm posted = formWithItem("5900000000002", 3, 20.0);
 
         // when
         fresh.applyUserSelections(posted);
 
         // then
-        assertThat(fresh.getSuggestedItems().get(0).getRequestedQty()).isEqualTo(3);
+        assertThat(fresh.getSuggestedItems()).extracting(SuggestedDeliveryItem::getRequestedQty).containsExactly(0, 3);
         assertThat(fresh.getItems()).isEmpty();
     }
 
     @Test
     void overlayNeverAddsOrRemovesItemRows() {
         // given
-        DeliveryCreationForm fresh = formWithItem("MFN-1", 1, 10.0);
+        DeliveryCreationForm fresh = formWithItem("5900000000001", 1, 10.0);
         DeliveryCreationForm posted = new DeliveryCreationForm();
-        DeliveryItem extra = deliveryItem("MFN-EXTRA", 9, 99.0);
-        extra.setEan("5900000000009");
         posted.setItems(List.of(
-                deliveryItem("MFN-1", 5, 12.5),
-                extra
+                deliveryItem("5900000000001", 5, 12.5),
+                deliveryItem("5900000000009", 9, 99.0)
         ));
 
         // when
@@ -252,11 +274,11 @@ class DeliveryCreationFormTest {
 
         // then: an item without sources outside the plan is a suggestion chosen before, not a new item
         assertThat(fresh.getItems()).hasSize(1);
-        assertThat(fresh.getSuggestedItems()).extracting(SuggestedDeliveryItem::getMfn).containsExactly("MFN-EXTRA");
+        assertThat(fresh.getSuggestedItems()).extracting(SuggestedDeliveryItem::getEan).containsExactly("5900000000009");
     }
 
-    private DeliveryCreationForm formWithItem(String mfn, int requestedQty, double unitCost) {
-        return formWithItems(List.of(deliveryItem(mfn, requestedQty, unitCost)));
+    private DeliveryCreationForm formWithItem(String ean, int requestedQty, double unitCost) {
+        return formWithItems(List.of(deliveryItem(ean, requestedQty, unitCost)));
     }
 
     private DeliveryCreationForm formWithItems(List<DeliveryItem> items) {
@@ -265,16 +287,17 @@ class DeliveryCreationFormTest {
         return form;
     }
 
-    private DeliveryItem deliveryItem(String mfn, int requestedQty, double unitCost) {
+    private DeliveryItem deliveryItem(String ean, int requestedQty, double unitCost) {
         DeliveryItem item = new DeliveryItem();
-        item.setMfn(mfn);
+        item.setEan(ean);
+        item.setMfn("MFN-1");
         item.setRequestedQty(requestedQty);
         item.setUnitCost(unitCost);
         return item;
     }
 
-    private DeliveryItem deliveryItem(String mfn, int requestedQty, double unitCost, Allocation allocation) {
-        DeliveryItem item = deliveryItem(mfn, requestedQty, unitCost);
+    private DeliveryItem deliveryItem(String ean, int requestedQty, double unitCost, Allocation allocation) {
+        DeliveryItem item = deliveryItem(ean, requestedQty, unitCost);
         item.setAllocations(List.of(allocation));
         return item;
     }

@@ -85,7 +85,7 @@ public class ProductRecommendationEngine {
 
     private ProductRecommendation createRecommendation(PimView pim, CategoryDefinition categoryDefinition, MatchedInventory matchedInventory) {
         InventoryKey key = matchedInventory.getInventoryKey();
-        Optional<PimEntry> pimEntry = pim.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
+        Optional<PimEntry> pimEntry = pim.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), List.of());
         return new ProductRecommendation(categoryDefinition, matchedInventory, pimEntry);
     }
 

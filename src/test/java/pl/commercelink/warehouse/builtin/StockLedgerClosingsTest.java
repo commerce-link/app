@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.warehouse.builtin.StockLedgerClosings.ClosingBalance;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -57,9 +58,9 @@ class StockLedgerClosingsTest {
     }
 
     @Test
-    void closingBalancesAreTheClosingColumnsOfTheSavedReport() throws Exception {
+    void closingWithEanColumnGivesTheOpeningBalance() throws Exception {
         // given
-        StockLedgerRow row = new StockLedgerRow("MFN-A", "Kabel; \"HDMI\" 2m", 2, 100.0,
+        StockLedgerRow row = new StockLedgerRow("5901234567890", "Kabel; \"HDMI\" 2m", 2, 100.0,
                 Map.of(LedgerCategory.PURCHASE, 3), Map.of(LedgerCategory.PURCHASE, 150.25));
         when(fileStorage.canRead(BUCKET, SEPTEMBER_KEY)).thenReturn(true);
         when(fileStorage.getBytes(BUCKET, SEPTEMBER_KEY)).thenReturn(StockLedgerRow.toCsv(List.of(row)));
@@ -68,7 +69,17 @@ class StockLedgerClosingsTest {
         Map<String, ClosingBalance> balances = closings.closingBalances(STORE_ID, SEPTEMBER);
 
         // then
-        assertThat(balances).containsExactly(entry("MFN-A", new ClosingBalance("Kabel; \"HDMI\" 2m", 5, 250.25)));
+        assertThat(balances).containsExactly(entry("5901234567890", new ClosingBalance("Kabel; \"HDMI\" 2m", 5, 250.25)));
+    }
+
+    @Test
+    void closingInTheOldFormatIsRejected() {
+        // given
+        byte[] report = "\"SKU (MFN)\";\"Nazwa\";\"BZ ilość\";\"BZ wartość\"\n\"MFN-A\";\"Widget\";\"5\";\"250,25\"\n"
+                .getBytes(StandardCharsets.UTF_8);
+
+        // when / then
+        assertThatThrownBy(() -> StockLedgerClosings.parse(report)).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -84,7 +95,7 @@ class StockLedgerClosingsTest {
     @Test
     void reportWithoutTheClosingColumnsIsRejected() {
         // given
-        byte[] report = "\"SKU (MFN)\";\"Nazwa\"\n\"MFN-A\";\"Widget\"\n".getBytes();
+        byte[] report = "\"SKU (EAN)\";\"Nazwa\"\n\"5901234567890\";\"Widget\"\n".getBytes();
 
         // when / then
         assertThatThrownBy(() -> StockLedgerClosings.parse(report)).isInstanceOf(IllegalStateException.class);

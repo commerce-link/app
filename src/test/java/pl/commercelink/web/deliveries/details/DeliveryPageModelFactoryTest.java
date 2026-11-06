@@ -93,7 +93,7 @@ class DeliveryPageModelFactoryTest {
     void theQuantityDialogOpensForTheProductNamedInTheAddress() {
         // given
         DeliveryPageData data = new DeliveryPageData(warehouse(), "Manual-Hurt", null, List.of(), null, List.of(), null,
-                Set.of(), "qty", "MFN-MIRAGE-01", NOW);
+                Set.of(), "qty", "5900000000006", NOW);
 
         // when
         DeliveryPageModel model = DeliveryPageModelFactory.build(data, ADMIN);

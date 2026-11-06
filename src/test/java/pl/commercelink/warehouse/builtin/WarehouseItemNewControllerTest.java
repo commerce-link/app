@@ -154,6 +154,23 @@ class WarehouseItemNewControllerTest {
     }
 
     @Test
+    void typedEanIsStoredUnified() throws Exception {
+        // given
+        when(taxonomy.findByMfn(any())).thenReturn(null);
+        when(receipts.addItem(eq("store-1"), any(), eq("operator"))).thenReturn(OperationResult.success());
+        WarehouseItemAddForm form = form("MQD83ZM/A");
+        form.setName("Apple AirPods Pro");
+        form.setEan(" 0194253397205 ");
+
+        // when
+        asStore(() -> controller.addItem(form, new ExtendedModelMap(), PL,
+                new MockHttpServletResponse(), new RedirectAttributesModelMap()));
+
+        // then
+        verify(receipts).addItem(eq("store-1"), argThat(item -> "194253397205".equals(item.getEan())), eq("operator"));
+    }
+
+    @Test
     void serviceFailureShowsTheMessageAndSavesNothing() throws Exception {
         // given
         when(taxonomy.findByMfn(any())).thenReturn(known());

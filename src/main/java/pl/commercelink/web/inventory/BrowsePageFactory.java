@@ -88,7 +88,7 @@ public class BrowsePageFactory {
             pagination = Pagination.of(query.page(), result.total(), BrowseQuery.PAGE_SIZE,
                     page -> query.withPage(page).href());
             boolean leaf = category != null && tree.childrenOf(category).isEmpty();
-            Map<String, Long> inStock = warehouseStock.inStockByMfn(storeId, productCodes(result.rows()));
+            Map<String, Long> inStock = warehouseStock.inStockByEan(storeId, productEans(result.rows()));
             rows = result.rows().stream().map(row -> rowView(row, query, placement, leaf, labels, inStock)).toList();
             total = result.total();
             truncated = result.truncated();
@@ -163,13 +163,13 @@ public class BrowsePageFactory {
                 warehouseQty(row, inStock), addHref);
     }
 
-    private static Set<String> productCodes(List<BrowseRow> rows) {
-        return rows.stream().flatMap(row -> row.key().getProductCodes().stream())
+    private static Set<String> productEans(List<BrowseRow> rows) {
+        return rows.stream().flatMap(row -> row.key().getProductEans().stream())
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private static long warehouseQty(BrowseRow row, Map<String, Long> inStock) {
-        return row.key().getProductCodes().stream().mapToLong(code -> inStock.getOrDefault(code, 0L)).sum();
+        return row.key().getProductEans().stream().mapToLong(ean -> inStock.getOrDefault(ean, 0L)).sum();
     }
 
     private String title(String category) {

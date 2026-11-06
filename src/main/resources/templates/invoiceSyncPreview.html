@@ -99,7 +99,7 @@
                                                 th:text="#{invoiceSync.item.cost(${p.money(mapping.unitCost)})}"></span></span>
                                     </th>
                                     <td class="cl-cell-pick" th:attr="data-label=#{invoiceSync.col.position}">
-                                        <input type="hidden" th:field="*{mappings[__${stat.index}__].mfn}"/>
+                                        <input type="hidden" th:field="*{mappings[__${stat.index}__].ean}"/>
                                         <select class="cl-select" th:field="*{mappings[__${stat.index}__].selectedPositionId}" data-cl-sync-select
                                                 th:attr="aria-label=#{invoiceSync.position.for(${mapping.name})}">
                                             <option value="" th:text="#{invoiceSync.noMatch}"></option>

@@ -44,7 +44,7 @@ class WarehouseDocumentsMessagesTest {
                 Files.walk(Path.of("src/main/java/pl/commercelink/web/warehousedocuments")),
                 Stream.of(Path.of("src/main/resources/templates/warehouse-documents.html"),
                         Path.of("src/main/resources/templates/warehouse-document-details.html"),
-                        Path.of("src/main/resources/templates/warehouse-document-mfn-history.html"),
+                        Path.of("src/main/resources/templates/warehouse-document-item-history.html"),
                         Path.of("src/main/resources/templates/fragments/warehouse-documents-list.html")))) {
             for (Path file : files.filter(Files::isRegularFile).toList()) {
                 Matcher m = KEY.matcher(Files.readString(file));

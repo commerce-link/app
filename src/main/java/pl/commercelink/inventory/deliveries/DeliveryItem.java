@@ -26,14 +26,14 @@ public class DeliveryItem {
     }
 
     public static List<DeliveryItem> groupAndUnify(List<Allocation> allocations) {
-        Map<String, List<Allocation>> allocationByMfn = allocations.stream()
-                .collect(Collectors.groupingBy(Allocation::getMfn));
+        Map<String, List<Allocation>> allocationByEan = allocations.stream()
+                .collect(Collectors.groupingBy(Allocation::getEan));
 
         List<DeliveryItem> result = new ArrayList<>();
-        for (String mfn : allocationByMfn.keySet()) {
-            List<Allocation> allocs = allocationByMfn.get(mfn);
+        for (String ean : allocationByEan.keySet()) {
+            List<Allocation> allocs = allocationByEan.get(ean);
             String name = allocs.get(0).getName();
-            String ean = allocs.get(0).getEan();
+            String mfn = allocs.get(0).getMfn();
             double unitCost = allocs.get(0).getUnitCost();
 
             result.add(new DeliveryItem(name, ean, mfn, unitCost, allocs));

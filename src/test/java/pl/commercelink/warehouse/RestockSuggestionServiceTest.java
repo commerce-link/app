@@ -11,16 +11,23 @@ import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.InventoryItem;
+import pl.commercelink.invoicing.api.Price;
+import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.SupplierScope;
+import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.warehouse.api.StockQueryService;
 import pl.commercelink.warehouse.api.Warehouse;
+import pl.commercelink.warehouse.api.WarehouseItemView;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -78,9 +85,10 @@ class RestockSuggestionServiceTest {
                 .thenReturn(List.of(gpu, cpuAmd, cpuIntel));
         when(enabledInventory.findByInventoryKey(any())).thenReturn(matched);
         when(matched.isEmpty()).thenReturn(false);
+        when(matched.getInventoryKey()).thenReturn(new InventoryKey());
         when(matched.getInventoryItemsFromSupplier("Action")).thenReturn(List.of(offer));
         when(warehouse.stockQueryService("store")).thenReturn(stockQueryService);
-        when(stockQueryService.searchByMfns(eq("store"), any())).thenReturn(List.of());
+        when(stockQueryService.searchByEans(eq("store"), any())).thenReturn(List.of());
 
         // when
         List<RestockSuggestion> result = service.suggestForDelivery("store", "Action", Collections.emptySet());
@@ -113,9 +121,10 @@ class RestockSuggestionServiceTest {
                 .thenReturn(List.of(goodDeal, hotDeal));
         when(enabledInventory.findByInventoryKey(any())).thenReturn(matched);
         when(matched.isEmpty()).thenReturn(false);
+        when(matched.getInventoryKey()).thenReturn(new InventoryKey());
         when(matched.getInventoryItemsFromSupplier("Action")).thenReturn(List.of(offer));
         when(warehouse.stockQueryService("store")).thenReturn(stockQueryService);
-        when(stockQueryService.searchByMfns(eq("store"), any())).thenReturn(List.of());
+        when(stockQueryService.searchByEans(eq("store"), any())).thenReturn(List.of());
 
         // when
         List<RestockSuggestion> result = service.suggestForDelivery("store", "Action", Collections.emptySet());
@@ -125,6 +134,69 @@ class RestockSuggestionServiceTest {
                 .containsExactly(RestockPriceCategory.HotDeal, RestockPriceCategory.GoodDeal);
         assertThat(result).extracting(RestockSuggestion::getName)
                 .containsExactly("ZZZ", "AAA");
+    }
+
+    @Test
+    void deliverySkipsOnlyTheProductInStockUnderAnEanOfItsGroup() {
+        // given
+        StockProductLevel asus = new StockProductLevel("GPU", "PIM-A", "5901000000011", "X1", "Asus X1", 1_000_000, 0, 3);
+        StockProductLevel gigabyte = new StockProductLevel("GPU", "PIM-G", "5901000000028", "X1", "Gigabyte X1", 1_000_000, 0, 3);
+        MatchedInventory asusGroup = group("PIM-A", "5901000000011", "5901000000035");
+        MatchedInventory gigabyteGroup = group("PIM-G", "5901000000028");
+        WarehouseItemView asusUnderSecondEan = new WarehouseItemView("store", "item-1", "Asus X1", "5901000000035", "X1",
+                Price.fromNet(100.0), 1, FulfilmentStatus.Delivered, ItemCondition.Sealed);
+
+        when(storesRepository.findById("store")).thenReturn(store);
+        when(store.isEnabledSupplier("Action")).thenReturn(true);
+        when(inventory.withEnabledSuppliersOnly("store", SupplierScope.FULFILMENT)).thenReturn(enabledInventory);
+        when(productCatalogRepository.findAll("store")).thenReturn(List.of(catalog));
+        when(catalog.getCatalogId()).thenReturn("cat");
+        when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false, true))
+                .thenReturn(List.of(asus, gigabyte));
+        when(enabledInventory.findByInventoryKey(any()))
+                .thenAnswer(call -> "PIM-A".equals(call.<InventoryKey>getArgument(0).getId()) ? asusGroup : gigabyteGroup);
+        when(warehouse.stockQueryService("store")).thenReturn(stockQueryService);
+        when(stockQueryService.searchByEans(eq("store"), any())).thenAnswer(call ->
+                call.<Collection<String>>getArgument(1).contains(asusUnderSecondEan.getEan()) ? List.of(asusUnderSecondEan) : List.of());
+
+        // when
+        List<RestockSuggestion> result = service.suggestForDelivery("store", "Action", Collections.emptySet());
+
+        // then
+        assertThat(result).extracting(RestockSuggestion::getName).containsExactly("Gigabyte X1");
+    }
+
+    @Test
+    void productPlannedInTheDeliveryUnderAnEanOfItsGroupIsNotSuggested() {
+        // given
+        StockProductLevel asus = new StockProductLevel("GPU", "PIM-A", "5901000000011", "X1", "Asus X1", 1_000_000, 0, 3);
+        StockProductLevel gigabyte = new StockProductLevel("GPU", "PIM-G", "5901000000028", "X1", "Gigabyte X1", 1_000_000, 0, 3);
+        MatchedInventory asusGroup = group("PIM-A", "5901000000011", "5901000000035");
+        MatchedInventory gigabyteGroup = group("PIM-G", "5901000000028");
+
+        when(storesRepository.findById("store")).thenReturn(store);
+        when(store.isEnabledSupplier("Action")).thenReturn(true);
+        when(inventory.withEnabledSuppliersOnly("store", SupplierScope.FULFILMENT)).thenReturn(enabledInventory);
+        when(productCatalogRepository.findAll("store")).thenReturn(List.of(catalog));
+        when(catalog.getCatalogId()).thenReturn("cat");
+        when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false, true))
+                .thenReturn(List.of(asus, gigabyte));
+        when(enabledInventory.findByInventoryKey(any()))
+                .thenAnswer(call -> "PIM-A".equals(call.<InventoryKey>getArgument(0).getId()) ? asusGroup : gigabyteGroup);
+        when(warehouse.stockQueryService("store")).thenReturn(stockQueryService);
+        when(stockQueryService.searchByEans(eq("store"), any())).thenReturn(List.of());
+
+        // when
+        List<RestockSuggestion> result = service.suggestForDelivery("store", "Action", Set.of("5901000000035"));
+
+        // then
+        assertThat(result).extracting(RestockSuggestion::getName).containsExactly("Gigabyte X1");
+    }
+
+    private static MatchedInventory group(String pimId, String... eans) {
+        InventoryKey key = InventoryKey.fromPimIdAndEan(pimId, eans[0]);
+        Stream.of(eans).forEach(key::addEan);
+        return new MatchedInventory(key, List.of(new InventoryItem(eans[0], "X1", 100.0, "PLN", 5, 1, "Action")), null, null);
     }
 
     @Test
@@ -142,6 +214,7 @@ class RestockSuggestionServiceTest {
                 .thenReturn(List.of(level));
         when(enabledInventory.findByInventoryKey(any())).thenReturn(matched);
         when(matched.isEmpty()).thenReturn(false);
+        when(matched.getInventoryKey()).thenReturn(new InventoryKey());
         when(matched.getInventoryItemsFromSupplier("Action")).thenReturn(List.of(offer));
 
         // when
@@ -164,6 +237,7 @@ class RestockSuggestionServiceTest {
                 .thenReturn(List.of(affordable, tooExpensive));
         when(enabledInventory.findByInventoryKey(any())).thenReturn(matched);
         when(matched.isEmpty()).thenReturn(false);
+        when(matched.getInventoryKey()).thenReturn(new InventoryKey());
         when(matched.getInventoryItems()).thenReturn(List.of(offer));
 
         // when
@@ -184,6 +258,7 @@ class RestockSuggestionServiceTest {
                 .thenReturn(List.of(level));
         when(enabledInventory.findByInventoryKey(any())).thenReturn(matched);
         when(matched.isEmpty()).thenReturn(false);
+        when(matched.getInventoryKey()).thenReturn(new InventoryKey());
         when(matched.getInventoryItems()).thenReturn(List.of(offer));
 
         // when

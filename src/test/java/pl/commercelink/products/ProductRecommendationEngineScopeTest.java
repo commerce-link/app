@@ -100,11 +100,11 @@ class ProductRecommendationEngineScopeTest {
 
     @Test
     void twoInventoryGroupsResolvingToOneEntryAreRecommendedOnceAtTheLowerPrice() {
-        // given: a store entry with the first group's EAN and, by bad feed data, a code of the second group
+        // given: a store entry with the EANs of both groups
         CategoryDefinition definition = new CategoryDefinition().withGeneratedId();
         definition.setPimCategoryIds(new LinkedList<>(List.of("989")));
         PimEntry storeEntry = new PimEntry("store-pim-1",
-                List.of(new PimIdentifier(EAN, PimIdentifierType.GTIN), new PimIdentifier("OWN-1", PimIdentifierType.MPN)),
+                List.of(new PimIdentifier(EAN, PimIdentifierType.GTIN), new PimIdentifier("5900000000999", PimIdentifierType.GTIN)),
                 "Intel", "Core i7 (store)", "CPU", null, true, null, null, null, "s1");
         PimEntryIndex index = new PimEntryIndex(List.of(storeEntry), UnaryOperator.identity(), UnaryOperator.identity());
         MatchedInventory second = org.mockito.Mockito.mock(MatchedInventory.class);

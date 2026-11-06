@@ -359,7 +359,7 @@ public class DeliveryCreateController {
         return "deliveries/create/items";
     }
 
-    /** Copies the planned value of one unbound row field into the posted form; answers "mfn|field" of the row. */
+    /** Copies the planned value of one unbound row field into the posted form; answers "ean|field" of the row. */
     private static Optional<String> restorePlannedValue(DeliveryCreationForm planned, DeliveryCreationForm posted,
                                                         String list, int index, String property) {
         if ("items".equals(list)) {
@@ -367,7 +367,7 @@ public class DeliveryCreateController {
                 return Optional.empty();
             }
             DeliveryItem row = posted.getItems().get(index);
-            planned.getItems().stream().filter(item -> Objects.equals(item.getMfn(), row.getMfn())).findFirst()
+            planned.getItems().stream().filter(item -> Objects.equals(item.getEan(), row.getEan())).findFirst()
                     .ifPresent(item -> {
                         if ("unitCost".equals(property)) {
                             row.setUnitCost(item.getUnitCost());
@@ -375,13 +375,13 @@ public class DeliveryCreateController {
                             row.setRequestedQty(item.getRequestedQty());
                         }
                     });
-            return Optional.of(row.getMfn() + "|" + property);
+            return Optional.of(row.getEan() + "|" + property);
         }
         if (posted.getSuggestedItems() == null || index >= posted.getSuggestedItems().size()) {
             return Optional.empty();
         }
         SuggestedDeliveryItem row = posted.getSuggestedItems().get(index);
-        planned.getSuggestedItems().stream().filter(item -> Objects.equals(item.getMfn(), row.getMfn())).findFirst()
+        planned.getSuggestedItems().stream().filter(item -> Objects.equals(item.getEan(), row.getEan())).findFirst()
                 .ifPresent(item -> {
                     if ("unitCost".equals(property)) {
                         row.setUnitCost(item.getUnitCost());
@@ -389,7 +389,7 @@ public class DeliveryCreateController {
                         row.setRequestedQty(item.getRequestedQty());
                     }
                 });
-        return Optional.of(row.getMfn() + "|" + property);
+        return Optional.of(row.getEan() + "|" + property);
     }
 
     private String showManual(String storeId, String provider, String orderId, String from, DeliveryCreationForm form,

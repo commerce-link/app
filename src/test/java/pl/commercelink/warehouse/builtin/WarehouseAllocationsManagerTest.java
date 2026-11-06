@@ -14,6 +14,7 @@ import pl.commercelink.inventory.deliveries.AllocationType;
 import pl.commercelink.inventory.deliveries.DeliveryItem;
 import pl.commercelink.orders.FulfilmentStatus;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -31,6 +32,9 @@ class WarehouseAllocationsManagerTest {
     private static final String STORE_ID = "store-1";
     private static final String PROVIDER = "TechData";
     private static final String ITEM_ID = "warehouse-item-1";
+    private static final String EAN_A = "5901234123457";
+    private static final String EAN_B = "5901234123464";
+    private static final String SHARED_MFN = "SHOE-1";
 
     @Mock
     private WarehouseItemFactory warehouseItemFactory;
@@ -275,14 +279,11 @@ class WarehouseAllocationsManagerTest {
     @DisplayName("updateUnitCosts returns the summed cost delta for changed items")
     void updateUnitCostsReturnsSummedCostDelta() {
         // given
-        WarehouseItem item = new WarehouseItem();
-        item.setQty(3);
-        item.setCost(10.0);
-        item.setManufacturerCode("MFN-1");
+        WarehouseItem item = stockItem(EAN_A, 3, 10.0);
         when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(item));
 
         // when
-        double delta = warehouseAllocationsManager.updateUnitCosts(STORE_ID, "delivery-1", Map.of("MFN-1", 12.5));
+        double delta = warehouseAllocationsManager.updateUnitCosts(STORE_ID, "delivery-1", Map.of(EAN_A, 12.5));
 
         // then
         assertThat(delta).isEqualTo(7.5);
@@ -294,14 +295,11 @@ class WarehouseAllocationsManagerTest {
     @DisplayName("updateUnitCosts returns zero and skips save when the price is unchanged")
     void updateUnitCostsReturnsZeroWhenPriceUnchanged() {
         // given
-        WarehouseItem item = new WarehouseItem();
-        item.setQty(3);
-        item.setCost(10.0);
-        item.setManufacturerCode("MFN-1");
+        WarehouseItem item = stockItem(EAN_A, 3, 10.0);
         when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(item));
 
         // when
-        double delta = warehouseAllocationsManager.updateUnitCosts(STORE_ID, "delivery-1", Map.of("MFN-1", 10.0));
+        double delta = warehouseAllocationsManager.updateUnitCosts(STORE_ID, "delivery-1", Map.of(EAN_A, 10.0));
 
         // then
         assertThat(delta).isZero();
@@ -312,18 +310,58 @@ class WarehouseAllocationsManagerTest {
     @DisplayName("updateUnitCosts skips items without a confirmed price")
     void updateUnitCostsSkipsItemsWithoutConfirmedPrice() {
         // given
-        WarehouseItem claimed = new WarehouseItem();
-        claimed.setManufacturerCode("MFN-2");
-        claimed.setCost(10.0);
+        WarehouseItem claimed = stockItem(EAN_B, 1, 10.0);
         when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(claimed));
 
         // when
-        double delta = warehouseAllocationsManager.updateUnitCosts(STORE_ID, "delivery-1", Map.of("MFN-1", 8.5));
+        double delta = warehouseAllocationsManager.updateUnitCosts(STORE_ID, "delivery-1", Map.of(EAN_A, 8.5));
 
         // then
         assertThat(delta).isZero();
         assertThat(claimed.getCost()).isEqualTo(10.0);
         verify(warehouseRepository, never()).save(any());
+    }
+
+    @Test
+    void twoProductsUnderOneCodeGetTheirOwnInvoicePrices() {
+        // given
+        WarehouseItem itemA = stockItem(EAN_A, 1, 90.0);
+        WarehouseItem itemB = stockItem(EAN_B, 1, 90.0);
+        when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(itemA, itemB));
+
+        // when
+        double delta = warehouseAllocationsManager.updateUnitCosts(STORE_ID, "delivery-1",
+                Map.of(EAN_A, 100.0, EAN_B, 120.0));
+
+        // then
+        assertThat(itemA.getCost()).isEqualTo(100.0);
+        assertThat(itemB.getCost()).isEqualTo(120.0);
+        assertThat(delta).isEqualTo(40.0);
+    }
+
+    @Test
+    void recordWithoutEanKeepsItsCost() {
+        // given
+        WarehouseItem withoutEan = stockItem(null, 1, 90.0);
+        when(warehouseRepository.findByDeliveryId(STORE_ID, "delivery-1")).thenReturn(List.of(withoutEan));
+
+        // when
+        double delta = warehouseAllocationsManager.updateUnitCosts(STORE_ID, "delivery-1",
+                new HashMap<>(Map.of(EAN_A, 100.0)));
+
+        // then
+        assertThat(delta).isZero();
+        assertThat(withoutEan.getCost()).isEqualTo(90.0);
+        verify(warehouseRepository, never()).save(any());
+    }
+
+    private static WarehouseItem stockItem(String ean, int qty, double cost) {
+        WarehouseItem item = new WarehouseItem();
+        item.setQty(qty);
+        item.setCost(cost);
+        item.setEan(ean);
+        item.setManufacturerCode(SHARED_MFN);
+        return item;
     }
 
     @Test
