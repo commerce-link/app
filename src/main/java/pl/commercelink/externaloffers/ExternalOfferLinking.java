@@ -179,7 +179,7 @@ public class ExternalOfferLinking {
                     && (replacedSku == null || !replacedSku.equals(item.getSku()))) {
                 continue;
             }
-            List<String> before = valuesOf(item);
+            List<Object> before = valuesOf(item);
             offer.replace(item);
             // a repeated link changes nothing, and the count says what was filled
             if (before.equals(valuesOf(item))) {
@@ -195,8 +195,10 @@ public class ExternalOfferLinking {
         return new LinkResult(updated);
     }
 
-    private static List<String> valuesOf(OrderItem item) {
-        return Arrays.asList(item.getSku(), item.getEan(), item.getManufacturerCode(), item.getCategory());
+    // the source is compared too: an item stored before the source existed may already carry the link's codes
+    private static List<Object> valuesOf(OrderItem item) {
+        return Arrays.asList(item.getSku(), item.getEan(), item.getManufacturerCode(), item.getCategory(),
+                item.getExternalOfferSource());
     }
 
     private static String marketplaceOf(Order order) {

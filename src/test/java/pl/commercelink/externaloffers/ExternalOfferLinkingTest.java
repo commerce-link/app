@@ -340,6 +340,28 @@ class ExternalOfferLinkingTest {
         // then
         assertThat(item.getExternalOfferSource()).isEqualTo(ResolvedOffer.Source.LINK);
         assertThat(item.hasUnlinkedExternalOffer()).isFalse();
+        verify(orderItemsRepository).save(item);
+    }
+
+    @Test
+    void relinkingAnItemThatAlreadyCarriesTheLinkCodesStoresItsSource() {
+        // given an item linked before the source was stored: its codes already are the ones the link gives
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        item.setSku("2001000000043");
+        item.setEan("2001000000043");
+        item.setExternalItemId("2001000000043");
+        item.setExternalOfferKey("2001000000043");
+        openOrders(order);
+        assertThat(item.hasUnlinkedExternalOffer()).isTrue();
+
+        // when
+        ExternalOfferLinking.LinkResult result = linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+
+        // then
+        verify(orderItemsRepository).save(item);
+        assertThat(result.updatedItems()).isEqualTo(1);
+        assertThat(item.hasUnlinkedExternalOffer()).isFalse();
     }
 
     @Test
@@ -642,6 +664,7 @@ class ExternalOfferLinkingTest {
         OrderItem item = unlinkedItem(orderId, itemId, FulfilmentStatus.New);
         item.setSku(ean);
         item.setEan(ean);
+        item.setExternalOfferSource(ResolvedOffer.Source.LINK);
         return item;
     }
 
