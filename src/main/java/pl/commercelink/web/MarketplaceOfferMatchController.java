@@ -43,8 +43,8 @@ import java.util.Locale;
  * it got, or why the last one failed; a refresh picks up the new state. A second run is refused while one is going on.
  * Only for a connected marketplace whose adapter can list the store's offers. A run the worker would skip (expired
  * connection, inactive store) is not ordered at all, so the page never promises a result that cannot come. The operator's
- * first order also switches daily matching on (MarketplaceOfferMatchSweep, every evening); a switch on the page turns
- * it off or on again.
+ * first order also switches daily matching on (MarketplaceOfferMatchSweep, every evening), unless it was already set; a
+ * switch on the page turns it off or on again.
  */
 @Controller
 public class MarketplaceOfferMatchController {
@@ -203,7 +203,7 @@ public class MarketplaceOfferMatchController {
             return "redirect:" + pagePath(storeId, marketplace);
         }
         // switched on before the order is sent: a failed save leaves nothing ordered rather than a run without the switch
-        boolean switchedOn = schedule.set(storeId, marketplace, true);
+        boolean switchedOn = schedule.enableIfNeverSet(storeId, marketplace);
         publisher.order(storeId, marketplace);
         String ordered = messageSource.getMessage("store.marketplaces.offer.matching.ordered",
                 new Object[]{marketplaces.displayName(marketplace)}, locale);
@@ -223,6 +223,8 @@ public class MarketplaceOfferMatchController {
                 new Object[]{marketplaces.displayName(marketplace)}, locale);
         if (async) {
             render(storeId, marketplace, model, locale);
+            // the value just saved, not the store read again: an eventually consistent read may still return the old one
+            model.addAttribute("scheduled", scheduled);
             model.addAttribute("savedMessage", message);
             return SCHEDULE_FRAGMENT;
         }

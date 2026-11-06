@@ -498,7 +498,7 @@ class MarketplaceOfferMatchControllerTest {
     @Test
     void orderingARunSwitchesDailyMatchingOnBeforeTheRunIsOrdered() {
         // given
-        when(schedule.set(STORE_ID, EMPIK, true)).thenReturn(true);
+        when(schedule.enableIfNeverSet(STORE_ID, EMPIK)).thenReturn(true);
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
@@ -506,7 +506,7 @@ class MarketplaceOfferMatchControllerTest {
 
         // then
         var order = inOrder(schedule, publisher);
-        order.verify(schedule).set(STORE_ID, EMPIK, true);
+        order.verify(schedule).enableIfNeverSet(STORE_ID, EMPIK);
         order.verify(publisher).order(STORE_ID, EMPIK);
         assertThat((String) redirectAttributes.getFlashAttributes().get(SettingsFlash.SAVED_MESSAGE))
                 .startsWith("Dopasowanie ofert z Empik zlecone")
@@ -516,7 +516,7 @@ class MarketplaceOfferMatchControllerTest {
     @Test
     void orderingARunWithDailyMatchingAlreadyOnDoesNotRepeatTheNotice() {
         // given
-        when(schedule.set(STORE_ID, EMPIK, true)).thenReturn(false);
+        when(schedule.enableIfNeverSet(STORE_ID, EMPIK)).thenReturn(false);
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
@@ -597,6 +597,8 @@ class MarketplaceOfferMatchControllerTest {
         verify(schedule).set(STORE_ID, EMPIK, true);
         assertThat(view).isEqualTo("store-marketplace-offer-matching :: scheduleForm");
         assertThat(model.getAttribute("savedMessage")).isEqualTo("Codzienne dopasowanie ofert z Empik włączone.");
+        // the saved value, even though the store read again for the page still has the switch off
+        assertThat(model.getAttribute("scheduled")).isEqualTo(true);
         assertThat(model.getAttribute("scheduleFormAction"))
                 .isEqualTo("/dashboard/store/marketplaces/Empik/offer-matching/schedule");
     }

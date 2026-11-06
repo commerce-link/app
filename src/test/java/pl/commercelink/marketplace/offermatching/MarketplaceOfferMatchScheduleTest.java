@@ -93,14 +93,60 @@ class MarketplaceOfferMatchScheduleTest {
     }
 
     @Test
-    void switchingOffAConnectionThatNeverRanDailyIsNotSaved() {
+    void switchingOffAConnectionThatNeverHadTheSettingSavesItAsOff() {
         // given
-        when(storesRepository.findById(STORE_ID)).thenReturn(storeConnectedTo(EMPIK, null));
+        Store store = storeConnectedTo(EMPIK, null);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
 
         // when
-        schedule.set(STORE_ID, EMPIK, false);
+        boolean changed = schedule.set(STORE_ID, EMPIK, false);
 
         // then
+        assertThat(changed).isTrue();
+        verify(storesRepository).save(store);
+        assertThat(store.getMarketplaceIntegration(EMPIK).getOfferMatchingScheduled()).isFalse();
+    }
+
+    @Test
+    void aManualRunSwitchesOnAConnectionThatNeverHadTheSetting() {
+        // given
+        Store store = storeConnectedTo(EMPIK, null);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+
+        // when
+        boolean switchedOn = schedule.enableIfNeverSet(STORE_ID, EMPIK);
+
+        // then
+        assertThat(switchedOn).isTrue();
+        verify(storesRepository).save(store);
+        assertThat(store.getMarketplaceIntegration(EMPIK).runsOfferMatchingDaily()).isTrue();
+    }
+
+    @Test
+    void aManualRunLeavesAConnectionSwitchedOffByTheOperatorOff() {
+        // given
+        Store store = storeConnectedTo(EMPIK, false);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+
+        // when
+        boolean switchedOn = schedule.enableIfNeverSet(STORE_ID, EMPIK);
+
+        // then
+        assertThat(switchedOn).isFalse();
+        verify(storesRepository, never()).save(any());
+        assertThat(store.getMarketplaceIntegration(EMPIK).runsOfferMatchingDaily()).isFalse();
+    }
+
+    @Test
+    void aManualRunOnAConnectionAlreadyRunningDailySavesNothing() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(storeConnectedTo(EMPIK, true));
+
+        // when
+        boolean switchedOn = schedule.enableIfNeverSet(STORE_ID, EMPIK);
+
+        // then
+        assertThat(switchedOn).isFalse();
         verify(storesRepository, never()).save(any());
     }
 
