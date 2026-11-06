@@ -6,7 +6,7 @@
 
     <groupId>pl.commercelink</groupId>
     <artifactId>commercelink</artifactId>
-    <version>2026.11.10</version>
+    <version>2026.11.11</version>
     <packaging>jar</packaging>
 
     <parent>
@@ -109,7 +109,7 @@
         <dependency>
             <groupId>pl.commercelink</groupId>
             <artifactId>marketplace-api</artifactId>
-            <version>0.9.0</version>
+            <version>0.9.1</version>
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>

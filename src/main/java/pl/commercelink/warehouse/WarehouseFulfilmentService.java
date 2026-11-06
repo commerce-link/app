@@ -70,6 +70,7 @@ public class WarehouseFulfilmentService {
                 remainingItem.setComment(orderItem.getComment());
                 remainingItem.setExternalItemId(orderItem.getExternalItemId());
                 remainingItem.setExternalOfferKey(orderItem.getExternalOfferKey());
+                remainingItem.setExternalOfferSource(orderItem.getExternalOfferSource());
                 fulfilledOrderItems.add(remainingItem);
             }
 
@@ -100,6 +101,7 @@ public class WarehouseFulfilmentService {
         newItem.setComment(orderItem.getComment());
         newItem.setExternalItemId(orderItem.getExternalItemId());
         newItem.setExternalOfferKey(orderItem.getExternalOfferKey());
+        newItem.setExternalOfferSource(orderItem.getExternalOfferSource());
         newItem.copyFulfilmentFrom(confirmation);
         return newItem;
     }

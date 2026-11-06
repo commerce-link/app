@@ -143,6 +143,7 @@ class ExternalOfferLinkingImportParityTest {
         assertThat(linked.getEan()).isEqualTo(imported.getEan());
         assertThat(linked.getManufacturerCode()).isEqualTo(imported.getManufacturerCode()).isNull();
         assertThat(linked.getCategory()).isEqualTo(imported.getCategory());
+        assertThat(linked.getExternalOfferSource()).isEqualTo(imported.getExternalOfferSource());
         assertThat(linked.hasUnlinkedExternalOffer()).isEqualTo(imported.hasUnlinkedExternalOffer()).isFalse();
     }
 

@@ -171,11 +171,15 @@ public class ExternalOfferLinking {
                 continue;
             }
             boolean isChosen = item.getItemId().equals(chosen.getItemId());
-            if (!isChosen && !item.hasUnlinkedExternalOffer()
+            // a link outranks a manufacturer code in the resolver, but only a line nobody categorised or re-skued since
+            // is re-filled, as before the source was stored
+            boolean recognisedByManufacturerCode = item.getExternalOfferSource() == ResolvedOffer.Source.MFN
+                    && item.looksUnlinkedByCode();
+            if (!isChosen && !item.hasUnlinkedExternalOffer() && !recognisedByManufacturerCode
                     && (replacedSku == null || !replacedSku.equals(item.getSku()))) {
                 continue;
             }
-            List<String> before = valuesOf(item);
+            List<Object> before = valuesOf(item);
             offer.replace(item);
             // a repeated link changes nothing, and the count says what was filled
             if (before.equals(valuesOf(item))) {
@@ -191,8 +195,10 @@ public class ExternalOfferLinking {
         return new LinkResult(updated);
     }
 
-    private static List<String> valuesOf(OrderItem item) {
-        return Arrays.asList(item.getSku(), item.getEan(), item.getManufacturerCode(), item.getCategory());
+    // the source is compared too: an item stored before the source existed may already carry the link's codes
+    private static List<Object> valuesOf(OrderItem item) {
+        return Arrays.asList(item.getSku(), item.getEan(), item.getManufacturerCode(), item.getCategory(),
+                item.getExternalOfferSource());
     }
 
     private static String marketplaceOf(Order order) {

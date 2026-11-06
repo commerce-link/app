@@ -77,7 +77,10 @@ public class ExternalOfferLink {
         return new ArrayList<>(unified);
     }
 
-    /** Not normalised: the offer key comes from the orders' source and is stable, so it is matched verbatim. */
+    /**
+     * Not normalised: the offer key comes from the orders' source and is matched verbatim. It is not stable on every
+     * marketplace (an Allegro signature can be edited), so a changed key needs a new link.
+     */
     public static String linkKey(String orderSource, String offerKey) {
         return orderSource + "#" + offerKey;
     }

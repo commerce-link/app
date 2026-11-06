@@ -29,6 +29,7 @@ import pl.commercelink.stores.Store;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -471,6 +472,38 @@ class MarketplaceOrderImporterTest {
         OrderItem item = productItem();
         assertNull(item.getExternalOfferKey());
         assertFalse(item.hasUnlinkedExternalOffer());
+    }
+
+    @Test
+    void storesTheResolutionSourceOfEachLine() {
+        // given four lines: a link, an own offer, a manufacturer code and one nothing recognised
+        when(storeOffers.resolve("Empik", "K1", "C1")).thenReturn(Optional.of(
+                new ResolvedOffer(null, "2000000001012", null, null, ResolvedOffer.Source.LINK)));
+        when(storeOffers.resolve("Empik", "K2", "C2")).thenReturn(Optional.of(
+                new ResolvedOffer("K2", "2000000001029", "M2", "Lampy", ResolvedOffer.Source.OWN_OFFER)));
+        when(storeOffers.resolve("Empik", "K3", "C3")).thenReturn(Optional.of(
+                new ResolvedOffer("pim-3", "2000000001036", "M3", "Lampy", ResolvedOffer.Source.MFN)));
+        when(storeOffers.resolve("Empik", "K4", "C4")).thenReturn(Optional.empty());
+        MarketplaceOrder base = orderWithProduct("C1", "K1");
+        List<MarketplaceProduct> products = List.of(
+                new MarketplaceProduct("Widget 1", "C1", new BigDecimal("100.00"), 1, BigDecimal.ZERO, "K1"),
+                new MarketplaceProduct("Widget 2", "C2", new BigDecimal("100.00"), 1, BigDecimal.ZERO, "K2"),
+                new MarketplaceProduct("Widget 3", "C3", new BigDecimal("100.00"), 1, BigDecimal.ZERO, "K3"),
+                new MarketplaceProduct("Widget 4", "C4", new BigDecimal("100.00"), 1, BigDecimal.ZERO, "K4"));
+        MarketplaceOrder order = new MarketplaceOrder(base.externalOrderId(), base.customer(), products,
+                base.shipping(), base.paymentType(), base.paymentTransactionId());
+
+        // when
+        importer.importOrder(storeWithId("store-1"), "Empik", order);
+
+        // then
+        Map<String, ResolvedOffer.Source> sourceByKey = new HashMap<>();
+        capturedOrderItems().stream().filter(i -> !i.isService())
+                .forEach(i -> sourceByKey.put(i.getExternalOfferKey(), i.getExternalOfferSource()));
+        assertEquals(ResolvedOffer.Source.LINK, sourceByKey.get("K1"));
+        assertEquals(ResolvedOffer.Source.OWN_OFFER, sourceByKey.get("K2"));
+        assertEquals(ResolvedOffer.Source.MFN, sourceByKey.get("K3"));
+        assertNull(sourceByKey.get("K4"));
     }
 
     private OrderItem productItem() {

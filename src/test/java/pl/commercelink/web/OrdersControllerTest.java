@@ -18,6 +18,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.externaloffers.ExternalOfferLinking;
+import pl.commercelink.externaloffers.ResolvedOffer;
 import pl.commercelink.products.Product;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierChoice;
@@ -3937,6 +3938,23 @@ class OrdersControllerTest {
             // then
             assertThat(linked.getSku()).isEqualTo("DMW-9");
             assertThat(linked.getEan()).isNull();
+        }
+
+        @Test
+        void assignSkuClearsTheSourceThatRecognisedTheItem() {
+            // given
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.New));
+            OrderItem recognised = item("i1", FulfilmentStatus.New, "MFN-77");
+            recognised.setExternalOfferSource(ResolvedOffer.Source.MFN);
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(recognised);
+
+            // when
+            ordersController.assignSku(ORDER_ID, "i1", "DMW-9", new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(recognised.getSku()).isEqualTo("DMW-9");
+            assertThat(recognised.getExternalOfferSource()).isNull();
+            verify(orderItemsRepository).save(recognised);
         }
 
         @Test
