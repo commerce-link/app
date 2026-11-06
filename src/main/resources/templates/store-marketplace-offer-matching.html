@@ -54,6 +54,25 @@
                     </form>
                 </section>
 
+                <!--/* Saves at once (the switch submits the opposite state), like the integration switches of Reporting. */-->
+                <form th:fragment="scheduleForm" id="offer-matching-schedule" class="cl-form cl-card"
+                      th:action="@{${scheduleFormAction}}" method="post" novalidate data-cl-async
+                      th:attr="data-success-message=${savedMessage}, data-error-message=#{form.save.failed}">
+                    <input type="hidden" name="scheduled" th:value="${!scheduled}">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="offer-matching-schedule-title" th:text="#{store.marketplaces.offer.matching.schedule.title}"></h2>
+                        <button type="submit" class="cl-switch" id="offer-matching-schedule-switch" role="switch"
+                                th:attr="aria-checked=${scheduled}" aria-labelledby="offer-matching-schedule-title">
+                            <span class="cl-swap" th:classappend="${scheduled} ? 'is-swapped'" aria-hidden="true">
+                                <span class="cl-swap-a" th:text="#{store.marketplaces.offer.matching.schedule.off}"></span>
+                                <span class="cl-swap-b" th:text="#{store.marketplaces.offer.matching.schedule.on}"></span>
+                            </span>
+                            <span class="cl-switch-track" aria-hidden="true"><span class="cl-switch-thumb"></span></span>
+                        </button>
+                    </div>
+                    <p class="cl-card-desc" th:text="#{store.marketplaces.offer.matching.schedule.description(${displayName})}"></p>
+                </form>
+
                 <th:block th:if="${matching != null}">
                     <!--/* is-orders: the list reset and spacing shared by the read-only tiles of payments and the statement */-->
                     <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{store.marketplaces.offer.matching.stats}">
@@ -133,6 +152,7 @@
         </div>
     </section>
     <script th:src="@{/js/submit-once.js}" defer></script>
+    <script th:src="@{/js/async-form.js}" defer></script>
 </div>
 </body>
 </html>
