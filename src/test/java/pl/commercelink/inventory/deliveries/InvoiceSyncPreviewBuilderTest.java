@@ -22,10 +22,16 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class InvoiceSyncPreviewBuilderTest {
+
+    private static final String EAN_A = "5901234123457";
+    private static final String EAN_B = "5901234123464";
+    private static final String EAN_C = "5901234123471";
+    private static final String SHARED_MFN = "SHOE-1";
 
     @Mock
     private StoresRepository storesRepository;
@@ -50,7 +56,7 @@ class InvoiceSyncPreviewBuilderTest {
         delivery.setDeliveryId("delivery-1");
         delivery.setOrderedAt(LocalDateTime.of(2026, 10, 6, 9, 30));
         delivery.addPayment(Payment.outgoingBankTransfer("FV/1", null, 100.0));
-        delivery.setItems(List.of(item("MFN-1", 2, 50.0)));
+        delivery.setItems(List.of(item(EAN_A, 2, 50.0)));
         when(deliveriesQueryService.fetchDeliveryWithAllocations("store-1", "delivery-1")).thenReturn(delivery);
         when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
         Invoice invoice = new Invoice("inv-1", "FV/1", null, Price.fromNet(100.0), null, "PLN", 1.0, false,
@@ -78,8 +84,8 @@ class InvoiceSyncPreviewBuilderTest {
         when(storesRepository.findById("store-1")).thenReturn(store);
         Delivery delivery = new Delivery("store-1", "ZK/1", "Acme");
         delivery.setDeliveryId("delivery-1");
-        delivery.setAllocations(List.of(allocation("MFN-C"), allocation("MFN-A"), allocation("MFN-B"), allocation("MFN-A")));
-        delivery.setItems(List.of(item("MFN-A", 1, 10.0), item("MFN-B", 1, 20.0), item("MFN-C", 1, 30.0)));
+        delivery.setAllocations(List.of(allocation(EAN_C), allocation(EAN_A), allocation(EAN_B), allocation(EAN_A)));
+        delivery.setItems(List.of(item(EAN_A, 1, 10.0), item(EAN_B, 1, 20.0), item(EAN_C, 1, 30.0)));
         when(deliveriesQueryService.fetchDeliveryWithAllocations("store-1", "delivery-1")).thenReturn(delivery);
         when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
         Invoice invoice = new Invoice("inv-1", "FV/1", null, Price.fromNet(60.0), null, "PLN", 1.0, false, null, List.of(),
@@ -90,7 +96,31 @@ class InvoiceSyncPreviewBuilderTest {
         InvoiceSyncPreview preview = builder.build("store-1", "delivery-1", "inv-1");
 
         // then
-        assertThat(preview.getMappings()).extracting(InvoiceSyncPreview.Mapping::getMfn).containsExactly("MFN-C", "MFN-A", "MFN-B");
+        assertThat(preview.getMappings()).extracting(InvoiceSyncPreview.Mapping::getEan).containsExactly(EAN_C, EAN_A, EAN_B);
+    }
+
+    @Test
+    void twoProductsUnderOneCodeGetTheirOwnRows() {
+        // given
+        Store store = new Store();
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        Delivery delivery = new Delivery("store-1", "ZK/1", "Acme");
+        delivery.setDeliveryId("delivery-1");
+        delivery.setAllocations(List.of(allocation(EAN_B), allocation(EAN_A)));
+        delivery.setItems(List.of(item(EAN_A, 1, 100.0), item(EAN_B, 1, 120.0)));
+        when(deliveriesQueryService.fetchDeliveryWithAllocations("store-1", "delivery-1")).thenReturn(delivery);
+        when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
+        Invoice invoice = new Invoice("inv-1", "FV/1", null, Price.fromNet(220.0), null, "PLN", 1.0, false, null, List.of(),
+                BillingParty.company("seller-1", "Acme S.A.", null, null, null, null, null, "ACME"), null);
+        when(invoicingProvider.fetchInvoiceById("inv-1", InvoiceDirection.Purchase)).thenReturn(invoice);
+
+        // when
+        InvoiceSyncPreview preview = builder.build("store-1", "delivery-1", "inv-1");
+
+        // then
+        assertThat(preview.getMappings())
+                .extracting(InvoiceSyncPreview.Mapping::getEan, InvoiceSyncPreview.Mapping::getMfn, InvoiceSyncPreview.Mapping::getUnitCost)
+                .containsExactly(tuple(EAN_B, SHARED_MFN, 120.0), tuple(EAN_A, SHARED_MFN, 100.0));
     }
 
     @Test
@@ -100,7 +130,7 @@ class InvoiceSyncPreviewBuilderTest {
         when(storesRepository.findById("store-1")).thenReturn(store);
         Delivery delivery = new Delivery("store-1", "W6XDAEXETN", "Wave");
         delivery.setDeliveryId("delivery-1");
-        delivery.setItems(List.of(item("X870EAPROXICE", 1, 1311.66)));
+        delivery.setItems(List.of(item(EAN_A, 1, 1311.66)));
         when(deliveriesQueryService.fetchDeliveryWithAllocations("store-1", "delivery-1")).thenReturn(delivery);
         when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
         // as Fakturownia returns it: totals in EUR, every line converted with the invoice's rate (299.09 EUR x 4.3855)
@@ -128,16 +158,18 @@ class InvoiceSyncPreviewBuilderTest {
         assertThat(builder.build("store-1", "missing", "inv-1")).isNull();
     }
 
-    private static Allocation allocation(String mfn) {
+    private static Allocation allocation(String ean) {
         Allocation allocation = new Allocation();
-        allocation.setMfn(mfn);
+        allocation.setEan(ean);
+        allocation.setMfn(SHARED_MFN);
         return allocation;
     }
 
-    private static DeliveryItem item(String mfn, int qty, double unitCost) {
+    private static DeliveryItem item(String ean, int qty, double unitCost) {
         DeliveryItem item = new DeliveryItem();
-        item.setName("Product " + mfn);
-        item.setMfn(mfn);
+        item.setName("Product " + ean);
+        item.setEan(ean);
+        item.setMfn(SHARED_MFN);
         item.setOrderedQty(qty);
         item.setUnitCost(unitCost);
         return item;

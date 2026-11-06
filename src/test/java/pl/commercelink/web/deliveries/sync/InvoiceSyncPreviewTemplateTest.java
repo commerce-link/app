@@ -52,7 +52,9 @@ class InvoiceSyncPreviewTemplateTest {
         String html = render(typical());
 
         // then
-        assertThat(html).contains("name=\"mappings[0].selectedPositionId\"").contains("name=\"mappings[0].mfn\"")
+        assertThat(html).contains("name=\"mappings[0].selectedPositionId\"")
+                .containsPattern("name=\"mappings\\[0]\\.ean\" value=\"5901234123457\"|value=\"5901234123457\" name=\"mappings\\[0]\\.ean\"")
+                .doesNotContain("name=\"mappings[0].mfn\"")
                 .contains("name=\"shippingCostPositionId\"").contains("name=\"paymentCostPositionId\"")
                 .contains("name=\"deliveryId\"").contains("name=\"invoiceShortcut\"")
                 .containsPattern("<option value=\"p1\"[^>]* selected=\"selected\">3\u00a0249,00 PLN · 2 × Laptop</option>")
@@ -197,8 +199,9 @@ class InvoiceSyncPreviewTemplateTest {
         preview.setShippingCostPositionId("p4");
         preview.setOptions(List.of(option("p1", 2, "Laptop", 3249.00), option("p2", 4, "Monitor", 590.00),
                 option("p3", 2, "Stacja", 1200.00), option("p4", 1, "Transport", 35.00), option("p5", 1, "Opłata BDO", 2.40)));
-        preview.setMappings(new ArrayList<>(List.of(mapping("MFN-1", "Laptop E14", 2, 3249.00, "p1"),
-                mapping("MFN-2", "Monitor P2425H", 4, 589.99, "p2"), mapping("MFN-3", "Dock Gen 2", 2, 719.00, null))));
+        preview.setMappings(new ArrayList<>(List.of(mapping("5901234123457", "MFN-1", "Laptop E14", 2, 3249.00, "p1"),
+                mapping("5901234123464", "MFN-2", "Monitor P2425H", 4, 589.99, "p2"),
+                mapping("5901234123471", "MFN-3", "Dock Gen 2", 2, 719.00, null))));
         return preview;
     }
 
@@ -213,8 +216,10 @@ class InvoiceSyncPreviewTemplateTest {
         return option;
     }
 
-    private static InvoiceSyncPreview.Mapping mapping(String mfn, String name, int qty, double unitCost, String positionId) {
+    private static InvoiceSyncPreview.Mapping mapping(String ean, String mfn, String name, int qty, double unitCost,
+                                                      String positionId) {
         InvoiceSyncPreview.Mapping mapping = new InvoiceSyncPreview.Mapping();
+        mapping.setEan(ean);
         mapping.setMfn(mfn);
         mapping.setName(name);
         mapping.setQty(qty);
