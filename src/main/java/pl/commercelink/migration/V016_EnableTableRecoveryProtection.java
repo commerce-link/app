@@ -19,6 +19,7 @@ import org.springframework.context.annotation.Profile;
 import pl.commercelink.carriers.Carrier;
 import pl.commercelink.carriers.CarrierDictionary;
 import pl.commercelink.discounts.DiscountCode;
+import pl.commercelink.externaloffers.ExternalOfferLink;
 import pl.commercelink.notifications.StoreNotificationRecord;
 import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.scheduling.DailyScheduleExecutionCount;
@@ -56,6 +57,7 @@ public class V016_EnableTableRecoveryProtection {
             "OrderItems",
             "Orders",
             "Products",
+            ExternalOfferLink.TABLE_NAME,
             ReceiptAttempt.TABLE_NAME,
             "RMA",
             "RMACenters",

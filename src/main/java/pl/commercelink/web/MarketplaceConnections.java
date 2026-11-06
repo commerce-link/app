@@ -101,7 +101,8 @@ class MarketplaceConnections {
                         .sorted(String.CASE_INSENSITIVE_ORDER)
                         .toList(),
                 base, deviceFlow ? base + "/authorize" : null, base + "/disconnect",
-                marketplacesPath + "/exports/" + name);
+                marketplacesPath + "/exports/" + name,
+                descriptor != null && descriptor.supportsOfferListing() ? base + "/offer-matching" : null);
     }
 
     private String ordersText(MarketplaceIntegration integration, Locale locale) {

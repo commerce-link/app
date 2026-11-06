@@ -24,7 +24,7 @@ public class WarehouseFulfilmentService {
         List<OrderItem> warehouseFulfillableItems = orderItems.stream().filter(OrderItem::isWarehouseFulfilled).toList();
 
         List<ReservationItem> reservationItems = warehouseFulfillableItems.stream()
-                .map(i -> new ReservationItem(i.getItemId(), i.getManufacturerCode(), i.getQty(), i.getWarehouseItemId()))
+                .map(i -> new ReservationItem(i.getItemId(), i.getEan(), i.getQty(), i.getWarehouseItemId()))
                 .collect(Collectors.toList());
 
         Reservation reservation = Reservation.orderFulfilment(
@@ -69,6 +69,8 @@ public class WarehouseFulfilmentService {
                 );
                 remainingItem.setComment(orderItem.getComment());
                 remainingItem.setExternalItemId(orderItem.getExternalItemId());
+                remainingItem.setExternalOfferKey(orderItem.getExternalOfferKey());
+                remainingItem.setExternalOfferSource(orderItem.getExternalOfferSource());
                 fulfilledOrderItems.add(remainingItem);
             }
 
@@ -98,6 +100,8 @@ public class WarehouseFulfilmentService {
         );
         newItem.setComment(orderItem.getComment());
         newItem.setExternalItemId(orderItem.getExternalItemId());
+        newItem.setExternalOfferKey(orderItem.getExternalOfferKey());
+        newItem.setExternalOfferSource(orderItem.getExternalOfferSource());
         newItem.copyFulfilmentFrom(confirmation);
         return newItem;
     }

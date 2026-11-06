@@ -59,7 +59,6 @@ class OfferItemReloaderTest {
     void setupInventory() {
         when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.PRICING)).thenReturn(inventoryView);
         when(inventoryView.findByEan(any())).thenReturn(MatchedInventory.empty(new InventoryKey()));
-        when(inventoryView.findByProductCode(any())).thenReturn(MatchedInventory.empty(new InventoryKey()));
     }
 
     @Test
@@ -147,18 +146,17 @@ class OfferItemReloaderTest {
     }
 
     @Test
-    void anOlderLineWithTheManufacturerCodeIsStillFound() {
+    void anOlderLineWithTheManufacturerCodeIsNotFound() {
         // given
         BasketItem item = basketItemWithSku("MFN-A", 0.0);
         MatchedInventory offered = offeredAt(100, 200, 2);
-        when(inventoryView.findByProductCode("MFN-A")).thenReturn(offered);
         when(inventoryView.findByEan("5900000000014")).thenReturn(offered);
 
         // when
         List<OfferItem> offerItems = offerItemReloader.reload(basketWith(item));
 
         // then
-        assertThat(offerItems).singleElement().satisfies(o -> assertThat(o.isExistInInventory()).isTrue());
+        assertThat(offerItems).singleElement().satisfies(o -> assertThat(o.isExistInInventory()).isFalse());
     }
 
     @Test

@@ -44,7 +44,6 @@ class InventorySearchScopeTest {
     private InventorySearch search() {
         MatchedInventory none = new MatchedInventory(new InventoryKey(), taxonomyCache, supplierRegistry);
         when(view.findByEan(anyString())).thenReturn(none);
-        when(view.findByProductCode(anyString())).thenReturn(none);
         when(view.findByInventoryKey(any())).thenReturn(none);
         when(inventory.withEnabledSuppliersOnly(anyString())).thenReturn(view);
         when(inventory.withGlobalData()).thenReturn(view);

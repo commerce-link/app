@@ -238,6 +238,58 @@ class ProductsAddReviewScopeTest {
     }
 
     @Test
+    void productWithTheSameCodeButAnotherEanIsNotADuplicate() {
+        // given
+        ProductsAddReview review = review(ScopedPimCatalog.of());
+        when(productRepository.findAll(anyString())).thenReturn(List.of(
+                new Product(null, null, "5900000000111", MFN, "Brand", "L", "Held", "Default")));
+        CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
+        ProductsBulkAddForm form = ProductsBulkAddForm.of(List.of(
+                new Product(null, null, EAN_UNKNOWN_TO_PIM, MFN, "Brand", "L", "New", "Default")));
+
+        // when
+        int added = review.save("s1", category, form);
+
+        // then
+        assertThat(added).isEqualTo(1);
+    }
+
+    @Test
+    void reviewKeepsAGroupSharingOnlyTheCode() {
+        // given
+        ProductsAddReview review = review(catalog());
+        when(productRepository.findAll(anyString())).thenReturn(List.of(
+                new Product(null, null, "5900000000111", MFN, "Brand", "L", "Held", "Default")));
+        CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
+
+        // when
+        ProductsAddReview.Prepared prepared = review.prepare("s2", category, List.of(EAN), null);
+
+        // then
+        assertThat(prepared.skippedExisting()).isEmpty();
+        assertThat(prepared.form().getProducts()).hasSize(1);
+    }
+
+    @Test
+    void productWithTheSameEanIsADuplicateDespiteAnotherPimId() {
+        // given
+        ProductsAddReview review = review(catalog());
+        MatchedInventory groupOfG2 = mock(MatchedInventory.class);
+        when(groupOfG2.isEmpty()).thenReturn(false);
+        when(groupOfG2.getInventoryKey()).thenReturn(InventoryKey.fromPimIdAndEan("g2", EAN));
+        when(view.findByEan(EAN)).thenReturn(groupOfG2);
+        when(productRepository.findAll(anyString())).thenReturn(List.of(
+                new Product(null, "g1", EAN, "OTHER-1", "Other", "L", "Held", "Default")));
+        CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
+
+        // when
+        ProductsAddReview.Prepared prepared = review.prepare("s2", category, List.of(EAN), null);
+
+        // then
+        assertThat(prepared.skippedExisting()).containsExactly(EAN);
+    }
+
+    @Test
     void pimEntryFoundOnlyByCodeIsNotAttached() {
         // given
         PimEntry kingston = globalEntryOfBrand("Kingston");

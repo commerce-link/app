@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -31,8 +30,10 @@ class FulfilmentGroupsGeneratorCandidateFilterTest {
         return item;
     }
 
+    private static final String EAN = "5900000000014";
+
     private static OrderItem productItem() {
-        return new OrderItem("order-1", "Category", "Product", 1, 199.99, "MFN-1", false);
+        return new OrderItem("order-1", "Category", "Product", 1, 199.99, EAN, false);
     }
 
     private static InventoryItem warehouseItem() {
@@ -66,8 +67,7 @@ class FulfilmentGroupsGeneratorCandidateFilterTest {
     @DisplayName("a routed order falls back to its supplier when warehouse stock is not permitted")
     void routedOrderFallsBackToSupplierCandidatesWhenWarehouseStockIsNotPermitted() {
         // given
-        when(inventory.findByEan("MFN-1")).thenReturn(MatchedInventory.empty(new InventoryKey()));
-        when(inventory.findByProductCode("MFN-1")).thenReturn(matchedInventory);
+        when(inventory.findByEan(EAN)).thenReturn(matchedInventory);
         when(matchedInventory.getInventoryItems()).thenReturn(List.of(warehouseItem(), acmeItem()));
 
         FulfilmentGroupsGenerator generator = FulfilmentGroupsGenerator.builder()
@@ -87,8 +87,7 @@ class FulfilmentGroupsGeneratorCandidateFilterTest {
     @DisplayName("an unrouted order still prefers warehouse stock")
     void unroutedOrderStillPrefersWarehouseStock() {
         // given
-        when(inventory.findByEan("MFN-1")).thenReturn(MatchedInventory.empty(new InventoryKey()));
-        when(inventory.findByProductCode("MFN-1")).thenReturn(matchedInventory);
+        when(inventory.findByEan(EAN)).thenReturn(matchedInventory);
         when(matchedInventory.getInventoryItems()).thenReturn(List.of(warehouseItem(), acmeItem()));
 
         FulfilmentGroupsGenerator generator = FulfilmentGroupsGenerator.builder()
@@ -107,8 +106,7 @@ class FulfilmentGroupsGeneratorCandidateFilterTest {
     @DisplayName("an item without offers keeps the manual placeholder")
     void itemWithoutOffersKeepsTheManualPlaceholder() {
         // given
-        when(inventory.findByEan("MFN-1")).thenReturn(MatchedInventory.empty(new InventoryKey()));
-        when(inventory.findByProductCode("MFN-1")).thenReturn(matchedInventory);
+        when(inventory.findByEan(EAN)).thenReturn(matchedInventory);
         when(matchedInventory.getInventoryItems()).thenReturn(List.of());
 
         FulfilmentGroupsGenerator generator = FulfilmentGroupsGenerator.builder()

@@ -9,6 +9,7 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.web.OrderOptionsModel;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
@@ -69,12 +70,12 @@ final class WarehouseDeliveryScope implements DeliveryScope {
     @Override
     public List<SuggestedDeliveryItem> suggestions() {
         Delivery delivery = planning.run(storeId, provider);
-        Set<String> plannedMfns = delivery == null ? Set.of() : delivery.getAllocations().stream()
-                .map(Allocation::getMfn)
+        Set<String> plannedEans = delivery == null ? Set.of() : delivery.getAllocations().stream()
+                .map(Allocation::getEan)
                 .filter(Objects::nonNull)
-                .map(String::toLowerCase)
+                .map(UnifiedProductIdentifiers::unifyEan)
                 .collect(Collectors.toSet());
-        return restockSuggestions.suggestForDelivery(storeId, provider, plannedMfns).stream()
+        return restockSuggestions.suggestForDelivery(storeId, provider, plannedEans).stream()
                 .map(SuggestedDeliveryItem::from)
                 .collect(Collectors.toList());
     }

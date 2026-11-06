@@ -1,5 +1,6 @@
 package pl.commercelink.web.orders;
 
+import pl.commercelink.externaloffers.ExternalOfferResolver;
 import pl.commercelink.shipping.ShippingIntegrationNamesFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -113,7 +114,7 @@ class OrderPageModelFactoryTest {
         factory = new OrderPageModelFactory(storesRepository, orderEventsRepository, dropshipItemLookup,
                 deliveryRedirectResolver, dropshipEligibility, supplierLabels, shipmentCarrierOptions, productCatalogRepository, taxonomyCache,
                 messageSource, receiptAttemptService, receiptAlerts, shippingService,
-                ShippingIntegrationNamesFixture.names());
+                ShippingIntegrationNamesFixture.names(), mock(pl.commercelink.externaloffers.ExternalOfferResolver.class));
         ReflectionTestUtils.setField(factory, "appDomain", "https://app.example");
         Store store = new Store();
         store.setStoreId("store-1");
@@ -954,7 +955,7 @@ class OrderPageModelFactoryTest {
                 dropshipItemLookup, deliveryRedirectResolver, dropshipEligibility, supplierLabels,
                 new ShipmentCarrierOptions(mock(CarriersRepository.class)), productCatalogRepository, taxonomyCache,
                 messageSource, receiptAttemptService, receiptAlerts, realShipping,
-                ShippingIntegrationNamesFixture.names());
+                ShippingIntegrationNamesFixture.names(), mock(pl.commercelink.externaloffers.ExternalOfferResolver.class));
         ReflectionTestUtils.setField(withRealShipping, "appDomain", "https://app.example");
 
         // when

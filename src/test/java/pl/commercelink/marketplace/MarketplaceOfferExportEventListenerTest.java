@@ -20,8 +20,17 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.marketplace.api.MarketplaceExportReport;
+import pl.commercelink.marketplace.api.MarketplaceListedOffer;
 import pl.commercelink.marketplace.api.MarketplaceOffer;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
+import pl.commercelink.externaloffers.ExternalOfferLink;
+import pl.commercelink.externaloffers.ExternalOfferLinkRepository;
+import pl.commercelink.externaloffers.ExternalOfferLinkSource;
+import pl.commercelink.marketplace.api.MarketplaceOffersPage;
+import pl.commercelink.marketplace.offermatching.MarketplaceOfferMatching;
+import pl.commercelink.marketplace.offermatching.OfferMatchProgress;
+import pl.commercelink.pim.ScopedPimCatalog;
+import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
@@ -36,9 +45,12 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,6 +63,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -80,6 +93,7 @@ class MarketplaceOfferExportEventListenerTest {
     @Mock private MarketplaceProvider provider;
     @Mock private StoreActivity storeActivity;
     @Mock private StorePimAliases aliases;
+    @Mock private ExternalOfferLinkRepository offerLinks;
 
     @InjectMocks
     private MarketplaceOfferExportEventListener listener;
@@ -182,8 +196,8 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     @Test
-    void afterDeletingTheCloneTheOfferIdIsUnchanged() {
-        // given the product is back on S, the pricelist was built while the clone existed and still carries a C row
+    void productWithoutItsPricelistRowIsNotOfferedInThisRun() {
+        // given the product is back on S, the pricelist was built while the clone existed and carries only a C row
         Product product = product("source-S", "EAN-A");
         configureCategoryWith(warehouseDefinition(5), product, 10);
         usePricelist(new Pricelist(PRICELIST_ID, List.of(row("clone-C", product, 100))));
@@ -193,10 +207,10 @@ class MarketplaceOfferExportEventListenerTest {
         listener.handleMessage(request());
 
         // then
-        assertThat(captureRemovedOffers()).isEmpty();
-        assertThat(capturePublishedOffers()).singleElement().satisfies(offer -> {
+        assertThat(capturePublishedOffers()).isEmpty();
+        assertThat(captureRemovedOffers()).singleElement().satisfies(offer -> {
             assertThat(offer.productId()).isEqualTo("source-S");
-            assertThat(offer.price()).isEqualTo(100L);
+            assertThat(offer.quantity()).isZero();
         });
     }
 
@@ -436,23 +450,43 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     @Test
-    void aSkippedProductWithoutEanShieldsAPreviousOfferWithoutEanByManufacturerCode() {
+    void previousOfferIsProtectedOnlyByEan() {
         // given
-        Product product = product("clone-C", null);
+        Product product = product("clone-C", "5900000000011");
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
         when(aliases.knows(STORE_ID, "clone-C")).thenReturn(false);
-        MarketplaceOfferSnapshot withoutEan = MarketplaceOfferSnapshot.published("source-S", 100L, 10L, null, " mfn-clone-c ");
-        previousSnapshotContains(withoutEan,
-                // a snapshot with an EAN is matched by its EAN only, even when the manufacturer code is the same
-                MarketplaceOfferSnapshot.published("pim-Y", 100L, 10L, "5900000000099", "MFN-clone-C"));
+        MarketplaceOfferSnapshot withEan = MarketplaceOfferSnapshot.published("source-S", 100L, 10L, "5900000000011", "MFN-S");
+        previousSnapshotContains(withEan,
+                MarketplaceOfferSnapshot.published("pim-Y", 100L, 10L, null, " mfn-clone-c "));
 
         // when
         listener.handleMessage(request());
 
-        // then
+        // then the offer with the product's EAN waits; the one sharing only its manufacturer code is taken off
         assertThat(captureRemovedOffers()).extracting(MarketplaceOffer::productId).containsExactly("pim-Y");
-        assertThat(captureSavedRows()).contains(withoutEan.withWaitingRuns(1));
+        assertThat(captureSavedRows()).contains(withEan.withWaitingRuns(1));
+    }
+
+    @Test
+    void previousOfferWithoutEanProtectsNothing() {
+        // given the only previous offer carries the product's manufacturer code but no EAN
+        Product product = product("clone-C", "5900000000011");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        when(aliases.knows(STORE_ID, "clone-C")).thenReturn(false);
+        previousSnapshotContains(MarketplaceOfferSnapshot.published("source-S", 100L, 10L, null, "MFN-clone-C"));
+
+        try (LogCapture logs = LogCapture.start()) {
+            // when
+            listener.handleMessage(request());
+
+            // then
+            assertThat(capturePublishedOffers()).extracting(MarketplaceOffer::productId).containsExactly("clone-C");
+            assertThat(captureRemovedOffers()).extracting(MarketplaceOffer::productId).containsExactly("source-S");
+            assertThat(logs.warnings()).singleElement().satisfies(warning -> assertThat(warning)
+                    .contains("clone-C").contains("re-pin"));
+        }
     }
 
     @Test
@@ -951,6 +985,344 @@ class MarketplaceOfferExportEventListenerTest {
         assertThat(run.isFailed()).isFalse();
     }
 
+    @Test
+    void skipsProductLinkedToForeignOffer() {
+        // given EAN-1 is linked to the offer PS-8001 another system published; pim-2 has no link
+        Product linked = product("pim-1", "EAN-1");
+        Product unlinked = product("pim-2", "EAN-2");
+        configureCategoryWith(warehouseDefinition(5), List.of(linked, unlinked), 10);
+        priceFor(linked, 100, 2);
+        priceFor(unlinked, 200, 2);
+        linksOnTheMarketplace(link("PS-8001", "EAN-1"));
+
+        try (LogCapture logs = LogCapture.start()) {
+            // when
+            listener.handleMessage(request());
+
+            // then
+            assertThat(capturePublishedOffers()).extracting(MarketplaceOffer::productId).containsExactly("pim-2");
+            assertThat(captureSavedRows()).extracting(MarketplaceOfferSnapshot::pimId).containsExactly("pim-2");
+            assertThat(logs.warnings()).singleElement().satisfies(warning -> assertThat(warning)
+                    .contains(STORE_ID).contains(MARKETPLACE).contains("1 product"));
+        }
+        verify(offerLinks, times(1)).findAll(STORE_ID, MARKETPLACE);
+    }
+
+    @Test
+    void skipsAClonedProductWhoseEanIsLinkedToForeignOffer() {
+        // given the clone C of S is exported under S's offer id, which is not the offer the EAN is linked to
+        Product product = product("clone-C", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        when(aliases.offerIdOf(STORE_ID, "clone-C")).thenReturn("source-S");
+        linksOnTheMarketplace(link("PS-8001", "EAN-A"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        verify(provider, never()).exportOffers(any(), any(), any());
+        assertThat(captureSavedRows()).isEmpty();
+    }
+
+    @Test
+    void exportsAClonedProductWhoseEanIsLinkedToItsSourceOfferId() {
+        // given the link points at the offer we published under the clone's offer id (its source's id)
+        Product product = product("clone-C", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        when(aliases.offerIdOf(STORE_ID, "clone-C")).thenReturn("source-S");
+        linksOnTheMarketplace(link("source-S", "EAN-A"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(capturePublishedOffers()).extracting(MarketplaceOffer::productId).containsExactly("source-S");
+    }
+
+    @Test
+    void skipsProductWhoseEanIsFormattedDifferentlyInTheStoredLink() {
+        // given a stored link whose EAN keeps a leading zero that the catalog's EAN does not have
+        Product product = product("pim-1", "5901234123457");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        ExternalOfferLink padded = link("PS-8001", "5901234123457");
+        padded.setEans(List.of("05901234123457"));
+        linksOnTheMarketplace(padded);
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        verify(provider, never()).exportOffers(any(), any(), any());
+    }
+
+    @Test
+    void exportsProductWhoseLinkIsItsOwnOfferId() {
+        // given the link points at the offer we published ourselves under the product's pimId
+        Product product = product("pim-1", "EAN-1");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        linksOnTheMarketplace(link("pim-1", "EAN-1"));
+
+        try (LogCapture logs = LogCapture.start()) {
+            // when
+            listener.handleMessage(request());
+
+            // then
+            assertThat(capturePublishedOffers()).singleElement().satisfies(offer -> {
+                assertThat(offer.productId()).isEqualTo("pim-1");
+                assertThat(offer.price()).isEqualTo(100L);
+                assertThat(offer.quantity()).isEqualTo(10L);
+            });
+            assertThat(logs.warnings()).isEmpty();
+        }
+    }
+
+    @Test
+    void skipsACatalogProductMatchedThroughAnEanItSharesWithTheStoresOwnCard() {
+        // given the catalog product sits on the global entry, and the store's own card carries the same EAN
+        Product product = product("local-seed-0101", "730143315289");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        PimCatalog pim = ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("local-seed-0101", "730143315289", "100-100001084WOF", "CPU"),
+                ScopedPimCatalog.storeEntry("local-store-0001", STORE_ID, "730143315289", "STORE-OWN-01", "CPU"));
+        ExternalOfferLink matched = matchedLink(pim,
+                new MarketplaceListedOffer("PS-8001", List.of("730143315289"), "Procesor z innego systemu", 3, new BigDecimal("19.99"), true));
+        linksOnTheMarketplace(matched);
+
+        // when
+        listener.handleMessage(request());
+
+        // then the link offer matching saved carries the catalog product's EAN, so no duplicate offer is published
+        assertThat(matched.getEans()).containsExactly("730143315289");
+        verify(provider, never()).exportOffers(any(), any(), any());
+        assertThat(captureSavedRows()).isEmpty();
+    }
+
+    // the link a real matching run saves for the offer
+    private ExternalOfferLink matchedLink(PimCatalog pim, MarketplaceListedOffer offer) {
+        ExternalOfferLinkRepository matchingLinks = mock(ExternalOfferLinkRepository.class);
+        when(matchingLinks.saveUnlessManual(any())).thenReturn(true);
+        Store matchingStore = new Store();
+        matchingStore.setStoreId(STORE_ID);
+
+        new MarketplaceOfferMatching(matchingLinks, new StorePimAliases(pim))
+                .resume(matchingStore, MARKETPLACE, cursor -> new MarketplaceOffersPage(List.of(offer), null, 1),
+                        OfferMatchProgress.start("run-1", Instant.now()));
+
+        ArgumentCaptor<ExternalOfferLink> saved = ArgumentCaptor.forClass(ExternalOfferLink.class);
+        verify(matchingLinks).saveUnlessManual(saved.capture());
+        return saved.getValue();
+    }
+
+    @Test
+    void exportsUnlinkedProductsAsBefore() {
+        // given the store has links on this marketplace, none of them to this product's EAN
+        Product product = product("pim-2", "EAN-2");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        linksOnTheMarketplace(link("PS-8001", "EAN-1"));
+
+        try (LogCapture logs = LogCapture.start()) {
+            // when
+            listener.handleMessage(request());
+
+            // then
+            assertThat(capturePublishedOffers()).singleElement().satisfies(offer -> {
+                assertThat(offer.productId()).isEqualTo("pim-2");
+                assertThat(offer.ean()).isEqualTo("EAN-2");
+                assertThat(offer.price()).isEqualTo(100L);
+                assertThat(offer.quantity()).isEqualTo(10L);
+            });
+            assertThat(captureSavedRows()).singleElement().satisfies(row -> {
+                assertThat(row.pimId()).isEqualTo("pim-2");
+                assertThat(row.outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_PUBLISHED);
+            });
+            assertThat(logs.warnings()).isEmpty();
+        }
+    }
+
+    @Test
+    void previouslyPublishedProductThatGetsLinkedIsZeroedOnce() {
+        // given our own offer pim-1 was published in the previous run, and the product has since been linked to a
+        // foreign offer: ours becomes an orphan and goes through the ordinary removal, the foreign one is not touched
+        Product product = product("pim-1", "EAN-1");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        previousSnapshotContains(MarketplaceOfferSnapshot.published("pim-1", 100L, 10L, "EAN-1", "MFN-pim-1"));
+        linksOnTheMarketplace(link("PS-8001", "EAN-1"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(capturePublishedOffers()).isEmpty();
+        assertThat(captureRemovedOffers()).singleElement().satisfies(offer -> {
+            assertThat(offer.productId()).isEqualTo("pim-1");
+            assertThat(offer.quantity()).isZero();
+        });
+        assertThat(captureSavedRows()).singleElement().satisfies(row -> {
+            assertThat(row.pimId()).isEqualTo("pim-1");
+            assertThat(row.outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_REMOVAL_PENDING);
+            assertThat(row.removalAttempts()).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void failsTheRunWhenTheLinksCannotBeRead() {
+        // given
+        Product product = product("pim-1", "EAN-1");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        when(offerLinks.findAll(STORE_ID, MARKETPLACE)).thenThrow(new IllegalStateException("DynamoDB unavailable"));
+
+        // when / then
+        assertThatThrownBy(() -> listener.handleMessage(request())).isInstanceOf(IllegalStateException.class);
+        verify(provider, never()).exportOffers(any(), any(), any());
+        verify(marketplaceExportRunService, never()).saveRun(any());
+    }
+
+    @Test
+    void skipsProductWhoseEanIsTheSecondOneOfALinkCarryingSeveral() {
+        // given one foreign offer stands for two equivalent EANs
+        Product linked = product("pim-1", "730143315289");
+        Product unlinked = product("pim-2", "730143315999");
+        configureCategoryWith(warehouseDefinition(5), List.of(linked, unlinked), 10);
+        priceFor(linked, 100, 2);
+        priceFor(unlinked, 200, 2);
+        linksOnTheMarketplace(link("PS-8001", "730143315111", "730143315289"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(capturePublishedOffers()).extracting(MarketplaceOffer::productId).containsExactly("pim-2");
+    }
+
+    @Test
+    void skipsProductWhoseCatalogEanIsFormattedDifferentlyFromTheLinkEan() {
+        // given the catalog EAN carries leading zeros that unifyEan strips
+        Product product = product("pim-1", "0730143315289");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        linksOnTheMarketplace(link("PS-8001", "730143315289"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        verify(provider, never()).exportOffers(any(), any(), any());
+    }
+
+    @Test
+    void skipsProductWhoseCatalogEanHasSurroundingWhitespace() {
+        // given the order import trims the catalog EAN, so the export has to as well
+        Product product = product("pim-1", " 0730143315289 ");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        linksOnTheMarketplace(link("PS-8001", "730143315289"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        verify(provider, never()).exportOffers(any(), any(), any());
+    }
+
+    @Test
+    void skipsEveryProductCarryingTheLinkedEan() {
+        // given two catalog products share the EAN of one foreign offer
+        Product first = product("pim-1", "730143315289");
+        Product second = product("pim-2", "730143315289");
+        Product other = product("pim-3", "730143315999");
+        configureCategoryWith(warehouseDefinition(5), List.of(first, second, other), 10);
+        priceFor(first, 100, 2);
+        priceFor(second, 110, 2);
+        priceFor(other, 200, 2);
+        linksOnTheMarketplace(link("PS-8001", "730143315289"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(capturePublishedOffers()).extracting(MarketplaceOffer::productId).containsExactly("pim-3");
+    }
+
+    @Test
+    void skipsProductLinkedByAnOperatorLikeOneLinkedByMatching() {
+        // given
+        Product product = product("pim-1", "730143315289");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        linksOnTheMarketplace(ExternalOfferLink.of(STORE_ID, MARKETPLACE, "PS-8001", List.of("730143315289"),
+                ExternalOfferLinkSource.MANUAL, "operator", Instant.parse("2026-11-01T10:00:00Z")));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        verify(provider, never()).exportOffers(any(), any(), any());
+    }
+
+    @Test
+    void exportsProductWithoutEanEvenWhenLinksExist() {
+        // given a product that has no EAN cannot match any link
+        Product product = product("pim-1", null);
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        linksOnTheMarketplace(link("PS-8001", "EAN-1"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(capturePublishedOffers()).extracting(MarketplaceOffer::productId).containsExactly("pim-1");
+    }
+
+    @Test
+    void ignoresALinkWithoutEans() {
+        // given a stored link that carries no EANs
+        Product product = product("pim-1", "EAN-1");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        ExternalOfferLink empty = link("PS-8001", "EAN-X");
+        empty.setEans(null);
+        linksOnTheMarketplace(empty);
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(capturePublishedOffers()).extracting(MarketplaceOffer::productId).containsExactly("pim-1");
+    }
+
+    @Test
+    void skipsProductWhenOneOfTwoLinksToItsEanIsForeignAndTheOtherIsItsOwnKey() {
+        // given our own offer key and a foreign key both list the product's EAN
+        Product product = product("pim-1", "EAN-1");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        linksOnTheMarketplace(link("pim-1", "EAN-1"), link("PS-8001", "EAN-1"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        verify(provider, never()).exportOffers(any(), any(), any());
+    }
+
+    private ExternalOfferLink link(String sellerOfferKey, String... eans) {
+        return ExternalOfferLink.of(STORE_ID, MARKETPLACE, sellerOfferKey, List.of(eans), ExternalOfferLinkSource.EAN,
+                "matching", Instant.parse("2026-11-01T10:00:00Z"));
+    }
+
+    private void linksOnTheMarketplace(ExternalOfferLink... links) {
+        when(offerLinks.findAll(STORE_ID, MARKETPLACE)).thenReturn(List.of(links));
+    }
+
     private MarketplaceOfferExportRequest request() {
         return new MarketplaceOfferExportRequest(MARKETPLACE, STORE_ID, CATALOG_ID, PRICELIST_ID);
     }
@@ -984,6 +1356,15 @@ class MarketplaceOfferExportEventListenerTest {
 
     private void configureCategoryWith(MarketplaceDefinition marketplaceDefinition, Product product, int warehouseQuantity, String categoryName, String definitionName) {
         configureCategoryWith(marketplaceDefinition, product, mockMatchedInventoryWithWarehouseQuantity(warehouseQuantity), categoryName, definitionName);
+    }
+
+    private void configureCategoryWith(MarketplaceDefinition marketplaceDefinition, List<Product> products, int warehouseQuantity) {
+        when(catalog.getCategories()).thenReturn(List.of(category("Laptops", null, List.of(marketplaceDefinition))));
+        when(productRepository.findAllProductsWithPimId(CATEGORY_ID, true)).thenReturn(products);
+        for (Product product : products) {
+            MatchedInventory matchedInventory = mockMatchedInventoryWithWarehouseQuantity(warehouseQuantity);
+            when(inventoryView.findByProduct(product)).thenReturn(matchedInventory);
+        }
     }
 
     private void configureCategoryWith(MarketplaceDefinition marketplaceDefinition, Product product, MatchedInventory matchedInventory) {

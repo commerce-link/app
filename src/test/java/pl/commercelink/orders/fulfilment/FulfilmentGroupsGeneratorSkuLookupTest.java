@@ -13,10 +13,7 @@ import pl.commercelink.orders.OrderItem;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -29,7 +26,7 @@ class FulfilmentGroupsGeneratorSkuLookupTest {
     private InventoryView inventory;
 
     @Test
-    void skuIsLookedUpByEanFirst() {
+    void skuIsLookedUpOnlyByEan() {
         // given
         MatchedInventory byEan = offering(offer(EAN, "MFN-1", "Acme"));
         when(inventory.findByEan(EAN)).thenReturn(byEan);
@@ -39,34 +36,30 @@ class FulfilmentGroupsGeneratorSkuLookupTest {
 
         // then
         assertThat(items).extracting(i -> i.getSource().getProvider()).containsExactly("Acme");
-        verify(inventory, never()).findByProductCode(any());
     }
 
     @Test
-    void skuWithoutOffersByEanIsLookedUpByManufacturerCode() {
+    void skuWithAManufacturerCodeFindsNoOffers() {
         // given
-        MatchedInventory byCode = offering(offer(EAN, "MFN-1", "Acme"));
         when(inventory.findByEan("MFN-1")).thenReturn(nothing());
-        when(inventory.findByProductCode("MFN-1")).thenReturn(byCode);
 
         // when
         List<FulfilmentItem> items = generator().run(List.of(itemWithSku("MFN-1")));
 
         // then
-        assertThat(items).extracting(i -> i.getSource().getProvider()).containsExactly("Acme");
+        assertThat(items).isEmpty();
     }
 
     @Test
-    void everyPreBuildPartGoesThroughTheCascade() {
+    void everyPreBuildPartIsLookedUpByEan() {
         // given
-        MatchedInventory firstByEan = offering(offer(EAN, "MFN-1", "Acme"));
-        MatchedInventory secondByCode = offering(offer(OTHER_EAN, "MFN-2", "Beta"));
-        when(inventory.findByEan(EAN)).thenReturn(firstByEan);
-        when(inventory.findByEan("MFN-2")).thenReturn(nothing());
-        when(inventory.findByProductCode("MFN-2")).thenReturn(secondByCode);
+        MatchedInventory first = offering(offer(EAN, "MFN-1", "Acme"));
+        MatchedInventory second = offering(offer(OTHER_EAN, "MFN-2", "Beta"));
+        when(inventory.findByEan(EAN)).thenReturn(first);
+        when(inventory.findByEan(OTHER_EAN)).thenReturn(second);
 
         // when
-        List<FulfilmentItem> items = generator().run(List.of(itemWithSku(EAN + ":MFN-2")));
+        List<FulfilmentItem> items = generator().run(List.of(itemWithSku(EAN + ":" + OTHER_EAN)));
 
         // then
         assertThat(items).extracting(i -> i.getSource().getProvider()).containsExactlyInAnyOrder("Acme", "Beta");

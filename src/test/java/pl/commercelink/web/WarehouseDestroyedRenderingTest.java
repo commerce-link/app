@@ -53,7 +53,7 @@ class WarehouseDestroyedRenderingTest {
     private static DestroyedPageModel pageWithRows() {
         return model(List.of(
                 new DestroyedPageModel.Row(item("a1", "/dashboard/deliveries/details?deliveryId=d1", "S1"), "06.10.2026",
-                        "/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=d1&mfn=MZ-V9P2T0BW",
+                        "/dashboard/warehouse-documents/item-history?deliveryId=d1&ean=8806094215038",
                         "/dashboard/item/history?serialNo=S1", "Actions: SSD a1"),
                 new DestroyedPageModel.Row(item("b2", null, null), "02.10.2026", null, null, "Actions: SSD b2")), false, null);
     }
@@ -76,7 +76,7 @@ class WarehouseDestroyedRenderingTest {
         // then
         assertThat(html).contains("cl-table is-warehouse is-destroyed").doesNotContain("data-cl-select-row").doesNotContain("??");
         assertThat(html).contains("06.10.2026").contains("class=\"cl-col-date\"").contains("class=\"cl-col-menu\"");
-        assertThat(html).contains("delivery-mfn-history").contains("/dashboard/item/history?serialNo=S1");
+        assertThat(html).contains("warehouse-documents/item-history").contains("/dashboard/item/history?serialNo=S1");
         assertThat(html).contains("aria-disabled=\"true\"").contains("Item without a delivery");
         assertThat(html).contains("data-cl-list-path=\"/dashboard/warehouse/items/destroyed\"");
     }

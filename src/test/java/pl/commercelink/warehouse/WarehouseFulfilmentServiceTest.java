@@ -7,6 +7,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.documents.DocumentType;
+import pl.commercelink.externaloffers.ResolvedOffer;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
@@ -85,6 +86,28 @@ class WarehouseFulfilmentServiceTest {
     }
 
     @Test
+    void reservationAsksForTheEanOfTheChosenOffer() {
+        // given
+        OrderItem orderItem = new OrderItem("order-1", Categories.UNCATEGORIZED, "Widget", 1, 199.0, "5901234123457", false);
+        orderItem.setEan("5901234123457");
+        orderItem.setManufacturerCode("MFN-1");
+        orderItem.setDeliveryId(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+
+        when(order.getStoreId()).thenReturn("store-1");
+        when(order.getDocumentByType(DocumentType.Reservation)).thenReturn(Optional.empty());
+        when(warehouse.reservationService("store-1")).thenReturn(reservationService);
+        when(reservationService.create(any())).thenAnswer(invocation -> confirmAt(invocation.getArgument(0), 20.0));
+
+        // when
+        warehouseFulfilmentService.run(order, List.of(orderItem));
+
+        // then
+        ArgumentCaptor<Reservation> captor = ArgumentCaptor.forClass(Reservation.class);
+        verify(reservationService).create(captor.capture());
+        assertEquals("5901234123457", captor.getValue().getItems().get(0).getEan());
+    }
+
+    @Test
     void keepsTheMarketplaceKeyOnEveryItemProducedByAPartialReservation() {
         // given: a qty-3 marketplace line reserved 2 + 1 across two batches
         OrderItem orderItem = new OrderItem("order-1", Categories.UNCATEGORIZED, "Widget", 3, 199.0, "SKU-1", false);
@@ -133,6 +156,47 @@ class WarehouseFulfilmentServiceTest {
         // then
         assertEquals(2, fulfilledItems.size());
         fulfilledItems.forEach(item -> assertEquals("local-seed-0051", item.getExternalItemId()));
+    }
+
+    @Test
+    void theRemainderKeepsTheResolutionSource() {
+        // given a qty-3 linked marketplace line of which the warehouse can reserve only 2
+        OrderItem orderItem = new OrderItem("order-1", Categories.UNCATEGORIZED, "Widget", 3, 199.0, "SKU-1", false);
+        orderItem.setManufacturerCode("MFN-1");
+        orderItem.setDeliveryId(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+        orderItem.setExternalOfferSource(ResolvedOffer.Source.LINK);
+
+        when(order.getStoreId()).thenReturn("store-1");
+        when(order.getDocumentByType(DocumentType.Reservation)).thenReturn(Optional.empty());
+        when(warehouse.reservationService("store-1")).thenReturn(reservationService);
+        when(reservationService.create(any())).thenAnswer(invocation -> confirmOnly(invocation.getArgument(0), 2));
+
+        // when
+        List<OrderItem> fulfilledItems = warehouseFulfilmentService.run(order, List.of(orderItem));
+
+        // then
+        assertEquals(2, fulfilledItems.size());
+        fulfilledItems.forEach(item -> assertEquals(ResolvedOffer.Source.LINK, item.getExternalOfferSource()));
+    }
+
+    @Test
+    void anExtraConfirmationItemKeepsTheResolutionSource() {
+        // given a qty-3 linked marketplace line reserved 2 + 1 across two deliveries
+        OrderItem orderItem = new OrderItem("order-1", Categories.UNCATEGORIZED, "Widget", 3, 199.0, "SKU-1", false);
+        orderItem.setDeliveryId(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+        orderItem.setExternalOfferSource(ResolvedOffer.Source.LINK);
+
+        when(order.getStoreId()).thenReturn("store-1");
+        when(order.getDocumentByType(DocumentType.Reservation)).thenReturn(Optional.empty());
+        when(warehouse.reservationService("store-1")).thenReturn(reservationService);
+        when(reservationService.create(any())).thenAnswer(invocation -> confirmInTwoBatches(invocation.getArgument(0)));
+
+        // when
+        List<OrderItem> fulfilledItems = warehouseFulfilmentService.run(order, List.of(orderItem));
+
+        // then
+        OrderItem extra = fulfilledItems.stream().filter(item -> item != orderItem).findFirst().orElseThrow();
+        assertEquals(ResolvedOffer.Source.LINK, extra.getExternalOfferSource());
     }
 
     private Reservation confirmOnly(Reservation reservation, int qty) {

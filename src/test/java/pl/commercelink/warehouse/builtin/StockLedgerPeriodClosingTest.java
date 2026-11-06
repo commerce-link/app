@@ -41,6 +41,7 @@ class StockLedgerPeriodClosingTest {
     private static final StockLedgerPeriod MARCH = new StockLedgerPeriod(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
     private static final StockLedgerPeriod APRIL = new StockLedgerPeriod(LocalDate.of(2026, 4, 1), LocalDate.of(2026, 4, 30));
     private static final Clock OCTOBER_7 = Clock.fixed(Instant.parse("2026-10-07T10:00:00Z"), ZoneOffset.UTC);
+    private static final String EAN_A = "5901234567890";
 
     @Mock
     private StockLedgerService stockLedgerService;
@@ -61,7 +62,7 @@ class StockLedgerPeriodClosingTest {
     @Test
     void anyPastPeriodCanBeClosedEvenWithNothingClosedBeforeIt() throws Exception {
         // given
-        List<StockLedgerRow> rows = List.of(new StockLedgerRow("MFN-A", "Widget", 1, 10.0, Map.of(), Map.of()));
+        List<StockLedgerRow> rows = List.of(new StockLedgerRow(EAN_A, "Widget", 1, 10.0, Map.of(), Map.of()));
         when(stockLedgerService.generate(STORE_ID, MARCH.from(), MARCH.to())).thenReturn(rows);
 
         // when
@@ -135,9 +136,9 @@ class StockLedgerPeriodClosingTest {
     void regeneratedPeriodWhoseClosingBalanceChangedNamesTheLaterClosedPeriods() throws Exception {
         // given
         when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(MARCH, APRIL));
-        when(closings.closingBalances(STORE_ID, MARCH)).thenReturn(Map.of("MFN-A", new ClosingBalance("Widget", 1, 10.0)));
+        when(closings.closingBalances(STORE_ID, MARCH)).thenReturn(Map.of(EAN_A, new ClosingBalance("Widget", 1, 10.0)));
         when(stockLedgerService.generate(STORE_ID, MARCH.from(), MARCH.to()))
-                .thenReturn(List.of(new StockLedgerRow("MFN-A", "Widget", 1, 11.0, Map.of(), Map.of())));
+                .thenReturn(List.of(new StockLedgerRow(EAN_A, "Widget", 1, 11.0, Map.of(), Map.of())));
 
         // when
         StockLedgerClosingResult result = closing.close(STORE_ID, MARCH);
@@ -150,9 +151,9 @@ class StockLedgerPeriodClosingTest {
     void regeneratedPeriodWithTheSameClosingBalanceLeavesTheLaterPeriodsUpToDate() throws Exception {
         // given
         when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(MARCH, APRIL));
-        when(closings.closingBalances(STORE_ID, MARCH)).thenReturn(Map.of("MFN-A", new ClosingBalance("Widget", 1, 10.0)));
+        when(closings.closingBalances(STORE_ID, MARCH)).thenReturn(Map.of(EAN_A, new ClosingBalance("Widget", 1, 10.0)));
         when(stockLedgerService.generate(STORE_ID, MARCH.from(), MARCH.to()))
-                .thenReturn(List.of(new StockLedgerRow("MFN-A", "Widget", 1, 10.0, Map.of(), Map.of())));
+                .thenReturn(List.of(new StockLedgerRow(EAN_A, "Widget", 1, 10.0, Map.of(), Map.of())));
 
         // when
         StockLedgerClosingResult result = closing.close(STORE_ID, MARCH);

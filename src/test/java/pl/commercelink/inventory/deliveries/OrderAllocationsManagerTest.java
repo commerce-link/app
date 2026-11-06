@@ -19,6 +19,7 @@ import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
 
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,6 +38,9 @@ class OrderAllocationsManagerTest {
 
     private static final String STORE_ID = "store-1";
     private static final String ORDER_ID = "order-1";
+    private static final String EAN_A = "5901234123457";
+    private static final String EAN_B = "5901234123464";
+    private static final String SHARED_MFN = "SHOE-1";
 
     @Mock
     private OrdersRepository ordersRepository;
@@ -294,15 +298,11 @@ class OrderAllocationsManagerTest {
     @DisplayName("updateUnitCosts applies confirmed price and returns delta")
     void updateUnitCostsAppliesConfirmedPriceAndReturnsDelta() {
         // given
-        OrderItem item = new OrderItem();
-        item.setQty(2);
-        item.setCost(100.0);
-        item.setManufacturerCode("MFN-1");
-        item.setStatus(FulfilmentStatus.Ordered);
+        OrderItem item = orderedItem(EAN_A, 2, 100.0);
         when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(item));
 
         // when
-        double delta = orderAllocationsManager.updateUnitCosts("delivery-1", Map.of("MFN-1", 110.0));
+        double delta = orderAllocationsManager.updateUnitCosts("delivery-1", Map.of(EAN_A, 110.0));
 
         // then
         assertThat(delta).isEqualTo(20.0);
@@ -314,15 +314,12 @@ class OrderAllocationsManagerTest {
     @DisplayName("updateUnitCosts skips returned items")
     void updateUnitCostsSkipsReturnedItems() {
         // given
-        OrderItem item = new OrderItem();
-        item.setQty(2);
-        item.setCost(100.0);
-        item.setManufacturerCode("MFN-1");
+        OrderItem item = orderedItem(EAN_A, 2, 100.0);
         item.setStatus(FulfilmentStatus.Returned);
         when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(item));
 
         // when
-        double delta = orderAllocationsManager.updateUnitCosts("delivery-1", Map.of("MFN-1", 110.0));
+        double delta = orderAllocationsManager.updateUnitCosts("delivery-1", Map.of(EAN_A, 110.0));
 
         // then
         assertThat(delta).isZero();
@@ -334,15 +331,12 @@ class OrderAllocationsManagerTest {
     @DisplayName("updateUnitCosts updates replaced items without counting delta")
     void updateUnitCostsUpdatesReplacedItemsWithoutCountingDelta() {
         // given
-        OrderItem item = new OrderItem();
-        item.setQty(2);
-        item.setCost(100.0);
-        item.setManufacturerCode("MFN-1");
+        OrderItem item = orderedItem(EAN_A, 2, 100.0);
         item.setStatus(FulfilmentStatus.Replaced);
         when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(item));
 
         // when
-        double delta = orderAllocationsManager.updateUnitCosts("delivery-1", Map.of("MFN-1", 110.0));
+        double delta = orderAllocationsManager.updateUnitCosts("delivery-1", Map.of(EAN_A, 110.0));
 
         // then
         assertThat(delta).isZero();
@@ -354,19 +348,56 @@ class OrderAllocationsManagerTest {
     @DisplayName("updateUnitCosts ignores items without confirmed price")
     void updateUnitCostsIgnoresItemsWithoutConfirmedPrice() {
         // given
-        OrderItem item = new OrderItem();
-        item.setQty(2);
-        item.setCost(100.0);
-        item.setManufacturerCode("MFN-OTHER");
-        item.setStatus(FulfilmentStatus.Ordered);
+        OrderItem item = orderedItem(EAN_B, 2, 100.0);
         when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(item));
 
         // when
-        double delta = orderAllocationsManager.updateUnitCosts("delivery-1", Map.of("MFN-1", 110.0));
+        double delta = orderAllocationsManager.updateUnitCosts("delivery-1", Map.of(EAN_A, 110.0));
 
         // then
         assertThat(delta).isZero();
         verify(orderItemsRepository, never()).save(any(OrderItem.class));
+    }
+
+    @Test
+    void twoProductsUnderOneCodeGetTheirOwnInvoicePrices() {
+        // given
+        OrderItem itemA = orderedItem(EAN_A, 1, 90.0);
+        OrderItem itemB = orderedItem(EAN_B, 1, 90.0);
+        when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(itemA, itemB));
+
+        // when
+        double delta = orderAllocationsManager.updateUnitCosts("delivery-1", Map.of(EAN_A, 100.0, EAN_B, 120.0));
+
+        // then
+        assertThat(itemA.getCost()).isEqualTo(100.0);
+        assertThat(itemB.getCost()).isEqualTo(120.0);
+        assertThat(delta).isEqualTo(40.0);
+    }
+
+    @Test
+    void recordWithoutEanKeepsItsCost() {
+        // given
+        OrderItem withoutEan = orderedItem(null, 1, 90.0);
+        when(orderItemsRepository.findByDeliveryId("delivery-1")).thenReturn(List.of(withoutEan));
+
+        // when
+        double delta = orderAllocationsManager.updateUnitCosts("delivery-1", new HashMap<>(Map.of(EAN_A, 100.0)));
+
+        // then
+        assertThat(delta).isZero();
+        assertThat(withoutEan.getCost()).isEqualTo(90.0);
+        verify(orderItemsRepository, never()).save(any(OrderItem.class));
+    }
+
+    private static OrderItem orderedItem(String ean, int qty, double cost) {
+        OrderItem item = new OrderItem();
+        item.setQty(qty);
+        item.setCost(cost);
+        item.setEan(ean);
+        item.setManufacturerCode(SHARED_MFN);
+        item.setStatus(FulfilmentStatus.Ordered);
+        return item;
     }
 
     @Test

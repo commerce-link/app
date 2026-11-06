@@ -235,7 +235,7 @@ public class DeliveryCreationService {
     private Map<String, Double> confirmedUnitCosts(DeliveryCreationForm form) {
         return form.getItems().stream()
                 .filter(item -> item.getRequestedQty() > 0)
-                .collect(Collectors.toMap(DeliveryItem::getMfn, DeliveryItem::getUnitCost, (a, b) -> a));
+                .collect(Collectors.toMap(DeliveryItem::getEan, DeliveryItem::getUnitCost, (a, b) -> a));
     }
 
     private void prepareForm(String storeId, DeliveryCreationForm form) {

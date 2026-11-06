@@ -27,7 +27,7 @@ class BuiltInStockQueryServiceTest {
     void exposesPurchaseCostToInventoryWhenUnitSystemCostIsNotSet() {
         // given
         WarehouseItem item = anAvailableItem(20.0);
-        when(warehouseRepository.findAllAvailableByMfns("store-1", List.of("MFN-1"))).thenReturn(List.of(item));
+        when(warehouseRepository.findAllAvailableByEans("store-1", List.of("5901234123457"))).thenReturn(List.of(item));
 
         // when
         InventoryItem inventoryItem = firstInventoryItem();
@@ -41,7 +41,7 @@ class BuiltInStockQueryServiceTest {
         // given
         WarehouseItem item = anAvailableItem(20.0);
         item.setUnitSystemCost(150.0);
-        when(warehouseRepository.findAllAvailableByMfns("store-1", List.of("MFN-1"))).thenReturn(List.of(item));
+        when(warehouseRepository.findAllAvailableByEans("store-1", List.of("5901234123457"))).thenReturn(List.of(item));
 
         // when
         InventoryItem inventoryItem = firstInventoryItem();
@@ -51,37 +51,33 @@ class BuiltInStockQueryServiceTest {
     }
 
     @Test
-    void excludesNotSealedItemsFromAvailableStock() {
-        // given
-        WarehouseItem sealed = anAvailableItem(20.0);
-        WarehouseItem openBox = anAvailableItem(20.0);
-        openBox.setCondition(ItemCondition.OpenBox);
-        WarehouseItem damaged = anAvailableItem(20.0);
-        damaged.setCondition(ItemCondition.Damaged);
-        when(warehouseRepository.findAllAvailableByMfns("store-1", List.of("MFN-1"))).thenReturn(List.of(openBox, sealed, damaged));
-
-        // when
-        List<WarehouseItemView> views = new BuiltInStockQueryService(warehouseRepository)
-                .searchAvailableByMfns("store-1", List.of("MFN-1"));
-
-        // then
-        assertEquals(1, views.size());
-        assertEquals(sealed.getItemId(), views.get(0).getItemId());
-    }
-
-    @Test
     void excludesNotSealedItemsFromStockLevelSearch() {
         // given
         WarehouseItem openBox = anAvailableItem(20.0);
         openBox.setCondition(ItemCondition.OpenBox);
-        when(warehouseRepository.findAllByMfns("store-1", List.of("MFN-1"))).thenReturn(List.of(openBox));
+        when(warehouseRepository.findAllByEans("store-1", List.of("5901234123457"))).thenReturn(List.of(openBox));
 
         // when
         List<WarehouseItemView> views = new BuiltInStockQueryService(warehouseRepository)
-                .searchByMfns("store-1", List.of("MFN-1"));
+                .searchByEans("store-1", List.of("5901234123457"));
 
         // then
         assertEquals(0, views.size());
+    }
+
+    @Test
+    void reservedItemOfTheProductCountsAsStock() {
+        // given
+        WarehouseItem reserved = anAvailableItem(20.0);
+        reserved.setStatus(FulfilmentStatus.Reserved);
+        when(warehouseRepository.findAllByEans("store-1", List.of("5901234123457"))).thenReturn(List.of(reserved));
+
+        // when
+        List<WarehouseItemView> views = new BuiltInStockQueryService(warehouseRepository)
+                .searchByEans("store-1", List.of("5901234123457"));
+
+        // then
+        assertThat(views).extracting(WarehouseItemView::getItemId).containsExactly(reserved.getItemId());
     }
 
     @Test
@@ -105,11 +101,11 @@ class BuiltInStockQueryServiceTest {
         WarehouseItem sealed = anAvailableItem(20.0);
         WarehouseItem damaged = anAvailableItem(20.0);
         damaged.setCondition(ItemCondition.Damaged);
-        when(warehouseRepository.findAllAvailableByMfns("store-1", List.of("MFN-1"))).thenReturn(List.of(sealed, damaged));
+        when(warehouseRepository.findAllAvailableByEans("store-1", List.of("5901234123457"))).thenReturn(List.of(sealed, damaged));
 
         // when
         List<WarehouseItemView> views = new BuiltInStockQueryService(warehouseRepository)
-                .searchAllAvailableByMfns("store-1", List.of("MFN-1"));
+                .searchAllAvailableByEans("store-1", List.of("5901234123457"));
 
         // then
         assertThat(views).extracting(WarehouseItemView::getItemId)
@@ -172,7 +168,7 @@ class BuiltInStockQueryServiceTest {
 
     private InventoryItem firstInventoryItem() {
         List<WarehouseItemView> views = new BuiltInStockQueryService(warehouseRepository)
-                .searchAvailableByMfns("store-1", List.of("MFN-1"));
+                .searchAvailableByEans("store-1", List.of("5901234123457"));
         return views.get(0).toInventoryItem();
     }
 

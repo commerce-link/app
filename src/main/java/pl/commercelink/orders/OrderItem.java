@@ -1,8 +1,11 @@
 package pl.commercelink.orders;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
+import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.baskets.BasketItem;
+import pl.commercelink.externaloffers.ResolvedOffer;
 import pl.commercelink.starter.util.ConversionUtil;
+import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.warehouse.api.ReservationConfirmation;
 
@@ -27,6 +30,12 @@ public class OrderItem extends Item {
     private boolean consolidated;
     @DynamoDBAttribute(attributeName = "externalItemId")
     private String externalItemId;
+    @DynamoDBAttribute(attributeName = "externalOfferKey")
+    private String externalOfferKey;
+    // empty on items imported before it was stored and on lines nothing recognised
+    @DynamoDBAttribute(attributeName = "externalOfferSource")
+    @DynamoDBTypeConvertedEnum
+    private ResolvedOffer.Source externalOfferSource;
     @DynamoDBAttribute(attributeName = "position")
     private int position;
     @DynamoDBVersionAttribute
@@ -64,6 +73,8 @@ public class OrderItem extends Item {
         this.price = source.getPrice();
         this.consolidated = source.isConsolidated();
         this.externalItemId = source.getExternalItemId();
+        this.externalOfferKey = source.getExternalOfferKey();
+        this.externalOfferSource = source.getExternalOfferSource();
         this.position = source.getPosition();
         this.setCondition(source.getCondition());
 
@@ -219,6 +230,47 @@ public class OrderItem extends Item {
 
     public void setExternalItemId(String externalItemId) {
         this.externalItemId = externalItemId;
+    }
+
+    public String getExternalOfferKey() {
+        return externalOfferKey;
+    }
+
+    public void setExternalOfferKey(String externalOfferKey) {
+        this.externalOfferKey = externalOfferKey;
+    }
+
+    public ResolvedOffer.Source getExternalOfferSource() {
+        return externalOfferSource;
+    }
+
+    public void setExternalOfferSource(ResolvedOffer.Source externalOfferSource) {
+        this.externalOfferSource = externalOfferSource;
+    }
+
+    /**
+     * An imported marketplace line whose seller offer could not be tied to goods yet: nothing recognised it (no
+     * externalOfferSource), it has no category, and its sku is still the marketplace's own code (stored raw in
+     * externalItemId, the basket strips its spaces). The source decides first because a marketplace whose product code
+     * is the EAN itself, linked to that same EAN, leaves the sku equal to the raw code; items stored before the source
+     * existed have none and keep the text comparison alone. "Assign SKU" or the warehouse changing the sku also ends it.
+     * The EAN does not decide: it belongs to fulfilment, and removing the supplier clears it.
+     */
+    @DynamoDBIgnore
+    public boolean hasUnlinkedExternalOffer() {
+        return looksUnlinkedByCode() && externalOfferSource == null;
+    }
+
+    /**
+     * The text-only rule that decided "unlinked" before the resolution source was stored: an offer key, no category,
+     * not a service, and the sku still equal to the marketplace's raw code. A line recognised by manufacturer code
+     * that still matches it is one the operator never touched, so a later link may re-fill it.
+     */
+    @DynamoDBIgnore
+    public boolean looksUnlinkedByCode() {
+        return externalOfferKey != null && Categories.UNCATEGORIZED.equals(getCategory()) && !isService()
+                && StringUtils.defaultString(StringUtils.deleteWhitespace(externalItemId))
+                .equals(StringUtils.defaultString(getSku()));
     }
 
     public int getPosition() {

@@ -27,8 +27,8 @@ import pl.commercelink.carriers.CarrierTranslator;
 import pl.commercelink.carriers.CarriersRepository;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.marketplace.api.MarketplaceProviderDescriptor;
-import pl.commercelink.migration.V025_CreateCarrierTables;
-import pl.commercelink.migration.V026_LocalDevelopmentCarriersSeed;
+import pl.commercelink.migration.V026_CreateCarrierTables;
+import pl.commercelink.migration.V027_LocalDevelopmentCarriersSeed;
 import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.shipping.api.ShippingProviderDescriptor;
 import pl.commercelink.testsupport.DynamoDbLocalImage;
@@ -89,8 +89,8 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         carriers = new CarriersRepository(client);
         dictionaries = new CarrierDictionaryRepository(client);
         translator = new CarrierTranslator(dictionaries);
-        new V025_CreateCarrierTables(client).createTables();
-        new V026_LocalDevelopmentCarriersSeed(client).seed();
+        new V026_CreateCarrierTables(client).createTables();
+        new V027_LocalDevelopmentCarriersSeed(client).seed();
         // test vocabularies laid over the seeded ones, so the assertions do not depend on what the local seed holds
         put(CENEO_FORMS, "InPost=InPost", "DPD=DPD", "Poczta Polska=Poczta Polska");
         put(CENEO, "1=InPost", "1=InPost Kurier", "2=DHL", "3=DPD", "4=Poczta Polska");
@@ -145,7 +145,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         dictionaries.save(edited);
 
         // when
-        new V025_CreateCarrierTables(client).createTables();
+        new V026_CreateCarrierTables(client).createTables();
 
         // then
         assertThat(translator.carrierFor(ALLEGRO_METHODS, "Paczka w Ruchu")).isEqualTo("Orlen");
@@ -159,7 +159,7 @@ class CarriersEndToEndDynamoDbIntegrationTest {
         dictionaries.save(edited);
 
         // when
-        new V026_LocalDevelopmentCarriersSeed(client).seed();
+        new V027_LocalDevelopmentCarriersSeed(client).seed();
 
         // then
         assertThat(translator.carrierFor(ALLEGRO_METHODS, "Paczka w Ruchu")).isEqualTo("Orlen");

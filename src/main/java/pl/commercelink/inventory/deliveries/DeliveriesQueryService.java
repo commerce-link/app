@@ -54,7 +54,7 @@ public class DeliveriesQueryService {
 
         // reduce qty on warehouse allocations based on received allocations in the system
         for (Allocation receivedAllocation : receivedAllocations) {
-            int qty = delivery.getReceivedAllocationsFor(receivedAllocation.getMfn(), AllocationType.Order)
+            int qty = delivery.getReceivedAllocationsFor(receivedAllocation.getEan(), AllocationType.Order)
                     .stream()
                     .mapToInt(Allocation::getQty)
                     .sum();

@@ -37,7 +37,7 @@ class WarehouseItemPageRenderingTest {
                 "7c1e5a20", "/dashboard/warehouse?q=ssd", "Warehouse", mode, mode == Mode.DESTROYED ? "Destroyed on 06.10.2026" : null,
                 mode == Mode.NEW ? List.of() : List.of(new Fact("Quantity", "3 pcs", true)), mode == Mode.NEW ? null : "2 067,00 PLN",
                 new Origin("/dashboard/deliveries/details?deliveryId=d-1", "3F2A9C1E", null,
-                        mode == Mode.NEW ? null : "/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=d-1&mfn=MZ&from=item&itemId=7c1e5a20-1111",
+                        mode == Mode.NEW ? null : "/dashboard/warehouse-documents/item-history?deliveryId=d-1&ean=8806094215038&from=item&itemId=7c1e5a20-1111",
                         List.of(new Link("S1", "/dashboard/item/history?serialNo=S1"), new Link("S2", "/dashboard/item/history?serialNo=S2"))),
                 form(status), Map.of(), null, List.of(new StoreCategories.Group("Computers", List.of("SSD drives"))), null,
                 List.of(new Choice("Sealed", "Sealed", null, "is-ok"), new Choice("Damaged", "Damaged", null, "is-bad")),
@@ -65,7 +65,7 @@ class WarehouseItemPageRenderingTest {
         assertThat(html).contains("name=\"name\"").contains("name=\"condition\"").contains("name=\"serialNo\"").contains("name=\"unitSystemCost\"");
         assertThat(html).doesNotContain("name=\"qty\"").doesNotContain("name=\"status\"").doesNotContain("data-cl-confirm");
         assertThat(html).contains("2 067,00 PLN").contains("/dashboard/item/history?serialNo=S1").contains("/dashboard/item/history?serialNo=S2");
-        assertThat(html).contains("delivery-mfn-history?deliveryId=d-1&amp;mfn=MZ&amp;from=item");
+        assertThat(html).contains("warehouse-documents/item-history?deliveryId=d-1&amp;ean=8806094215038&amp;from=item");
     }
 
     @Test
@@ -300,7 +300,7 @@ class WarehouseItemPageRenderingTest {
         String destroyed = render(page(Mode.DESTROYED));
 
         // then
-        // one name for the delivery-mfn-history page across the dashboard: "Item document history" on the delivery details
+        // one name for the warehouse-documents/item-history page across the dashboard: "Item document history" on the delivery details
         assertThat(edit).contains(">Item document history ›</a>");
         assertThat(destroyed).contains("<span>Item document history</span>").contains("are in the item document history.");
         assertThat(edit + destroyed).doesNotContain(">Document history");

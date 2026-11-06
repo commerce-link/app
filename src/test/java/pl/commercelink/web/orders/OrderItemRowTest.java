@@ -3,10 +3,12 @@ package pl.commercelink.web.orders;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
+import pl.commercelink.externaloffers.ResolvedOffer;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
+import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.api.ItemCondition;
 
@@ -163,6 +165,45 @@ class OrderItemRowTest {
         // then
         assertThat(freshRow.sku()).isEqualTo("ABC:DEF");
         assertThat(deliveredRow.sku()).isNull();
+    }
+
+    @Test
+    void aLineOfAnOfferCommerceLinkPublishedHasNoLinkAction() {
+        // given
+        OrderItem own = item(FulfilmentStatus.New, "5900000000011");
+        own.setExternalOfferKey("k7m2xq9pz4");
+        OrderItem foreign = item(FulfilmentStatus.New, "2001000000043");
+        foreign.setExternalOfferKey("PS-1010");
+        OrderItemRow.Context context = new OrderItemRow.Context(ORDER, false, false,
+                new SupplierLabels(mock(StoresRepository.class)).forStore(null), item -> null, serial -> null,
+                ReceiptLock.NONE, false, "k7m2xq9pz4"::equals);
+
+        // when
+        OrderItemRow ownRow = OrderItemRow.of(own, 0, context);
+        OrderItemRow foreignRow = OrderItemRow.of(foreign, 1, context);
+
+        // then
+        assertThat(hasAction(ownRow, ItemAction.CHANGE_OFFER_LINK)).isFalse();
+        assertThat(hasAction(ownRow, ItemAction.LINK_OFFER)).isFalse();
+        assertThat(hasAction(foreignRow, ItemAction.CHANGE_OFFER_LINK)).isTrue();
+    }
+
+    @Test
+    void aLinkedItemWithAnEanSignatureShowsNoBadgeAndOffersRelink() {
+        // given the seller's signature is the EAN itself and the goods have no category
+        OrderItem linked = new OrderItem(ORDER.getOrderId(), "Uncategorized", "Czajnik", 1, 100, "2000000000015", false);
+        linked.setStatus(FulfilmentStatus.New);
+        linked.setExternalItemId("2000000000015");
+        linked.setExternalOfferKey("2000000000015");
+        linked.setExternalOfferSource(ResolvedOffer.Source.LINK);
+
+        // when
+        OrderItemRow row = OrderItemRow.of(linked, 0, context());
+
+        // then
+        assertThat(row.unlinkedOffer()).isFalse();
+        assertThat(hasAction(row, ItemAction.LINK_OFFER)).isFalse();
+        assertThat(hasAction(row, ItemAction.CHANGE_OFFER_LINK)).isTrue();
     }
 
     private static boolean hasAction(OrderItemRow row, ItemAction action) {

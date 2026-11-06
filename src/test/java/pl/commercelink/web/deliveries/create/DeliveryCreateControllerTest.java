@@ -80,6 +80,7 @@ class DeliveryCreateControllerTest {
     private static DeliveryCreationForm requested(int qty) {
         DeliveryCreationForm form = new DeliveryCreationForm();
         DeliveryItem item = new DeliveryItem();
+        item.setEan("5900000000001");
         item.setMfn("MFN-1");
         item.setRequestedQty(qty);
         form.setItems(new ArrayList<>(List.of(item)));
@@ -508,11 +509,13 @@ class DeliveryCreateControllerTest {
         // given: suggestions are not in the plan, so this page works them out to restore the planned cost
         when(scope.plannedForm()).thenReturn(requested(1));
         pl.commercelink.web.dtos.SuggestedDeliveryItem offered = new pl.commercelink.web.dtos.SuggestedDeliveryItem();
+        offered.setEan("5900000000077");
         offered.setMfn("S-1");
         offered.setUnitCost(50.0);
         when(scope.suggestions()).thenReturn(List.of(offered));
         DeliveryCreationForm form = requested(1);
         pl.commercelink.web.dtos.SuggestedDeliveryItem typed = new pl.commercelink.web.dtos.SuggestedDeliveryItem();
+        typed.setEan("5900000000077");
         typed.setMfn("S-1");
         typed.setRequestedQty(2);
         form.setSuggestedItems(new ArrayList<>(List.of(typed)));
@@ -529,7 +532,7 @@ class DeliveryCreateControllerTest {
             assertThat(suggestion.getUnitCost()).isEqualTo(50.0);
             assertThat(suggestion.getRequestedQty()).isEqualTo(2);
         });
-        assertThat((java.util.Set<String>) model.getAttribute("invalidFields")).containsExactly("S-1|unitCost");
+        assertThat((java.util.Set<String>) model.getAttribute("invalidFields")).containsExactly("5900000000077|unitCost");
     }
 
     @Test
@@ -667,7 +670,7 @@ class DeliveryCreateControllerTest {
         DeliveryItem shown = ((DeliveryCreationForm) model.getAttribute("form")).getItems().getFirst();
         assertThat(shown.getUnitCost()).isEqualTo(12.5);
         assertThat(shown.getRequestedQty()).isEqualTo(4);
-        assertThat(model.getAttribute("invalidFields")).isEqualTo(java.util.Set.of("MFN-1|unitCost"));
+        assertThat(model.getAttribute("invalidFields")).isEqualTo(java.util.Set.of("5900000000001|unitCost"));
     }
 
     @Test

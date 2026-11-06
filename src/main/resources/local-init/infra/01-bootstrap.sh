@@ -52,6 +52,16 @@ awslocal sqs create-queue --queue-name report-generation-dlq.fifo \
 awslocal sqs create-queue --queue-name report-generation-queue.fifo \
   --attributes '{"FifoQueue":"true","ContentBasedDeduplication":"false","VisibilityTimeout":"900","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:report-generation-dlq.fifo\",\"maxReceiveCount\":\"3\"}"}'
 
+## Offer matching queue (standard, not FIFO) with a DLQ + redrive mirroring prod: visibility 900 s, 3 receives
+awslocal sqs create-queue --queue-name marketplace-offer-match-queue-dlq
+awslocal sqs create-queue --queue-name marketplace-offer-match-queue \
+  --attributes '{"VisibilityTimeout":"900","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:marketplace-offer-match-queue-dlq\",\"maxReceiveCount\":\"3\"}"}'
+
+## Offer matching sweep queue: EventBridge scheduler on prod sends one message every evening; never retried
+awslocal sqs create-queue --queue-name marketplace-offer-match-sweep-queue-dlq
+awslocal sqs create-queue --queue-name marketplace-offer-match-sweep-queue \
+  --attributes '{"VisibilityTimeout":"300","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:marketplace-offer-match-sweep-queue-dlq\",\"maxReceiveCount\":\"1\"}"}'
+
 ## E-receipts sweep queue: EventBridge scheduler on prod sends one message per minute
 awslocal sqs create-queue --queue-name receipt-sweep-queue-dlq
 awslocal sqs create-queue --queue-name receipt-sweep-queue \

@@ -49,7 +49,7 @@ final class InventoryStatisticsCalculator {
     }
 
     // An own group of a store entry joins only a global group of that same entry or one without any entry (see
-    // InventoryIndex.covers); any other own group joins the global group it matches by id, EAN or code.
+    // InventoryIndex.covers); any other own group joins the global group it matches by id or EAN.
     private static boolean sharesPimEntry(MatchedInventory global, MatchedInventory own, StoreEntryKeys storeEntries) {
         InventoryKey ownKey = own.getInventoryKey();
         return !InventoryIndex.isStoreEntryKey(ownKey, storeEntries)

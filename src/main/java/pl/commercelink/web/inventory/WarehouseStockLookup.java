@@ -17,9 +17,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
 
-/** The store's own stock on hand, by manufacturer code, from the same warehouse the prices page reads. */
+/** The store's own stock on hand, by EAN, from the same warehouse the prices page reads. */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -34,9 +34,9 @@ public class WarehouseStockLookup {
     private final Warehouse warehouse;
     private final StoresRepository storesRepository;
 
-    /** Quantity in stock (not in delivery) per requested manufacturer code; empty when there is no own warehouse to ask. */
-    public Map<String, Long> inStockByMfn(@Nullable String storeId, Collection<String> mfns) {
-        if (storeId == null || mfns.isEmpty()) {
+    /** Quantity in stock (not in delivery) per requested EAN; empty when there is no own warehouse to ask. */
+    public Map<String, Long> inStockByEan(@Nullable String storeId, Collection<String> eans) {
+        if (storeId == null || eans.isEmpty()) {
             return Map.of();
         }
         Store store = storesRepository.findById(storeId);
@@ -51,9 +51,8 @@ public class WarehouseStockLookup {
             return Map.of();
         }
         Map<String, Long> qty = new HashMap<>();
-        for (String code : mfns) {
-            String mfn = unifyMfn(code);
-            Long inStock = mfn == null ? null : storeStock.get(mfn);
+        for (String code : eans) {
+            Long inStock = code == null ? null : storeStock.get(unifyEan(code));
             if (inStock != null) {
                 qty.put(code, inStock);
             }
@@ -64,9 +63,9 @@ public class WarehouseStockLookup {
     private Map<String, Long> loadInStock(String storeId) {
         Map<String, Long> qty = new HashMap<>();
         for (WarehouseItemView item : warehouse.stockQueryService(storeId).searchAllAvailable(storeId)) {
-            String mfn = unifyMfn(item.getMfn());
-            if (mfn != null && !item.isInDelivery()) {
-                qty.merge(mfn, (long) item.getQty(), Long::sum);
+            String ean = item.getEan();
+            if (ean != null && !ean.isBlank() && !item.isInDelivery()) {
+                qty.merge(unifyEan(ean), (long) item.getQty(), Long::sum);
             }
         }
         return Map.copyOf(qty);

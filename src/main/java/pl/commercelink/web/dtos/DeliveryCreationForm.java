@@ -188,7 +188,7 @@ public class DeliveryCreationForm {
         setRemoveUnselected(posted.isRemoveUnselected());
         setDeliveryAddressId(posted.getDeliveryAddressId());
         for (DeliveryItem postedItem : posted.getItems()) {
-            DeliveryItem matchingItem = findItemByMfn(postedItem.getMfn());
+            DeliveryItem matchingItem = findItemByEan(postedItem.getEan());
             if (matchingItem != null) {
                 matchingItem.setRequestedQty(postedItem.getRequestedQty());
                 matchingItem.setUnitCost(postedItem.getUnitCost());
@@ -215,9 +215,9 @@ public class DeliveryCreationForm {
         }
     }
 
-    private DeliveryItem findItemByMfn(String mfn) {
+    private DeliveryItem findItemByEan(String ean) {
         return items.stream()
-                .filter(item -> Objects.equals(item.getMfn(), mfn))
+                .filter(item -> Objects.equals(item.getEan(), ean))
                 .findFirst()
                 .orElse(null);
     }
@@ -253,7 +253,7 @@ public class DeliveryCreationForm {
      */
     private void applyToSuggestedItem(String mfn, String name, String ean, int requestedQty, double unitCost) {
         SuggestedDeliveryItem suggested = suggestedItems == null ? null : suggestedItems.stream()
-                .filter(candidate -> Objects.equals(candidate.getMfn(), mfn))
+                .filter(candidate -> Objects.equals(candidate.getEan(), ean))
                 .findFirst()
                 .orElse(null);
         if (suggested == null) {

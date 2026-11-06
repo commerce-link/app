@@ -99,24 +99,24 @@ public class InvoiceSyncService {
             positionById.put(pos.id(), pos);
         }
 
-        Map<String, Double> costsByMfn = new HashMap<>();
+        Map<String, Double> costsByEan = new HashMap<>();
         for (InvoiceSyncPreview.Mapping mapping : preview.getMappings()) {
             var positionId = mapping.getSelectedPositionId();
-            if (positionId != null && !positionId.isBlank() && mapping.getMfn() != null && positionById.containsKey(positionId)) {
-                costsByMfn.put(mapping.getMfn(), positionById.get(positionId).price().netValue());
+            if (positionId != null && !positionId.isBlank() && mapping.getEan() != null && positionById.containsKey(positionId)) {
+                costsByEan.put(mapping.getEan(), positionById.get(positionId).price().netValue());
             }
         }
 
         InvoiceSyncRequest syncRequest = new InvoiceSyncRequest(
                 preview.getDeliveryId(),
-                costsByMfn,
+                costsByEan,
                 invoice.seller()
         );
-        double allocationsCostDelta = deliveryCostSync.apply(storeId, preview.getDeliveryId(), costsByMfn);
+        double allocationsCostDelta = deliveryCostSync.apply(storeId, preview.getDeliveryId(), costsByEan);
         warehouse.invoiceSyncHandler(storeId).sync(syncRequest);
 
-        if (!costsByMfn.isEmpty()) {
-            updateRMAItems(preview.getDeliveryId(), costsByMfn);
+        if (!costsByEan.isEmpty()) {
+            updateRMAItems(preview.getDeliveryId(), costsByEan);
         }
 
         updateDelivery(storeId, preview, preview.getDeliveryId(), positionById, invoice, allocationsCostDelta);
@@ -159,10 +159,10 @@ public class InvoiceSyncService {
         deliveriesRepository.save(delivery);
     }
 
-    private void updateRMAItems(String deliveryId, Map<String, Double> costsByMfn) {
+    private void updateRMAItems(String deliveryId, Map<String, Double> costsByEan) {
         for (RMAItem item : rmaItemsRepository.findByDeliveryId(deliveryId)) {
-            if (costsByMfn.containsKey(item.getMfn())) {
-                double itemDelta = item.updateCost(costsByMfn.get(item.getMfn()));
+            if (costsByEan.containsKey(item.getEan())) {
+                double itemDelta = item.updateCost(costsByEan.get(item.getEan()));
                 if (itemDelta != 0) {
                     rmaItemsRepository.save(item);
                 }

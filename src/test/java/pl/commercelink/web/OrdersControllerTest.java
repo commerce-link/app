@@ -17,6 +17,9 @@ import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
+import pl.commercelink.externaloffers.ExternalOfferLinking;
+import pl.commercelink.externaloffers.ResolvedOffer;
+import pl.commercelink.products.Product;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierChoice;
 import pl.commercelink.inventory.supplier.SupplierLabels;
@@ -101,6 +104,7 @@ import pl.commercelink.web.orders.BulkAction;
 import pl.commercelink.web.orders.MoveTargetView;
 import pl.commercelink.web.orders.OrderAddressForm;
 import pl.commercelink.web.orders.OrderFlash;
+import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.web.orders.OrderNotice;
 import pl.commercelink.web.orders.OrderPageModel;
 import pl.commercelink.web.orders.OrderPageModelFactory;
@@ -156,7 +160,7 @@ class OrdersControllerTest {
 
     private static final String STORE_ID = "store-1";
     private static final String ORDER_ID = "order-1";
-    private static final String SUPPLIER_EAN = "5901234567890";
+    private static final String SUPPLIER_EAN = "2001000000043";
 
     @Mock
     private OrdersRepository ordersRepository;
@@ -210,6 +214,8 @@ class OrdersControllerTest {
     private pl.commercelink.invoicing.InvoiceCreationEventPublisher invoiceCreationEventPublisher;
     @Mock
     private ReceiptAttemptService receiptAttemptService;
+    @Mock
+    private pl.commercelink.externaloffers.ExternalOfferLinking externalOfferLinking;
 
     // Real resolver over the test classpath registry (`Stub` is a registered supplier type).
     @Spy
@@ -2456,7 +2462,7 @@ class OrdersControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "5901234567890", "10", "net", "Bravo-k7f3a9c2", null), null,
+        ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "2001000000043", "10", "net", "Bravo-k7f3a9c2", null), null,
                 new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
 
         // then
@@ -2478,7 +2484,7 @@ class OrdersControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "5901234567890", "10", "net", "Acme", null), null,
+        ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "2001000000043", "10", "net", "Acme", null), null,
                 new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
 
         // then
@@ -2521,7 +2527,7 @@ class OrdersControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "5901234567890", "10", "net", SupplierChoice.CUSTOM, "Stub"), null,
+        ordersController.assignSupplier(ORDER_ID, AssignSupplierForm.of(item.getItemId(), "2001000000043", "10", "net", SupplierChoice.CUSTOM, "Stub"), null,
                 new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
 
         // then
@@ -3916,6 +3922,179 @@ class OrdersControllerTest {
             // then
             assertThat(fresh.getSku()).isEqualTo("X:Y");
             verify(orderItemsRepository).save(fresh);
+        }
+
+        @Test
+        void assignSkuDropsTheEanAnOfferLinkGaveTheItem() {
+            // given a New item carries an EAN only from its offer link, which the typed codes now replace
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.New));
+            OrderItem linked = item("i1", FulfilmentStatus.New, "2001000000012:2001000000029");
+            linked.setEan("2001000000012");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(linked);
+
+            // when
+            ordersController.assignSku(ORDER_ID, "i1", "DMW-9", new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(linked.getSku()).isEqualTo("DMW-9");
+            assertThat(linked.getEan()).isNull();
+        }
+
+        @Test
+        void assignSkuClearsTheSourceThatRecognisedTheItem() {
+            // given
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.New));
+            OrderItem recognised = item("i1", FulfilmentStatus.New, "MFN-77");
+            recognised.setExternalOfferSource(ResolvedOffer.Source.MFN);
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(recognised);
+
+            // when
+            ordersController.assignSku(ORDER_ID, "i1", "DMW-9", new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(recognised.getSku()).isEqualTo("DMW-9");
+            assertThat(recognised.getExternalOfferSource()).isNull();
+            verify(orderItemsRepository).save(recognised);
+        }
+
+        @Test
+        void linkOfferRefusesItemThatIsNotNew() {
+            // given
+            Order order = order(OrderStatus.Assembly);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            OrderItem ordered = item("i1", FulfilmentStatus.Ordered, "RAW-1");
+            ordered.setExternalOfferKey("XS-1");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(ordered);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.linkOffer(ORDER_ID, "i1", "c1", "p1", null, redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.item.link.offer.locked");
+            verifyNoInteractions(externalOfferLinking);
+        }
+
+        @Test
+        void linkOfferRefusesClosedOrder() {
+            // given
+            Order order = order(OrderStatus.Cancelled);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
+            fresh.setExternalOfferKey("XS-1");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.linkOffer(ORDER_ID, "i1", "c1", "p1", null, redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.item.error.closed");
+            verifyNoInteractions(externalOfferLinking);
+            verify(orderItemsRepository, never()).save(any());
+        }
+
+        @Test
+        void linkOfferRedirectsToDetails() {
+            // given
+            Order order = order(OrderStatus.New);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
+            fresh.setExternalOfferKey("XS-1");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
+            when(externalOfferLinking.link(STORE_ID, order, "i1", "c1", "p1", null))
+                    .thenReturn(new pl.commercelink.externaloffers.ExternalOfferLinking.LinkResult(3));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.linkOffer(ORDER_ID, "i1", "c1", "p1", null, redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(notice(redirect).text()).isEqualTo("order.item.link.offer.done [3]");
+        }
+
+        @Test
+        void linkOfferShowsWhyTheProductCannotBeLinked() {
+            // given
+            Order order = order(OrderStatus.New);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
+            fresh.setExternalOfferKey("XS-1");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
+            when(externalOfferLinking.link(STORE_ID, order, "i1", "c-foreign", "p1", null)).thenThrow(
+                    new IllegalArgumentException(pl.commercelink.externaloffers.ExternalOfferLinking.PRODUCT_NOT_IN_CATALOG));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.linkOffer(ORDER_ID, "i1", "c-foreign", "p1", null, redirect, polish);
+
+            // then
+            assertThat(flash(redirect)).containsEntry("errorMessage",
+                    pl.commercelink.externaloffers.ExternalOfferLinking.PRODUCT_NOT_IN_CATALOG);
+        }
+
+        @Test
+        void linkOfferLinksATypedEanInsteadOfAProduct() {
+            // given
+            Order order = order(OrderStatus.New);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
+            fresh.setExternalOfferKey("PS-1");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
+            when(externalOfferLinking.linkEan(STORE_ID, order, "i1", "2001000000043", null))
+                    .thenReturn(new pl.commercelink.externaloffers.ExternalOfferLinking.LinkResult(1));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.linkOffer(ORDER_ID, "i1", "", "", "2001000000043", redirect, polish);
+
+            // then
+            assertThat(notice(redirect).text()).isEqualTo("order.item.link.offer.done [1]");
+            verify(externalOfferLinking, never()).link(any(), any(), any(), any(), any(), any());
+        }
+
+        @Test
+        void linkOfferTreatsAnEanOfSpacesOnlyAsATypedEan() {
+            // given the field was filled with spaces, not left empty for a product choice
+            Order order = order(OrderStatus.New);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
+            fresh.setExternalOfferKey("PS-1");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
+            when(externalOfferLinking.linkEan(STORE_ID, order, "i1", "   ", null)).thenThrow(new IllegalArgumentException(
+                    pl.commercelink.externaloffers.ExternalOfferLinking.INVALID_EAN));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.linkOffer(ORDER_ID, "i1", "", "", "   ", redirect, polish);
+
+            // then
+            assertThat(flash(redirect)).containsEntry("errorMessage",
+                    pl.commercelink.externaloffers.ExternalOfferLinking.INVALID_EAN);
+            verify(externalOfferLinking, never()).link(any(), any(), any(), any(), any(), any());
+        }
+
+        @Test
+        void linkOfferShowsWhyATypedEanCannotBeLinked() {
+            // given
+            Order order = order(OrderStatus.New);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
+            fresh.setExternalOfferKey("PS-1");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
+            when(externalOfferLinking.linkEan(STORE_ID, order, "i1", "12AB", null)).thenThrow(
+                    new IllegalArgumentException(pl.commercelink.externaloffers.ExternalOfferLinking.INVALID_EAN));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.linkOffer(ORDER_ID, "i1", null, null, "12AB", redirect, polish);
+
+            // then
+            assertThat(flash(redirect)).containsEntry("errorMessage",
+                    pl.commercelink.externaloffers.ExternalOfferLinking.INVALID_EAN);
         }
 
         @Test

@@ -11,12 +11,14 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.marketplace.api.MarketplaceOffer;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
+import pl.commercelink.externaloffers.ExternalOfferLink;
+import pl.commercelink.externaloffers.ExternalOfferLinkRepository;
+import pl.commercelink.externaloffers.OfferEans;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.*;
 import pl.commercelink.products.information.StorePimAliases;
-import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
@@ -49,11 +51,12 @@ public class MarketplaceOfferExportEventListener {
     private final MarketplaceExportRunService marketplaceExportRunService;
     private final StoreActivity storeActivity;
     private final StorePimAliases aliases;
+    private final ExternalOfferLinkRepository offerLinks;
 
     @Value("${marketplace.export.removalAttempts:3}")
     private int removalRetryCount;
 
-    // How many runs in a row a skipped product keeps the previous offers with its codes before they are taken off.
+    // How many runs in a row a skipped product keeps the previous offers with its EAN before they are taken off.
     @Value("${marketplace.export.unknown-entry-max-waiting-runs:3}")
     private int unknownEntryMaxWaitingRuns;
 
@@ -92,8 +95,12 @@ public class MarketplaceOfferExportEventListener {
 
         List<MarketplaceOfferSnapshot> previousExport = loadPreviousSnapshot(store, catalog, payload.getMarketplace());
 
-        ExportCandidates candidates = collectOffersFromCatalog(
-                store.getStoreId(), catalog, payload.getMarketplace(), enrichedInventory, pricelist, previousExport);
+        // a failed read fails the run: exporting without the links would publish duplicates of the foreign offers
+        ForeignOffers foreignOffers = new ForeignOffers(
+                offerLinks.findAll(store.getStoreId(), payload.getMarketplace()));
+
+        ExportCandidates candidates = collectOffersFromCatalog(store.getStoreId(), catalog, payload.getMarketplace(),
+                enrichedInventory, pricelist, previousExport, foreignOffers);
 
         handleMarketplaceExport(store, payload.getMarketplace(), candidates, previousExport, run);
     }
@@ -109,11 +116,11 @@ public class MarketplaceOfferExportEventListener {
                                                       String marketplace,
                                                       InventoryView inventory,
                                                       Pricelist pricelist,
-                                                      List<MarketplaceOfferSnapshot> previousExport) {
+                                                      List<MarketplaceOfferSnapshot> previousExport,
+                                                      ForeignOffers foreignOffers) {
         List<CategoryDefinition> categories = new LinkedList<>();
         List<MarketplaceDefinition> definitions = new LinkedList<>();
         List<List<Product>> productsPerCategory = new LinkedList<>();
-        Set<String> exportedPimIds = new HashSet<>();
 
         for (CategoryDefinition category : catalog.getCategories()) {
             Optional<MarketplaceDefinition> definitionForMarketplace = category.getCategoryDefinition(marketplace);
@@ -123,10 +130,15 @@ public class MarketplaceOfferExportEventListener {
             }
 
             List<Product> products = productRepository.findAllProductsWithPimId(category.getCategoryId(), true);
-            products.forEach(product -> exportedPimIds.add(product.getPimId()));
             categories.add(category);
             definitions.add(definitionForMarketplace.get());
-            productsPerCategory.add(products);
+            productsPerCategory.add(products.stream()
+                    .filter(product -> !foreignOffers.cover(storeId, product, aliases))
+                    .toList());
+        }
+        if (foreignOffers.skippedProducts() > 0) {
+            log.warn("Marketplace {} export of store {}: {} product(s) skipped, linked to offers published by another "
+                    + "system", marketplace, storeId, foreignOffers.skippedProducts());
         }
 
         Map<String, MarketplaceOffer> offersByOfferId = new LinkedHashMap<>();
@@ -134,7 +146,7 @@ public class MarketplaceOfferExportEventListener {
         for (int i = 0; i < categories.size(); i++) {
             String categoryName = categories.get(i).getName();
             for (Candidate candidate : createMarketplaceOffers(storeId, categories.get(i), definitions.get(i),
-                    productsPerCategory.get(i), exportedPimIds, inventory, pricelist)) {
+                    productsPerCategory.get(i), inventory, pricelist)) {
                 if (candidate.entryKnown()) {
                     addOffer(offersByOfferId, candidate.offer(), marketplace, storeId, categoryName);
                 } else {
@@ -165,7 +177,7 @@ public class MarketplaceOfferExportEventListener {
     /**
      * A product whose PIM entry the index copy does not know gets its own pimId as the offer id. An index copy older
      * than the product's entry (a clone made moments ago) cannot tell the real offer id, the source's, so the product
-     * is held back while the previous export has an offer it would protect: one with its codes that no product of this
+     * is held back while the previous export has an offer it would protect: one with its EAN that no product of this
      * run offers, still on the marketplace and within the bound (see handleMarketplaceExport, which keeps it for that
      * many runs and then reports and removes it). In every other case (a dead pin: the entry was deleted and the
      * delete event lost; an offer already under the product's own id; nothing to protect) the product is exported
@@ -203,17 +215,57 @@ public class MarketplaceOfferExportEventListener {
         return previousExport.stream().anyMatch(snapshot -> !currentOfferIds.contains(snapshot.pimId())
                 && isLiveOffer(snapshot)
                 && snapshot.waitingRuns() <= unknownEntryMaxWaitingRuns
-                && sharesCodes(product, snapshot));
+                && sharesEan(product, snapshot));
     }
 
-    // as SkippedProducts matches: by EAN, or by MFN when the previous offer has no EAN
-    private static boolean sharesCodes(Product product, MarketplaceOfferSnapshot snapshot) {
+    private static boolean sharesEan(Product product, MarketplaceOfferSnapshot snapshot) {
         Optional<String> ean = unifiedEan(snapshot.ean());
-        if (ean.isPresent()) {
-            return ean.equals(unifiedEan(product.getEan()));
+        return ean.isPresent() && ean.equals(unifiedEan(product.getEan()));
+    }
+
+    /**
+     * The links of this marketplace to offers published by another system (design D3): until the store chooses to
+     * update them, a product whose EAN is among the EANs of such a link is left out of the export, so no duplicate
+     * offer appears under our id. A link whose offer key is the product's own offer id points at our offer, which is
+     * exported as before. EANs are compared unified on both sides; a product without EAN cannot match a link.
+     */
+    private static final class ForeignOffers {
+
+        private final Map<String, Set<String>> offerKeysByEan = new HashMap<>();
+        private int skippedProducts;
+
+        ForeignOffers(List<ExternalOfferLink> links) {
+            for (ExternalOfferLink link : links) {
+                if (link.getEans() == null) {
+                    continue;
+                }
+                for (String linkEan : link.getEans()) {
+                    unifiedEan(linkEan).ifPresent(ean ->
+                            offerKeysByEan.computeIfAbsent(ean, key -> new HashSet<>()).add(link.getOfferKey()));
+                }
+            }
         }
-        Optional<String> mfn = unifiedMfn(snapshot.manufacturerCode());
-        return mfn.isPresent() && mfn.equals(unifiedMfn(product.getManufacturerCode()));
+
+        boolean cover(String storeId, Product product, StorePimAliases aliases) {
+            if (offerKeysByEan.isEmpty()) {
+                return false;
+            }
+            Optional<String> ean = unifiedEan(product.getEan());
+            if (ean.isEmpty()) {
+                return false;
+            }
+            String offerId = aliases.offerIdOf(storeId, product.getPimId());
+            boolean covered = offerKeysByEan.getOrDefault(ean.get(), Set.of()).stream()
+                    .anyMatch(offerKey -> !offerKey.equals(offerId));
+            if (covered) {
+                skippedProducts++;
+            }
+            return covered;
+        }
+
+        int skippedProducts() {
+            return skippedProducts;
+        }
     }
 
     /** A product's offer, and whether the index copy knows its PIM entry. */
@@ -231,26 +283,20 @@ public class MarketplaceOfferExportEventListener {
     }
 
     /**
-     * The products skipped in this run (see {@link #createMarketplaceOffers}), by unified EAN and unified MFN. A previous
-     * offer is matched by its EAN, or by its MFN when it has no EAN.
+     * The products skipped in this run (see {@link #createMarketplaceOffers}), by unified EAN. A previous offer without
+     * an EAN matches none of them.
      */
     private static final class SkippedProducts {
 
         private final Map<String, SkippedProduct> byEan = new HashMap<>();
-        private final Map<String, SkippedProduct> byMfn = new HashMap<>();
 
         void add(Product product) {
             SkippedProduct skipped = new SkippedProduct(product.getProductId(), product.getPimId());
             unifiedEan(product.getEan()).ifPresent(ean -> byEan.putIfAbsent(ean, skipped));
-            unifiedMfn(product.getManufacturerCode()).ifPresent(mfn -> byMfn.putIfAbsent(mfn, skipped));
         }
 
-        Optional<SkippedProduct> withCodesOf(MarketplaceOfferSnapshot snapshot) {
-            Optional<String> ean = unifiedEan(snapshot.ean());
-            if (ean.isPresent()) {
-                return ean.map(byEan::get);
-            }
-            return unifiedMfn(snapshot.manufacturerCode()).map(byMfn::get);
+        Optional<SkippedProduct> withEanOf(MarketplaceOfferSnapshot snapshot) {
+            return unifiedEan(snapshot.ean()).map(byEan::get);
         }
     }
 
@@ -258,7 +304,6 @@ public class MarketplaceOfferExportEventListener {
                                                            CategoryDefinition category,
                                                            MarketplaceDefinition marketplaceDefinition,
                                                            List<Product> products,
-                                                           Set<String> exportedPimIds,
                                                            InventoryView inventory,
                                                            Pricelist pricelist) {
         List<Candidate> result = new LinkedList<>();
@@ -267,11 +312,9 @@ public class MarketplaceOfferExportEventListener {
 
         for (Product product : products) {
 
-            // The pricelist is keyed by the id of its build time: the source, the clone, or (when the clone was
-            // deleted after the build) a clone the product no longer points at, which only the codes still find.
-            // The code fallback never takes the row of another product of this export.
-            Optional<AvailabilityAndPrice> priceInPricelist = aliases.find(storeId, pricelist, product.getPimId())
-                    .or(() -> pricelist.findByCodes(product.getEan(), product.getManufacturerCode(), exportedPimIds));
+            // A product whose row is keyed by a clone deleted after the pricelist was built is left out until the next
+            // pricelist, which starts another export.
+            Optional<AvailabilityAndPrice> priceInPricelist = aliases.find(storeId, pricelist, product.getPimId());
 
             if (priceInPricelist.isEmpty()) {
                 continue;
@@ -335,7 +378,7 @@ public class MarketplaceOfferExportEventListener {
             // only an offer that is on the marketplace can be kept: a removal in progress or given up goes on as before
             Optional<SkippedProduct> skipped = currentPimIds.contains(snapshot.pimId()) || !isLiveOffer(snapshot)
                     ? Optional.empty()
-                    : candidates.skipped().withCodesOf(snapshot);
+                    : candidates.skipped().withEanOf(snapshot);
             if (skipped.isEmpty() || snapshot.waitingRuns() > unknownEntryMaxWaitingRuns) {
                 previousSnapshots.add(snapshot);
             } else if (snapshot.waitingRuns() < unknownEntryMaxWaitingRuns) {
@@ -402,11 +445,7 @@ public class MarketplaceOfferExportEventListener {
     }
 
     private static Optional<String> unifiedEan(String ean) {
-        return Optional.ofNullable(UnifiedProductIdentifiers.unifyEan(ean)).filter(code -> !code.isBlank());
-    }
-
-    private static Optional<String> unifiedMfn(String manufacturerCode) {
-        return Optional.ofNullable(UnifiedProductIdentifiers.unifyMfn(manufacturerCode)).filter(code -> !code.isBlank());
+        return Optional.ofNullable(OfferEans.unify(ean));
     }
 
     private List<MarketplaceOfferSnapshot> retryableOrphans(List<MarketplaceOfferSnapshot> previousSnapshots, Set<String> currentPimIds) {

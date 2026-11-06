@@ -154,10 +154,10 @@ public class WarehouseAllocationsManager {
         }
     }
 
-    public double updateUnitCosts(String storeId, String deliveryId, Map<String, Double> unitCostsByMfn) {
+    public double updateUnitCosts(String storeId, String deliveryId, Map<String, Double> unitCostsByEan) {
         double delta = 0;
         for (WarehouseItem item : warehouseRepository.findByDeliveryId(storeId, deliveryId)) {
-            Double confirmed = unitCostsByMfn.get(item.getManufacturerCode());
+            Double confirmed = unitCostsByEan.get(item.getEan());
             if (confirmed == null) {
                 continue;
             }

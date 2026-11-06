@@ -1641,21 +1641,44 @@ class CatalogProductsControllerTest {
         verify(productRepository, times(1)).save(any(Product.class));
     }
 
-    /** The guard compares the same way as the review: a product with the code alone is the same product too. */
+    /** The guard compares the same way as the review: the manufacturer code alone (a size of one model) is another product. */
     @Test
-    void createProductIsRefusedWhenTheCategoryHasTheManufacturerCodeAlready() throws Exception {
+    void createProductSharingOnlyTheManufacturerCodeIsNotADuplicate() throws Exception {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
-                new Product(gpu.getCategoryId(), null, null, "mfn-1", "MSI", null, "MSI RTX 5070", "Default")));
+                new Product(gpu.getCategoryId(), null, "5909999999999", "mfn-1", "MSI", null, "MSI RTX 5070", "Default")));
 
-        // when / then
+        // when
         mvc.perform(post(categoryPath() + "/products/new")
                         .param("name", "MSI RTX 5070 OC").param("ean", "4719331361600").param("manufacturerCode", "MFN-1")
                         .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default").param("enabled", "true"))
-                .andExpect(view().name("catalog/product"))
-                .andExpect(model().attribute("errors", hasEntry("ean", "product.error.duplicate")));
-        verify(productRepository, never()).save(any(Product.class));
+                .andExpect(redirectedUrl(categoryPath() + "?status=active"));
+
+        // then
+        verify(productRepository).save(any(Product.class));
+    }
+
+    @Test
+    void pendingProductCorrectedToAnotherProductsCodeIsNotADuplicate() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        Product pending = new Product(gpu.getCategoryId(), null, "4719331361699", "MFN-9", "MSI", "l", "MSI RTX 5070", "Default");
+        pending.setProductId("p1");
+        Product other = new Product(gpu.getCategoryId(), "pim-2", "4719331361600", "MFN-1", "MSI", "l", "Other", "Default");
+        other.setProductId("p2");
+        when(access.requireProduct(gpu, "p1")).thenReturn(pending);
+        when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(pending, other));
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/p1")
+                        .param("name", "MSI RTX 5070").param("ean", "5901234567890").param("manufacturerCode", "MFN-1")
+                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default")
+                        .param("enabled", "true"))
+                .andExpect(redirectedUrl(categoryPath() + "?status=active"));
+
+        // then
+        verify(productRepository).save(pending);
     }
 
     /** D-I6 for a product: another save got there first, so this one is refused at the form instead of a 500. */

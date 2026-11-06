@@ -1948,6 +1948,12 @@ body.cl-drawer-open .cl-sidebar {
     margin-bottom: 16px;
 }
 
+/* The same distance when the card's footer (or the form holding it) follows the alert. */
+.cl-page .cl-card > .cl-alert + .cl-card-footer,
+.cl-page .cl-card > .cl-alert + form:has(> .cl-card-footer) {
+    margin-top: 16px;
+}
+
 /* Record list: one row per record or configuration item, summary on the left, actions on the right. */
 .cl-page .cl-card .cl-list {
     margin: 0;

@@ -49,6 +49,18 @@ class ListingInventoryTest {
         assertThat(listing.keys()).containsExactly(globalKey, ownOnlyKey);
     }
 
+    @Test
+    void ownGroupSharingOnlyACodeWithAGlobalGroupIsListed() {
+        // given
+        InventoryKey globalKey = new InventoryKey("5901234567890", "MFN-1");
+        InventoryKey ownKey = new InventoryKey("4000000000009", "MFN-1");
+        ListingInventory listing = new ListingInventory(InventoryIndex.of(List.of(group(globalKey))),
+                InventoryIndex.of(List.of(group(ownKey))), STORE_ENTRY);
+
+        // when / then
+        assertThat(listing.keys()).containsExactly(globalKey, ownKey);
+    }
+
     private InventoryKey pimKey(String id, String ean, String code) {
         InventoryKey key = new InventoryKey(id);
         key.addEan(ean);

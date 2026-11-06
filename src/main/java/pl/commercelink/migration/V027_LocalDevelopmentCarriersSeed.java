@@ -19,8 +19,8 @@ import java.util.List;
  * delivery method names). Production carriers and dictionaries are loaded from outside this repository.
  */
 @Profile("localdev")
-@ChangeUnit(id = "V026-local-development-carriers-seed", order = "026", author = "commercelink")
-public class V026_LocalDevelopmentCarriersSeed {
+@ChangeUnit(id = "V027-local-development-carriers-seed", order = "027", author = "commercelink")
+public class V027_LocalDevelopmentCarriersSeed {
 
     private static final List<String> CARRIERS = List.of("InPost", "InPost Kurier", "DPD", "DHL", "Poczta Polska",
             "Orlen", "Zabka", "UPS", "GLS", "FedEx", "DB Schenker", "Raben", "Allegro One", "Meest", "Ambro Express",
@@ -28,7 +28,7 @@ public class V026_LocalDevelopmentCarriersSeed {
 
     private final AmazonDynamoDB dynamoDB;
 
-    public V026_LocalDevelopmentCarriersSeed(AmazonDynamoDB dynamoDB) {
+    public V027_LocalDevelopmentCarriersSeed(AmazonDynamoDB dynamoDB) {
         this.dynamoDB = dynamoDB;
     }
 

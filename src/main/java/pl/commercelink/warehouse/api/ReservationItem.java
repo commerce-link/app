@@ -6,7 +6,7 @@ import java.util.List;
 public class ReservationItem {
 
     private String itemId;
-    private String mfn;
+    private String ean;
     private int qty;
     private String warehouseItemId;
 
@@ -21,14 +21,14 @@ public class ReservationItem {
         this.itemId = itemId;
     }
 
-    public ReservationItem(String itemId, String mfn, int qty) {
+    public ReservationItem(String itemId, String ean, int qty) {
         this.itemId = itemId;
-        this.mfn = mfn;
+        this.ean = ean;
         this.qty = qty;
     }
 
-    public ReservationItem(String itemId, String mfn, int qty, String warehouseItemId) {
-        this(itemId, mfn, qty);
+    public ReservationItem(String itemId, String ean, int qty, String warehouseItemId) {
+        this(itemId, ean, qty);
         this.warehouseItemId = warehouseItemId;
     }
 
@@ -60,12 +60,12 @@ public class ReservationItem {
         this.itemId = itemId;
     }
 
-    public String getMfn() {
-        return mfn;
+    public String getEan() {
+        return ean;
     }
 
-    public void setMfn(String mfn) {
-        this.mfn = mfn;
+    public void setEan(String ean) {
+        this.ean = ean;
     }
 
     public int getQty() {

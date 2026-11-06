@@ -65,15 +65,11 @@ public class InventoryKey {
             matched = id.equals(other.id);
         }
 
-        return matched || hasAnyEan(other.eans) || hasAnyProductCode(other.productCodes);
+        return matched || hasAnyEan(other.eans);
     }
 
     public boolean hasAnyEan(Collection<String> eans) {
         return eans.stream().anyMatch(this.eans::contains);
-    }
-
-    public boolean hasAnyProductCode(Collection<String> productCodes) {
-        return productCodes.stream().anyMatch(this.productCodes::contains);
     }
 
     public String getId() {
@@ -89,15 +85,19 @@ public class InventoryKey {
     }
 
     public static InventoryKey fromProduct(Product product) {
-        return new InventoryKey(product.getEan(), product.getManufacturerCode());
+        InventoryKey key = new InventoryKey(product.getEan(), product.getManufacturerCode());
+        key.id = product.getPimId();
+        return key;
+    }
+
+    public static InventoryKey fromPimIdAndEan(String pimId, String ean) {
+        InventoryKey key = new InventoryKey(ean, null);
+        key.id = pimId;
+        return key;
     }
 
     public static InventoryKey fromEan(String ean) {
         return new InventoryKey(ean, null);
-    }
-
-    public static InventoryKey fromMfn(String manufacturerCode) {
-        return new InventoryKey(null, manufacturerCode);
     }
 
     public static InventoryKey fromPimId(String pimId) {

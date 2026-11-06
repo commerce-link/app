@@ -84,7 +84,8 @@ public class FulfilmentGroupsGenerator {
         }
 
         if (orderItem.hasSKU()) {
-            // this is a hack to support multiple manufacturer codes for single product used in PreBuilds definition
+            // several codes of the same goods joined with ":" (PreBuild definitions, "Assign SKU", the EANs of a linked
+            // marketplace offer): each is looked up and the cheapest offer under any of them wins
             return Arrays.stream(orderItem.getSku().split(":"))
                     .map(String::trim)
                     .map(c -> createFulfilmentBasedOnSku(orderItem, c))
@@ -97,19 +98,13 @@ public class FulfilmentGroupsGenerator {
     }
 
     private List<FulfilmentItem> createFulfilmentBasedOnSku(OrderItem orderItem, String sku) {
-        Collection<InventoryItem> offers = findOffersByEanThenManufacturerCode(sku);
+        Collection<InventoryItem> offers = inventory.findByEan(sku).getInventoryItems();
         List<FulfilmentItem> candidates = FulfilmentItem.fromInventory(orderItem, offers);
         if (!offers.isEmpty() && candidates.stream().noneMatch(candidateFilter)) {
             // a routed order must not stall on warehouse stock it is not allowed to use
             return FulfilmentItem.fromProviders(orderItem, offers);
         }
         return candidates;
-    }
-
-    // TODO remove search by manufacturer sku when all products have EAN codes
-    private Collection<InventoryItem> findOffersByEanThenManufacturerCode(String sku) {
-        Collection<InventoryItem> byEan = inventory.findByEan(sku).getInventoryItems();
-        return byEan.isEmpty() ? inventory.findByProductCode(sku).getInventoryItems() : byEan;
     }
 
     public static Builder builder() {

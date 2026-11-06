@@ -3,6 +3,7 @@ package pl.commercelink.warehouse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.Inventory;
+import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.pricelist.RollingPriceAggregate;
 import pl.commercelink.pricelist.RollingPriceAggregateRepository;
@@ -86,8 +87,9 @@ public class StockLevels {
                 double restockPricePromo = getRestockPricePromo(product, priceAggregates);
                 double restockPriceStandard = getRestockPriceStandard(product, priceAggregates);
 
+                InventoryKey productKey = InventoryKey.fromPimIdAndEan(product.getPimId(), product.getEan());
                 Optional<StockProductLevel> optional = stockProductLevels.stream()
-                        .filter(s -> s.hasManufacturerCode(product.getManufacturerCode())).findFirst();
+                        .filter(s -> s.inventoryKey().matches(productKey)).findFirst();
 
                 if (optional.isPresent()) {
                     StockProductLevel spl = optional.get();
@@ -99,6 +101,8 @@ public class StockLevels {
                 } else {
                     StockProductLevel spl = new StockProductLevel(
                             category.getName(),
+                            product.getPimId(),
+                            product.getEan(),
                             product.getManufacturerCode(),
                             product.getName(),
                             restockPricePromo,
@@ -114,8 +118,8 @@ public class StockLevels {
 
         if (scope == RestockScope.ExpectedStockQty) {
             for (StockProductLevel s : stockProductLevels) {
-                List<WarehouseItemView> items = warehouse.stockQueryService(storeId)
-                        .searchByMfns(storeId, Collections.singletonList(s.getManufacturerCode()));
+                Collection<String> eans = enabledInventory.findByInventoryKey(s.inventoryKey()).getInventoryKey().getProductEans();
+                List<WarehouseItemView> items = warehouse.stockQueryService(storeId).searchByEans(storeId, eans);
                 s.calculateStock(items);
             }
             return stockProductLevels.stream()

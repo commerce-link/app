@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import pl.commercelink.baskets.BasketItem;
+import pl.commercelink.externaloffers.ResolvedOffer;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.warehouse.api.ItemCondition;
@@ -267,6 +268,163 @@ class OrderItemTest {
     private BasketItem basketItem(String mfn) {
         return new BasketItem("pim-1", "Product", mfn,
                 "Laptops", 100.0, 0, 1, null, 3, false);
+    }
+
+    @Test
+    void splitCopyKeepsTheExternalOfferKey() {
+        // given
+        OrderItem source = orderItem("MFN-1");
+        source.setExternalOfferKey("PS-8001");
+
+        // when
+        OrderItem split = new OrderItem(ORDER_ID, source, 1);
+
+        // then
+        assertThat(split.getExternalOfferKey()).isEqualTo("PS-8001");
+    }
+
+    @Test
+    void updatingANewItemFromAFormWithoutTheOfferKeyKeepsTheStoredKey() {
+        // given
+        OrderItem stored = orderItem("MFN-1");
+        stored.setExternalOfferKey("PS-8001");
+        OrderItem fromForm = orderItem("MFN-2");
+
+        // when
+        stored.updateAllFields(fromForm);
+        stored.update(fromForm);
+
+        // then
+        assertThat(stored.getExternalOfferKey()).isEqualTo("PS-8001");
+    }
+
+    @Test
+    void onlyANonServiceUncategorizedLineWithAnOfferKeyIsUnlinked() {
+        // given an imported line nothing recognised: its sku is still the marketplace's code
+        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, "DMW-1001", false);
+        item.setExternalItemId("DMW-1001");
+
+        // when / then
+        assertThat(item.hasUnlinkedExternalOffer()).isFalse();
+        item.setExternalOfferKey("PS-1");
+        assertThat(item.hasUnlinkedExternalOffer()).isTrue();
+        item.setService(true);
+        assertThat(item.hasUnlinkedExternalOffer()).isFalse();
+    }
+
+    @Test
+    void theMarketplaceCodeIsComparedWithoutItsSpacesAsTheBasketStripsThem() {
+        // given
+        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, "DMW1001", false);
+        item.setExternalItemId("DMW 1001");
+        item.setExternalOfferKey("PS-1");
+
+        // when / then
+        assertThat(item.hasUnlinkedExternalOffer()).isTrue();
+    }
+
+    @Test
+    void aLineWithoutAMarketplaceCodeIsUnlinkedWhileItHasNoSku() {
+        // given
+        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, null, false);
+        item.setExternalOfferKey("PS-1");
+
+        // when / then
+        assertThat(item.hasUnlinkedExternalOffer()).isTrue();
+    }
+
+    @Test
+    void aLineOfALinkedOfferIsLinkedWithoutACategory() {
+        // given the link gave the line its EANs only: its goods need not be in a catalog
+        OrderItem item = linkedLine();
+
+        // when / then
+        assertThat(item.hasUnlinkedExternalOffer()).isFalse();
+    }
+
+    @Test
+    void aLineOfALinkedOfferStaysLinkedWhenItsFulfilmentIsRemoved() {
+        // given "Remove supplier" clears the EAN the fulfilment chose, not the codes the link gave
+        OrderItem item = linkedLine();
+
+        // when
+        item.removeFulfilment();
+
+        // then
+        assertThat(item.getEan()).isNull();
+        assertThat(item.hasUnlinkedExternalOffer()).isFalse();
+    }
+
+    @Test
+    void aLineGivenAnotherSkuByHandIsNotUnlinked() {
+        // given
+        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, "DMW-1001", false);
+        item.setExternalItemId("DMW-1001");
+        item.setExternalOfferKey("PS-1");
+
+        // when
+        item.setSku("2001000000043");
+
+        // then
+        assertThat(item.hasUnlinkedExternalOffer()).isFalse();
+    }
+
+    @Test
+    void aLinkedItemWhoseSkuEqualsTheRawCodeIsNotUnlinked() {
+        // given a marketplace whose product code is the EAN itself, linked to that same EAN
+        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, "2000000000015", false);
+        item.setExternalItemId("2000000000015");
+        item.setExternalOfferKey("2000000000015");
+        item.setExternalOfferSource(ResolvedOffer.Source.LINK);
+
+        // when / then
+        assertThat(item.hasUnlinkedExternalOffer()).isFalse();
+    }
+
+    @Test
+    void anItemRecognisedByManufacturerCodeWithoutCategoryIsNotUnlinked() {
+        // given the PIM knew the code but the goods have no category, so the sku stays the raw code
+        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, "DMW-1001", false);
+        item.setExternalItemId("DMW-1001");
+        item.setExternalOfferKey("PS-1");
+        item.setExternalOfferSource(ResolvedOffer.Source.MFN);
+
+        // when / then
+        assertThat(item.hasUnlinkedExternalOffer()).isFalse();
+    }
+
+    @Test
+    void anItemWithoutSourceKeepsTheTextRule() {
+        // given an item imported before the source was stored
+        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, "DMW-1001", false);
+        item.setExternalItemId("DMW-1001");
+        item.setExternalOfferKey("PS-1");
+
+        // when / then
+        assertThat(item.getExternalOfferSource()).isNull();
+        assertThat(item.hasUnlinkedExternalOffer()).isTrue();
+    }
+
+    @Test
+    void theCopyConstructorKeepsTheSource() {
+        // given
+        OrderItem source = orderItem("MFN-1");
+        source.setExternalOfferSource(ResolvedOffer.Source.OWN_OFFER);
+
+        // when
+        OrderItem copy = new OrderItem(ORDER_ID, source, 1);
+
+        // then
+        assertThat(copy.getExternalOfferSource()).isEqualTo(ResolvedOffer.Source.OWN_OFFER);
+    }
+
+    private OrderItem linkedLine() {
+        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0,
+                "2001000000012:2001000000029", false);
+        item.setExternalItemId("DMW-1001");
+        item.setExternalOfferKey("PS-1");
+        item.setEan("2001000000012");
+        return item;
     }
 
     private OrderItem orderItem(String mfn) {

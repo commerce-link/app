@@ -29,6 +29,7 @@ class DeliveryOrderedQtyUpdateServiceTest {
 
     private static final String STORE_ID = "store-1";
     private static final String MFN = "MFN-1";
+    private static final String EAN = "1234567890123";
 
     @Mock
     private DeliveriesQueryService deliveriesQueryService;
@@ -50,7 +51,7 @@ class DeliveryOrderedQtyUpdateServiceTest {
         delivery.setTotalCost(50.0);
 
         // when
-        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), MFN, 8);
+        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), EAN, 8);
 
         // then
         assertThat(result.isSuccess()).isTrue();
@@ -62,6 +63,25 @@ class DeliveryOrderedQtyUpdateServiceTest {
     }
 
     @Test
+    void orderedQtyChangeFindsTheLineByEan() {
+        // given
+        Allocation disk = warehouseAllocation("warehouse-item-1", 2, 10.0, true);
+        Allocation fan = warehouseAllocation("warehouse-item-2", 3, 4.0, true);
+        fan.setEan("5900000000002");
+        Delivery delivery = delivery(disk, fan);
+        delivery.setTotalCost(32.0);
+
+        // when
+        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), "5900000000002", 5);
+
+        // then
+        assertThat(result.isSuccess()).isTrue();
+        verify(warehouseAllocationsManager).increaseQty(STORE_ID, "warehouse-item-2", 2);
+        verifyNoMoreInteractions(warehouseAllocationsManager);
+        assertThat(delivery.getTotalCost()).isEqualTo(40.0);
+    }
+
+    @Test
     @DisplayName("run creates new ordered warehouse item when qty grows and no warehouse allocation exists")
     void runCreatesWarehouseItemWhenNoneExists() {
         // given
@@ -70,7 +90,7 @@ class DeliveryOrderedQtyUpdateServiceTest {
         DeliveryItem item = delivery.getItems().getFirst();
 
         // when
-        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), MFN, 5);
+        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), EAN, 5);
 
         // then
         assertThat(result.isSuccess()).isTrue();
@@ -93,7 +113,7 @@ class DeliveryOrderedQtyUpdateServiceTest {
         when(warehouseAllocationsManager.decreaseQty(STORE_ID, "warehouse-item-2", 2)).thenReturn(2);
 
         // when
-        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), MFN, 2);
+        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), EAN, 2);
 
         // then
         assertThat(result.isSuccess()).isTrue();
@@ -112,7 +132,7 @@ class DeliveryOrderedQtyUpdateServiceTest {
                 warehouseAllocation("warehouse-item-1", 2, 10.0, true));
 
         // when
-        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), MFN, 2);
+        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), EAN, 2);
 
         // then
         assertThat(result.isSuccess()).isFalse();
@@ -129,7 +149,7 @@ class DeliveryOrderedQtyUpdateServiceTest {
                 warehouseAllocation("warehouse-item-2", 3, 10.0, true));
 
         // when
-        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), MFN, 1);
+        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), EAN, 1);
 
         // then
         assertThat(result.isSuccess()).isFalse();
@@ -145,7 +165,7 @@ class DeliveryOrderedQtyUpdateServiceTest {
         delivery.setReceivedAt(LocalDateTime.now());
 
         // when
-        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), MFN, 5);
+        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), EAN, 5);
 
         // then
         assertThat(result.isSuccess()).isFalse();
@@ -161,7 +181,7 @@ class DeliveryOrderedQtyUpdateServiceTest {
         delivery.getDocuments().add(new Document());
 
         // when
-        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), MFN, 5);
+        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), EAN, 5);
 
         // then
         assertThat(result.isSuccess()).isFalse();
@@ -170,13 +190,13 @@ class DeliveryOrderedQtyUpdateServiceTest {
     }
 
     @Test
-    @DisplayName("run rejects unknown manufacturer code")
-    void runRejectsUnknownMfn() {
+    @DisplayName("run rejects a line the delivery does not have")
+    void runRejectsUnknownLine() {
         // given
         Delivery delivery = delivery(warehouseAllocation("warehouse-item-1", 2, 10.0, true));
 
         // when
-        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), "unknown-mfn", 5);
+        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), "5909999999999", 5);
 
         // then
         assertThat(result.isSuccess()).isFalse();
@@ -191,7 +211,7 @@ class DeliveryOrderedQtyUpdateServiceTest {
         Delivery delivery = delivery(warehouseAllocation("warehouse-item-1", 2, 10.0, true));
 
         // when
-        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), MFN, 2);
+        OperationResult<Void> result = deliveryOrderedQtyUpdateService.run(STORE_ID, delivery.getDeliveryId(), EAN, 2);
 
         // then
         assertThat(result.isSuccess()).isTrue();
@@ -223,7 +243,7 @@ class DeliveryOrderedQtyUpdateServiceTest {
         allocation.setKey(new AllocationKey(orderId, itemId, "Warehouse"));
         allocation.setType(type);
         allocation.setMfn(MFN);
-        allocation.setEan("1234567890123");
+        allocation.setEan(EAN);
         allocation.setQty(qty);
         allocation.setUnitCost(unitCost);
         return allocation;

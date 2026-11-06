@@ -289,7 +289,7 @@ class InventoryResultsRenderingTest {
     @Test
     void knownProductWithoutOffersOffersTheManageShortcutOnlyToAdmin() {
         // given
-        InventorySearchResult known = new InventorySearchResult.KnownWithoutOffers(MatchedBy.MFN, PRODUCT);
+        InventorySearchResult known = new InventorySearchResult.KnownWithoutOffers(MatchedBy.EAN, PRODUCT);
 
         // when
         String admin = engine.process(RESULTS, context(known, true));

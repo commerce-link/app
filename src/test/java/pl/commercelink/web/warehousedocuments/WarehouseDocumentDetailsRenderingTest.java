@@ -122,7 +122,7 @@ class WarehouseDocumentDetailsRenderingTest {
                 "PZ/MAG1/2026/000214", "Przyjęcie zewnętrzne", true, "Dostawa od dostawcy", "Utworzono 07.10.2026, 14:32",
                 "Jan Kowalski", "3 494,00 PLN", "Pozycje: 2",
                 List.of(new ItemLine("Samsung 990 PRO", "8806094215038", "MZ-V9P2T0BW", "5 szt.", "689,00 PLN", "3 445,00 PLN",
-                                "/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=del-1&mfn=MZ-V9P2T0BW", "Akcje: Samsung 990 PRO"),
+                                "/dashboard/warehouse-documents/item-history?deliveryId=del-1&ean=8806094215038", "Akcje: Samsung 990 PRO"),
                         new ItemLine("Kabel HDMI", null, "HDMI21-2M", "1 szt.", "49,00 PLN", "49,00 PLN", null, "Akcje: Kabel HDMI")),
                 true, "Razem: 6 szt.", "3 494,00 PLN netto", "Powiązania",
                 List.of(new Link("Dostawa", "3f2a9c1e", "/dashboard/deliveries/details?deliveryId=del-1", false),

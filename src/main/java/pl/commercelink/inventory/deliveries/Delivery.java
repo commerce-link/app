@@ -345,9 +345,9 @@ public class Delivery {
     }
 
     @DynamoDBIgnore
-    public List<Allocation> getReceivedAllocationsFor(String mfn, AllocationType type) {
+    public List<Allocation> getReceivedAllocationsFor(String ean, AllocationType type) {
         return allocations.stream()
-                .filter(a -> StringUtils.equals(a.getMfn(), mfn))
+                .filter(a -> StringUtils.equals(a.getEan(), ean))
                 .filter(a -> a.getType() == type)
                 .filter(a -> !a.isInAllocation())
                 .collect(Collectors.toList());

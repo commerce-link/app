@@ -108,11 +108,11 @@ class WarehouseControllerTest {
         // given
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            StockProductLevel level = new StockProductLevel("GPU", "MFN-1", "RTX 5070", 0, 0, 1);
+            StockProductLevel level = new StockProductLevel("GPU", null, null, "MFN-1", "RTX 5070", 0, 0, 1);
             InventoryItem offer = new InventoryItem("5901234123457", "MFN-1", 1000.0, "PLN", 5, 1, "Action");
             when(restockSuggestionService.suggestForRestock(eq(STORE_ID), eq("catalog-1"), isNull(),
                     eq(RestockScope.WholeCatalog), eq(false), isNull()))
-                    .thenReturn(List.of(new RestockSuggestion(level, offer, null)));
+                    .thenReturn(List.of(new RestockSuggestion(level, offer, null, List.of())));
             when(manualWarehouseFulfilment.init(eq(STORE_ID), anyList())).thenReturn(new FulfilmentForm());
             when(supplierLabels.forStoreId(STORE_ID)).thenReturn(new SupplierLabels(mock(StoresRepository.class)).forStore(null));
 

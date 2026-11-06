@@ -37,7 +37,7 @@ class WarehouseDocumentsController {
     private WarehouseDocumentItemRepository warehouseDocumentItemRepository;
 
     @Autowired
-    private WarehouseDocumentMfnHistoryService warehouseDocumentMfnHistoryService;
+    private WarehouseDocumentItemHistoryService warehouseDocumentItemHistoryService;
 
     @Autowired
     private WarehouseDocumentListService warehouseDocumentListService;
@@ -146,9 +146,9 @@ class WarehouseDocumentsController {
         return warehouseLabelPrintService.renderDocumentLabels(getStoreId(), documentId, printer).content();
     }
 
-    @GetMapping("/dashboard/warehouse-documents/delivery-mfn-history")
+    @GetMapping("/dashboard/warehouse-documents/item-history")
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    String deliveryMfnHistory(@RequestParam String deliveryId, @RequestParam String mfn,
+    String itemHistory(@RequestParam String deliveryId, @RequestParam String ean,
                               @RequestParam(required = false) String from, @RequestParam(required = false) String documentId,
                               @RequestParam(required = false) String itemId,
                               Locale locale, Model model) {
@@ -170,12 +170,12 @@ class WarehouseDocumentsController {
             backHref = "/dashboard/warehouse/items/" + itemId;
             backLabel = item.getName();
         }
-        ItemHistoryPage page = ItemHistoryPage.of(warehouseDocumentMfnHistoryService.history(storeId, deliveryId, mfn),
-                deliveryId, mfn, backHref, backLabel, messageSource, locale);
+        ItemHistoryPage page = ItemHistoryPage.of(warehouseDocumentItemHistoryService.history(storeId, deliveryId, ean),
+                deliveryId, ean, backHref, backLabel, messageSource, locale);
         // an item added by hand or bought without a delivery keeps its documents under its supplier or "Unknown": no delivery to open
         model.addAttribute("page", item == null ? page
                 : page.withDeliveryHref(warehouseItemPageFactory.deliveryHref(item, CustomSecurityContext.hasRole("ADMIN"), locale)));
-        return "warehouse-document-mfn-history";
+        return "warehouse-document-item-history";
     }
 
     private String getStoreId() {

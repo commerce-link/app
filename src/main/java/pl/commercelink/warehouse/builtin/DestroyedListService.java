@@ -85,9 +85,9 @@ class DestroyedListService {
 
     private DestroyedPageModel.Row row(WarehouseItem item, WarehouseItemRow row, Locale locale) {
         // an item added by hand or bought from a supplier without a delivery still has its documents under that id
-        String documents = StringUtils.isNotBlank(item.getDeliveryId()) && StringUtils.isNotBlank(item.getManufacturerCode())
-                ? "/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=" + encode(item.getDeliveryId())
-                  + "&mfn=" + encode(item.getManufacturerCode()) + "&from=item&itemId=" + encode(item.getItemId())
+        String documents = StringUtils.isNotBlank(item.getDeliveryId()) && StringUtils.isNotBlank(item.getEan())
+                ? "/dashboard/warehouse-documents/item-history?deliveryId=" + encode(item.getDeliveryId())
+                  + "&ean=" + encode(item.getEan()) + "&from=item&itemId=" + encode(item.getItemId())
                 : null;
         String serial = Arrays.stream(StringUtils.defaultString(item.getSerialNo()).split(","))
                 .map(String::trim).filter(StringUtils::isNotEmpty).findFirst().orElse(null);
