@@ -77,14 +77,12 @@ class StoreEntryPinningTest {
                 .filter(product -> product.getCategoryId().equals(invocation.getArgument(0))
                         && product.getProductId().equals(invocation.getArgument(1)))
                 .findFirst().orElse(null));
-        when(productRepository.findAllByEanOrMfnInCategories(any(), any(), any())).thenAnswer(invocation -> {
+        when(productRepository.findAllByEanInCategories(any(), any())).thenAnswer(invocation -> {
             Collection<String> categoryIds = invocation.getArgument(0);
             List<String> eans = invocation.getArgument(1);
-            List<String> mfnCodes = invocation.getArgument(2);
             return products.stream()
                     .filter(product -> categoryIds.contains(product.getCategoryId()))
-                    .filter(product -> (product.getEan() != null && eans.contains(product.getEan()))
-                            || (product.getManufacturerCode() != null && mfnCodes.contains(product.getManufacturerCode())))
+                    .filter(product -> product.getEan() != null && eans.contains(product.getEan()))
                     .toList();
         });
         when(productRepository.detachPimFromProducts(anyString())).thenAnswer(invocation -> {
@@ -96,38 +94,6 @@ class StoreEntryPinningTest {
         });
         pinning = new StoreEntryPinning(productRepository, productCatalogRepository, history,
                 new BrandMapper(mock(PimCatalog.class)));
-    }
-
-    @Test
-    void storeEntryIsNotPinnedToAProductOfAnotherBrand() {
-        // given
-        PimCatalog copy = ScopedPimCatalog.of(storeEntry("X", STORE, List.of(E1), List.of("A1")));
-        Product otherBrand = branded(product("p1", STORE_CATEGORY, null, E9, "A1"), "Gembird");
-        Product sameBrand = branded(product("p2", STORE_CATEGORY, null, E2, "A1"), "brand");
-
-        // when
-        pinning.onStoreEntryAnnounced(event("X", List.of(E1), List.of("A1")), copy);
-
-        // then
-        assertThat(otherBrand.getPimId()).isNull();
-        assertThat(sameBrand.getPimId()).isEqualTo("X");
-    }
-
-    @Test
-    void cloneIsNotPinnedToAProductOfAnotherBrandByCode() {
-        // given
-        PimCatalog copy = ScopedPimCatalog.of(
-                ScopedPimCatalog.globalEntry("S", E1, null, "cat"),
-                ScopedPimCatalog.cloneEntry("C", STORE, "S", E2, "A1", "cat"));
-        Product otherBrand = branded(product("p1", STORE_CATEGORY, null, E9, "A1"), "Gembird");
-        Product sameBrand = branded(product("p2", STORE_CATEGORY, null, E3, "A1"), "Brand");
-
-        // when
-        pinning.onCloneAnnounced(cloneEvent("C", "S", List.of(E2)), copy);
-
-        // then
-        assertThat(otherBrand.getPimId()).isNull();
-        assertThat(sameBrand.getPimId()).isEqualTo("C");
     }
 
     @Test

@@ -239,9 +239,9 @@ public class ProductRepository extends DynamoDbRepository<Product> {
         return result;
     }
 
-    public List<Product> findAllWithoutPimIdByEanOrMfn(List<String> eans, List<String> mfnCodes) {
+    public List<Product> findAllWithoutPimIdByEan(List<String> eans) {
         Map<String, AttributeValue> eav = new HashMap<>();
-        String filter = withoutPimIdByEanOrMfnFilter(eans, mfnCodes, eav);
+        String filter = withoutPimIdByEanFilter(eans, eav);
         if (filter == null) {
             return new ArrayList<>();
         }
@@ -253,13 +253,9 @@ public class ProductRepository extends DynamoDbRepository<Product> {
         return dynamoDBMapper.scan(Product.class, scanExpression);
     }
 
-    public List<Product> findAllWithoutPimIdByEanOrMfnInCategories(Collection<String> categoryIds, List<String> eans, List<String> mfnCodes) {
-        return findAllInCategories(categoryIds, eav -> withoutPimIdByEanOrMfnFilter(eans, mfnCodes, eav));
-    }
-
-    /** Products of the given categories whose EAN or MFN is among the codes, pinned to a PIM entry or not. */
-    public List<Product> findAllByEanOrMfnInCategories(Collection<String> categoryIds, List<String> eans, List<String> mfnCodes) {
-        return findAllInCategories(categoryIds, eav -> eanOrMfnCondition(eans, mfnCodes, eav));
+    /** Products of the given categories whose EAN is among the given ones, pinned to a PIM entry or not. */
+    public List<Product> findAllByEanInCategories(Collection<String> categoryIds, List<String> eans) {
+        return findAllInCategories(categoryIds, eav -> eanCondition(eans, eav));
     }
 
     private List<Product> findAllInCategories(Collection<String> categoryIds,
@@ -284,11 +280,11 @@ public class ProductRepository extends DynamoDbRepository<Product> {
     }
 
     /**
-     * Builds the filter "pimId missing or null, and ean or mfn among the given codes", adding its values to {@code eav}.
-     * Returns null when both lists are empty, i.e. nothing can match.
+     * Builds the filter "pimId missing or null, and ean among the given ones", adding its values to {@code eav}.
+     * Returns null when the list is empty, i.e. nothing can match.
      */
-    private static String withoutPimIdByEanOrMfnFilter(List<String> eans, List<String> mfnCodes, Map<String, AttributeValue> eav) {
-        String codes = eanOrMfnCondition(eans, mfnCodes, eav);
+    private static String withoutPimIdByEanFilter(List<String> eans, Map<String, AttributeValue> eav) {
+        String codes = eanCondition(eans, eav);
         if (codes == null) {
             return null;
         }
@@ -297,37 +293,20 @@ public class ProductRepository extends DynamoDbRepository<Product> {
     }
 
     /**
-     * Builds the condition "ean or mfn among the given codes", adding its values to {@code eav}.
-     * Returns null when both lists are empty, i.e. nothing can match.
+     * Builds the condition "ean among the given ones", adding its values to {@code eav}.
+     * Returns null when the list is empty, i.e. nothing can match.
      */
-    private static String eanOrMfnCondition(List<String> eans, List<String> mfnCodes, Map<String, AttributeValue> eav) {
-        List<String> conditions = new ArrayList<>();
-
-        List<String> eanPlaceholders = new ArrayList<>();
-        for (int i = 0; i < eans.size(); i++) {
-            String key = ":ean" + i;
-            eanPlaceholders.add(key);
-            eav.put(key, new AttributeValue().withS(eans.get(i)));
-        }
-        if (!eanPlaceholders.isEmpty()) {
-            conditions.add("ean IN (" + String.join(", ", eanPlaceholders) + ")");
-        }
-
-        List<String> mfnPlaceholders = new ArrayList<>();
-        for (int i = 0; i < mfnCodes.size(); i++) {
-            String key = ":mfn" + i;
-            mfnPlaceholders.add(key);
-            eav.put(key, new AttributeValue().withS(mfnCodes.get(i)));
-        }
-        if (!mfnPlaceholders.isEmpty()) {
-            conditions.add("mfn IN (" + String.join(", ", mfnPlaceholders) + ")");
-        }
-
-        if (conditions.isEmpty()) {
+    private static String eanCondition(List<String> eans, Map<String, AttributeValue> eav) {
+        if (eans.isEmpty()) {
             return null;
         }
-
-        return "(" + String.join(" OR ", conditions) + ")";
+        List<String> placeholders = new ArrayList<>();
+        for (int i = 0; i < eans.size(); i++) {
+            String key = ":ean" + i;
+            placeholders.add(key);
+            eav.put(key, new AttributeValue().withS(eans.get(i)));
+        }
+        return "ean IN (" + String.join(", ", placeholders) + ")";
     }
 
 }
