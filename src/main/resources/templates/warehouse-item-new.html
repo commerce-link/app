@@ -29,12 +29,12 @@
                 <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
                 <p class="cl-alert-text" th:text="${errorMessage}"></p>
             </div>
-            <div th:if="${mfnUnknown}" class="cl-alert is-warn" role="status">
+            <div th:if="${eanUnknown}" class="cl-alert is-warn" role="status">
                 <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
-                <p class="cl-alert-text" th:text="#{warehouse.item.new.unknown(${form.manufacturerCode})}"></p>
+                <p class="cl-alert-text" th:text="#{warehouse.item.new.unknown(${form.ean})}"></p>
             </div>
 
-            <input th:if="${mfnUnknown}" type="hidden" name="productDataShown" value="true">
+            <input th:if="${eanUnknown}" type="hidden" name="productDataShown" value="true">
 
             <div class="cl-card">
                 <fieldset class="cl-fieldset">
@@ -42,7 +42,7 @@
                     <div class="cl-form-grid">
 
                         <div class="cl-span-3"
-                             th:insert="~{fragments/settings-form :: textFieldWith('manufacturerCode', 'warehouse.item.new.mfn', ${form.manufacturerCode}, 'text', 'off', true, ${errors['manufacturerCode']}, null, null, #{warehouse.item.new.mfn.placeholder}, false)}"></div>
+                             th:insert="~{fragments/settings-form :: textFieldWith('ean', 'warehouse.item.new.ean', ${form.ean}, 'text', 'off', true, ${errors['ean']}, null, 'numeric', #{warehouse.item.new.ean.placeholder}, false)}"></div>
 
                         <div class="cl-span-3 cl-field">
                             <label class="cl-label" for="cost" th:text="#{warehouse.item.new.cost}"></label>
@@ -96,13 +96,13 @@
                     </fieldset>
                 </fieldset>
 
-                <fieldset class="cl-fieldset" id="product-data" th:if="${mfnUnknown}">
+                <fieldset class="cl-fieldset" id="product-data" th:if="${eanUnknown}">
                     <legend class="cl-fieldset-title" th:text="#{warehouse.item.new.group.product}"></legend>
                     <div class="cl-form-grid">
                         <div class="cl-span-6"
                              th:insert="~{fragments/settings-form :: textFieldWith('name', 'warehouse.item.new.name', ${form.name}, 'text', 'off', true, ${errors['name']}, null, null, null, ${errors.isEmpty() and errorMessage == null})}"></div>
                         <div class="cl-span-3"
-                             th:insert="~{fragments/settings-form :: textFieldWith('ean', 'warehouse.item.new.ean', ${form.ean}, 'text', 'off', true, ${errors['ean']}, null, 'numeric', null, false)}"></div>
+                             th:insert="~{fragments/settings-form :: textFieldWith('manufacturerCode', 'warehouse.item.new.mfn', ${form.manufacturerCode}, 'text', 'off', true, ${errors['manufacturerCode']}, null, null, null, false)}"></div>
                         <div class="cl-span-3 cl-field">
                             <label class="cl-label" for="category" th:text="#{warehouse.item.new.category}"></label>
                             <select class="cl-select" id="category" name="category">

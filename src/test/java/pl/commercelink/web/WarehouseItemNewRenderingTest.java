@@ -17,12 +17,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class WarehouseItemNewRenderingTest {
 
-    private static String render(WarehouseItemAddForm form, Map<String, String> errors, boolean mfnUnknown, String errorMessage) {
+    private static String render(WarehouseItemAddForm form, Map<String, String> errors, boolean eanUnknown, String errorMessage) {
         Context context = new Context();
         context.setVariable("form", form);
         context.setVariable("errors", errors);
         context.setVariable("errorArgs", Map.of());
-        context.setVariable("mfnUnknown", mfnUnknown);
+        context.setVariable("eanUnknown", eanUnknown);
         context.setVariable("errorMessage", errorMessage);
         context.setVariable("vatRate", Price.DEFAULT_VAT_RATE);
         context.setVariable("statuses", List.of(FulfilmentStatus.New, FulfilmentStatus.Allocation));
@@ -34,31 +34,32 @@ class WarehouseItemNewRenderingTest {
 
     private static WarehouseItemAddForm form() {
         WarehouseItemAddForm form = new WarehouseItemAddForm();
-        form.setManufacturerCode("XPG-S70-2TB");
+        form.setEan("4710886000000");
         form.setCost("689,00");
         form.setQty("2");
         return form;
     }
 
     @Test
-    void aKnownCodeShowsNoProductDataGroup() {
+    void aKnownEanShowsNoProductDataGroup() {
         // when
         String html = render(form(), Map.of(), false, null);
 
         // then
-        assertThat(html).doesNotContain("id=\"product-data\"").doesNotContain("??");
+        assertThat(html).doesNotContain("id=\"product-data\"").doesNotContain("name=\"manufacturerCode\"").doesNotContain("??");
         assertThat(html).contains("id=\"warehouseItemNewForm\"").contains("data-cl-submit-once");
-        assertThat(html).contains("value=\"XPG-S70-2TB\"").contains("value=\"689,00\"");
+        assertThat(html).containsPattern("id=\"ean\"[^>]*value=\"4710886000000\"")
+                .contains("value=\"689,00\"");
     }
 
     @Test
-    void anUnknownCodeRevealsProductDataAndWarnsWithTheCode() {
+    void anUnknownEanRevealsProductDataAndWarnsWithTheEan() {
         // when
         String html = render(form(), Map.of(), true, null);
 
         // then
-        assertThat(html).contains("id=\"product-data\"").contains("name=\"ean\"").contains("name=\"category\"");
-        assertThat(html).contains("We did not find code XPG-S70-2TB").contains("SSD drives");
+        assertThat(html).contains("id=\"product-data\"").contains("name=\"manufacturerCode\"").contains("name=\"category\"");
+        assertThat(html).contains("We did not find EAN 4710886000000").contains("SSD drives");
         assertThat(html).doesNotContain("??");
     }
 
@@ -115,11 +116,13 @@ class WarehouseItemNewRenderingTest {
         String html = render(form(), Map.of(), true, null);
 
         // then
-        assertThat(template).contains("settings-form :: textFieldWith('manufacturerCode'")
+        assertThat(template).contains("settings-form :: textFieldWith('ean'")
                 .contains("settings-form :: textFieldWith('qty'").contains("settings-form :: textFieldWith('name'")
-                .contains("settings-form :: textFieldWith('ean'");
-        assertThat(html).contains("id=\"manufacturerCode\"").contains("placeholder=\"")
-                .containsPattern("id=\"qty\"[^>]*inputmode=\"numeric\"").containsPattern("id=\"ean\"[^>]*inputmode=\"numeric\"");
+                .contains("settings-form :: textFieldWith('manufacturerCode'");
+        assertThat(html).contains("id=\"manufacturerCode\"")
+                .containsPattern("id=\"qty\"[^>]*inputmode=\"numeric\"")
+                .containsPattern("id=\"ean\"[^>]*inputmode=\"numeric\"")
+                .containsPattern("id=\"ean\"[^>]*placeholder=\"e.g. 5901234123457\"");
     }
 
     @Test

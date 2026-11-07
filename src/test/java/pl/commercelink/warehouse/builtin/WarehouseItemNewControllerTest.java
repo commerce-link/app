@@ -79,9 +79,9 @@ class WarehouseItemNewControllerTest {
         when(supplierChoice.resolve(any(), eq("Acme"), any())).thenReturn(new SupplierChoice.Resolution("Acme", null, null));
     }
 
-    private static WarehouseItemAddForm form(String mfn) {
+    private static WarehouseItemAddForm form(String ean) {
         WarehouseItemAddForm form = new WarehouseItemAddForm();
-        form.setManufacturerCode(mfn);
+        form.setEan(ean);
         form.setCost("689,00");
         form.setQty("2");
         form.setStatus("New");
@@ -104,12 +104,12 @@ class WarehouseItemNewControllerTest {
     @Test
     void successRedirectsAfterPost() throws Exception {
         // given
-        when(taxonomy.findByMfn(any())).thenReturn(known());
+        when(taxonomy.findByEan(any())).thenReturn(known());
         when(receipts.addItem(eq("store-1"), any(), eq("operator"))).thenReturn(OperationResult.success());
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        String view = asStore(() -> controller.addItem(form("GV-N406TWF2OC"), new ExtendedModelMap(), PL,
+        String view = asStore(() -> controller.addItem(form("5900000000065"), new ExtendedModelMap(), PL,
                 new MockHttpServletResponse(), redirect));
 
         // then
@@ -118,51 +118,82 @@ class WarehouseItemNewControllerTest {
     }
 
     @Test
-    void unknownMfnReturns422WithProductDataAndKeepsValues() throws Exception {
+    void aKnownEanTakesTheNameCodeAndCategoryFromItsRecord() throws Exception {
         // given
-        when(taxonomy.findByMfn(any())).thenReturn(null);
+        when(taxonomy.findByEan("5900000000065")).thenReturn(known());
+        when(receipts.addItem(eq("store-1"), any(), eq("operator"))).thenReturn(OperationResult.success());
+
+        // when
+        asStore(() -> controller.addItem(form("5900000000065"), new ExtendedModelMap(), PL,
+                new MockHttpServletResponse(), new RedirectAttributesModelMap()));
+
+        // then
+        verify(receipts).addItem(eq("store-1"), argThat(item -> "RTX 4060".equals(item.getName())
+                && "GV-N406TWF2OC".equals(item.getManufacturerCode()) && "Karty graficzne".equals(item.getCategory())
+                && "5900000000065".equals(item.getEan())), eq("operator"));
+    }
+
+    @Test
+    void theTypedEanIsLookedUpUnified() throws Exception {
+        // given
+        TaxonomyCache cache = new TaxonomyCache(mock(TaxonomyRepository.class));
+        cache.add(new Taxonomy("194253397205", "MQD83ZM/A", "Apple", "Apple AirPods Pro", "Słuchawki", 1, null, null));
+        ReflectionTestUtils.setField(controller, "taxonomyCache", cache);
+        when(receipts.addItem(eq("store-1"), any(), eq("operator"))).thenReturn(OperationResult.success());
+
+        // when
+        String view = asStore(() -> controller.addItem(form(" 0194253397205 "), new ExtendedModelMap(), PL,
+                new MockHttpServletResponse(), new RedirectAttributesModelMap()));
+
+        // then
+        assertThat(view).startsWith("redirect:");
+        verify(receipts).addItem(eq("store-1"), argThat(item -> "Apple AirPods Pro".equals(item.getName())
+                && "194253397205".equals(item.getEan())), eq("operator"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void anEmptyEanIsAnErrorOfTheEanFieldAndAsksForNoProductData() throws Exception {
+        // given
         MockHttpServletResponse response = new MockHttpServletResponse();
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        String view = asStore(() -> controller.addItem(form("XPG-S70-2TB"), model, PL, response, new RedirectAttributesModelMap()));
+        asStore(() -> controller.addItem(form(" "), model, PL, response, new RedirectAttributesModelMap()));
+
+        // then
+        assertThat(response.getStatus()).isEqualTo(422);
+        assertThat((Map<String, String>) model.get("errors")).containsEntry("ean", "warehouse.item.new.error.ean");
+        assertThat(model.get("eanUnknown")).isEqualTo(false);
+        verifyNoInteractions(receipts);
+    }
+
+    @Test
+    void unknownEanReturns422WithProductDataAndKeepsValues() throws Exception {
+        // given
+        when(taxonomy.findByEan(any())).thenReturn(null);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = asStore(() -> controller.addItem(form("4710886000000"), model, PL, response, new RedirectAttributesModelMap()));
 
         // then
         assertThat(view).isEqualTo("warehouse-item-new");
         assertThat(response.getStatus()).isEqualTo(422);
-        assertThat(model.get("mfnUnknown")).isEqualTo(true);
+        assertThat(model.get("eanUnknown")).isEqualTo(true);
         assertThat(((WarehouseItemAddForm) model.get("form")).getCost()).isEqualTo("689,00");
         verifyNoInteractions(receipts);
     }
 
     @Test
-    void aCodeWithTwoBrandsAsksForProductData() throws Exception {
+    void unknownEanWithNameAndCodeIsSaved() throws Exception {
         // given
-        TaxonomyCache twoBrandsUnderOneCode = new TaxonomyCache(mock(TaxonomyRepository.class));
-        twoBrandsUnderOneCode.add(new Taxonomy("5099206000000", "920", "Logitech", "Logitech K120", "Klawiatury", 1, null, null));
-        twoBrandsUnderOneCode.add(new Taxonomy("5901299000000", "920", "Genesis", "Genesis kabel HDMI", "Kable", 1, null, null));
-        ReflectionTestUtils.setField(controller, "taxonomyCache", twoBrandsUnderOneCode);
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        ExtendedModelMap model = new ExtendedModelMap();
-
-        // when
-        String view = asStore(() -> controller.addItem(form("920"), model, PL, response, new RedirectAttributesModelMap()));
-
-        // then
-        assertThat(view).isEqualTo("warehouse-item-new");
-        assertThat(response.getStatus()).isEqualTo(422);
-        assertThat(model.get("mfnUnknown")).isEqualTo(true);
-        verifyNoInteractions(receipts);
-    }
-
-    @Test
-    void unknownMfnWithNameAndEanIsSaved() throws Exception {
-        // given
-        when(taxonomy.findByMfn(any())).thenReturn(null);
+        when(taxonomy.findByEan(any())).thenReturn(null);
         when(receipts.addItem(eq("store-1"), any(), eq("operator"))).thenReturn(OperationResult.success());
-        WarehouseItemAddForm form = form("XPG-S70-2TB");
+        WarehouseItemAddForm form = form("4710886000000");
         form.setName("XPG S70 2TB");
-        form.setEan("4710886000000");
+        form.setManufacturerCode(" xpg-s70 2tb ");
         form.setCategory("Dyski SSD");
 
         // when
@@ -172,17 +203,18 @@ class WarehouseItemNewControllerTest {
         // then
         assertThat(view).startsWith("redirect:");
         verify(receipts).addItem(eq("store-1"), argThat(item -> "XPG S70 2TB".equals(item.getName())
+                && "XPG-S702TB".equals(item.getManufacturerCode()) && "4710886000000".equals(item.getEan())
                 && "Dyski SSD".equals(item.getCategory()) && item.getQty() == 2), eq("operator"));
     }
 
     @Test
     void typedEanIsStoredUnified() throws Exception {
         // given
-        when(taxonomy.findByMfn(any())).thenReturn(null);
+        when(taxonomy.findByEan(any())).thenReturn(null);
         when(receipts.addItem(eq("store-1"), any(), eq("operator"))).thenReturn(OperationResult.success());
-        WarehouseItemAddForm form = form("MQD83ZM/A");
+        WarehouseItemAddForm form = form(" 0194253397205 ");
         form.setName("Apple AirPods Pro");
-        form.setEan(" 0194253397205 ");
+        form.setManufacturerCode("MQD83ZM/A");
 
         // when
         asStore(() -> controller.addItem(form, new ExtendedModelMap(), PL,
@@ -195,13 +227,13 @@ class WarehouseItemNewControllerTest {
     @Test
     void serviceFailureShowsTheMessageAndSavesNothing() throws Exception {
         // given
-        when(taxonomy.findByMfn(any())).thenReturn(known());
+        when(taxonomy.findByEan(any())).thenReturn(known());
         when(receipts.addItem(any(), any(), any())).thenReturn(OperationResult.failure("Brak danych firmy"));
         MockHttpServletResponse response = new MockHttpServletResponse();
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        asStore(() -> controller.addItem(form("GV-N406TWF2OC"), model, PL, response, new RedirectAttributesModelMap()));
+        asStore(() -> controller.addItem(form("5900000000065"), model, PL, response, new RedirectAttributesModelMap()));
 
         // then
         assertThat(response.getStatus()).isEqualTo(422);
@@ -212,10 +244,10 @@ class WarehouseItemNewControllerTest {
     @SuppressWarnings("unchecked")
     void customSupplierRefusalIsAFieldError() throws Exception {
         // given
-        when(taxonomy.findByMfn(any())).thenReturn(known());
+        when(taxonomy.findByEan(any())).thenReturn(known());
         when(supplierChoice.resolve(any(), eq("__custom__"), any()))
                 .thenReturn(new SupplierChoice.Resolution(null, "order.item.supplier.required", null));
-        WarehouseItemAddForm form = form("GV-N406TWF2OC");
+        WarehouseItemAddForm form = form("5900000000065");
         form.setSupplier("__custom__");
         ExtendedModelMap model = new ExtendedModelMap();
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -232,10 +264,10 @@ class WarehouseItemNewControllerTest {
     @Test
     void forgedStatusOrQuantityIsRefusedAndSavesNothing() throws Exception {
         // given
-        when(taxonomy.findByMfn(any())).thenReturn(known());
-        WarehouseItemAddForm forgedStatus = form("GV-N406TWF2OC");
+        when(taxonomy.findByEan(any())).thenReturn(known());
+        WarehouseItemAddForm forgedStatus = form("5900000000065");
         forgedStatus.setStatus("Delivered");
-        WarehouseItemAddForm negativeQty = form("GV-N406TWF2OC");
+        WarehouseItemAddForm negativeQty = form("5900000000065");
         negativeQty.setQty("-2");
 
         for (WarehouseItemAddForm forged : List.of(forgedStatus, negativeQty)) {
@@ -255,10 +287,10 @@ class WarehouseItemNewControllerTest {
     @SuppressWarnings("unchecked")
     void anEmptySupplierChoiceIsAnErrorOfTheSelect() throws Exception {
         // given
-        when(taxonomy.findByMfn(any())).thenReturn(known());
+        when(taxonomy.findByEan(any())).thenReturn(known());
         when(supplierChoice.resolve(any(), eq(""), any()))
                 .thenReturn(new SupplierChoice.Resolution(null, "order.item.assign.supplier.required", null));
-        WarehouseItemAddForm form = form("GV-N406TWF2OC");
+        WarehouseItemAddForm form = form("5900000000065");
         form.setSupplier("");
         ExtendedModelMap model = new ExtendedModelMap();
 
@@ -274,10 +306,10 @@ class WarehouseItemNewControllerTest {
     @SuppressWarnings("unchecked")
     void aTypedNameUnderAnEmptySelectStillKeysTheErrorToTheSelect() throws Exception {
         // given: no JS, the select left empty while the hidden custom name field carries a value
-        when(taxonomy.findByMfn(any())).thenReturn(known());
+        when(taxonomy.findByEan(any())).thenReturn(known());
         when(supplierChoice.resolve(any(), eq(""), eq("Hurtownia")))
                 .thenReturn(new SupplierChoice.Resolution(null, "order.item.assign.supplier.required", null));
-        WarehouseItemAddForm form = form("GV-N406TWF2OC");
+        WarehouseItemAddForm form = form("5900000000065");
         form.setSupplier("");
         form.setCustomSupplier("Hurtownia");
         ExtendedModelMap model = new ExtendedModelMap();
@@ -310,10 +342,10 @@ class WarehouseItemNewControllerTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void aSecondSubmitOfAnUnknownCodeWithoutProductDataNamesTheMissingFields() throws Exception {
+    void aSecondSubmitOfAnUnknownEanWithoutProductDataNamesTheMissingFields() throws Exception {
         // given
-        when(taxonomy.findByMfn(any())).thenReturn(null);
-        WarehouseItemAddForm form = form("XPG-S70-2TB");
+        when(taxonomy.findByEan(any())).thenReturn(null);
+        WarehouseItemAddForm form = form("4710886000000");
         form.setProductDataShown(true);
         ExtendedModelMap model = new ExtendedModelMap();
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -324,7 +356,8 @@ class WarehouseItemNewControllerTest {
         // then
         assertThat(response.getStatus()).isEqualTo(422);
         assertThat((Map<String, String>) model.get("errors"))
-                .containsEntry("name", "warehouse.item.new.error.name").containsEntry("ean", "warehouse.item.new.error.ean");
+                .containsEntry("name", "warehouse.item.new.error.name")
+                .containsEntry("manufacturerCode", "warehouse.item.new.error.mfn");
         verifyNoInteractions(receipts);
     }
 }

@@ -327,9 +327,6 @@ class InventorySearchTest {
 
     @Test
     void manufacturerCodeFindsNothing() {
-        // given
-        when(taxonomyCache.findByMfn(anyString())).thenReturn(new Taxonomy(EAN, MFN, "Logitech", "MX Keys S", "Keyboards", 1, null, null, null, "1"));
-
         // when
         InventorySearchResult result = search.search(STORE_ID, MFN);
 

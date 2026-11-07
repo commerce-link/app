@@ -47,7 +47,6 @@ class TaxonomyCodeIndexTest {
 
         // when / then
         assertThat(index.eansOf("920", "Logitech")).isEmpty();
-        assertThat(index.eansOfSingleBrand("920")).isEmpty();
     }
 
     @Test
@@ -57,28 +56,7 @@ class TaxonomyCodeIndexTest {
 
         // when / then
         assertThat(index.eansOf("920", null)).isEmpty();
-        assertThat(index.eansOf(null, "Logitech")).isEmpty();
-        assertThat(index.eansOfSingleBrand(" ")).isEmpty();
-    }
-
-    @Test
-    void codeWithOneBrandGivesAllItsEans() {
-        // given
-        index.link("920", "Logitech", "111");
-        index.link("920", "logitech", "222");
-
-        // when / then
-        assertThat(index.eansOfSingleBrand("920")).containsExactly("111", "222");
-    }
-
-    @Test
-    void codeThatCameWithTwoBrandsGivesNothing() {
-        // given
-        index.link("920", "Logitech", "111");
-        index.link("920", "Natec", "111");
-
-        // when / then
-        assertThat(index.eansOfSingleBrand("920")).isEmpty();
+        assertThat(index.eansOf(" ", "Logitech")).isEmpty();
     }
 
     @Test

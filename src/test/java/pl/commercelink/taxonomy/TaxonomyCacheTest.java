@@ -322,59 +322,6 @@ class TaxonomyCacheTest {
     }
 
     @Test
-    void findByMfnGivesNothingWhenTheCodeHasTwoBrands() {
-        // given
-        cache.add(new Taxonomy(EAN_1, "920", "Logitech", "Mysz", "Myszki", 1, null, null));
-        cache.add(new Taxonomy(EAN_2, "920", "Genesis", "Kabel", "Kable", 1, null, null));
-
-        // when / then
-        assertNull(cache.findByMfn("920"));
-    }
-
-    @Test
-    void findByMfnGivesTheBestRecordWhenTheCodeHasOneBrand() {
-        // given
-        cache.add(new Taxonomy(EAN_1, "920", "Logitech", "K120 PL", "Klawiatury", 5, null, null));
-        cache.add(new Taxonomy(EAN_2, "920", "logitech ", "K120 DE", "Klawiatury", 2, null, null));
-
-        // when
-        Taxonomy result = cache.findByMfn("920");
-
-        // then
-        assertEquals("K120 DE", result.name());
-    }
-
-    @Test
-    void findByMfnCountsTheBrandsTheCodeCameWith() {
-        // given
-        cache.add(new Taxonomy(EAN_1, "920", "Logitech", "K120", "Klawiatury", 1, null, null));
-        cache.add(new Taxonomy(EAN_1, "920", "Natec", "K120", null, 9, null, null));
-
-        // when / then
-        assertNull(cache.findByMfn("920"));
-    }
-
-    @Test
-    void rowWithoutBrandIsNotFoundByItsCode() {
-        // given
-        cache.add(new Taxonomy(EAN_1, "920", null, "K120", "Klawiatury", 1, null, null));
-
-        // when / then
-        assertNull(cache.findByMfn("920"));
-    }
-
-    @Test
-    void findByMfnGivesNothingForAnUnknownOrBlankCode() {
-        // given
-        cache.add(categorized(EAN_1, "CPU", 1));
-
-        // when / then
-        assertNull(cache.findByMfn("UNKNOWN"));
-        assertNull(cache.findByMfn(null));
-        assertNull(cache.findByMfn(" "));
-    }
-
-    @Test
     void fileWithOneRowPerCodeLoadsByEan() {
         // given
         TaxonomyCache loaded = loadedWith(List.of(
@@ -385,8 +332,8 @@ class TaxonomyCacheTest {
         // when / then
         assertEquals(2, loaded.size());
         assertEquals("Name B", loaded.findByEan(EAN_1).name());
-        assertEquals("Name B", loaded.findByMfn("MFN-A").name());
-        assertEquals("Name C", loaded.findByMfn("MFN-C").name());
+        assertEquals("Name B", loaded.findCategorySource(new Taxonomy(EAN_3, "MFN-A", "Brand", "Row", null, 1, null, null)).name());
+        assertEquals("Name C", loaded.findCategorySource(new Taxonomy(EAN_3, "MFN-C", "Brand", "Row", null, 1, null, null)).name());
     }
 
     @Test

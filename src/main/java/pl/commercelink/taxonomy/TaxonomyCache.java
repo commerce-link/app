@@ -104,11 +104,6 @@ public class TaxonomyCache {
         return taxonomy;
     }
 
-    @Deprecated
-    public Taxonomy findByMfn(String mfn) {
-        return best(recordsOf(codeIndex.eansOfSingleBrand(mfn)));
-    }
-
     public void blockCodeSource(String mfn, String brand, String ean) {
         String key = unifyEan(ean);
         if (StringUtils.isBlank(key)) return;

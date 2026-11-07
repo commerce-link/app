@@ -42,13 +42,6 @@ class TaxonomyCodeIndex {
                 .toList();
     }
 
-    @Deprecated
-    List<String> eansOfSingleBrand(String mfn) {
-        List<CodeEntry> entries = entriesUnder(mfn);
-        if (entries.stream().map(CodeEntry::brand).distinct().count() != 1) return List.of();
-        return entries.stream().map(CodeEntry::ean).distinct().toList();
-    }
-
     void clear() {
         entriesByMfn.clear();
         blockedByMfn.clear();

@@ -103,11 +103,10 @@ class WarehouseItemController {
     @PostMapping("/dashboard/warehouse/items/new")
     String addItem(@ModelAttribute("form") WarehouseItemAddForm form, Model model, Locale locale,
                    HttpServletResponse response, RedirectAttributes redirectAttributes) {
-        Taxonomy taxonomy = StringUtils.isBlank(form.getManufacturerCode()) ? null
-                : taxonomyCache.findByMfn(UnifiedProductIdentifiers.unifyMfn(form.getManufacturerCode()));
-        boolean known = taxonomy != null && StringUtils.isNoneBlank(taxonomy.name(), taxonomy.ean());
-        boolean productDataNeeded = !known && StringUtils.isNotBlank(form.getManufacturerCode());
-        // the first submit of an unknown code only reveals the product data group, so it carries no name/ean errors yet
+        Taxonomy taxonomy = StringUtils.isBlank(form.getEan()) ? null : taxonomyCache.findByEan(form.getEan().trim());
+        boolean known = taxonomy != null && StringUtils.isNotBlank(taxonomy.name());
+        boolean productDataNeeded = !known && StringUtils.isNotBlank(form.getEan());
+        // the first submit of an unknown EAN only reveals the product data group, so it carries no name/code errors yet
         boolean productDataAsked = productDataNeeded && (form.isProductDataShown() || hasAnyProductData(form));
         Map<String, String> errors = new LinkedHashMap<>(form.validate(productDataAsked));
         Map<String, Object[]> errorArgs = new HashMap<>();
@@ -129,8 +128,9 @@ class WarehouseItemController {
                 : StringUtils.defaultIfBlank(form.getCategory(), Categories.UNCATEGORIZED);
         WarehouseItem item = new WarehouseItem(getStoreId(), supplier.identity(), category,
                 known ? taxonomy.name() : form.getName().trim(),
-                UnifiedProductIdentifiers.unifyEan(known ? taxonomy.ean() : form.getEan().trim()),
-                UnifiedProductIdentifiers.unifyMfn(form.getManufacturerCode()), form.netCost(), form.quantity());
+                UnifiedProductIdentifiers.unifyEan(form.getEan().trim()),
+                known ? taxonomy.mfn() : UnifiedProductIdentifiers.unifyMfn(form.getManufacturerCode()),
+                form.netCost(), form.quantity());
         item.setStatus(form.statusValue());
 
         OperationResult<?> result = warehouseInternalReceiptService.addItem(
@@ -160,15 +160,15 @@ class WarehouseItemController {
     }
 
     private static boolean hasAnyProductData(WarehouseItemAddForm form) {
-        return StringUtils.isNotBlank(form.getName()) || StringUtils.isNotBlank(form.getEan());
+        return StringUtils.isNotBlank(form.getName()) || StringUtils.isNotBlank(form.getManufacturerCode());
     }
 
     private String newItemPage(Model model, WarehouseItemAddForm form, Map<String, String> errors,
-                               Map<String, Object[]> errorArgs, boolean mfnUnknown, String errorMessage) {
+                               Map<String, Object[]> errorArgs, boolean eanUnknown, String errorMessage) {
         model.addAttribute("form", form);
         model.addAttribute("errors", errors);
         model.addAttribute("errorArgs", errorArgs);
-        model.addAttribute("mfnUnknown", mfnUnknown);
+        model.addAttribute("eanUnknown", eanUnknown);
         model.addAttribute("errorMessage", errorMessage);
         model.addAttribute("vatRate", Price.DEFAULT_VAT_RATE);
         model.addAttribute("statuses", NEW_ITEM_STATUSES);
