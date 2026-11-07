@@ -19,16 +19,17 @@ class TaxonomyResolverTest {
     @InjectMocks
     private TaxonomyResolver taxonomyResolver;
 
+    private static final String EAN = "1234567890123";
+
     @Test
     void hitReturnsResolvedNameAndCategoryKey() {
         // given
-        when(taxonomyCache.findByMfn("MFN-1")).thenReturn(taxonomy("Resolved Name", "CPU"));
+        when(taxonomyCache.findByEan(EAN)).thenReturn(taxonomy("Resolved Name", "CPU"));
 
         // when
-        ResolvedProduct resolved = taxonomyResolver.resolve("MFN-1", "Fallback Name", "Laptops");
+        ResolvedProduct resolved = taxonomyResolver.resolve(EAN, "Fallback Name", "Laptops");
 
         // then
-        assertThat(resolved.mfn()).isEqualTo("MFN-1");
         assertThat(resolved.name()).isEqualTo("Resolved Name");
         assertThat(resolved.category()).isEqualTo("CPU");
         assertThat(resolved.categoryId()).isEqualTo("PIM-100");
@@ -37,10 +38,10 @@ class TaxonomyResolverTest {
     @Test
     void missYieldsNoCategoryId() {
         // given
-        when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
+        when(taxonomyCache.findByEan(EAN)).thenReturn(null);
 
         // when
-        ResolvedProduct resolved = taxonomyResolver.resolve("MFN-1", "Fallback Name", "Laptops");
+        ResolvedProduct resolved = taxonomyResolver.resolve(EAN, "Fallback Name", "Laptops");
 
         // then
         assertThat(resolved.categoryId()).isNull();
@@ -49,10 +50,10 @@ class TaxonomyResolverTest {
     @Test
     void missFallsBackToProvidedNameAndCategoryKey() {
         // given
-        when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
+        when(taxonomyCache.findByEan(EAN)).thenReturn(null);
 
         // when
-        ResolvedProduct resolved = taxonomyResolver.resolve("MFN-1", "Fallback Name", "Laptops");
+        ResolvedProduct resolved = taxonomyResolver.resolve(EAN, "Fallback Name", "Laptops");
 
         // then
         assertThat(resolved.name()).isEqualTo("Fallback Name");
@@ -62,10 +63,10 @@ class TaxonomyResolverTest {
     @Test
     void blankCategoryFallsBackToProvidedCategoryKey() {
         // given
-        when(taxonomyCache.findByMfn("MFN-1")).thenReturn(taxonomy("Resolved Name", " "));
+        when(taxonomyCache.findByEan(EAN)).thenReturn(taxonomy("Resolved Name", " "));
 
         // when
-        ResolvedProduct resolved = taxonomyResolver.resolve("MFN-1", "Fallback Name", "Laptops");
+        ResolvedProduct resolved = taxonomyResolver.resolve(EAN, "Fallback Name", "Laptops");
 
         // then
         assertThat(resolved.name()).isEqualTo("Resolved Name");
@@ -75,10 +76,10 @@ class TaxonomyResolverTest {
     @Test
     void nullCategoryWithNullFallbackYieldsNullCategory() {
         // given
-        when(taxonomyCache.findByMfn("MFN-1")).thenReturn(taxonomy("Resolved Name", null));
+        when(taxonomyCache.findByEan(EAN)).thenReturn(taxonomy("Resolved Name", null));
 
         // when
-        ResolvedProduct resolved = taxonomyResolver.resolve("MFN-1", "Fallback Name", null);
+        ResolvedProduct resolved = taxonomyResolver.resolve(EAN, "Fallback Name", null);
 
         // then
         assertThat(resolved.name()).isEqualTo("Resolved Name");
@@ -86,6 +87,6 @@ class TaxonomyResolverTest {
     }
 
     private static Taxonomy taxonomy(String name, String category) {
-        return new Taxonomy("1234567890123", "MFN-1", "Brand", name, category, 1, null, null, null, "PIM-100");
+        return new Taxonomy(EAN, "MFN-1", "Brand", name, category, 1, null, null, null, "PIM-100");
     }
 }

@@ -77,7 +77,7 @@ class BuiltInDocumentCreationService {
     private void saveDocumentItems(String documentId, LocalDateTime createdAt, DocumentType type, List<DocumentLineItem> items) {
         List<WarehouseDocumentItem> documentItems = new ArrayList<>();
         for (DocumentLineItem item : items) {
-            ResolvedProduct resolved = taxonomyResolver.resolve(item.getMfn(), item.getName(), null);
+            ResolvedProduct resolved = taxonomyResolver.resolve(item.getEan(), item.getName(), null);
             documentItems.add(new WarehouseDocumentItem(
                     documentId,
                     type,

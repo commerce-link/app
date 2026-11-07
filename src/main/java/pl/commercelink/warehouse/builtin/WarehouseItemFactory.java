@@ -25,7 +25,7 @@ class WarehouseItemFactory {
     }
 
     WarehouseItem create(String storeId, ReservationRemovalItem item) {
-        ResolvedProduct resolved = taxonomyResolver.resolve(item.getMfn(), item.getName(), item.getCategory());
+        ResolvedProduct resolved = taxonomyResolver.resolve(item.getEan(), item.getName(), item.getCategory());
         WarehouseItem warehouseItem = new WarehouseItem(
                 storeId, item.getDeliveryId(), categoryFor(storeId, resolved), nameOrUnknown(resolved.name()),
                 item.getEan(), item.getMfn(), item.getUnitPrice(), item.getQty()
@@ -39,7 +39,7 @@ class WarehouseItemFactory {
     }
 
     WarehouseItem create(String storeId, GoodsReceiptItem item) {
-        ResolvedProduct resolved = taxonomyResolver.resolve(item.getMfn(), item.getName(), item.getCategory());
+        ResolvedProduct resolved = taxonomyResolver.resolve(item.getEan(), item.getName(), item.getCategory());
         WarehouseItem warehouseItem = new WarehouseItem(
                 storeId, item.getDeliveryId(), categoryFor(storeId, resolved), nameOrUnknown(resolved.name()),
                 item.getEan(), item.getMfn(), item.getUnitPrice(), item.getQty()
@@ -53,7 +53,7 @@ class WarehouseItemFactory {
 
     WarehouseItem create(String storeId, FulfilmentItem item) {
         FulfilmentSource source = item.getSource();
-        ResolvedProduct resolved = taxonomyResolver.resolve(source.getMfn(), source.getName(), source.getCategory());
+        ResolvedProduct resolved = taxonomyResolver.resolve(source.getEan(), source.getName(), source.getCategory());
         return new WarehouseItem(
                 storeId,
                 source.getProvider(),
@@ -71,7 +71,7 @@ class WarehouseItemFactory {
     }
 
     WarehouseItem create(String storeId, String provider, DeliveryItem item, int qty) {
-        ResolvedProduct resolved = taxonomyResolver.resolve(item.getMfn(), item.getName(), Categories.UNCATEGORIZED);
+        ResolvedProduct resolved = taxonomyResolver.resolve(item.getEan(), item.getName(), Categories.UNCATEGORIZED);
         return new WarehouseItem(
                 storeId, provider, categoryFor(storeId, resolved), nameOrUnknown(resolved.name()),
                 item.getEan(), item.getMfn(), item.getUnitCost(), qty

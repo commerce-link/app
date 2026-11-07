@@ -174,10 +174,8 @@ public class ExternalOfferResolver {
         /**
          * The category of the first EAN the taxonomy knows with a category (one still waiting for its category is
          * skipped), named as the store calls the PIM category in its catalogs, else as the taxonomy does; null when none
-         * is known. A warehouse item takes its category from the same taxonomy and names it the same way, but looks it
-         * up by the manufacturer code of the delivered goods, not by EAN ({@code WarehouseItemFactory}): the two agree
-         * while the taxonomy's entries for the goods agree, and can differ where its entries for the EAN and the code
-         * name different categories.
+         * is known. A warehouse item takes its category the same way, from the taxonomy record of its own EAN
+         * ({@code WarehouseItemFactory}).
          */
         private String taxonomyCategory(List<String> eans) {
             for (String ean : eans) {

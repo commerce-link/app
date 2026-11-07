@@ -11,12 +11,11 @@ public class TaxonomyResolver {
         this.taxonomyCache = taxonomyCache;
     }
 
-    @Deprecated
-    public ResolvedProduct resolve(String mfn, String fallbackName, String fallbackCategory) {
-        Taxonomy taxonomy = taxonomyCache.findByMfn(mfn);
+    public ResolvedProduct resolve(String ean, String fallbackName, String fallbackCategory) {
+        Taxonomy taxonomy = taxonomyCache.findByEan(ean);
 
         if (taxonomy == null) {
-            return new ResolvedProduct(mfn, fallbackName, fallbackCategory, null);
+            return new ResolvedProduct(fallbackName, fallbackCategory, null);
         }
 
         String name = taxonomy.name() != null && !taxonomy.name().isEmpty()
@@ -28,8 +27,8 @@ public class TaxonomyResolver {
                 ? categoryKey
                 : fallbackCategory;
 
-        return new ResolvedProduct(mfn, name, category, taxonomy.categoryId());
+        return new ResolvedProduct(name, category, taxonomy.categoryId());
     }
 
-    public record ResolvedProduct(String mfn, String name, String category, String categoryId) {}
+    public record ResolvedProduct(String name, String category, String categoryId) {}
 }

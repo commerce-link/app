@@ -24,6 +24,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyRepository;
 
 import java.util.List;
 import java.util.Locale;
@@ -34,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -130,6 +132,26 @@ class WarehouseItemNewControllerTest {
         assertThat(response.getStatus()).isEqualTo(422);
         assertThat(model.get("mfnUnknown")).isEqualTo(true);
         assertThat(((WarehouseItemAddForm) model.get("form")).getCost()).isEqualTo("689,00");
+        verifyNoInteractions(receipts);
+    }
+
+    @Test
+    void aCodeWithTwoBrandsAsksForProductData() throws Exception {
+        // given
+        TaxonomyCache twoBrandsUnderOneCode = new TaxonomyCache(mock(TaxonomyRepository.class));
+        twoBrandsUnderOneCode.add(new Taxonomy("5099206000000", "920", "Logitech", "Logitech K120", "Klawiatury", 1, null, null));
+        twoBrandsUnderOneCode.add(new Taxonomy("5901299000000", "920", "Genesis", "Genesis kabel HDMI", "Kable", 1, null, null));
+        ReflectionTestUtils.setField(controller, "taxonomyCache", twoBrandsUnderOneCode);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = asStore(() -> controller.addItem(form("920"), model, PL, response, new RedirectAttributesModelMap()));
+
+        // then
+        assertThat(view).isEqualTo("warehouse-item-new");
+        assertThat(response.getStatus()).isEqualTo(422);
+        assertThat(model.get("mfnUnknown")).isEqualTo(true);
         verifyNoInteractions(receipts);
     }
 
