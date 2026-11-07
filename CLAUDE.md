@@ -162,7 +162,7 @@ Feed loading runs on two tracks:
 - **Global feeds** — `FeedReloaderScheduler` runs every 5 minutes, compares each provider's last update with the feed file date in S3, and reloads only suppliers with newer feeds; prices are converted to the local currency, then the inventory index is updated in one pass.
 - **Per-store feeds** — `StoreSupplierFeedScheduler` creates an EventBridge Scheduler entry per store+supplier (once daily at a random night hour, Europe/Warsaw) targeting `supplier-feed-import-queue`, consumed by `SqsFeedLoaderEventListener`; `triggerImmediateImport()` allows ad-hoc imports. Active only when `application.env=prod`.
 
-Products are matched across suppliers by EAN and manufacturer code via `InventoryAutoDiscovery`.
+**Product identity.** The system works on the EAN by default. The manufacturer code (MFN) together with the brand is used only to build `InventoryAutoDiscovery`, so that several EANs of the same product are joined into one `MatchedInventory`. Searching by EAN in UI windows is allowed, but every operation in the system is based on the `pimId` or the EAN. The EAN identifies a product unambiguously, while brand and MFN can repeat, e.g. for products whose sizes are often told apart only by the EAN.
 
 ### Price Snapshots and Rolling Aggregates
 
