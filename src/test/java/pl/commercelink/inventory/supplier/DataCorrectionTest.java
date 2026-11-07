@@ -338,21 +338,21 @@ class DataCorrectionTest {
     }
 
     @Test
-    void offerWithoutBrandAndEanHasNoBrand() {
-        // given -- the EAN filled in from the entry under the code is no proof the entry is this product
+    void offerWithoutBrandTakesNoEanFromAnEntryFoundByALongCode() {
+        // given -- without a brand even a long code can name another product
         DataCorrection correction = correctionWith(entryWithBrand("Western Digital", true, "5900000000002", "SDSSDA-1T00"));
 
         // when
         InventoryItem result = correction.run(offer(null, "", "SDSSDA-1T00"));
 
         // then
-        assertThat(result.ean()).isEqualTo("5900000000002");
+        assertThat(result.ean()).isEmpty();
         assertThat(result.brand()).isNull();
     }
 
     @Test
     void offerWithThePlaceholderEanTakesNoBrandFromPim() {
-        // given -- the EAN comes from the entry under the code; another entry carries the placeholder as its GTIN
+        // given -- another entry carries the placeholder as its GTIN
         DataCorrection correction = correctionWith(
                 entryWithBrand("Trust", true, "5900000000002", "TRUST-23647"),
                 entryWithBrand("Logitech", true, "1111111111111", "910-006559"));

@@ -581,7 +581,7 @@ class CatalogProductsControllerTest {
         when(missing.isEmpty()).thenReturn(true);
         when(inventoryView.findByEan("1")).thenReturn(found);
         when(inventoryView.findByEan("2")).thenReturn(missing);
-        when(pimView.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+        when(pimView.findByPimIdOrGtins(any(), any())).thenReturn(Optional.empty());
 
         // when
         var result = mvc.perform(post(categoryPath() + "/products/add/review").param("eans", "1", "2"))
@@ -648,7 +648,7 @@ class CatalogProductsControllerTest {
         when(foundInventory.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
         when(foundInventory.getLowestPrice()).thenReturn(Price.fromGross(2749));
         when(inventoryView.findByEan("1")).thenReturn(foundInventory);
-        when(pimView.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+        when(pimView.findByPimIdOrGtins(any(), any())).thenReturn(Optional.empty());
         String returnTo = "/dashboard/inventory?cat=11";
 
         // when / then
@@ -934,7 +934,7 @@ class CatalogProductsControllerTest {
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-9");
         when(entry.brand()).thenReturn("msi");
-        when(pimView.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), List.of()))
+        when(pimView.findByPimIdOrGtins(key.getId(), key.getProductEans()))
                 .thenReturn(Optional.of(entry));
         when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
 
@@ -965,7 +965,7 @@ class CatalogProductsControllerTest {
         when(matched.isEmpty()).thenReturn(false);
         when(matched.getInventoryKey()).thenReturn(key);
         when(inventoryView.findByEan("5901234567899")).thenReturn(matched);
-        when(pimView.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), List.of()))
+        when(pimView.findByPimIdOrGtins(key.getId(), key.getProductEans()))
                 .thenReturn(Optional.empty());
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-5");
@@ -1002,7 +1002,7 @@ class CatalogProductsControllerTest {
         ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
         verify(productRepository).save(saved.capture());
         assertThat(saved.getValue().getPimId()).isEqualTo("pim-7");
-        verify(pimView, never()).findByPimIdOrGtinsOrMpns(any(), any(), any());
+        verify(pimView, never()).findByPimIdOrGtins(any(), any());
     }
 
     /** Selecting every proposal of a large category posts more rows than Spring grows a list to by default. */
@@ -1064,7 +1064,7 @@ class CatalogProductsControllerTest {
         // then
         assertThat((List<String>) result.getModelAndView().getModel().get("skippedExisting")).containsExactly("1");
         assertThat(((ProductsBulkAddForm) result.getModelAndView().getModel().get("form")).getProducts()).isEmpty();
-        verify(pimView, never()).findByPimIdOrGtinsOrMpns(any(), any(), any());
+        verify(pimView, never()).findByPimIdOrGtins(any(), any());
     }
 
     /** D-M48: a forged way of pricing is a mistake of its field, answered like any other with the review and 422. */
@@ -1132,7 +1132,7 @@ class CatalogProductsControllerTest {
         when(foundInventory.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
         when(foundInventory.getLowestPrice()).thenReturn(Price.fromGross(2749));
         when(inventoryView.findByEan("1")).thenReturn(foundInventory);
-        when(pimView.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), List.of())).thenReturn(Optional.empty());
+        when(pimView.findByPimIdOrGtins(key.getId(), key.getProductEans())).thenReturn(Optional.empty());
 
         // when
         var result = mvc.perform(get(categoryPath() + "/products/new").param("ean", "1"))
@@ -1482,7 +1482,7 @@ class CatalogProductsControllerTest {
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-9");
         when(entry.brand()).thenReturn("msi");
-        when(pimView.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), List.of()))
+        when(pimView.findByPimIdOrGtins(key.getId(), key.getProductEans()))
                 .thenReturn(Optional.of(entry));
         when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
 

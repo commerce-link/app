@@ -360,7 +360,7 @@ class InventorySearchTest {
         when(view.findByEan(EAN)).thenReturn(new MatchedInventory(key, List.of(offer("Elko", 100.0, 5)), taxonomyCache, supplierRegistry));
         PimEntry entry = mock(PimEntry.class);
         when(entry.name()).thenReturn("Logitech MX Keys S");
-        when(pimView.findByPimIdOrGtinsOrMpns(eq("PIM-1"), any(), eq(List.of()))).thenReturn(Optional.of(entry));
+        when(pimView.findByPimIdOrGtins(eq("PIM-1"), any())).thenReturn(Optional.of(entry));
 
         // when
         InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
