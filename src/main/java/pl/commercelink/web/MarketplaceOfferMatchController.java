@@ -13,10 +13,13 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.marketplace.api.MarketplaceProviderDescriptor;
 import pl.commercelink.marketplace.offermatching.MarketplaceOfferMatchPublisher;
+import pl.commercelink.marketplace.offermatching.MarketplaceOfferMatchSchedule;
 import pl.commercelink.marketplace.offermatching.OfferMatchResult;
 import pl.commercelink.marketplace.offermatching.OfferMatchResultStore;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -39,21 +42,26 @@ import java.util.Locale;
  * marketplace may hand out only a few a minute): the page shows the latest saved result and, while a run goes on, how far
  * it got, or why the last one failed; a refresh picks up the new state. A second run is refused while one is going on.
  * Only for a connected marketplace whose adapter can list the store's offers. A run the worker would skip (expired
- * connection, inactive store) is not ordered at all, so the page never promises a result that cannot come.
+ * connection, inactive store) is not ordered at all, so the page never promises a result that cannot come. The operator's
+ * first order also switches daily matching on (MarketplaceOfferMatchSweep, every evening), unless it was already set; a
+ * switch on the page turns it off or on again.
  */
 @Controller
 public class MarketplaceOfferMatchController {
 
     private static final String VIEW = "store-marketplace-offer-matching";
+    private static final String SCHEDULE_FRAGMENT = VIEW + " :: scheduleForm";
     private static final String BLOCKED_STORE = "store.marketplaces.offer.matching.blocked.store";
     private static final String BLOCKED_INTEGRATION = "store.marketplaces.offer.matching.blocked.integration";
     private static final String RUNNING = "store.marketplaces.offer.matching.running.refused";
     private static final String MARKETPLACE_PATH = "/{marketplace:[A-Za-z0-9_.-]+}/offer-matching";
+    private static final String SCHEDULE_PATH = "/schedule";
     private static final String GROUP_CSV_PATH = "/{group:linked|toReview}.csv";
 
     private final StoresRepository storesRepository;
     private final MarketplaceConnections marketplaces;
     private final MarketplaceOfferMatchPublisher publisher;
+    private final MarketplaceOfferMatchSchedule schedule;
     private final OfferMatchResultStore resultStore;
     private final StoreActivity storeActivity;
     private final MessageSource messageSource;
@@ -61,17 +69,21 @@ public class MarketplaceOfferMatchController {
 
     @Autowired
     public MarketplaceOfferMatchController(StoresRepository storesRepository, MarketplaceConnections marketplaces,
-                                           MarketplaceOfferMatchPublisher publisher, OfferMatchResultStore resultStore,
-                                           StoreActivity storeActivity, MessageSource messageSource) {
-        this(storesRepository, marketplaces, publisher, resultStore, storeActivity, messageSource, Clock.systemUTC());
+                                           MarketplaceOfferMatchPublisher publisher, MarketplaceOfferMatchSchedule schedule,
+                                           OfferMatchResultStore resultStore, StoreActivity storeActivity,
+                                           MessageSource messageSource) {
+        this(storesRepository, marketplaces, publisher, schedule, resultStore, storeActivity, messageSource,
+                Clock.systemUTC());
     }
 
     MarketplaceOfferMatchController(StoresRepository storesRepository, MarketplaceConnections marketplaces,
-                                    MarketplaceOfferMatchPublisher publisher, OfferMatchResultStore resultStore,
-                                    StoreActivity storeActivity, MessageSource messageSource, Clock clock) {
+                                    MarketplaceOfferMatchPublisher publisher, MarketplaceOfferMatchSchedule schedule,
+                                    OfferMatchResultStore resultStore, StoreActivity storeActivity,
+                                    MessageSource messageSource, Clock clock) {
         this.storesRepository = storesRepository;
         this.marketplaces = marketplaces;
         this.publisher = publisher;
+        this.schedule = schedule;
         this.resultStore = resultStore;
         this.storeActivity = storeActivity;
         this.messageSource = messageSource;
@@ -120,6 +132,25 @@ public class MarketplaceOfferMatchController {
         return order(storeId, marketplace, locale, redirectAttributes);
     }
 
+    @PostMapping("/dashboard/store/marketplaces" + MARKETPLACE_PATH + SCHEDULE_PATH)
+    @PreAuthorize("hasRole('ADMIN')")
+    public String switchSchedule(@PathVariable String marketplace, @RequestParam boolean scheduled,
+                                 @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
+                                 Model model, Locale locale, RedirectAttributes redirectAttributes) {
+        return switchSchedule(CustomSecurityContext.getStoreId(), marketplace, scheduled,
+                SettingsPaths.isAsync(requestedWith), model, locale, redirectAttributes);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/marketplaces" + MARKETPLACE_PATH + SCHEDULE_PATH)
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String superAdminSwitchSchedule(@PathVariable String storeId, @PathVariable String marketplace,
+                                           @RequestParam boolean scheduled,
+                                           @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
+                                           Model model, Locale locale, RedirectAttributes redirectAttributes) {
+        return switchSchedule(storeId, marketplace, scheduled, SettingsPaths.isAsync(requestedWith), model, locale,
+                redirectAttributes);
+    }
+
     private String render(String storeId, String marketplace, Model model, Locale locale) {
         Store store = requireOfferListing(storeId, marketplace);
         String displayName = marketplaces.displayName(marketplace);
@@ -134,6 +165,8 @@ public class MarketplaceOfferMatchController {
                 .map(progress -> OfferMatchingRunView.of(progress, clock.instant())).orElse(null));
         model.addAttribute("displayName", displayName);
         model.addAttribute("formAction", pagePath(storeId, marketplace));
+        model.addAttribute("scheduled", store.getMarketplaceIntegration(marketplace).runsOfferMatchingDaily());
+        model.addAttribute("scheduleFormAction", pagePath(storeId, marketplace) + SCHEDULE_PATH);
         model.addAttribute("csvHrefBase", pagePath(storeId, marketplace));
         model.addAttribute("marketplacesHref", SettingsPaths.store(storeId, "/marketplaces"));
         model.addAttribute("backLabel", messageSource.getMessage("store.marketplaces", null, locale));
@@ -169,9 +202,33 @@ public class MarketplaceOfferMatchController {
                     new Object[]{marketplaces.displayName(marketplace)}, locale));
             return "redirect:" + pagePath(storeId, marketplace);
         }
+        // switched on before the order is sent: a failed save leaves nothing ordered rather than a run without the switch
+        boolean switchedOn = schedule.enableIfNeverSet(storeId, marketplace);
         publisher.order(storeId, marketplace);
-        SettingsFlash.onRedirect(redirectAttributes, messageSource.getMessage("store.marketplaces.offer.matching.ordered",
-                new Object[]{marketplaces.displayName(marketplace)}, locale));
+        String ordered = messageSource.getMessage("store.marketplaces.offer.matching.ordered",
+                new Object[]{marketplaces.displayName(marketplace)}, locale);
+        SettingsFlash.onRedirect(redirectAttributes, switchedOn
+                ? ordered + " " + messageSource.getMessage("store.marketplaces.offer.matching.ordered.scheduled", null, locale)
+                : ordered);
+        return "redirect:" + pagePath(storeId, marketplace);
+    }
+
+    private String switchSchedule(String storeId, String marketplace, boolean scheduled, boolean async, Model model,
+                                  Locale locale, RedirectAttributes redirectAttributes) {
+        requireOfferListing(storeId, marketplace);
+        schedule.set(storeId, marketplace, scheduled);
+        String message = messageSource.getMessage(scheduled
+                        ? "store.marketplaces.offer.matching.schedule.switchedOn"
+                        : "store.marketplaces.offer.matching.schedule.switchedOff",
+                new Object[]{marketplaces.displayName(marketplace)}, locale);
+        if (async) {
+            render(storeId, marketplace, model, locale);
+            // the value just saved, not the store read again: an eventually consistent read may still return the old one
+            model.addAttribute("scheduled", scheduled);
+            model.addAttribute("savedMessage", message);
+            return SCHEDULE_FRAGMENT;
+        }
+        SettingsFlash.onRedirect(redirectAttributes, message);
         return "redirect:" + pagePath(storeId, marketplace);
     }
 

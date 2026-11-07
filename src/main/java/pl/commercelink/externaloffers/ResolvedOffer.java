@@ -35,6 +35,7 @@ public record ResolvedOffer(String pimId, String ean, String mfn, String categor
         return new ResolvedOffer(null, eans.get(0), null, category, Source.LINK, eans.subList(1, eans.size()));
     }
 
+    // persisted by name on OrderItem.externalOfferSource: do not rename the values
     public enum Source {
         /**
          * An explicit link from the seller offer key to EANs: the EANs and, where the taxonomy knows the goods, their
@@ -70,6 +71,7 @@ public record ResolvedOffer(String pimId, String ean, String mfn, String categor
         item.setEan(StringUtils.trimToNull(ean));
         item.setManufacturerCode(StringUtils.trimToNull(mfn));
         item.setCategory(StringUtils.isNotBlank(category) ? category : Categories.UNCATEGORIZED);
+        item.setExternalOfferSource(source);
     }
 
     /**
@@ -78,6 +80,7 @@ public record ResolvedOffer(String pimId, String ean, String mfn, String categor
      * match on it); a missing value leaves the item's own.
      */
     public void fill(OrderItem item) {
+        item.setExternalOfferSource(source);
         if (sku() != null) {
             item.setSku(sku());
         }

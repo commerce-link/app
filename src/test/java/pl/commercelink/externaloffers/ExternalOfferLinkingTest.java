@@ -324,6 +324,47 @@ class ExternalOfferLinkingTest {
     }
 
     @Test
+    void linkingAnItemMarksItLinked() {
+        // given a marketplace whose product code is the EAN itself and goods without a category
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        item.setSku("2001000000043");
+        item.setExternalItemId("2001000000043");
+        item.setExternalOfferKey("2001000000043");
+        openOrders(order);
+        assertThat(item.hasUnlinkedExternalOffer()).isTrue();
+
+        // when
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+
+        // then
+        assertThat(item.getExternalOfferSource()).isEqualTo(ResolvedOffer.Source.LINK);
+        assertThat(item.hasUnlinkedExternalOffer()).isFalse();
+        verify(orderItemsRepository).save(item);
+    }
+
+    @Test
+    void relinkingAnItemThatAlreadyCarriesTheLinkCodesStoresItsSource() {
+        // given an item linked before the source was stored: its codes already are the ones the link gives
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        item.setSku("2001000000043");
+        item.setEan("2001000000043");
+        item.setExternalItemId("2001000000043");
+        item.setExternalOfferKey("2001000000043");
+        openOrders(order);
+        assertThat(item.hasUnlinkedExternalOffer()).isTrue();
+
+        // when
+        ExternalOfferLinking.LinkResult result = linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+
+        // then
+        verify(orderItemsRepository).save(item);
+        assertThat(result.updatedItems()).isEqualTo(1);
+        assertThat(item.hasUnlinkedExternalOffer()).isFalse();
+    }
+
+    @Test
     void linkEanRejectsWhatIsNotAnEan() {
         // given
         Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
@@ -463,6 +504,84 @@ class ExternalOfferLinkingTest {
     }
 
     @Test
+    void anItemRecognisedByManufacturerCodeIsFilledWithTheLinkToo() {
+        // given another line of the key that the PIM recognised by code: no category, sku still the raw code
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        Order other = marketplaceOrder("o2", EMPIK, OrderStatus.New, 2);
+        unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        OrderItem byCode = unlinkedItem("o2", "i2", FulfilmentStatus.New);
+        byCode.setExternalOfferSource(ResolvedOffer.Source.MFN);
+        openOrders(order, other);
+
+        // when
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+
+        // then the next import would resolve the line by the link, which outranks the code
+        assertThat(byCode.getExternalOfferSource()).isEqualTo(ResolvedOffer.Source.LINK);
+        assertThat(byCode.getSku()).isEqualTo("2001000000043");
+    }
+
+    @Test
+    void aCategorisedItemRecognisedByManufacturerCodeIsNotRefilled() {
+        // given another line of the key recognised by code whose goods the taxonomy categorised
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        Order other = marketplaceOrder("o2", EMPIK, OrderStatus.New, 2);
+        unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        OrderItem byCode = unlinkedItem("o2", "i2", FulfilmentStatus.New);
+        byCode.setExternalOfferSource(ResolvedOffer.Source.MFN);
+        byCode.setCategory("Dom i kuchnia");
+        openOrders(order, other);
+
+        // when
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+
+        // then
+        assertThat(byCode.getExternalOfferSource()).isEqualTo(ResolvedOffer.Source.MFN);
+        assertThat(byCode.getSku()).isEqualTo("RAW-1");
+        assertThat(byCode.getCategory()).isEqualTo("Dom i kuchnia");
+        verify(orderItemsRepository, never()).save(byCode);
+    }
+
+    @Test
+    void anItemWithAHandAssignedSkuIsNotRefilled() {
+        // given another line of the key recognised by code whose sku the operator changed by hand
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        Order other = marketplaceOrder("o2", EMPIK, OrderStatus.New, 2);
+        unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        OrderItem byHand = unlinkedItem("o2", "i2", FulfilmentStatus.New);
+        byHand.setExternalOfferSource(ResolvedOffer.Source.MFN);
+        byHand.setSku("DMW-9");
+        openOrders(order, other);
+
+        // when
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+
+        // then
+        assertThat(byHand.getSku()).isEqualTo("DMW-9");
+        assertThat(byHand.getExternalOfferSource()).isEqualTo(ResolvedOffer.Source.MFN);
+        verify(orderItemsRepository, never()).save(byHand);
+    }
+
+    @Test
+    void anOwnOfferItemIsNotRefilled() {
+        // given another line of the key that CommerceLink's own offer recognised
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        Order other = marketplaceOrder("o2", EMPIK, OrderStatus.New, 2);
+        unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        OrderItem own = unlinkedItem("o2", "i2", FulfilmentStatus.New);
+        own.setExternalOfferSource(ResolvedOffer.Source.OWN_OFFER);
+        openOrders(order, other);
+
+        // when
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+
+        // then
+        assertThat(own.getSku()).isEqualTo("RAW-1");
+        assertThat(own.getExternalOfferSource()).isEqualTo(ResolvedOffer.Source.OWN_OFFER);
+        verify(orderItemsRepository, never()).save(own);
+    }
+
+    @Test
     void changingALinkAlsoCorrectsOtherItemsTheOldLinkFilled() {
         // given a wrong EAN linked earlier gave both items its codes
         Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
@@ -545,6 +664,7 @@ class ExternalOfferLinkingTest {
         OrderItem item = unlinkedItem(orderId, itemId, FulfilmentStatus.New);
         item.setSku(ean);
         item.setEan(ean);
+        item.setExternalOfferSource(ResolvedOffer.Source.LINK);
         return item;
     }
 

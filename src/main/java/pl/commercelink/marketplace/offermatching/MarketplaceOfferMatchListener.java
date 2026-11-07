@@ -17,14 +17,15 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Runs the operator's offer matching order, one part per message: a part ends when the marketplace limits requests or
- * the time budget is used, its progress is saved and a continuation is sent, delayed by SQS rather than a sleeping
- * worker. Only the continuation at the saved run and cursor goes on, so a duplicated or late one is dropped.
+ * Runs an offer matching order (the operator's or the nightly sweep's), one part per message: a part ends when the
+ * marketplace limits requests or the time budget is used, its progress is saved and a continuation is sent, delayed by
+ * SQS rather than a sleeping worker. Only the continuation at the saved run and cursor goes on, so a duplicated or late one is dropped.
  */
 @Slf4j
 @Component
-// Not gated on application.env: the queue is fed only by an operator, not a schedule, and SQS gives each message to one
-// instance, so it runs in every environment, as ReportGenerationListener does.
+// Not gated on application.env: SQS gives each message to one instance, so it runs in every environment, as
+// ReportGenerationListener does. The queue is fed by the operator and, on AWS only (application.env=prod), by the nightly
+// MarketplaceOfferMatchSweep; a local run orders nothing by itself.
 class MarketplaceOfferMatchListener {
 
     /**
