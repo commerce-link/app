@@ -16,6 +16,7 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimIdentifier;
 import pl.commercelink.pim.api.PimView;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.TaxonomyRepository;
@@ -61,7 +62,8 @@ class PurchaseReportServiceTest {
         when(pimCatalog.withGlobalData()).thenReturn(pimView);
         when(documentRepository.findAllInDateRange(anyString(), any(), any())).thenReturn(List.of());
         taxonomy = new TaxonomyCache(mock(TaxonomyRepository.class));
-        service = new PurchaseReportService(documentRepository, itemRepository, deliveriesRepository, taxonomy, pimCatalog);
+        service = new PurchaseReportService(documentRepository, itemRepository, deliveriesRepository,
+                new ProductDataResolver(pimCatalog, taxonomy));
     }
 
     @Test
@@ -123,7 +125,7 @@ class PurchaseReportServiceTest {
     }
 
     @Test
-    void recordComesBeforeThePimEntry() {
+    void pimEntryComesBeforeTheRecord() {
         // given
         givenDocuments(goodsReceiptDoc("doc-1", "delivery-1", "Acme"));
         givenDelivery("delivery-1", "AcmeA");
@@ -137,7 +139,25 @@ class PurchaseReportServiceTest {
 
         // then
         assertThat(rows).extracting(PurchaseReportRow::category, PurchaseReportRow::brand)
-                .containsExactly(tuple("Dyski SSD", "Samsung"));
+                .containsExactly(tuple("GPU", "ASUS"));
+    }
+
+    @Test
+    void pimEntryWithoutCategoryTakesTheCategoryOfTheRecord() {
+        // given
+        givenDocuments(goodsReceiptDoc("doc-1", "delivery-1", "Acme"));
+        givenDelivery("delivery-1", "AcmeA");
+        when(itemRepository.findByDocumentId("doc-1"))
+                .thenReturn(List.of(item("doc-1", EAN_PLAIN, CODE, "Samsung 990 Pro 2TB", 1)));
+        taxonomy.add(record(EAN_PLAIN, "Dyski SSD"));
+        when(pimView.findByGtin(EAN_PLAIN)).thenReturn(Optional.of(pimEntry(null)));
+
+        // when
+        List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
+
+        // then
+        assertThat(rows).extracting(PurchaseReportRow::category, PurchaseReportRow::brand)
+                .containsExactly(tuple("Dyski SSD", "ASUS"));
     }
 
     @Test
@@ -148,7 +168,6 @@ class PurchaseReportServiceTest {
         when(itemRepository.findByDocumentId("doc-1"))
                 .thenReturn(List.of(item("doc-1", EAN_PLAIN, CODE, "Samsung 990 Pro 2TB", 1)));
         taxonomy.add(record(EAN_PLAIN, null));
-        when(pimView.findByGtin(EAN_PLAIN)).thenReturn(Optional.of(pimEntry("GPU")));
 
         // when
         List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
@@ -271,7 +290,8 @@ class PurchaseReportServiceTest {
         when(itemRepository.findByDocumentId("doc-1"))
                 .thenReturn(List.of(item("doc-1", "5909999999999", "RTX4070-DUAL", "DUAL RTX 4070", 2)));
         PurchaseReportService report = new PurchaseReportService(documentRepository, itemRepository, deliveriesRepository,
-                taxonomy, ScopedPimCatalog.of(ScopedPimCatalog.globalEntry("pim-1", "5900000000001", "RTX4070-DUAL", "GPU")));
+                new ProductDataResolver(ScopedPimCatalog.of(ScopedPimCatalog.globalEntry("pim-1", "5900000000001", "RTX4070-DUAL", "GPU")),
+                        taxonomy));
 
         // when
         List<PurchaseReportRow> rows = report.generate(STORE_ID, FROM, TO);

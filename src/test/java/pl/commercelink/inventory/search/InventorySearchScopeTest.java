@@ -13,9 +13,11 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.pim.ScopedPimCatalog;
+import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimIdentifier;
 import pl.commercelink.pim.api.PimIdentifierType;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.warehouse.api.Warehouse;
@@ -54,7 +56,8 @@ class InventorySearchScopeTest {
                 new PimIdentifier("M-A", PimIdentifierType.MPN),
                 new PimIdentifier("M-B", PimIdentifierType.MPN, true)),
                 "Brand", "Store product", "GPU", null, true, null, null, null, "s1");
-        return new InventorySearch(inventory, storesRepository, ScopedPimCatalog.of(global, store), taxonomyCache, warehouse,
+        PimCatalog catalog = ScopedPimCatalog.of(global, store);
+        return new InventorySearch(inventory, storesRepository, catalog, new ProductDataResolver(catalog, taxonomyCache), warehouse,
                 new SupplierLabels(storesRepository), supplierRegistry);
     }
 

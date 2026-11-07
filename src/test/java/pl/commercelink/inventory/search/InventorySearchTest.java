@@ -24,6 +24,7 @@ import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
@@ -93,7 +94,7 @@ class InventorySearchTest {
     @BeforeEach
     void setUp() {
         // the label map is real: resolving a connection's label is part of what a search returns
-        search = new InventorySearch(inventory, storesRepository, pimCatalog, taxonomyCache, warehouse,
+        search = new InventorySearch(inventory, storesRepository, pimCatalog, new ProductDataResolver(pimCatalog, taxonomyCache), warehouse,
                 new SupplierLabels(storesRepository), supplierRegistry);
         // shipping is free and instant unless a test says otherwise, so a case about prices stays about prices
         when(supplierRegistry.exists(anyString())).thenReturn(true);
@@ -367,6 +368,60 @@ class InventorySearchTest {
 
         // then
         assertThat(found.product().name()).isEqualTo("Logitech MX Keys S");
+    }
+
+    @Test
+    void headerTakesThePimEntryBeforeTheTaxonomy() {
+        // given
+        InventoryKey key = new InventoryKey("PIM-1");
+        key.addEan(EAN);
+        when(view.findByEan(EAN)).thenReturn(new MatchedInventory(key, List.of(offer("Elko", 100.0, 5)), taxonomyCache, supplierRegistry));
+        when(taxonomyCache.find(any())).thenReturn(taxonomy());
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.name()).thenReturn("Logitech MX Keys S");
+        when(pimView.findByPimIdOrGtins(eq("PIM-1"), any())).thenReturn(Optional.of(entry));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(found.product().name()).isEqualTo("Logitech MX Keys S");
+    }
+
+    @Test
+    void warehouseOnlyProductTakesThePimEntryBeforeTheTaxonomy() {
+        // given
+        when(stock.searchAllAvailableByEans(STORE_ID, List.of(EAN)))
+                .thenReturn(List.of(warehouseItem(80.0, 3, FulfilmentStatus.Delivered, ItemCondition.Sealed)));
+        when(taxonomyCache.findByEan(EAN)).thenReturn(taxonomy());
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.name()).thenReturn("Logitech MX Keys S");
+        when(pimView.findByGtin(EAN)).thenReturn(Optional.of(entry));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(found.product().name()).isEqualTo("Logitech MX Keys S");
+    }
+
+    @Test
+    void productWithoutOffersTakesThePimEntryBeforeTheTaxonomy() {
+        // given
+        when(taxonomyCache.findByEan(EAN)).thenReturn(taxonomy());
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.name()).thenReturn("Logitech MX Keys S");
+        when(pimView.findByGtin(EAN)).thenReturn(Optional.of(entry));
+
+        // when
+        InventorySearchResult result = search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(((InventorySearchResult.KnownWithoutOffers) result).product().name()).isEqualTo("Logitech MX Keys S");
+    }
+
+    private static Taxonomy taxonomy() {
+        return new Taxonomy(EAN, MFN, "Logitech", "MX Keys S", "Keyboards", 1, null, null, null, "1");
     }
 
     @Test

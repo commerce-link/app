@@ -6,9 +6,8 @@ import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
-import pl.commercelink.pim.api.PimCatalog;
-import pl.commercelink.pim.api.PimView;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.products.ProductData;
+import pl.commercelink.products.ProductDataResolver;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -28,8 +27,7 @@ public class PurchaseReportService {
     private final WarehouseDocumentRepository documentRepository;
     private final WarehouseDocumentItemRepository itemRepository;
     private final DeliveriesRepository deliveriesRepository;
-    private final TaxonomyCache taxonomyCache;
-    private final PimCatalog pimCatalog;
+    private final ProductDataResolver productDataResolver;
 
     public List<PurchaseReportRow> generate(String storeId, LocalDate dateFrom, LocalDate dateTo) {
         LocalDateTime periodStart = dateFrom.atStartOfDay();
@@ -47,7 +45,6 @@ public class PurchaseReportService {
 
     private Map<AggregateKey, Aggregate> aggregate(String storeId, LocalDateTime periodStart, LocalDateTime periodEnd) {
         Map<AggregateKey, Aggregate> aggregates = new HashMap<>();
-        PimView pim = pimCatalog.withStoreData(storeId);
         Map<String, String> supplierByDeliveryId = new HashMap<>();
         for (WarehouseDocument doc : documentRepository.findAllInDateRange(storeId, periodStart, periodEnd)) {
             if (doc.getType() != DocumentType.GoodsReceipt) continue;
@@ -55,14 +52,14 @@ public class PurchaseReportService {
 
             String supplier = resolveSupplier(storeId, doc, supplierByDeliveryId);
             for (WarehouseDocumentItem item : itemRepository.findByDocumentId(doc.getDocumentId())) {
-                accumulate(item, supplier, pim, aggregates);
+                accumulate(storeId, item, supplier, aggregates);
             }
         }
         return aggregates;
     }
 
-    private void accumulate(WarehouseDocumentItem item, String supplier, PimView pim, Map<AggregateKey, Aggregate> aggregates) {
-        ReportedProduct product = ReportedProduct.of(item.getEan(), taxonomyCache, pim);
+    private void accumulate(String storeId, WarehouseDocumentItem item, String supplier, Map<AggregateKey, Aggregate> aggregates) {
+        ProductData product = productDataResolver.ofEan(storeId, item.getEan()).orElse(ProductData.EMPTY);
 
         Aggregate agg = aggregates.computeIfAbsent(new AggregateKey(supplier, product.category(), item.getEan()), k -> new Aggregate());
         agg.qty += item.getQty();

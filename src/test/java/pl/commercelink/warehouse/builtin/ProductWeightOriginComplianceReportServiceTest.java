@@ -14,6 +14,7 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimIdentifier;
 import pl.commercelink.pim.api.PimView;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.TaxonomyRepository;
@@ -56,7 +57,8 @@ class ProductWeightOriginComplianceReportServiceTest {
         when(pimCatalog.withGlobalData()).thenReturn(pimView);
         when(documentRepository.findAllInDateRange(anyString(), any(), any())).thenReturn(List.of());
         taxonomy = new TaxonomyCache(mock(TaxonomyRepository.class));
-        service = new ProductWeightOriginComplianceReportService(documentRepository, itemRepository, taxonomy, pimCatalog);
+        service = new ProductWeightOriginComplianceReportService(documentRepository, itemRepository,
+                new ProductDataResolver(pimCatalog, taxonomy));
     }
 
     @Test
@@ -128,7 +130,7 @@ class ProductWeightOriginComplianceReportServiceTest {
     }
 
     @Test
-    void recordComesBeforeThePimEntry() {
+    void pimEntryComesBeforeTheRecord() {
         // given
         givenDocuments(goodsReceiptDoc("doc-1", "Germany"));
         when(itemRepository.findByDocumentId("doc-1"))
@@ -141,10 +143,32 @@ class ProductWeightOriginComplianceReportServiceTest {
 
         // then
         assertThat(rows).singleElement().satisfies(row -> {
-            assertThat(row.category()).isEqualTo("Dyski SSD");
-            assertThat(row.brand()).isEqualTo("Samsung");
+            assertThat(row.category()).isEqualTo("GPU");
+            assertThat(row.brand()).isEqualTo("ASUS");
+            assertThat(row.weightNetG()).isEqualTo(2100);
+            assertThat(row.weightGrossG()).isEqualTo(2400);
+        });
+    }
+
+    @Test
+    void pimEntryWithoutWeightsTakesTheWeightsOfTheRecord() {
+        // given
+        givenDocuments(goodsReceiptDoc("doc-1", "Germany"));
+        when(itemRepository.findByDocumentId("doc-1"))
+                .thenReturn(List.of(item("doc-1", EAN_PLAIN, CODE, "Samsung 990 Pro 2TB", 2)));
+        taxonomy.add(record(EAN_PLAIN, "Dyski SSD", 9, 60));
+        when(pimView.findByGtin(EAN_PLAIN)).thenReturn(Optional.of(pimEntry("GPU", "ASUS", null, null)));
+
+        // when
+        List<ProductWeightOriginComplianceReportRow> rows = service.generate(STORE_ID, FROM, TO);
+
+        // then
+        assertThat(rows).singleElement().satisfies(row -> {
+            assertThat(row.category()).isEqualTo("GPU");
             assertThat(row.weightNetG()).isEqualTo(9);
             assertThat(row.weightGrossG()).isEqualTo(60);
+            assertThat(row.totalWeightNetG()).isEqualTo(18L);
+            assertThat(row.totalWeightGrossG()).isEqualTo(120L);
         });
     }
 
@@ -155,7 +179,6 @@ class ProductWeightOriginComplianceReportServiceTest {
         when(itemRepository.findByDocumentId("doc-1"))
                 .thenReturn(List.of(item("doc-1", EAN_PLAIN, CODE, "Samsung 990 Pro 2TB", 1)));
         taxonomy.add(record(EAN_PLAIN, null, 9, 60));
-        when(pimView.findByGtin(EAN_PLAIN)).thenReturn(Optional.of(pimEntry("GPU", "ASUS", 2100, 2400)));
 
         // when
         List<ProductWeightOriginComplianceReportRow> rows = service.generate(STORE_ID, FROM, TO);
@@ -287,8 +310,8 @@ class ProductWeightOriginComplianceReportServiceTest {
         when(itemRepository.findByDocumentId("doc-1"))
                 .thenReturn(List.of(item("doc-1", "5909999999999", "RTX4070-DUAL", "DUAL RTX 4070", 2)));
         ProductWeightOriginComplianceReportService report = new ProductWeightOriginComplianceReportService(
-                documentRepository, itemRepository, taxonomy,
-                ScopedPimCatalog.of(ScopedPimCatalog.globalEntry("pim-1", "5900000000001", "RTX4070-DUAL", "GPU")));
+                documentRepository, itemRepository, new ProductDataResolver(
+                        ScopedPimCatalog.of(ScopedPimCatalog.globalEntry("pim-1", "5900000000001", "RTX4070-DUAL", "GPU")), taxonomy));
 
         // when
         List<ProductWeightOriginComplianceReportRow> rows = report.generate(STORE_ID, FROM, TO);

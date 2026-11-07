@@ -4,9 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
-import pl.commercelink.pim.api.PimCatalog;
-import pl.commercelink.pim.api.PimView;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.products.ProductData;
+import pl.commercelink.products.ProductDataResolver;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -24,8 +23,7 @@ public class ProductWeightOriginComplianceReportService {
 
     private final WarehouseDocumentRepository documentRepository;
     private final WarehouseDocumentItemRepository itemRepository;
-    private final TaxonomyCache taxonomyCache;
-    private final PimCatalog pimCatalog;
+    private final ProductDataResolver productDataResolver;
 
     public List<ProductWeightOriginComplianceReportRow> generate(String storeId, LocalDate dateFrom, LocalDate dateTo) {
         LocalDateTime periodStart = dateFrom.atStartOfDay();
@@ -43,21 +41,20 @@ public class ProductWeightOriginComplianceReportService {
 
     private Map<AggregateKey, Aggregate> aggregate(String storeId, LocalDateTime periodStart, LocalDateTime periodEnd) {
         Map<AggregateKey, Aggregate> aggregates = new HashMap<>();
-        PimView pim = pimCatalog.withStoreData(storeId);
         for (WarehouseDocument doc : documentRepository.findAllInDateRange(storeId, periodStart, periodEnd)) {
             if (doc.getType() != DocumentType.GoodsReceipt) continue;
             if (doc.getReason() != DocumentReason.SupplierDelivery) continue;
 
             String country = resolveCountry(doc);
             for (WarehouseDocumentItem item : itemRepository.findByDocumentId(doc.getDocumentId())) {
-                accumulate(item, country, pim, aggregates);
+                accumulate(storeId, item, country, aggregates);
             }
         }
         return aggregates;
     }
 
-    private void accumulate(WarehouseDocumentItem item, String country, PimView pim, Map<AggregateKey, Aggregate> aggregates) {
-        ReportedProduct product = ReportedProduct.of(item.getEan(), taxonomyCache, pim);
+    private void accumulate(String storeId, WarehouseDocumentItem item, String country, Map<AggregateKey, Aggregate> aggregates) {
+        ProductData product = productDataResolver.ofEan(storeId, item.getEan()).orElse(ProductData.EMPTY);
         Integer netG = product.netWeightInGrams();
         Integer grossG = product.grossWeightInGrams();
 

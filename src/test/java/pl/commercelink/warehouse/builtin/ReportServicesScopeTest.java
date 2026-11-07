@@ -10,6 +10,7 @@ import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.TaxonomyRepository;
 
@@ -65,7 +66,8 @@ class ReportServicesScopeTest {
         // given
         givenReceiptOfTheProduct();
         ProductWeightOriginComplianceReportService service =
-                new ProductWeightOriginComplianceReportService(documentRepository, itemRepository, taxonomy, pimCatalog);
+                new ProductWeightOriginComplianceReportService(documentRepository, itemRepository,
+                        new ProductDataResolver(pimCatalog, taxonomy));
 
         // when
         List<ProductWeightOriginComplianceReportRow> owner = service.generate("s1", FROM, TO);
@@ -88,7 +90,8 @@ class ReportServicesScopeTest {
         // given
         givenReceiptOfTheProduct();
         PurchaseReportService service =
-                new PurchaseReportService(documentRepository, itemRepository, deliveriesRepository, taxonomy, pimCatalog);
+                new PurchaseReportService(documentRepository, itemRepository, deliveriesRepository,
+                        new ProductDataResolver(pimCatalog, taxonomy));
 
         // when
         List<PurchaseReportRow> owner = service.generate("s1", FROM, TO);
