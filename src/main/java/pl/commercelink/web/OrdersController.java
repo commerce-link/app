@@ -847,7 +847,7 @@ public class OrdersController extends BaseController {
         List<OrderItemDraft> drafts = form.entries().stream()
                 .map(entry -> entry.isFromPricelist()
                         ? OrderItemDraft.of(pricelistEntry(entry), entry.getQty())
-                        : OrderItemDraft.of(inventoryView.findByInventoryKey(entry.inventoryKey()), entry.getQty()))
+                        : OrderItemDraft.of(inventoryView.findByInventoryKey(entry.inventoryKey()), entry.getEan(), entry.getQty()))
                 .toList();
 
         ordersManager.addOrderItems(store, order, drafts);

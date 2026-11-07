@@ -95,25 +95,26 @@ class BasketItemTest {
     }
 
     @Test
-    void inventoryItemGetsTheEanOfItsTaxonomy() {
+    void inventoryItemGetsTheChosenEan() {
         // given
         MatchedInventory matched = offeredProduct(new Taxonomy("5901234123457", "MZ-V9P1T0BW", "Samsung", "Dysk",
                 "Dyski", 0, null, null));
 
         // when
-        BasketItem item = BasketItem.of(matched, 1, false);
+        BasketItem item = BasketItem.of(matched, "5901234123464", 1, false);
 
         // then
-        assertThat(item.getSku()).isEqualTo("5901234123457");
+        assertThat(item.getSku()).isEqualTo("5901234123464");
+        assertThat(item.getName()).isEqualTo("Dysk");
     }
 
     @Test
     void missingProductLineGetsTheTypedEan() {
         // given
-        MatchedInventory matched = MatchedInventory.empty(new InventoryKey("5901234123457", "MZ-V9P1T0BW"));
+        MatchedInventory matched = MatchedInventory.empty(InventoryKey.fromEan("5901234123457"));
 
         // when
-        BasketItem item = BasketItem.of(matched, 1, false);
+        BasketItem item = BasketItem.of(matched, "5901234123457", 1, false);
 
         // then
         assertThat(item.getName()).isEqualTo("Brak produktu");
@@ -130,7 +131,7 @@ class BasketItemTest {
         when(matched.getMedianPrice()).thenReturn(Price.fromNet(200));
 
         // when
-        BasketItem item = BasketItem.of(matched, 1, false);
+        BasketItem item = BasketItem.of(matched, "5901234123457", 1, false);
 
         // then — client 2026-10-27: the estimate rather than the lowest price; the price stays the median
         assertThat(item.getUnitCost()).isEqualTo(184.50);

@@ -191,13 +191,13 @@ class OfferControllerTest {
         // given
         Basket basket = basketBase();
         MatchedInventory matchedInventory = MatchedInventory.empty(
-                new pl.commercelink.inventory.InventoryKey("EAN-X", "MFN-X"));
+                pl.commercelink.inventory.InventoryKey.fromEan("EAN-X"));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
         when(inventoryView.findByInventoryKey(any())).thenReturn(matchedInventory);
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromInventory("EAN-X", "MFN-X", 1)), null,
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromInventory("EAN-X", 1)), null,
                 new RedirectAttributesModelMap(), Locale.ENGLISH);
 
         // then
@@ -377,13 +377,13 @@ class OfferControllerTest {
         when(pricelistFinder.findByPimId(STORE_ID, "cat-1", "pim-2")).thenReturn(Optional.of(mouse));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
         when(inventoryView.findByInventoryKey(any())).thenReturn(MatchedInventory.empty(
-                new pl.commercelink.inventory.InventoryKey("EAN-X", "MFN-X")));
+                pl.commercelink.inventory.InventoryKey.fromEan("EAN-X")));
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
         offerController.addOfferItems(OFFER_ID, form(
                 AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 2),
-                AddItemsForm.Entry.fromInventory("EAN-X", "MFN-X", 1),
+                AddItemsForm.Entry.fromInventory("EAN-X", 1),
                 AddItemsForm.Entry.fromPricelist("cat-1", "pim-2", 1)), null,
                 new RedirectAttributesModelMap(), Locale.ENGLISH);
 

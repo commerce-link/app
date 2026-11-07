@@ -275,11 +275,11 @@ class OrdersControllerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(pricelistFinder.findByPimId(STORE_ID, "cat-1", "pim-1")).thenReturn(Optional.of(laptop));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        when(inventoryView.findByInventoryKey(any())).thenReturn(MatchedInventory.empty(new InventoryKey("EAN-X", "MFN-X")));
+        when(inventoryView.findByInventoryKey(any())).thenReturn(MatchedInventory.empty(InventoryKey.fromEan("EAN-X")));
         AddItemsForm form = new AddItemsForm();
         form.setItems(List.of(
                 AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 2),
-                AddItemsForm.Entry.fromInventory("EAN-X", "MFN-X", 1)));
+                AddItemsForm.Entry.fromInventory("EAN-X", 1)));
 
         // when
         String view = ordersController.addOrderItems(ORDER_ID, form, redirectAttributes, Locale.ENGLISH);

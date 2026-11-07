@@ -2,7 +2,6 @@ package pl.commercelink.web.offers;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
@@ -21,8 +20,8 @@ import java.util.Optional;
 
 /**
  * Adds the entries of the "add items" dialog to an offer's items, without saving: the table of the details page drafts
- * with it, and the page without JavaScript saves what it added. An entry whose product is gone since the dialog listed it
- * (no longer in the price list, or unknown at the suppliers) is skipped instead of failing the whole batch.
+ * with it, and the page without JavaScript saves what it added. A price list entry gone since the dialog listed it is
+ * skipped instead of failing the whole batch.
  */
 @Slf4j
 @Component
@@ -57,25 +56,10 @@ public class OfferItemsDraft {
                     inventoryView = inventory.withEnabledSuppliersOnly(storeId);
                 }
                 MatchedInventory matched = inventoryView.findByInventoryKey(entry.inventoryKey());
-                if (!addable(matched)) {
-                    log.warn("Offer {} (store {}): EAN {} / code {} is not at the suppliers; not added",
-                            basket.getBasketId(), storeId, entry.getEan(), entry.getMfn());
-                    skipped++;
-                    continue;
-                }
-                basket.addBasketItem(BasketItem.of(matched, entry.getQty(), consolidated));
+                basket.addBasketItem(BasketItem.of(matched, entry.getEan(), entry.getQty(), consolidated));
             }
         }
         return skipped;
-    }
-
-    /**
-     * Without offers BasketItem.of makes a "missing product" item carrying the typed EAN; an entry typed only by its
-     * manufacturer code has no EAN for it: the item would have a blank SKU, which the next table save drops anyway.
-     */
-    private static boolean addable(MatchedInventory matched) {
-        return matched != null && (matched.hasAnyOffers()
-                || matched.getInventoryKey().getProductEans().stream().anyMatch(StringUtils::isNotBlank));
     }
 
     private Map<String, Integer> categorySequenceNumbers(String storeId, String catalogId) {

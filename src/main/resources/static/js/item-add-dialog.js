@@ -1,11 +1,12 @@
 // Add-items dialog shared by the order details and the offer details (fragments/item-add-modal.html): pricelist tab
-// (catalog, category, label, search, sortable name and price), inventory tab (EAN and/or manufacturer code), the list of
-// picked entries with quantities, and a submit that posts items[i].* to data-add-items-url (or hands them to the page:
-// cl:item-add-submit). Both pages open it with data-cl-dialog-open (dialog.js), which fires cl:dialog-open.
+// (catalog, category, label, search, sortable name and price), inventory tab (the product of a typed EAN, from
+// data-inventory-url), the list of picked entries with quantities, and a submit that posts items[i].* to
+// data-add-items-url (or hands them to the page: cl:item-add-submit). Both pages open it with data-cl-dialog-open
+// (dialog.js), which fires cl:dialog-open.
 (function () {
     'use strict';
 
-    // picked entries: {source: 'pricelist', catalogId, product, qty} or {source: 'inventory', ean, mfn, qty}
+    // picked entries: {source: 'pricelist', catalogId, product, qty} or {source: 'inventory', product, qty}
     const itemAdd = {
         data: [],
         cache: {},
@@ -14,7 +15,10 @@
         picked: [],
         tab: 'pricelist',
         loading: false,
-        pending: false
+        pending: false,
+        inventoryRows: [],
+        inventoryLoading: false,
+        inventorySearched: false
     };
 
     function itemAddModalRoot() {
@@ -129,6 +133,12 @@
     }
 
     function renderItemAddTable() {
+        renderItemAddPricelistTable();
+        renderItemAddInventoryTable();
+        renderItemAddBasket();
+    }
+
+    function renderItemAddPricelistTable() {
         const category = document.getElementById('itemAddCategory').value;
         const label = document.getElementById('itemAddLabel').value;
         const search = document.getElementById('itemAddSearch').value.trim().toLowerCase();
@@ -150,72 +160,11 @@
 
         const catalogId = document.getElementById('itemAddCatalog').value;
         const tbody = document.getElementById('itemAddRows');
-        // below 720 px the table shows as cards and every cell names its column from data-label
-        const labels = Array.from(document.querySelectorAll('.cl-item-add-table thead th'))
-            .map(th => (th.querySelector('span') || th).textContent.trim());
+        const labels = columnLabels(tbody);
         tbody.replaceChildren();
-        rows.forEach(p => {
-            const entry = findItemAddPicked(catalogId, p);
-            const row = document.createElement('tr');
-            row.classList.toggle('is-picked', !!entry);
-
-            const checkCell = document.createElement('td');
-            checkCell.className = 'cl-table-check';
-            const check = document.createElement('input');
-            check.type = 'checkbox';
-            check.className = 'cl-check-input';
-            check.checked = !!entry;
-            check.tabIndex = -1;
-            check.setAttribute('aria-hidden', 'true');
-            checkCell.appendChild(check);
-
-            const nameCell = document.createElement('td');
-            nameCell.className = 'cl-item-add-name';
-            const nameLine = document.createElement('div');
-            nameLine.textContent = p.name;
-            const subLine = document.createElement('div');
-            subLine.className = 'cl-table-sub';
-            subLine.textContent = [p.label, p.ean, p.mfn].filter(v => v).join(' · ');
-            nameCell.append(nameLine, subLine);
-
-            const categoryCell = document.createElement('td');
-            categoryCell.textContent = p.category;
-
-            const priceCell = document.createElement('td');
-            priceCell.className = 'is-numeric cl-item-add-strong';
-            priceCell.textContent = formatItemAddPrice(p.price);
-
-            const qtyCell = document.createElement('td');
-            qtyCell.className = 'is-numeric';
-            const qtyTag = document.createElement('span');
-            qtyTag.className = 'cl-status ' + (p.qty === 0 ? 'is-bad' : (p.qty <= 5 ? 'is-warn' : 'is-ok'));
-            qtyTag.textContent = p.qty;
-            qtyCell.appendChild(qtyTag);
-
-            const deliveryCell = document.createElement('td');
-            deliveryCell.className = 'is-numeric';
-            deliveryCell.textContent = p.estimatedDeliveryDays + ' ' + itemAddModalRoot().getAttribute('data-days-suffix');
-
-            const pickCell = document.createElement('td');
-            pickCell.className = 'is-numeric';
-            if (entry) {
-                pickCell.appendChild(itemAddStepper(entry));
-            } else {
-                const add = document.createElement('button');
-                add.type = 'button';
-                add.className = 'cl-button cl-item-add-row-add';
-                add.textContent = '+ ' + itemAddModalRoot().getAttribute('data-add-label');
-                pickCell.appendChild(add);
-            }
-
-            row.append(checkCell, nameCell, categoryCell, priceCell, qtyCell, deliveryCell, pickCell);
-            Array.from(row.children).forEach((cell, i) => { cell.dataset.label = i === 0 ? '' : (labels[i] || ''); });
-            row.addEventListener('click', event => {
-                if (event.target.closest('.cl-item-add-stepper')) return;
-                toggleItemAddPick(catalogId, p);
-            });
-            tbody.appendChild(row);
-        });
+        rows.forEach(p => tbody.appendChild(itemAddProductRow(p, findItemAddPicked(catalogId, p),
+            [p.label, p.ean, p.mfn], labels,
+            entry => togglePicked(entry, () => ({source: 'pricelist', catalogId: catalogId, product: p, qty: 1})))));
 
         document.getElementById('itemAddLoading').hidden = !itemAdd.loading;
         document.getElementById('itemAddNoCatalog').hidden = itemAdd.loading || catalogSelected;
@@ -225,20 +174,102 @@
         count.textContent = catalogSelected && !itemAdd.loading
             ? count.getAttribute('data-template').replace('{0}', rows.length).replace('{1}', itemAdd.data.length)
             : '';
+    }
 
-        renderItemAddBasket();
+    function renderItemAddInventoryTable() {
+        const tbody = document.getElementById('itemAddInventoryRows');
+        const labels = columnLabels(tbody);
+        tbody.replaceChildren();
+        itemAdd.inventoryRows.forEach(p => tbody.appendChild(itemAddProductRow(p, findItemAddInventoryPicked(p),
+            [p.brand, p.ean, p.mfn], labels,
+            entry => togglePicked(entry, () => ({source: 'inventory', product: p, qty: 1})))));
+
+        document.getElementById('itemAddInventoryLoading').hidden = !itemAdd.inventoryLoading;
+        document.getElementById('itemAddInventoryNoResults').hidden =
+            itemAdd.inventoryLoading || !itemAdd.inventorySearched || !!itemAdd.inventoryRows.length;
+    }
+
+    // below 720 px the table shows as cards and every cell names its column from data-label
+    function columnLabels(tbody) {
+        return Array.from(tbody.closest('table').querySelectorAll('thead th'))
+            .map(th => (th.querySelector('span') || th).textContent.trim());
+    }
+
+    function itemAddProductRow(p, entry, codes, labels, toggle) {
+        const row = document.createElement('tr');
+        row.classList.toggle('is-picked', !!entry);
+
+        const checkCell = document.createElement('td');
+        checkCell.className = 'cl-table-check';
+        const check = document.createElement('input');
+        check.type = 'checkbox';
+        check.className = 'cl-check-input';
+        check.checked = !!entry;
+        check.tabIndex = -1;
+        check.setAttribute('aria-hidden', 'true');
+        checkCell.appendChild(check);
+
+        const nameCell = document.createElement('td');
+        nameCell.className = 'cl-item-add-name';
+        const nameLine = document.createElement('div');
+        nameLine.textContent = p.name;
+        const subLine = document.createElement('div');
+        subLine.className = 'cl-table-sub';
+        subLine.textContent = codes.filter(v => v).join(' · ');
+        nameCell.append(nameLine, subLine);
+
+        const categoryCell = document.createElement('td');
+        categoryCell.textContent = p.category;
+
+        const priceCell = document.createElement('td');
+        priceCell.className = 'is-numeric cl-item-add-strong';
+        priceCell.textContent = formatItemAddPrice(p.price);
+
+        const qtyCell = document.createElement('td');
+        qtyCell.className = 'is-numeric';
+        const qtyTag = document.createElement('span');
+        qtyTag.className = 'cl-status ' + (p.qty === 0 ? 'is-bad' : (p.qty <= 5 ? 'is-warn' : 'is-ok'));
+        qtyTag.textContent = p.qty;
+        qtyCell.appendChild(qtyTag);
+
+        const deliveryCell = document.createElement('td');
+        deliveryCell.className = 'is-numeric';
+        deliveryCell.textContent = p.estimatedDeliveryDays + ' ' + itemAddModalRoot().getAttribute('data-days-suffix');
+
+        const pickCell = document.createElement('td');
+        pickCell.className = 'is-numeric';
+        if (entry) {
+            pickCell.appendChild(itemAddStepper(entry));
+        } else {
+            const add = document.createElement('button');
+            add.type = 'button';
+            add.className = 'cl-button cl-item-add-row-add';
+            add.textContent = '+ ' + itemAddModalRoot().getAttribute('data-add-label');
+            pickCell.appendChild(add);
+        }
+
+        row.append(checkCell, nameCell, categoryCell, priceCell, qtyCell, deliveryCell, pickCell);
+        Array.from(row.children).forEach((cell, i) => { cell.dataset.label = i === 0 ? '' : (labels[i] || ''); });
+        row.addEventListener('click', event => {
+            if (event.target.closest('.cl-item-add-stepper')) return;
+            toggle(entry);
+        });
+        return row;
     }
 
     function findItemAddPicked(catalogId, product) {
         return itemAdd.picked.find(e => e.source === 'pricelist' && e.catalogId === catalogId && e.product.pimId === product.pimId);
     }
 
-    function toggleItemAddPick(catalogId, product) {
-        const entry = findItemAddPicked(catalogId, product);
+    function findItemAddInventoryPicked(product) {
+        return itemAdd.picked.find(e => e.source === 'inventory' && e.product.ean === product.ean);
+    }
+
+    function togglePicked(entry, create) {
         if (entry) {
             itemAdd.picked.splice(itemAdd.picked.indexOf(entry), 1);
         } else {
-            itemAdd.picked.push({source: 'pricelist', catalogId: catalogId, product: product, qty: 1});
+            itemAdd.picked.push(create());
             document.getElementById('itemAddBasket').classList.remove('is-collapsed');
             document.querySelector('[data-item-add-basket-toggle]').setAttribute('aria-expanded', 'true');
         }
@@ -267,36 +298,26 @@
         return wrap;
     }
 
-    function bumpItemAddQty(delta) {
-        const input = document.getElementById('itemAddQty');
-        input.value = Math.max(1, (parseInt(input.value, 10) || 1) + delta);
+    function renderItemAddSearchButton() {
+        document.getElementById('itemAddInventorySearch').disabled = !document.getElementById('itemAddEan').value.trim();
     }
 
-    function renderItemAddInventoryButton() {
+    function searchItemAddInventory() {
         const ean = document.getElementById('itemAddEan').value.trim();
-        const mfn = document.getElementById('itemAddMfn').value.trim();
-        document.getElementById('itemAddInventoryAdd').disabled = !ean && !mfn;
-    }
-
-    function addItemAddInventoryEntry() {
-        const ean = document.getElementById('itemAddEan').value.trim();
-        const mfn = document.getElementById('itemAddMfn').value.trim();
-        if (!ean && !mfn) return;
-        const qty = Math.max(1, parseInt(document.getElementById('itemAddQty').value, 10) || 1);
-        const existing = itemAdd.picked.find(e => e.source === 'inventory' && e.ean === ean && e.mfn === mfn);
-        if (existing) {
-            existing.qty += qty;
-        } else {
-            itemAdd.picked.push({source: 'inventory', ean: ean, mfn: mfn, qty: qty});
-        }
-        document.getElementById('itemAddEan').value = '';
-        document.getElementById('itemAddMfn').value = '';
-        document.getElementById('itemAddQty').value = '1';
-        document.getElementById('itemAddEan').focus();
-        document.getElementById('itemAddBasket').classList.remove('is-collapsed');
-        document.querySelector('[data-item-add-basket-toggle]').setAttribute('aria-expanded', 'true');
-        renderItemAddInventoryButton();
-        renderItemAddBasket();
+        if (!ean) return;
+        itemAdd.inventoryRows = [];
+        itemAdd.inventoryLoading = true;
+        renderItemAddInventoryTable();
+        const url = itemAddModalRoot().getAttribute('data-inventory-url') + '?ean=' + encodeURIComponent(ean);
+        fetch(url)
+            .then(response => response.ok ? response.json() : [])
+            .catch(() => [])
+            .then(rows => {
+                itemAdd.inventoryRows = rows;
+                itemAdd.inventoryLoading = false;
+                itemAdd.inventorySearched = true;
+                renderItemAddInventoryTable();
+            });
     }
 
     function removeItemAddEntry(entry) {
@@ -326,25 +347,14 @@
         tbody.replaceChildren();
         itemAdd.picked.forEach(entry => {
             const row = document.createElement('tr');
-            const fromInventory = entry.source === 'inventory';
 
             const nameCell = document.createElement('td');
-            if (fromInventory) {
-                const tag = document.createElement('span');
-                tag.className = 'cl-status is-info';
-                tag.textContent = modal.getAttribute('data-inventory-tag');
-                const code = document.createElement('span');
-                code.className = 'cl-table-sub';
-                code.textContent = [entry.ean, entry.mfn].filter(v => v).join(' · ');
-                nameCell.append(tag, code);
-            } else {
-                const nameLine = document.createElement('div');
-                nameLine.textContent = entry.product.name;
-                const subLine = document.createElement('div');
-                subLine.className = 'cl-table-sub';
-                subLine.textContent = [entry.product.category, entry.product.mfn].filter(v => v).join(' · ');
-                nameCell.append(nameLine, subLine);
-            }
+            const nameLine = document.createElement('div');
+            nameLine.textContent = entry.product.name;
+            const subLine = document.createElement('div');
+            subLine.className = 'cl-table-sub';
+            subLine.textContent = [entry.product.category, entry.product.mfn].filter(v => v).join(' · ');
+            nameCell.append(nameLine, subLine);
 
             const qtyCell = document.createElement('td');
             qtyCell.className = 'is-numeric';
@@ -352,11 +362,11 @@
 
             const priceCell = document.createElement('td');
             priceCell.className = 'is-numeric cl-item-add-muted';
-            priceCell.textContent = fromInventory ? modal.getAttribute('data-inventory-price') : formatItemAddPrice(entry.product.price);
+            priceCell.textContent = formatItemAddPrice(entry.product.price);
 
             const totalCell = document.createElement('td');
             totalCell.className = 'is-numeric cl-item-add-strong';
-            totalCell.textContent = fromInventory ? '—' : formatItemAddPrice(entry.product.price * entry.qty);
+            totalCell.textContent = formatItemAddPrice(entry.product.price * entry.qty);
 
             const removeCell = document.createElement('td');
             removeCell.className = 'cl-table-actions';
@@ -385,20 +395,12 @@
             return;
         }
         const pieces = itemAdd.picked.reduce((sum, e) => sum + e.qty, 0);
-        const priced = itemAdd.picked.filter(e => e.source === 'pricelist');
-        const total = priced.reduce((sum, e) => sum + e.product.price * e.qty, 0);
-        const unpriced = count - priced.length;
+        const total = itemAdd.picked.reduce((sum, e) => sum + e.product.price * e.qty, 0);
 
         hint.replaceChildren();
         const summary = document.createElement('strong');
         summary.textContent = itemAddMessage('data-summary', count, pieces, formatItemAddPrice(total));
         hint.appendChild(summary);
-        if (unpriced) {
-            const note = document.createElement('span');
-            note.className = 'cl-help';
-            note.textContent = itemAddMessage('data-summary-unpriced', unpriced);
-            hint.appendChild(note);
-        }
         submit.textContent = itemAddMessage('data-submit-count', count);
         submit.disabled = itemAdd.pending;
     }
@@ -415,8 +417,7 @@
                 params[prefix + 'catalogId'] = entry.catalogId;
                 params[prefix + 'pimId'] = entry.product.pimId;
             } else {
-                params[prefix + 'ean'] = entry.ean;
-                params[prefix + 'mfn'] = entry.mfn;
+                params[prefix + 'ean'] = entry.product.ean;
             }
         });
 
@@ -499,10 +500,6 @@
             if (sort) {
                 setItemAddSort(sort.getAttribute('data-item-add-sort'));
             }
-            var bump = target.closest && target.closest('[data-item-add-bump]');
-            if (bump) {
-                bumpItemAddQty(Number(bump.getAttribute('data-item-add-bump')));
-            }
             if (target.closest && target.closest('[data-item-add-basket-toggle]')) {
                 toggleItemAddBasket();
             }
@@ -516,17 +513,15 @@
         document.getElementById('itemAddCategory').addEventListener('change', onItemAddCategoryChange);
         document.getElementById('itemAddLabel').addEventListener('change', renderItemAddTable);
         document.getElementById('itemAddSearch').addEventListener('input', renderItemAddTable);
-        ['itemAddEan', 'itemAddMfn'].forEach(function (id) {
-            var input = document.getElementById(id);
-            input.addEventListener('input', renderItemAddInventoryButton);
-            input.addEventListener('keydown', function (event) {
-                if (event.key === 'Enter') {
-                    event.preventDefault();
-                    addItemAddInventoryEntry();
-                }
-            });
+        var ean = document.getElementById('itemAddEan');
+        ean.addEventListener('input', renderItemAddSearchButton);
+        ean.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                searchItemAddInventory();
+            }
         });
-        document.getElementById('itemAddInventoryAdd').addEventListener('click', addItemAddInventoryEntry);
+        document.getElementById('itemAddInventorySearch').addEventListener('click', searchItemAddInventory);
         document.getElementById('itemAddSubmit').addEventListener('click', submitAddItems);
     }
 
