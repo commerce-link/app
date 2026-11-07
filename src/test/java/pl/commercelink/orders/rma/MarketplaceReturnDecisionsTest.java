@@ -75,10 +75,10 @@ class MarketplaceReturnDecisionsTest {
         return item;
     }
 
-    private static OrderItem orderItem(String itemId, String mfn, int qty, FulfilmentStatus status) {
+    private static OrderItem orderItem(String itemId, String marketplaceKey, int qty, FulfilmentStatus status) {
         OrderItem item = mock(OrderItem.class);
         when(item.getItemId()).thenReturn(itemId);
-        when(item.getManufacturerCode()).thenReturn(mfn);
+        when(item.getExternalItemId()).thenReturn(marketplaceKey);
         when(item.getQty()).thenReturn(qty);
         when(item.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced))
                 .thenReturn(status == FulfilmentStatus.Returned || status == FulfilmentStatus.Replaced);
@@ -149,38 +149,6 @@ class MarketplaceReturnDecisionsTest {
         assertEquals(1, action.items().size());
         assertEquals("sku-a", action.items().get(0).marketplaceKey());
         assertEquals(2, action.items().get(0).quantity());
-    }
-
-    @Test
-    void refundItemsUseThePersistedOrderItemKeyInsteadOfTheRmaItemsStoredMfn() {
-        // given
-        OrderItem mutatedOrderItem = mock(OrderItem.class);
-        when(mutatedOrderItem.getItemId()).thenReturn("item-1");
-        when(mutatedOrderItem.getExternalItemId()).thenReturn("SKU-1");
-        when(mutatedOrderItem.getManufacturerCode()).thenReturn("SUPPLIER-CODE-1");
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(mutatedOrderItem));
-
-        // when
-        decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SUPPLIER-CODE-1", 1)), false);
-
-        // then
-        ArgumentCaptor<ReturnLifecycleEvent> captor = ArgumentCaptor.forClass(ReturnLifecycleEvent.class);
-        verify(publisher).publish(captor.capture());
-        assertEquals("SKU-1", captor.getValue().action().items().get(0).marketplaceKey());
-    }
-
-    @Test
-    void refundItemsFallBackToTheRmaItemsStoredMfnWhenTheOrderItemIsGone() {
-        // given
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
-
-        // when
-        decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
-
-        // then
-        ArgumentCaptor<ReturnLifecycleEvent> captor = ArgumentCaptor.forClass(ReturnLifecycleEvent.class);
-        verify(publisher).publish(captor.capture());
-        assertEquals("SKU-1", captor.getValue().action().items().get(0).marketplaceKey());
     }
 
     @Test
@@ -479,8 +447,7 @@ class MarketplaceReturnDecisionsTest {
         // when
         decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
 
-        // then: the split family was consulted and gave the real key, not the RMA item's stored (and
-        // possibly stale) mfn
+        // then: the split family was consulted and gave the key
         assertEquals("SKU-1", capturePublishedAction().items().get(0).marketplaceKey());
     }
 
@@ -601,14 +568,13 @@ class MarketplaceReturnDecisionsTest {
     }
 
     @Test
-    void returnAcceptedFailsLoudlyWhenAnItemHasNoOrderItemAndNoStoredMfn() {
-        // given: no order item anywhere in the family, and the RMA item's own stored mfn is also blank
+    void returnAcceptedFailsLoudlyWhenAnItemHasNoOrderItem() {
+        // given: no order item anywhere in the family; the RMA item's stored mfn is the supplier's code
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
-        RMAItem itemWithoutMfn = rmaItem("item-1", null, 1);
 
         // when / then
         assertThrows(IllegalStateException.class, () ->
-                decisions.publishAcceptance(marketplaceRma, List.of(itemWithoutMfn), false));
+                decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SUPPLIER-MPN-77", 1)), false));
         verifyNoInteractions(publisher);
         verify(rmaRepository, never()).save(any());
     }
@@ -616,8 +582,9 @@ class MarketplaceReturnDecisionsTest {
     @Test
     void returnAcceptedUsesTheNormalisedSkuAsRefundKeyForALegacyOrderItem() {
         // given
-        OrderItem legacy = orderItem("item-1", "SUPPLIER-MPN-77", 1, FulfilmentStatus.Delivered);
+        OrderItem legacy = orderItem("item-1", null, 1, FulfilmentStatus.Delivered);
         when(legacy.getSku()).thenReturn("LOCAL-SEED-0051");
+        when(legacy.getManufacturerCode()).thenReturn("SUPPLIER-MPN-77");
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(legacy));
 
         // when

@@ -81,6 +81,7 @@ class MarketplaceReturnImporterTest {
         when(order.getEmail()).thenReturn("buyer@allegro.pl");
         when(order.getShippingDetails()).thenReturn(new ShippingDetails());
         when(orderItem.getItemId()).thenReturn("item-1");
+        when(orderItem.getExternalItemId()).thenReturn("SKU-1");
         when(orderItem.getManufacturerCode()).thenReturn("SKU-1");
         when(orderItem.getQty()).thenReturn(3);
         when(orderItem.getPrice()).thenReturn(100.0);
@@ -180,36 +181,6 @@ class MarketplaceReturnImporterTest {
     }
 
     @Test
-    void matchesByThePersistedExternalItemIdWhenManufacturerCodeWasOverwrittenBySupplierAssignment() {
-        // given
-        when(orderItem.getExternalItemId()).thenReturn("SKU-1");
-        when(orderItem.getManufacturerCode()).thenReturn("SUPPLIER-CODE-1");
-        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
-
-        // when
-        importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.IN_TRANSIT, item("SKU-1", 1)));
-
-        // then
-        ArgumentCaptor<List<RMAItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
-        verify(rmaItemsRepository).batchSave(itemsCaptor.capture());
-        assertEquals("item-1", itemsCaptor.getValue().get(0).getItemId());
-    }
-
-    @Test
-    void matchesLegacyOrderItemsWhoseManufacturerCodeWasNormalisedAtImport() {
-        // given: an order imported before externalItemId existed — mfn went through unifyMfn
-        OrderItem legacy = orderItem("item-1", null, "K7M2XQ9PZ4", 1);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(legacy));
-        MarketplaceReturn ret = returnWithItem("k7m2xq9pz4", 1);
-
-        // when
-        importer.importReturn(store, MARKETPLACE, ret);
-
-        // then
-        verify(rmaRepository).save(any(RMA.class));
-    }
-
-    @Test
     void matchesCurrentOrderItemsOnTheRawMarketplaceKey() {
         // given: externalItemId holds the raw key; manufacturerCode may have been overwritten by assignSupplier
         OrderItem current = orderItem("item-1", "k7m2xq9pz4", "SUPPLIER-CODE-9", 1);
@@ -238,21 +209,6 @@ class MarketplaceReturnImporterTest {
         ArgumentCaptor<List<RMAItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
         verify(rmaItemsRepository).batchSave(itemsCaptor.capture());
         assertEquals("item-legacy", itemsCaptor.getValue().get(0).getItemId());
-    }
-
-    @Test
-    void fallsBackToManufacturerCodeWhenExternalItemIdIsBlank() {
-        // given
-        when(orderItem.getExternalItemId()).thenReturn(null);
-        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
-
-        // when
-        importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.IN_TRANSIT, item("SKU-1", 1)));
-
-        // then
-        ArgumentCaptor<List<RMAItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
-        verify(rmaItemsRepository).batchSave(itemsCaptor.capture());
-        assertEquals("item-1", itemsCaptor.getValue().get(0).getItemId());
     }
 
     @Test

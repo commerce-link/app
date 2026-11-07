@@ -25,8 +25,6 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
-
 /**
  * Bridges operator decisions on a marketplace-originated RMA to the marketplace: publishes the
  * lifecycle event and records the decision in the RMA history. No-op for manual RMAs.
@@ -100,17 +98,11 @@ public class MarketplaceReturnDecisions {
         if (orderItem != null) {
             return MarketplaceItemKey.of(orderItem);
         }
-        String fallback = rmaItem.getMfn();
-        if (isNotBlank(fallback)) {
-            log.warn("Accepted RMA item {} has no matching order item; falling back to its stored mfn {}",
-                    rmaItem.getRmaItemId(), fallback);
-            return fallback;
-        }
         // Collectors.groupingBy throws an NPE on a null key. Failing loudly here - after the warehouse
         // already accepted the items - is still better than silently dropping this item from the refund
         // sent to the marketplace, which would be a partial money movement nobody is told about.
         throw new IllegalStateException("Cannot determine a refund key for RMA item " + rmaItem.getRmaItemId()
-                + ": it has no matching order item and no stored mfn");
+                + ": it has no matching order item");
     }
 
     public boolean publishRejection(RMA rma) {
@@ -230,8 +222,9 @@ public class MarketplaceReturnDecisions {
         Map<String, Integer> returned = new HashMap<>();
         for (RMAItem item : rmaItems) {
             OrderItem orderItem = orderItemsById.get(item.getItemId());
-            String key = orderItem != null ? MarketplaceItemKey.of(orderItem) : item.getMfn();
-            returned.merge(key, item.getQty(), Integer::sum);
+            if (orderItem != null) {
+                returned.merge(MarketplaceItemKey.of(orderItem), item.getQty(), Integer::sum);
+            }
         }
 
         Map<String, Integer> required = new HashMap<>();
