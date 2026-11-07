@@ -107,7 +107,7 @@ public record WarehouseDocumentListQuery(String path, DocumentKind kind, List<Do
         return String.join("/", segments);
     }
 
-    public String productCode() {
+    public String ean() {
         return searchMode() == SearchMode.PRODUCT ? q : null;
     }
 
