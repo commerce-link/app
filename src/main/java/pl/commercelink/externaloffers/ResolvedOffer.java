@@ -44,7 +44,10 @@ public record ResolvedOffer(String pimId, String ean, String mfn, String categor
         LINK,
         /** The seller offer key is our own pimId, published by CommerceLink. */
         OWN_OFFER,
-        /** The manufacturer code from the order line matched a PIM MPN. */
+        /**
+         * The manufacturer code from the order line matched a PIM MPN. Lines are no longer recognised that way; only
+         * items imported before carry it, and linking an offer still re-fills them.
+         */
         MFN
     }
 

@@ -17,7 +17,6 @@ import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.StoreCategoryResolver;
-import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.taxonomy.Taxonomy;
@@ -57,8 +56,6 @@ class ExternalOfferLinkingImportParityTest {
 
     @Mock
     private ExternalOfferLinkRepository linkRepository;
-    @Mock
-    private PimCatalog pimCatalog;
     @Mock
     private StorePimAliases pimAliases;
     @Mock
@@ -128,7 +125,7 @@ class ExternalOfferLinkingImportParityTest {
 
     // what MarketplaceOrderImporter makes of the offer's next line
     private OrderItem importedLine(Order order) {
-        ResolvedOffer offer = resolver.forStore(STORE).resolve(EMPIK, KEY, RAW_CODE).orElseThrow();
+        ResolvedOffer offer = resolver.forStore(STORE).resolve(EMPIK, KEY).orElseThrow();
         OrderItem line = new OrderItem(order.getOrderId(),
                 offer.category() != null ? offer.category() : Categories.UNCATEGORIZED, "Czajnik", 1, 100,
                 offer.sku(), false);

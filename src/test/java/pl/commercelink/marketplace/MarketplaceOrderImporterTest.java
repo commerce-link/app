@@ -289,7 +289,7 @@ class MarketplaceOrderImporterTest {
     @Test
     void fillsALinkedLineWithItsEanAndTheTaxonomyCategory() {
         // given
-        when(storeOffers.resolve("Empik", "PS-8001", "DMW-2001"))
+        when(storeOffers.resolve("Empik", "PS-8001"))
                 .thenReturn(Optional.of(new ResolvedOffer(null, "2000000001012", null, "Lampy", ResolvedOffer.Source.LINK)));
 
         // when
@@ -308,7 +308,7 @@ class MarketplaceOrderImporterTest {
     @Test
     void fillsALinkedLineWithTheLinksEansOnly() {
         // given a link to two EANs of the same goods, which need not be in a catalog
-        when(storeOffers.resolve("Empik", "PS-1", "DMW-2001")).thenReturn(Optional.of(new ResolvedOffer(null,
+        when(storeOffers.resolve("Empik", "PS-1")).thenReturn(Optional.of(new ResolvedOffer(null,
                 "2000000001012", null, null, ResolvedOffer.Source.LINK, List.of("2000000001029"))));
 
         // when
@@ -325,42 +325,31 @@ class MarketplaceOrderImporterTest {
     }
 
     @Test
-    void everyResolvedLineTakesItsEanAsTheSkuAndKeepsItsManufacturerCode() {
+    void anOwnOfferLineTakesItsEanAsTheSkuAndKeepsItsManufacturerCode() {
         // given
-        when(storeOffers.resolve("Empik", "k7m2xq9pz4", "DMW-2001"))
+        when(storeOffers.resolve("Empik", "k7m2xq9pz4"))
                 .thenReturn(Optional.of(new ResolvedOffer("k7m2xq9pz4", "2000000001012", "MFN-2001", "Lampy", ResolvedOffer.Source.OWN_OFFER)));
-        when(storeOffers.resolve("Allegro", null, "ab 12"))
-                .thenReturn(Optional.of(new ResolvedOffer("pim-1", "2000000001029", "ab 12", "Monitors", ResolvedOffer.Source.MFN)));
 
         // when
         importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("DMW-2001", "k7m2xq9pz4"));
-        importer.importOrder(storeWithId("store-1"), "Allegro", orderWithProduct("ab 12"));
 
         // then
-        ArgumentCaptor<List<OrderItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
-        verify(ordersManager, times(2)).saveWithFulfilment(any(), itemsCaptor.capture());
-        List<OrderItem> lines = itemsCaptor.getAllValues().stream()
-                .flatMap(List::stream).filter(i -> !i.isService()).toList();
-        assertEquals(2, lines.size());
-        assertEquals("2000000001012", lines.get(0).getSku());
-        assertEquals("2000000001012", lines.get(0).getEan());
-        assertEquals("MFN-2001", lines.get(0).getManufacturerCode());
-        assertEquals("2000000001029", lines.get(1).getSku());
-        assertEquals("2000000001029", lines.get(1).getEan());
-        assertEquals("AB12", lines.get(1).getManufacturerCode());
-        assertEquals("ab 12", lines.get(1).getExternalItemId());
-        assertNull(lines.get(1).getExternalOfferKey());
-        assertFalse(lines.get(1).hasUnlinkedExternalOffer());
+        OrderItem item = productItem();
+        assertEquals("2000000001012", item.getSku());
+        assertEquals("2000000001012", item.getEan());
+        assertEquals("MFN-2001", item.getManufacturerCode());
+        assertEquals("DMW-2001", item.getExternalItemId());
+        assertFalse(item.hasUnlinkedExternalOffer());
     }
 
     @Test
     void aResolvedLineWithoutAnEanKeepsItsManufacturerCodeAsTheSku() {
-        // given the PIM entry the code matched has no GTIN
-        when(storeOffers.resolve("Allegro", null, "ab 12"))
-                .thenReturn(Optional.of(new ResolvedOffer("pim-1", null, "ab 12", "Monitors", ResolvedOffer.Source.MFN)));
+        // given the PIM entry of the own offer has no GTIN
+        when(storeOffers.resolve("Allegro", "pim-1"))
+                .thenReturn(Optional.of(new ResolvedOffer("pim-1", null, "ab 12", "Monitors", ResolvedOffer.Source.OWN_OFFER)));
 
         // when
-        importer.importOrder(storeWithId("store-1"), "Allegro", orderWithProduct("ab 12"));
+        importer.importOrder(storeWithId("store-1"), "Allegro", orderWithProduct("ab 12", "pim-1"));
 
         // then
         OrderItem item = productItem();
@@ -372,7 +361,7 @@ class MarketplaceOrderImporterTest {
     @Test
     void leavesItemUncategorizedAndRemembersOfferKeyWhenUnresolved() {
         // given
-        when(storeOffers.resolve(anyString(), anyString(), anyString())).thenReturn(Optional.empty());
+        when(storeOffers.resolve(anyString(), anyString())).thenReturn(Optional.empty());
 
         // when
         importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("DMW-2001", "PS-8001"));
@@ -388,7 +377,7 @@ class MarketplaceOrderImporterTest {
     @Test
     void resolvesTwoLinesWithTheSameOfferKey() {
         // given
-        when(storeOffers.resolve(anyString(), anyString(), anyString()))
+        when(storeOffers.resolve(anyString(), anyString()))
                 .thenReturn(Optional.of(new ResolvedOffer(null, "2000000001012", null, "Lampy", ResolvedOffer.Source.LINK)));
         MarketplaceOrder base = orderWithProduct("DMW-2001", "PS-8001");
         MarketplaceProduct first = base.products().get(0);
@@ -435,15 +424,15 @@ class MarketplaceOrderImporterTest {
         // then
         assertEquals(2, imported);
         verify(offerResolver, times(1)).forStore("store-1");
-        verify(storeOffers).resolve("Empik", "PS-1", "DMW-2001");
-        verify(storeOffers).resolve("Empik", "PS-2", "DMW-2002");
-        verify(storeOffers, never()).resolve("Empik", "PS-3", "DMW-2003");
+        verify(storeOffers).resolve("Empik", "PS-1");
+        verify(storeOffers).resolve("Empik", "PS-2");
+        verify(storeOffers, never()).resolve("Empik", "PS-3");
     }
 
     @Test
     void resolvesAllLinesOfAnOrderInOneStoreScope() {
         // given
-        when(storeOffers.resolve(anyString(), anyString(), anyString()))
+        when(storeOffers.resolve(anyString(), anyString()))
                 .thenReturn(Optional.of(new ResolvedOffer(null, "2000000001012", null, "Lampy", ResolvedOffer.Source.LINK)));
         MarketplaceOrder base = orderWithProduct("DMW-2001", "PS-8001");
         MarketplaceProduct first = base.products().get(0);
@@ -457,13 +446,13 @@ class MarketplaceOrderImporterTest {
 
         // then
         verify(offerResolver, times(1)).forStore("store-1");
-        verify(storeOffers, times(2)).resolve(anyString(), anyString(), anyString());
+        verify(storeOffers, times(2)).resolve(anyString(), anyString());
     }
 
     @Test
     void aBlankOfferKeyIsStoredAsNoKey() {
         // given
-        when(storeOffers.resolve("Empik", null, "DMW-2001")).thenReturn(Optional.empty());
+        when(storeOffers.resolve("Empik", null)).thenReturn(Optional.empty());
 
         // when
         importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("DMW-2001", "   "));
@@ -476,20 +465,17 @@ class MarketplaceOrderImporterTest {
 
     @Test
     void storesTheResolutionSourceOfEachLine() {
-        // given four lines: a link, an own offer, a manufacturer code and one nothing recognised
-        when(storeOffers.resolve("Empik", "K1", "C1")).thenReturn(Optional.of(
+        // given three lines: a link, an own offer and one nothing recognised
+        when(storeOffers.resolve("Empik", "K1")).thenReturn(Optional.of(
                 new ResolvedOffer(null, "2000000001012", null, null, ResolvedOffer.Source.LINK)));
-        when(storeOffers.resolve("Empik", "K2", "C2")).thenReturn(Optional.of(
+        when(storeOffers.resolve("Empik", "K2")).thenReturn(Optional.of(
                 new ResolvedOffer("K2", "2000000001029", "M2", "Lampy", ResolvedOffer.Source.OWN_OFFER)));
-        when(storeOffers.resolve("Empik", "K3", "C3")).thenReturn(Optional.of(
-                new ResolvedOffer("pim-3", "2000000001036", "M3", "Lampy", ResolvedOffer.Source.MFN)));
-        when(storeOffers.resolve("Empik", "K4", "C4")).thenReturn(Optional.empty());
+        when(storeOffers.resolve("Empik", "K3")).thenReturn(Optional.empty());
         MarketplaceOrder base = orderWithProduct("C1", "K1");
         List<MarketplaceProduct> products = List.of(
                 new MarketplaceProduct("Widget 1", "C1", new BigDecimal("100.00"), 1, BigDecimal.ZERO, "K1"),
                 new MarketplaceProduct("Widget 2", "C2", new BigDecimal("100.00"), 1, BigDecimal.ZERO, "K2"),
-                new MarketplaceProduct("Widget 3", "C3", new BigDecimal("100.00"), 1, BigDecimal.ZERO, "K3"),
-                new MarketplaceProduct("Widget 4", "C4", new BigDecimal("100.00"), 1, BigDecimal.ZERO, "K4"));
+                new MarketplaceProduct("Widget 3", "C3", new BigDecimal("100.00"), 1, BigDecimal.ZERO, "K3"));
         MarketplaceOrder order = new MarketplaceOrder(base.externalOrderId(), base.customer(), products,
                 base.shipping(), base.paymentType(), base.paymentTransactionId());
 
@@ -502,8 +488,7 @@ class MarketplaceOrderImporterTest {
                 .forEach(i -> sourceByKey.put(i.getExternalOfferKey(), i.getExternalOfferSource()));
         assertEquals(ResolvedOffer.Source.LINK, sourceByKey.get("K1"));
         assertEquals(ResolvedOffer.Source.OWN_OFFER, sourceByKey.get("K2"));
-        assertEquals(ResolvedOffer.Source.MFN, sourceByKey.get("K3"));
-        assertNull(sourceByKey.get("K4"));
+        assertNull(sourceByKey.get("K3"));
     }
 
     private OrderItem productItem() {

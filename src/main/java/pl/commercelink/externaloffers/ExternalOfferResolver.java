@@ -4,52 +4,36 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.externaloffers.ResolvedOffer.Source;
-import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
-import pl.commercelink.products.Product;
-import pl.commercelink.products.ProductCatalog;
-import pl.commercelink.products.ProductCatalogRepository;
-import pl.commercelink.products.ProductRepository;
-import pl.commercelink.products.StoreCategoryResolver;
+import pl.commercelink.products.*;
 import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Resolves a marketplace order line to the EAN fulfilment looks goods up by: first the seller offer key taken as our own
  * pimId (an offer CommerceLink published, for which no link is ever read), then for any other key an explicit offer link
  * (its EANs, taken as they are: fulfilment finds the goods in the warehouse and the suppliers' feeds, so the product need
- * not be in a catalog; the category comes from the taxonomy), then the manufacturer code as MPN. See
- * {@link ResolvedOffer#sku()}.
+ * not be in a catalog; the category comes from the taxonomy). The line's manufacturer code is never looked up: without a
+ * brand it can name another product, such as another size of the same model. See {@link ResolvedOffer#sku()}.
  */
 @Slf4j
 @Component
 public class ExternalOfferResolver {
 
     private final ExternalOfferLinkRepository linkRepository;
-    private final PimCatalog pimCatalog;
     private final StorePimAliases pimAliases;
     private final ProductRepository productRepository;
     private final ProductCatalogRepository productCatalogRepository;
     private final TaxonomyCache taxonomyCache;
     private final StoreCategoryResolver storeCategoryResolver;
 
-    public ExternalOfferResolver(ExternalOfferLinkRepository linkRepository, PimCatalog pimCatalog,
-                                    StorePimAliases pimAliases, ProductRepository productRepository,
-                                    ProductCatalogRepository productCatalogRepository, TaxonomyCache taxonomyCache,
-                                    StoreCategoryResolver storeCategoryResolver) {
+    public ExternalOfferResolver(ExternalOfferLinkRepository linkRepository, StorePimAliases pimAliases,
+                                    ProductRepository productRepository, ProductCatalogRepository productCatalogRepository,
+                                    TaxonomyCache taxonomyCache, StoreCategoryResolver storeCategoryResolver) {
         this.linkRepository = linkRepository;
-        this.pimCatalog = pimCatalog;
         this.pimAliases = pimAliases;
         this.productRepository = productRepository;
         this.productCatalogRepository = productCatalogRepository;
@@ -77,8 +61,8 @@ public class ExternalOfferResolver {
         return StringUtils.isNotBlank(offerKey) && pimAliases.effectiveEntry(storeId, offerKey).isPresent();
     }
 
-    public Optional<ResolvedOffer> resolve(String storeId, String orderSource, String offerKey, String manufacturerCode) {
-        return forStore(storeId).resolve(orderSource, offerKey, manufacturerCode);
+    public Optional<ResolvedOffer> resolve(String storeId, String orderSource, String offerKey) {
+        return forStore(storeId).resolve(orderSource, offerKey);
     }
 
     public class StoreOffers {
@@ -94,30 +78,16 @@ public class ExternalOfferResolver {
             this.storeId = storeId;
         }
 
-        public Optional<ResolvedOffer> resolve(String orderSource, String offerKey, String manufacturerCode) {
+        public Optional<ResolvedOffer> resolve(String orderSource, String offerKey) {
             if (isOwnOffer(storeId, offerKey)) {
-                // an offer CommerceLink published is resolved by its pimId and a link never applies to it; one whose entry
-                // has no code goes on to the manufacturer code, not to a link
-                Optional<ResolvedOffer> own = pimAliases.effectiveEntry(storeId, offerKey)
+                return pimAliases.effectiveEntry(storeId, offerKey)
                         .map(entry -> fromEntry(entry, Source.OWN_OFFER))
-                        .filter(offer -> hasProductCode(offer, offerKey));
-                if (own.isPresent()) {
-                    return own;
-                }
-            } else if (StringUtils.isNotBlank(offerKey)) {
-                Optional<ResolvedOffer> linked = linkRepository.find(storeId, orderSource, offerKey)
-                        .flatMap(this::fromLink);
-                if (linked.isPresent()) {
-                    return linked;
-                }
+                        .filter(offer -> offer.sku() != null);
             }
-
-            if (StringUtils.isNotBlank(manufacturerCode)) {
-                return pimCatalog.withStoreData(storeId).findByMpn(manufacturerCode)
-                        .map(entry -> new ResolvedOffer(entry.pimId(), OfferEans.unify(entry.primaryGtin().orElse(null)),
-                                manufacturerCode, entry.category(), Source.MFN));
+            if (StringUtils.isBlank(offerKey)) {
+                return Optional.empty();
             }
-            return Optional.empty();
+            return linkRepository.find(storeId, orderSource, offerKey).flatMap(this::fromLink);
         }
 
         /**
@@ -143,16 +113,6 @@ public class ExternalOfferResolver {
                         .toList();
             }
             return catalogProducts;
-        }
-
-        // without a code the item would carry the marketplace's raw code as its sku while looking resolved
-        private boolean hasProductCode(ResolvedOffer offer, String offerKey) {
-            if (offer.sku() != null) {
-                return true;
-            }
-            log.warn("Offer {} of store {} matches {} ({}), which has neither an EAN nor a manufacturer code; treated as"
-                    + " unresolved", offerKey, storeId, offer.pimId(), offer.source());
-            return false;
         }
 
         /**
