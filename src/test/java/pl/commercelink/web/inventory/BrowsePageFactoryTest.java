@@ -377,7 +377,7 @@ class BrowsePageFactoryTest {
         // then
         assertThat(page.rows().get(0).addable()).isFalse();
         assertThat(page.rows().get(0).addHref()).isNull();
-        assertThat(page.rows().get(0).detailHref()).contains("q=MFN-ONLY");
+        assertThat(page.rows().get(0).detailHref()).startsWith("/dashboard/inventory/prices?q=&from=");
         assertThat(page.rows().get(1).addable()).isTrue();
         assertThat(page.rows().get(1).addHref()).isEqualTo("/dashboard/inventory/add?ean=5901000000002&returnTo=%2Fdashboard%2Finventory%3Fcat%3D11");
     }

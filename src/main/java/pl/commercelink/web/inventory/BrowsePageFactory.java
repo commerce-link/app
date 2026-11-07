@@ -155,8 +155,7 @@ public class BrowsePageFactory {
                                        boolean leafSelected, SupplierLabelMap labels, Map<String, Long> inStock) {
         CategoryLine category = CategoryLine.of(tree, placement, row.categoryId(), row.categoryText(), row.catalogKey(),
                 leafSelected);
-        String code = row.ean() != null ? row.ean() : row.mfn();
-        String detailHref = InventoryPageController.PRICES_PATH + "?q=" + encode(code) + "&from=" + encode(query.href());
+        String detailHref = InventoryPageController.PRICES_PATH + "?q=" + encode(row.ean()) + "&from=" + encode(query.href());
         String addHref = row.ean() == null || row.ean().isBlank() ? null : InventoryAddController.href(row.ean(), query.href());
         return new BrowsePage.RowView(row.name(), row.brand(), row.ean(), row.mfn(), detailHref, category,
                 row.lowestDeliveredNet(), row.deliveryKnown(), labels.of(row.lowestSupplier()), row.qty(), row.suppliers(),

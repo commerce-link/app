@@ -105,12 +105,11 @@ public class InventoryPageController {
 
     // bookmarks of the former three-field form keep working
     @GetMapping(PAGE_PATH + "/check-price")
-    public String legacyCheckPrice(@RequestParam(value = "mfn", required = false) String mfn,
-                                   @RequestParam(value = "ean", required = false) String ean,
+    public String legacyCheckPrice(@RequestParam(value = "ean", required = false) String ean,
                                    @RequestParam(value = "pimId", required = false) String pimId,
                                    @RequestParam(value = "from", required = false) String from) {
         String back = InventoryReturnTo.safe(from).orElse(null);
-        return Stream.of(pimId, mfn, ean)
+        return Stream.of(pimId, ean)
                 .map(InventoryPageController::normalize)
                 .filter(value -> !value.isEmpty())
                 .findFirst()
