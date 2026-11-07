@@ -105,7 +105,7 @@
                    th:with="i=${itemStat.index}, detailId=|sources-${itemStat.index}|,
                             open=${!item.allocations.?[!selected].isEmpty()}, adj=${item.warehouseQtyAdjustment},
                             unitCostInput=${T(pl.commercelink.web.orders.Money).inputRounded(item.unitCost)}">
-            <tr class="cl-row-main" th:classappend="${open} ? 'is-open'" data-cl-delivery-item th:attr="data-mfn=${item.mfn}">
+            <tr class="cl-row-main" th:classappend="${open} ? 'is-open'" data-cl-delivery-item>
                 <th scope="row" class="cl-table-key" th:attr="data-label=#{general.product}">
                     <span th:text="${item.name}"></span><button th:if="${!item.allocations.isEmpty()}" type="button"
                             class="cl-table-edit" data-cl-dialog-open="fulfilment-dialog"

@@ -22,13 +22,13 @@ class WarehouseDocumentItemHistoryService {
 
     /** Every document of one delivery that moved this product, oldest first, with the stock after each move. Items
      *  whose document is not in the store are skipped: items are read by delivery id alone, which is not store-scoped. */
-    MfnHistory history(String storeId, String deliveryId, String ean) {
+    EanHistory history(String storeId, String deliveryId, String ean) {
         List<WarehouseDocumentItem> items = warehouseDocumentItemRepository.findByDeliveryId(deliveryId).stream()
                 .filter(item -> ean.equals(item.getEan()))
                 .sorted(Comparator.comparing(WarehouseDocumentItem::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
 
-        List<MfnHistoryRow> rows = new ArrayList<>();
+        List<EanHistoryRow> rows = new ArrayList<>();
         String productName = null;
         int runningStock = 0;
         for (WarehouseDocumentItem item : items) {
@@ -41,10 +41,10 @@ class WarehouseDocumentItemHistoryService {
             if (productName == null) {
                 productName = item.getName();
             }
-            rows.add(new MfnHistoryRow(item.getDocumentId(), document.getDocumentNo(), item.getDocumentType(),
+            rows.add(new EanHistoryRow(item.getDocumentId(), document.getDocumentNo(), item.getDocumentType(),
                     item.getCreatedAt(), item.getQty(), stockChange, runningStock, document.getReason(), document.getNote()));
         }
-        return new MfnHistory(productName, rows);
+        return new EanHistory(productName, rows);
     }
 
     // legacy items may lack a type; their direction is unknown, so they do not move the running stock

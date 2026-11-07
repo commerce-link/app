@@ -1209,6 +1209,18 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void theWarehouseDialogShowsAndSearchesTheEanOfTheItems() {
+        // when
+        String html = page(render(order(OrderStatus.New), ADMIN));
+
+        // then
+        String dialog = html.substring(html.indexOf("id=\"assign-warehouse-dialog\""));
+        dialog = dialog.substring(0, dialog.indexOf("</dialog>"));
+        assertThat(dialog).contains("<th scope=\"col\">EAN</th>").doesNotContain("<th scope=\"col\">SKU</th>")
+                .contains("Szukaj po nazwie, EAN-ie lub numerze seryjnym");
+    }
+
+    @Test
     void theSkuTypedByHandIsNotCheckedForItsFormat() {
         // when
         String html = page(render(order(OrderStatus.New), ADMIN));
@@ -1661,7 +1673,7 @@ class OrderDetailsTemplateTest {
 
     @Test
     void theMissingEanMessageAppearsAboveTheItemsCard() {
-        // given: order.items.add.error.no.mfn flashes through the shared errorMessage banner, which the layout
+        // given: an error flashes through the shared errorMessage banner, which the layout
         // renders once, above <main>, so it lands above every card on this page
         Order order = order(OrderStatus.New);
         OrderPageModel page = factory(Set.of()).build(order, items(order), ADMIN, PL);

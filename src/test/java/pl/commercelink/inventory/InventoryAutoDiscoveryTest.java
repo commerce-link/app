@@ -152,7 +152,7 @@ class InventoryAutoDiscoveryTest {
         MatchedInventory matched = result.iterator().next();
         assertThat(matched.getInventoryItems()).containsExactlyInAnyOrder(known, sameEanOtherMfn);
         assertThat(matched.getInventoryKey().getId()).isEqualTo("PIM1");
-        assertThat(matched.getMfnCodes()).contains("MFN1", "MFN1-ALT");
+        assertThat(matched.getInventoryKey().getProductCodes()).contains("MFN1", "MFN1-ALT");
     }
 
     @Test

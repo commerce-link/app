@@ -241,4 +241,17 @@ class OrdersScriptContractTest {
                 .containsPattern("active === document.body")
                 .contains("target.focus()");
     }
+
+    @Test
+    void theWarehouseDialogShowsAndSearchesTheEanOfTheItems() throws Exception {
+        // given
+        String script = read("src/main/resources/static/js/order-item-dialogs.js");
+
+        // when
+        String dialog = script.substring(script.indexOf("// --- Assign from warehouse"), script.indexOf("// --- Split bundle"));
+
+        // then
+        assertThat(dialog).contains("[i.name, i.ean, i.serialNo]").contains("cell(row, i.ean, 'cl-table-code')")
+                .doesNotContain("i.mfn");
+    }
 }

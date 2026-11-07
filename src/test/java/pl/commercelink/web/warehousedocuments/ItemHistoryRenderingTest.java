@@ -3,8 +3,8 @@ package pl.commercelink.web.warehousedocuments;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
-import pl.commercelink.warehouse.builtin.MfnHistory;
-import pl.commercelink.warehouse.builtin.MfnHistoryRow;
+import pl.commercelink.warehouse.builtin.EanHistory;
+import pl.commercelink.warehouse.builtin.EanHistoryRow;
 import pl.commercelink.web.settings.SettingsTemplateRenderer;
 
 import java.time.LocalDateTime;
@@ -20,9 +20,9 @@ class ItemHistoryRenderingTest {
     @Test
     void movesShowSignedChangesSummaryAndBackToTheDelivery() {
         // given
-        MfnHistory history = new MfnHistory("Samsung 990 PRO", List.of(
-                new MfnHistoryRow("d1", "PZ/MAG1/2026/000210", DocumentType.GoodsReceipt, LocalDateTime.of(2026, 10, 2, 8, 0), 5, 5, 5, null, null),
-                new MfnHistoryRow("d2", "WZ/MAG1/2026/001179", DocumentType.GoodsIssue, LocalDateTime.of(2026, 10, 3, 11, 0), 2, -2, 3, null, null)));
+        EanHistory history = new EanHistory("Samsung 990 PRO", List.of(
+                new EanHistoryRow("d1", "PZ/MAG1/2026/000210", DocumentType.GoodsReceipt, LocalDateTime.of(2026, 10, 2, 8, 0), 5, 5, 5, null, null),
+                new EanHistoryRow("d2", "WZ/MAG1/2026/001179", DocumentType.GoodsIssue, LocalDateTime.of(2026, 10, 3, 11, 0), 2, -2, 3, null, null)));
         ItemHistoryPage page = page(history);
 
         // when
@@ -41,9 +41,9 @@ class ItemHistoryRenderingTest {
     @Test
     void aDocumentsReasonAndNoteAreShownAndAbsentOnesLeaveNothingBehind() {
         // given
-        MfnHistory history = new MfnHistory("X", List.of(
-                new MfnHistoryRow("d1", "PZ/1", DocumentType.GoodsReceipt, LocalDateTime.of(2026, 10, 2, 8, 0), 5, 5, 5, null, null),
-                new MfnHistoryRow("d2", "RW/1", DocumentType.InternalIssue, LocalDateTime.of(2026, 10, 3, 8, 0), 1, -1, 4,
+        EanHistory history = new EanHistory("X", List.of(
+                new EanHistoryRow("d1", "PZ/1", DocumentType.GoodsReceipt, LocalDateTime.of(2026, 10, 2, 8, 0), 5, 5, 5, null, null),
+                new EanHistoryRow("d2", "RW/1", DocumentType.InternalIssue, LocalDateTime.of(2026, 10, 3, 8, 0), 1, -1, 4,
                         DocumentReason.Destruction, "  Zalany w magazynie B ")));
 
         // when
@@ -64,7 +64,7 @@ class ItemHistoryRenderingTest {
     @Test
     void backToTheDocumentBreaksItsNumberAfterSlashes() {
         // given
-        ItemHistoryPage page = ItemHistoryPage.of(new MfnHistory("X", List.of()), "del-1", "M",
+        ItemHistoryPage page = ItemHistoryPage.of(new EanHistory("X", List.of()), "del-1", "M",
                 "/dashboard/warehouse-documents/details?documentId=d1", "PZ/MAG1/2026/000210",
                 TestMessages.polish(), java.util.Locale.forLanguageTag("pl"));
 
@@ -78,7 +78,7 @@ class ItemHistoryRenderingTest {
     @Test
     void anEmptyHistoryShowsTheMessageWithoutATable() {
         // given
-        ItemHistoryPage page = page(new MfnHistory(null, List.of()));
+        ItemHistoryPage page = page(new EanHistory(null, List.of()));
 
         // when
         String html = SettingsTemplateRenderer.render(BODY, Map.of("page", page));
@@ -90,8 +90,8 @@ class ItemHistoryRenderingTest {
     @Test
     void anItemWithoutADocumentTypeRendersADash() {
         // given
-        MfnHistory history = new MfnHistory("X", List.of(
-                new MfnHistoryRow("d1", "X/1", null, null, 1, 0, 0, null, null)));
+        EanHistory history = new EanHistory("X", List.of(
+                new EanHistoryRow("d1", "X/1", null, null, 1, 0, 0, null, null)));
 
         // when
         ItemHistoryPage page = page(history);
@@ -105,7 +105,7 @@ class ItemHistoryRenderingTest {
     @Test
     void deliveryLinkEncodesTheDeliveryId() {
         // given
-        MfnHistory history = new MfnHistory("X", List.of());
+        EanHistory history = new EanHistory("X", List.of());
 
         // when
         ItemHistoryPage page = ItemHistoryPage.of(history, "del 1&x=2", "M", "/back", "Back",
@@ -118,7 +118,7 @@ class ItemHistoryRenderingTest {
     @Test
     void anItemWithoutADeliveryNamesItsIdWithoutALink() {
         // given
-        ItemHistoryPage page = ItemHistoryPage.of(new MfnHistory("X", List.of()), "Acme", "M", "/dashboard/warehouse/items/w-1", "X",
+        ItemHistoryPage page = ItemHistoryPage.of(new EanHistory("X", List.of()), "Acme", "M", "/dashboard/warehouse/items/w-1", "X",
                 TestMessages.polish(), java.util.Locale.forLanguageTag("pl")).withDeliveryHref(null);
 
         // when
@@ -128,7 +128,7 @@ class ItemHistoryRenderingTest {
         assertThat(html).doesNotContain("/dashboard/deliveries/details").contains(">Acme</span>");
     }
 
-    private static ItemHistoryPage page(MfnHistory history) {
+    private static ItemHistoryPage page(EanHistory history) {
         return ItemHistoryPage.of(history, "del-1", "8806094215038", "/dashboard/deliveries/details?deliveryId=del-1",
                 "Dostawa del-1", TestMessages.polish(), java.util.Locale.forLanguageTag("pl"));
     }

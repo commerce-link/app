@@ -54,8 +54,7 @@ public record ResolvedOffer(String pimId, String ean, String mfn, String categor
     /**
      * The order item's sku: the EAN, which fulfilment looks goods up by, followed by the other EANs of the same goods
      * joined with ":" (fulfilment tries each and takes the cheapest offer, as for an item given several codes with
-     * "Assign SKU"). Only a product without an EAN falls back to its manufacturer code, which fulfilment still looks up
-     * while items keyed by it remain; null without either.
+     * "Assign SKU"). Only a product without an EAN falls back to its manufacturer code; null without either.
      */
     public String sku() {
         if (StringUtils.isNotBlank(ean)) {

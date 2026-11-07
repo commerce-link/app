@@ -24,9 +24,9 @@ import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
 
 /**
- * One catalog product. Numbers arrive as text. A product is known by both its EAN and its manufacturer code; once it
- * has a PIM entry the two are fixed, because the price list and the offer are keyed by PIM id -- only a pending product
- * (no entry yet) may have them corrected, and its save then looks the PIM up by them.
+ * One catalog product. Numbers arrive as text. Once a product has a PIM entry its EAN and manufacturer code are fixed,
+ * because the price list and the offer are keyed by PIM id -- only a pending product (no entry yet) may have them
+ * corrected, and its save then looks the PIM up by the EAN.
  */
 @Getter
 @Setter
