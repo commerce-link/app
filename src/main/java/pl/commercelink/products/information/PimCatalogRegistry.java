@@ -15,7 +15,6 @@ import pl.commercelink.pim.api.PIMEntryAddedEvent;
 import pl.commercelink.pim.api.PIMEntryDeletedEvent;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
-import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.provider.EventBindingRegistrar;
 import pl.commercelink.starter.secrets.SecretsManager;
 import pl.commercelink.stores.Store;
@@ -100,10 +99,8 @@ public class PimCatalogRegistry {
 
     private void registerEntryHandlers(ProductRepository productRepository,
                                        ProductCatalogRepository productCatalogRepository) {
-        // not the BrandMapper bean: it needs the PimCatalog this class creates
-        BrandMapper brandMapper = new BrandMapper(catalog);
         StoreEntryPinning storeEntryPinning = new StoreEntryPinning(productRepository, productCatalogRepository,
-                codeHistory, brandMapper);
+                codeHistory);
         catalog.onEntryAdded(event -> onEntryAdded(event, storeEntryPinning, productRepository));
         catalog.onEntryDeleted(event -> onEntryDeleted(event, storeEntryPinning));
     }
