@@ -29,8 +29,7 @@ public record ItemIdentity(String name, String ean, String mfn, int productCount
         String ean = products.stream().map(Product::ean).filter(StringUtils::isNotBlank).findFirst().orElse(null);
         String mfn = products.stream().map(Product::mfn).filter(StringUtils::isNotBlank).findFirst().orElse(null);
         long eanCount = countDistinctNonBlank(products.stream().map(Product::ean));
-        long mfnCount = countDistinctNonBlank(products.stream().map(Product::mfn));
-        int count = (int) Math.max(Math.max(eanCount, mfnCount), products.isEmpty() ? 0 : 1);
+        int count = (int) Math.max(eanCount, products.isEmpty() ? 0 : 1);
         return new ItemIdentity(name, ean, mfn, count);
     }
 
