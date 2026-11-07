@@ -6,7 +6,7 @@ import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimView;
-import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -15,7 +15,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +24,7 @@ public class ProductWeightOriginComplianceReportService {
 
     private final WarehouseDocumentRepository documentRepository;
     private final WarehouseDocumentItemRepository itemRepository;
+    private final TaxonomyCache taxonomyCache;
     private final PimCatalog pimCatalog;
 
     public List<ProductWeightOriginComplianceReportRow> generate(String storeId, LocalDate dateFrom, LocalDate dateTo) {
@@ -37,7 +37,7 @@ public class ProductWeightOriginComplianceReportService {
                 .map(ProductWeightOriginComplianceReportService::toRow)
                 .sorted(Comparator.comparing(ProductWeightOriginComplianceReportRow::country)
                         .thenComparing(ProductWeightOriginComplianceReportRow::category)
-                        .thenComparing(ProductWeightOriginComplianceReportRow::mfn))
+                        .thenComparing(ProductWeightOriginComplianceReportRow::ean))
                 .toList();
     }
 
@@ -56,20 +56,17 @@ public class ProductWeightOriginComplianceReportService {
         return aggregates;
     }
 
-    private void accumulate(WarehouseDocumentItem item, String country, PimView pimLookup, Map<AggregateKey, Aggregate> aggregates) {
-        if (item.getMfn() == null || item.getMfn().isBlank()) return;
-        Optional<PimEntry> pim = pimLookup.findByGtin(item.getEan());
-        String category = pim.map(PimEntry::category).orElse(null);
-        String brand = pim.map(PimEntry::brand).orElse(null);
-        Integer netG = pim.map(PimEntry::netWeightInGrams).orElse(null);
-        Integer grossG = pim.map(PimEntry::grossWeightInGrams).orElse(null);
+    private void accumulate(WarehouseDocumentItem item, String country, PimView pim, Map<AggregateKey, Aggregate> aggregates) {
+        ReportedProduct product = ReportedProduct.of(item.getEan(), taxonomyCache, pim);
+        Integer netG = product.netWeightInGrams();
+        Integer grossG = product.grossWeightInGrams();
 
-        Aggregate agg = aggregates.computeIfAbsent(new AggregateKey(category, item.getMfn(), country), k -> new Aggregate());
+        Aggregate agg = aggregates.computeIfAbsent(new AggregateKey(product.category(), item.getEan(), country), k -> new Aggregate());
         agg.qty += item.getQty();
         if (netG != null) agg.totalNetG += (long) item.getQty() * netG;
         if (grossG != null) agg.totalGrossG += (long) item.getQty() * grossG;
         if (item.getName() != null && !item.getName().isBlank()) agg.latestName = item.getName();
-        if (brand != null && !brand.isBlank()) agg.latestBrand = brand;
+        if (product.brand() != null && !product.brand().isBlank()) agg.latestBrand = product.brand();
         agg.unitNetG = netG;
         agg.unitGrossG = grossG;
     }
@@ -88,7 +85,7 @@ public class ProductWeightOriginComplianceReportService {
                 k.category() != null ? k.category() : UNKNOWN,
                 a.latestBrand,
                 a.latestName,
-                k.mfn(),
+                k.ean(),
                 a.qty,
                 a.unitNetG,
                 a.unitGrossG,
@@ -96,7 +93,7 @@ public class ProductWeightOriginComplianceReportService {
                 a.unitGrossG != null ? a.totalGrossG : null);
     }
 
-    private record AggregateKey(String category, String mfn, String country) {}
+    private record AggregateKey(String category, String ean, String country) {}
 
     private static class Aggregate {
         String latestName;

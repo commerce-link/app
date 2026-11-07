@@ -10,6 +10,8 @@ import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyRepository;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -18,6 +20,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +37,7 @@ class ReportServicesScopeTest {
 
     private final PimCatalog pimCatalog = ScopedPimCatalog.of(
             ScopedPimCatalog.storeEntry("s1-2", "s1", ScopedPimCatalog.STORE_GTIN, MPN, "Monitors"));
+    private final TaxonomyCache taxonomy = new TaxonomyCache(mock(TaxonomyRepository.class));
 
     private void givenReceiptOfTheProduct() {
         WarehouseDocument doc = new WarehouseDocument();
@@ -61,7 +65,7 @@ class ReportServicesScopeTest {
         // given
         givenReceiptOfTheProduct();
         ProductWeightOriginComplianceReportService service =
-                new ProductWeightOriginComplianceReportService(documentRepository, itemRepository, pimCatalog);
+                new ProductWeightOriginComplianceReportService(documentRepository, itemRepository, taxonomy, pimCatalog);
 
         // when
         List<ProductWeightOriginComplianceReportRow> owner = service.generate("s1", FROM, TO);
@@ -84,7 +88,7 @@ class ReportServicesScopeTest {
         // given
         givenReceiptOfTheProduct();
         PurchaseReportService service =
-                new PurchaseReportService(documentRepository, itemRepository, deliveriesRepository, pimCatalog);
+                new PurchaseReportService(documentRepository, itemRepository, deliveriesRepository, taxonomy, pimCatalog);
 
         // when
         List<PurchaseReportRow> owner = service.generate("s1", FROM, TO);

@@ -24,7 +24,7 @@ class ProductWeightOriginComplianceReportExportTest {
     @Test
     void runWritesHeaderLineAndRowWithCountryFirst() throws Exception {
         when(service.generate(eq("store-1"), any(), any())).thenReturn(List.of(new ProductWeightOriginComplianceReportRow(
-                "Germany", "GPU", "ASUS", "DUAL 4070", "MFN-A", 5,
+                "Germany", "GPU", "ASUS", "DUAL 4070", "5901234567890", 5,
                 2100, 2400, 10500L, 12000L
         )));
 
@@ -32,7 +32,7 @@ class ProductWeightOriginComplianceReportExportTest {
                 .run("store-1", LocalDate.of(2026, 5, 1), LocalDate.of(2026, 5, 31));
 
         String csv = new String(bytes, StandardCharsets.UTF_8);
-        assertThat(csv).startsWith("\"Country\";\"Category\";\"Brand\";\"Name\";\"MFN\";\"Quantity\";\"Net weight (g)\";\"Gross weight (g)\";\"Total net weight (g)\";\"Total gross weight (g)\"");
-        assertThat(csv).contains("\"Germany\";\"GPU\";\"ASUS\";\"DUAL 4070\";\"MFN-A\";\"5\";\"2100\";\"2400\";\"10500\";\"12000\"");
+        assertThat(csv).startsWith("\"Country\";\"Category\";\"Brand\";\"Name\";\"EAN\";\"Quantity\";\"Net weight (g)\";\"Gross weight (g)\";\"Total net weight (g)\";\"Total gross weight (g)\"");
+        assertThat(csv).contains("\"Germany\";\"GPU\";\"ASUS\";\"DUAL 4070\";\"5901234567890\";\"5\";\"2100\";\"2400\";\"10500\";\"12000\"");
     }
 }
