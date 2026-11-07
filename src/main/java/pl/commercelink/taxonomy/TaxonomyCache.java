@@ -109,6 +109,12 @@ public class TaxonomyCache {
         return best(recordsOf(codeIndex.eansOfSingleBrand(mfn)));
     }
 
+    public void blockCodeSource(String mfn, String brand, String ean) {
+        String key = unifyEan(ean);
+        if (StringUtils.isBlank(key)) return;
+        codeIndex.block(mfn, brand, key);
+    }
+
     public Taxonomy findCategorySource(Taxonomy row) {
         Taxonomy own = findByEan(row.ean());
         if (hasCategory(own)) {

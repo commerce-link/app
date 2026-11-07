@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.supplier;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -23,6 +24,7 @@ import jakarta.xml.bind.annotation.XmlAccessorType;
 import jakarta.xml.bind.annotation.XmlRootElement;
 import java.io.FileNotFoundException;
 import java.io.StringReader;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -46,12 +48,20 @@ class StoreScopedFeedLoaderTest {
     @Mock
     private DataCleanup dataCleanup;
     @Mock
-    private FeedRowProcessor feedRowProcessor;
+    private FeedProcessor feedProcessor;
+    @Mock
+    private FeedProcessing processing;
 
     @InjectMocks
     private CsvProductFeedLoader loader;
     @InjectMocks
     private XmlProductFeedLoader xmlLoader;
+
+    @BeforeEach
+    void setUp() {
+        when(feedProcessor.start(any(), anyInt())).thenReturn(processing);
+        when(processing.finish()).thenReturn(new ArrayList<>());
+    }
 
     @XmlRootElement(name = "Item")
     @XmlAccessorType(XmlAccessType.FIELD)
@@ -112,7 +122,7 @@ class StoreScopedFeedLoaderTest {
     }
 
     @Test
-    void csvStoreOverloadPassesTaxonomyPenaltyToProcessor() throws Exception {
+    void csvStoreOverloadPassesTaxonomyPenaltyToTheFeedProcessing() throws Exception {
         // given
         when(storeFeedRepository.canRead("store-1", "Action", "csv")).thenReturn(true);
         when(storeFeedRepository.read("store-1", "Action", "csv")).thenReturn(new StringReader("header\nrow"));
@@ -125,9 +135,9 @@ class StoreScopedFeedLoaderTest {
         loader.fetch(parser, ';', "store-1", supplierInfo("Action"), 1000);
 
         // then
-        ArgumentCaptor<Integer> captor = ArgumentCaptor.forClass(Integer.class);
-        verify(feedRowProcessor).process(any(ParsedRow.class), captor.capture(), any(FeedParseStats.class));
-        assertEquals(1000, captor.getValue());
+        verify(feedProcessor).start("Action", 1000);
+        verify(processing).add(any(ParsedRow.class));
+        verify(processing).finish();
     }
 
     @Test
@@ -143,8 +153,9 @@ class StoreScopedFeedLoaderTest {
         loader.fetch(parser, ';', "store-1", supplierInfo("Action-k7f3a9c2"), 0);
 
         // then
+        verify(feedProcessor).start("Action-k7f3a9c2", 0);
         ArgumentCaptor<ParsedRow> captor = ArgumentCaptor.forClass(ParsedRow.class);
-        verify(feedRowProcessor).process(captor.capture(), anyInt(), any(FeedParseStats.class));
+        verify(processing).add(captor.capture());
         assertEquals("Action-k7f3a9c2", captor.getValue().item().supplier());
         assertEquals(5, captor.getValue().product().dataAccuracyScore());
         assertEquals("CPU", captor.getValue().product().rawCategory());
@@ -164,7 +175,8 @@ class StoreScopedFeedLoaderTest {
 
         // then
         assertTrue(result.isEmpty());
-        verify(feedRowProcessor, never()).process(any(), anyInt(), any());
+        verify(processing, never()).add(any());
+        verify(processing).skipInvalid();
     }
 
     @Test
@@ -181,7 +193,7 @@ class StoreScopedFeedLoaderTest {
     }
 
     @Test
-    void xmlStoreOverloadPassesTaxonomyPenaltyToProcessor() throws Exception {
+    void xmlStoreOverloadPassesTaxonomyPenaltyToTheFeedProcessing() throws Exception {
         // given
         when(storeFeedRepository.read("store-1", "Action", "xml")).thenReturn(new StringReader(XML_FEED));
         when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -190,13 +202,13 @@ class StoreScopedFeedLoaderTest {
         xmlLoader.load(TestXmlItem.class, "Item", supplierInfo("Action"), "store-1", 1000);
 
         // then
-        ArgumentCaptor<Integer> captor = ArgumentCaptor.forClass(Integer.class);
-        verify(feedRowProcessor).process(any(ParsedRow.class), captor.capture(), any(FeedParseStats.class));
-        assertEquals(1000, captor.getValue());
+        verify(feedProcessor).start("Action", 1000);
+        verify(processing).add(any(ParsedRow.class));
+        verify(processing).finish();
     }
 
     @Test
-    void csvGlobalOverloadPassesZeroTaxonomyPenaltyToProcessor() throws Exception {
+    void csvGlobalOverloadPassesZeroTaxonomyPenaltyToTheFeedProcessing() throws Exception {
         // given
         when(inventoryRepository.canRead("Action")).thenReturn(true);
         when(inventoryRepository.read("Action")).thenReturn(new StringReader("header\nrow"));
@@ -209,13 +221,11 @@ class StoreScopedFeedLoaderTest {
         loader.fetch(parser, ';', supplierInfo("Action"));
 
         // then
-        ArgumentCaptor<Integer> captor = ArgumentCaptor.forClass(Integer.class);
-        verify(feedRowProcessor).process(any(ParsedRow.class), captor.capture(), any(FeedParseStats.class));
-        assertEquals(0, captor.getValue());
+        verify(feedProcessor).start("Action", 0);
     }
 
     @Test
-    void xmlGlobalOverloadPassesZeroTaxonomyPenaltyToProcessor() throws Exception {
+    void xmlGlobalOverloadPassesZeroTaxonomyPenaltyToTheFeedProcessing() throws Exception {
         // given
         when(inventoryRepository.read("Action", "xml")).thenReturn(new StringReader(XML_FEED));
         when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -224,8 +234,6 @@ class StoreScopedFeedLoaderTest {
         xmlLoader.load(TestXmlItem.class, "Item", supplierInfo("Action"));
 
         // then
-        ArgumentCaptor<Integer> captor = ArgumentCaptor.forClass(Integer.class);
-        verify(feedRowProcessor).process(any(ParsedRow.class), captor.capture(), any(FeedParseStats.class));
-        assertEquals(0, captor.getValue());
+        verify(feedProcessor).start("Action", 0);
     }
 }

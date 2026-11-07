@@ -27,6 +27,17 @@ public class TaxonomyCategoryEnrichment {
         this.attempts = attempts;
     }
 
+    public Taxonomy enrichFromOwnRecord(Taxonomy taxonomy) {
+        if (TaxonomyCache.hasCategory(taxonomy)) {
+            return taxonomy;
+        }
+        Taxonomy own = taxonomyCache.findByEan(taxonomy.ean());
+        if (!TaxonomyCache.hasCategory(own)) {
+            return taxonomy;
+        }
+        return taxonomy.withCategory(own.category(), own.categoryId());
+    }
+
     public Taxonomy enrich(Taxonomy taxonomy) {
         if (TaxonomyCache.hasCategory(taxonomy)) {
             return taxonomy;

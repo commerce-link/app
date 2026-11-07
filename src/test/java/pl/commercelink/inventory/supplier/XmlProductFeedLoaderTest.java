@@ -16,13 +16,11 @@ import pl.commercelink.inventory.supplier.api.XmlItem;
 import java.io.Reader;
 import java.io.StringReader;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -40,7 +38,9 @@ class XmlProductFeedLoaderTest {
     @Mock
     private DataCleanup dataCleanup;
     @Mock
-    private FeedRowProcessor feedRowProcessor;
+    private FeedProcessor feedProcessor;
+    @Mock
+    private FeedProcessing processing;
     @InjectMocks
     private XmlProductFeedLoader loader;
 
@@ -49,7 +49,8 @@ class XmlProductFeedLoaderTest {
         // given
         when(inventoryRepository.read("acme", "xml")).thenReturn(reader(
                 "<products><product><ean>111</ean><qty>1</qty></product><product><ean>222</ean><qty>1</qty></product></products>"));
-        when(feedRowProcessor.process(any(), anyInt(), any())).thenReturn(Optional.empty());
+        when(feedProcessor.start("acme", 0)).thenReturn(processing);
+        when(processing.finish()).thenReturn(List.of());
         when(dataCleanup.run(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
@@ -57,7 +58,7 @@ class XmlProductFeedLoaderTest {
 
         // then
         assertThat(result).isEmpty();
-        verify(feedRowProcessor, times(2)).process(any(), anyInt(), any());
+        verify(processing, times(2)).add(any());
     }
 
     @Test
@@ -65,15 +66,17 @@ class XmlProductFeedLoaderTest {
         // given
         when(inventoryRepository.read("acme", "xml")).thenReturn(reader(
                 "<products><product><ean>111</ean><qty>0</qty></product><product><ean>222</ean><qty>4</qty></product></products>"));
-        when(feedRowProcessor.process(any(), anyInt(), any())).thenReturn(Optional.empty());
+        when(feedProcessor.start("acme", 0)).thenReturn(processing);
+        when(processing.finish()).thenReturn(List.of());
         when(dataCleanup.run(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
         loader.load(TestProduct.class, "product", SUPPLIER);
 
         // then
-        verify(feedRowProcessor, times(1)).process(argThat(parsed -> parsed.item().ean().equals("222")), anyInt(), any());
-        verify(feedRowProcessor, times(1)).process(any(), anyInt(), any());
+        verify(processing, times(1)).add(argThat(parsed -> parsed.item().ean().equals("222")));
+        verify(processing, times(1)).add(any());
+        verify(processing).skipInvalid();
     }
 
     @Test
@@ -83,13 +86,14 @@ class XmlProductFeedLoaderTest {
                 + "<!DOCTYPE products [ <!ENTITY xxe SYSTEM \"file:///etc/passwd\"> ]>"
                 + "<products><product><ean>&xxe;</ean></product></products>";
         when(inventoryRepository.read("acme", "xml")).thenReturn(reader(feed));
+        lenient().when(feedProcessor.start("acme", 0)).thenReturn(processing);
 
         // when
         List<InventoryItem> result = loader.load(TestProduct.class, "product", SUPPLIER);
 
         // then
         assertThat(result).isEmpty();
-        verify(feedRowProcessor, never()).process(any(), anyInt(), any());
+        verifyNoInteractions(processing);
         verifyNoInteractions(dataCleanup);
     }
 
@@ -102,13 +106,14 @@ class XmlProductFeedLoaderTest {
                 + " <!ENTITY lol3 \"&lol2;&lol2;&lol2;&lol2;&lol2;\"> ]>"
                 + "<products><product><ean>&lol3;</ean></product></products>";
         when(inventoryRepository.read("acme", "xml")).thenReturn(reader(feed));
+        lenient().when(feedProcessor.start("acme", 0)).thenReturn(processing);
 
         // when
         List<InventoryItem> result = loader.load(TestProduct.class, "product", SUPPLIER);
 
         // then
         assertThat(result).isEmpty();
-        verify(feedRowProcessor, never()).process(any(), anyInt(), any());
+        verifyNoInteractions(processing);
     }
 
     private static Reader reader(String xml) {

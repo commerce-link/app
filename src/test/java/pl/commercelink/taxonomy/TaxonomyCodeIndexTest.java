@@ -82,6 +82,47 @@ class TaxonomyCodeIndexTest {
     }
 
     @Test
+    void blockedEanIsNotGivenForItsCodeAndBrand() {
+        // given
+        index.link("BRAK", "Brand", "111");
+        index.link("BRAK", "Brand", "222");
+        index.link("BRAK", "Other", "111");
+
+        // when
+        index.block("BRAK", " brand ", "111");
+
+        // then
+        assertThat(index.eansOf("BRAK", "Brand")).containsExactly("222");
+        assertThat(index.eansOf("BRAK", "Other")).containsExactly("111");
+    }
+
+    @Test
+    void blockWithoutCodeOrBrandBlocksNothing() {
+        // given
+        index.link("920", "Logitech", "111");
+
+        // when
+        index.block("920", null, "111");
+        index.block(null, "Logitech", "111");
+
+        // then
+        assertThat(index.eansOf("920", "Logitech")).containsExactly("111");
+    }
+
+    @Test
+    void clearForgetsTheBlocksToo() {
+        // given
+        index.block("920", "Logitech", "111");
+
+        // when
+        index.clear();
+        index.link("920", "Logitech", "111");
+
+        // then
+        assertThat(index.eansOf("920", "Logitech")).containsExactly("111");
+    }
+
+    @Test
     void clearForgetsEverything() {
         // given
         index.link("920", "Logitech", "111");
