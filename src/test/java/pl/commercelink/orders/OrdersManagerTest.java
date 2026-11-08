@@ -183,7 +183,7 @@ class OrdersManagerTest {
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
         assertThat(itemCaptor.getValue().getCategory()).isEqualTo("Uncategorized");
-        assertThat(itemCaptor.getValue().getName()).isEmpty();
+        assertThat(itemCaptor.getValue().getName()).isEqualTo("Brak produktu");
         assertThat(itemCaptor.getValue().getPrice()).isEqualTo(0);
         assertThat(itemCaptor.getValue().getSku()).isEqualTo("EAN-Z");
     }

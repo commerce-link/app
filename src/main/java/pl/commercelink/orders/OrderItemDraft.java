@@ -27,7 +27,7 @@ public record OrderItemDraft(String category, String name, int qty, double price
 
     public static OrderItemDraft of(MatchedInventory matchedInventory, String ean, int qty) {
         if (!matchedInventory.hasAnyOffers()) {
-            return new OrderItemDraft(Categories.UNCATEGORIZED, "", qty, 0, ean, false,
+            return new OrderItemDraft(Categories.UNCATEGORIZED, "Brak produktu", qty, 0, ean, false,
                     matchedInventory.getEstimatedDeliveryDays());
         }
         Taxonomy taxonomy = matchedInventory.getTaxonomy();

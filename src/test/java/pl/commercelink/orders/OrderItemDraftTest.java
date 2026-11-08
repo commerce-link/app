@@ -36,7 +36,7 @@ class OrderItemDraftTest {
     }
 
     @Test
-    void anItemWithoutOffersGetsTheChosenEan() {
+    void anItemWithoutOffersGetsTheChosenEanAsAMissingProduct() {
         // given
         MatchedInventory empty = MatchedInventory.empty(InventoryKey.fromEan("5901234123457"));
 
@@ -46,5 +46,7 @@ class OrderItemDraftTest {
         // then
         assertThat(draft.sku()).isEqualTo("5901234123457");
         assertThat(draft.qty()).isEqualTo(2);
+        assertThat(draft.name()).isEqualTo("Brak produktu");
+        assertThat(draft.category()).isEqualTo("Uncategorized");
     }
 }

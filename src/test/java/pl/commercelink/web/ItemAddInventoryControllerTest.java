@@ -73,17 +73,19 @@ class ItemAddInventoryControllerTest {
     }
 
     @Test
-    void anEanWithoutOffersListsNothing() {
+    void anEanWithoutOffersListsAMissingProductUnderTheTypedEan() {
         // given
         when(matched.hasAnyOffers()).thenReturn(false);
+        when(matched.getEstimatedDeliveryDays()).thenReturn(1);
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
         when(inventoryView.findByEan(EAN)).thenReturn(matched);
 
         // when
-        List<ItemAddInventoryRow> rows = controller.find(EAN);
+        List<ItemAddInventoryRow> rows = controller.find(" " + EAN + " ");
 
         // then
-        assertThat(rows).isEmpty();
+        assertThat(rows).containsExactly(new ItemAddInventoryRow(EAN, null, null, "Brak produktu", "Uncategorized",
+                0, 0, 1));
     }
 
     @Test
