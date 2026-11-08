@@ -26,7 +26,6 @@ import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
-import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.externaloffers.ExternalOfferLinking;
 import pl.commercelink.orders.*;
@@ -46,10 +45,11 @@ import pl.commercelink.orders.imports.BasketOrderImporter;
 import pl.commercelink.orders.pos.PosOrderCreator;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.notifications.EmailNotificationType;
-import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.PricelistFinder;
+import pl.commercelink.products.ProductData;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.products.StoreCategories;
 import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.receipts.ReceiptAttemptService;
@@ -201,7 +201,7 @@ public class OrdersController extends BaseController {
     private GoodsOutEventPublisher goodsOutEventPublisher;
 
     @Autowired
-    private TaxonomyCache taxonomyCache;
+    private ProductDataResolver productDataResolver;
 
     @Autowired
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
@@ -1190,10 +1190,10 @@ public class OrdersController extends BaseController {
                     messageSource.getMessage("product.error.ean.invalid", null, locale));
         }
         String ean = unifyEan(typedEan);
-        // The taxonomy is the source of truth for a product's manufacturer code; the dialog offers the code field
-        // only once the EAN missed it, so a typed code never overrides a known one.
-        Taxonomy taxonomy = taxonomyCache.findByEan(ean);
-        String manufacturerCode = taxonomy != null ? StringUtils.trimToNull(taxonomy.mfn()) : null;
+        // The product data (store PIM, global PIM, taxonomy) is the source of truth for a product's manufacturer code;
+        // the dialog offers the code field only once the EAN missed it, so a typed code never overrides a known one.
+        String manufacturerCode = productDataResolver.ofEan(getStoreId(), ean)
+                .map(ProductData::mfn).orElse(null);
         if (manufacturerCode == null) {
             model.addAttribute("supplierMfnField", true);
             String typedCode = StringUtils.trimToNull(form.getManufacturerCode());
@@ -1224,7 +1224,7 @@ public class OrdersController extends BaseController {
     }
 
     /**
-     * A product outside the taxonomy has its manufacturer code only on the item, so that one is kept - but only while
+     * A product without known product data has its manufacturer code only on the item, so that one is kept - but only while
      * the dialog names the same EAN, so a stale code never follows the item to another product.
      */
     private String ownManufacturerCode(OrderItem item, String ean) {

@@ -18,13 +18,13 @@ import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.settings.ConfirmAction;
 import pl.commercelink.web.settings.SettingsFlash;
-import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.products.ProductData;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.products.StoreCategories;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.taxonomy.Categories;
-import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.net.URLEncoder;
@@ -48,7 +48,7 @@ class WarehouseItemController {
     static final String NEW_SUPPLIER_FIELD = "new-supplier";
 
     @Autowired
-    private TaxonomyCache taxonomyCache;
+    private ProductDataResolver productDataResolver;
 
     @Autowired
     private MessageSource messageSource;
@@ -103,8 +103,9 @@ class WarehouseItemController {
     @PostMapping("/dashboard/warehouse/items/new")
     String addItem(@ModelAttribute("form") WarehouseItemAddForm form, Model model, Locale locale,
                    HttpServletResponse response, RedirectAttributes redirectAttributes) {
-        Taxonomy taxonomy = StringUtils.isBlank(form.getEan()) ? null : taxonomyCache.findByEan(form.getEan().trim());
-        boolean known = taxonomy != null && StringUtils.isNotBlank(taxonomy.name());
+        ProductData product = StringUtils.isBlank(form.getEan()) ? null
+                : productDataResolver.ofEan(getStoreId(), UnifiedProductIdentifiers.unifyEan(form.getEan().trim())).orElse(null);
+        boolean known = product != null && StringUtils.isNotBlank(product.name());
         boolean productDataNeeded = !known && StringUtils.isNotBlank(form.getEan());
         // the first submit of an unknown EAN only reveals the product data group, so it carries no name/code errors yet
         boolean productDataAsked = productDataNeeded && (form.isProductDataShown() || hasAnyProductData(form));
@@ -124,12 +125,12 @@ class WarehouseItemController {
             return newItemPage(model, form, errors, errorArgs, productDataNeeded, null);
         }
 
-        String category = known ? StringUtils.defaultIfBlank(taxonomy.category(), Categories.UNCATEGORIZED)
+        String category = known ? StringUtils.defaultIfBlank(product.category(), Categories.UNCATEGORIZED)
                 : StringUtils.defaultIfBlank(form.getCategory(), Categories.UNCATEGORIZED);
         WarehouseItem item = new WarehouseItem(getStoreId(), supplier.identity(), category,
-                known ? taxonomy.name() : form.getName().trim(),
+                known ? product.name() : form.getName().trim(),
                 UnifiedProductIdentifiers.unifyEan(form.getEan().trim()),
-                known ? taxonomy.mfn() : UnifiedProductIdentifiers.unifyMfn(form.getManufacturerCode()),
+                known ? product.mfn() : UnifiedProductIdentifiers.unifyMfn(form.getManufacturerCode()),
                 form.netCost(), form.quantity());
         item.setStatus(form.statusValue());
 

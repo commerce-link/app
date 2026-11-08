@@ -183,6 +183,31 @@ class ProductDataResolverTest {
         assertThat(inOther).isEmpty();
     }
 
+    @Test
+    void eanAndCodeAreUnified() {
+        // given
+        ProductDataResolver resolver = resolver(globalEntry("g1", "0" + EAN, " gv-n406 twf2 ", "GPU"));
+
+        // when
+        Optional<ProductData> product = resolver.ofPimId(STORE_ID, "g1");
+
+        // then
+        assertThat(product).map(ProductData::ean).contains(EAN);
+        assertThat(product).map(ProductData::mfn).contains("GV-N406TWF2");
+    }
+
+    @Test
+    void aBlankCodeIsNoCode() {
+        // given
+        ProductDataResolver resolver = resolver(globalEntry("g1", EAN, " ", "GPU"));
+
+        // when
+        Optional<ProductData> product = resolver.ofPimId(STORE_ID, "g1");
+
+        // then
+        assertThat(product).map(ProductData::mfn).isEmpty();
+    }
+
     private static PimEntry entryWithNameOnly(String pimId, String gtin) {
         return new PimEntry(pimId, ScopedPimCatalog.identifiers(gtin, null), " ", "Global " + pimId, null, null, true,
                 null, null);

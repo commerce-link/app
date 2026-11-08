@@ -2,10 +2,18 @@ package pl.commercelink.products;
 
 import org.apache.commons.lang3.StringUtils;
 
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
+
 public record ProductData(String name, String brand, String category, String ean, String mfn,
                           Integer netWeightInGrams, Integer grossWeightInGrams) {
 
     public static final ProductData EMPTY = new ProductData(null, null, null, null, null, null, null);
+
+    public ProductData {
+        ean = unifyEan(StringUtils.trimToNull(ean));
+        mfn = unifyMfn(StringUtils.trimToNull(mfn));
+    }
 
     public ProductData orElse(ProductData fallback) {
         return new ProductData(

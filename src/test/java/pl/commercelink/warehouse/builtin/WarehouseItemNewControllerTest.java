@@ -17,6 +17,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.inventory.supplier.SupplierChoice;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
+import pl.commercelink.pim.ScopedPimCatalog;
+import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimView;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.products.StoreCategories;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
@@ -29,6 +33,7 @@ import pl.commercelink.taxonomy.TaxonomyRepository;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,6 +54,10 @@ class WarehouseItemNewControllerTest {
 
     @Mock
     private TaxonomyCache taxonomy;
+    @Mock
+    private PimCatalog pimCatalog;
+    @Mock
+    private PimView storePim;
     @Mock
     private SupplierChoice supplierChoice;
     @Mock
@@ -73,6 +82,8 @@ class WarehouseItemNewControllerTest {
         messages.setDefaultEncoding("UTF-8");
         messages.setFallbackToSystemLocale(false);
         ReflectionTestUtils.setField(controller, "messageSource", messages);
+        when(pimCatalog.withStoreData("store-1")).thenReturn(storePim);
+        ReflectionTestUtils.setField(controller, "productDataResolver", new ProductDataResolver(pimCatalog, taxonomy));
         when(stores.findById("store-1")).thenReturn(store);
         when(labels.forStoreId("store-1")).thenReturn(labelMap);
         when(categories.groupsFor("store-1")).thenReturn(List.of());
@@ -134,11 +145,29 @@ class WarehouseItemNewControllerTest {
     }
 
     @Test
+    void theStoresPimEntryComesBeforeTheTaxonomy() throws Exception {
+        // given
+        when(storePim.findByGtin("5900000000065")).thenReturn(Optional.of(
+                ScopedPimCatalog.storeEntry("s1-1", "store-1", "5900000000065", "GV-N406TWF2OC-8GD", "GPU")));
+        when(taxonomy.findByEan("5900000000065")).thenReturn(known());
+        when(receipts.addItem(eq("store-1"), any(), eq("operator"))).thenReturn(OperationResult.success());
+
+        // when
+        asStore(() -> controller.addItem(form("5900000000065"), new ExtendedModelMap(), PL,
+                new MockHttpServletResponse(), new RedirectAttributesModelMap()));
+
+        // then
+        verify(receipts).addItem(eq("store-1"), argThat(item -> "Store s1-1".equals(item.getName())
+                && "GV-N406TWF2OC-8GD".equals(item.getManufacturerCode()) && "GPU".equals(item.getCategory())
+                && "5900000000065".equals(item.getEan())), eq("operator"));
+    }
+
+    @Test
     void theTypedEanIsLookedUpUnified() throws Exception {
         // given
         TaxonomyCache cache = new TaxonomyCache(mock(TaxonomyRepository.class));
         cache.add(new Taxonomy("194253397205", "MQD83ZM/A", "Apple", "Apple AirPods Pro", "Słuchawki", 1, null, null));
-        ReflectionTestUtils.setField(controller, "taxonomyCache", cache);
+        ReflectionTestUtils.setField(controller, "productDataResolver", new ProductDataResolver(pimCatalog, cache));
         when(receipts.addItem(eq("store-1"), any(), eq("operator"))).thenReturn(OperationResult.success());
 
         // when

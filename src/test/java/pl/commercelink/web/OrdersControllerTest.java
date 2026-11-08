@@ -81,6 +81,10 @@ import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.pim.ScopedPimCatalog;
+import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimView;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
@@ -191,6 +195,10 @@ class OrdersControllerTest {
     @Mock
     private TaxonomyCache taxonomyCache;
     @Mock
+    private PimCatalog pimCatalog;
+    @Mock
+    private PimView storePim;
+    @Mock
     private StoreCategories storeCategories;
     @Mock
     private SupplierLabels supplierLabels;
@@ -247,6 +255,12 @@ class OrdersControllerTest {
     void realStepBack() {
         // the step back to Realization runs for real over the mocked order events (its event is part of the rule)
         ReflectionTestUtils.setField(ordersController, "realizationStepBack", new OrderRealizationStepBack(orderEventsRepository));
+    }
+
+    @BeforeEach
+    void realProductData() {
+        when(pimCatalog.withStoreData(STORE_ID)).thenReturn(storePim);
+        ReflectionTestUtils.setField(ordersController, "productDataResolver", new ProductDataResolver(pimCatalog, taxonomyCache));
     }
 
     @BeforeEach
@@ -5404,6 +5418,25 @@ class OrdersControllerTest {
 
             // then
             assertThat(item.getManufacturerCode()).isEqualTo("SM-G991B");
+            assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+        }
+
+        @Test
+        void theCodeOfTheStoresPimEntryComesBeforeTheTaxonomy() {
+            // given
+            OrderItem item = supplierItem(1.23);
+            when(storePim.findByGtin(SUPPLIER_EAN)).thenReturn(Optional.of(
+                    ScopedPimCatalog.storeEntry("s1-1", STORE_ID, SUPPLIER_EAN, "SM-G991B/DS", "Smartfony")));
+            when(taxonomyCache.findByEan(SUPPLIER_EAN)).thenReturn(
+                    new Taxonomy(SUPPLIER_EAN, "SM-G991B", "Samsung", "Galaxy S21", "Smartfony", 1, null, null, "raw"));
+
+            // when
+            ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net"), null,
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(),
+                    new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(item.getManufacturerCode()).isEqualTo("SM-G991B/DS");
             assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
         }
 
