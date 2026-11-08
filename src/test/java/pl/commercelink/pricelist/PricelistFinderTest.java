@@ -44,4 +44,33 @@ class PricelistFinderTest {
         // when / then
         assertThat(finder.findByPimId("s2", CATALOG, "S")).isEmpty();
     }
+
+    @Test
+    void newestPricelistIsEmptyWhenCatalogHasNone() {
+        // given
+        when(repository.findNewestPricelistIdCached(STORE, CATALOG)).thenReturn(null);
+
+        // when / then
+        assertThat(finder.newestPricelist(STORE, CATALOG).getAvailabilityAndPrices()).isEmpty();
+    }
+
+    @Test
+    void newestPricelistIsEmptyWhenItsFileIsGone() {
+        // given
+        when(repository.findNewestPricelistIdCached(STORE, CATALOG)).thenReturn("p1");
+        when(repository.find(STORE, CATALOG, "p1")).thenReturn(null);
+
+        // when / then
+        assertThat(finder.newestPricelist(STORE, CATALOG).getAvailabilityAndPrices()).isEmpty();
+    }
+
+    @Test
+    void newestPricelistFindsItsRowsByEan() {
+        // given
+        pricelistWith(STORE, "C");
+
+        // when / then
+        assertThat(finder.newestPricelist(STORE, CATALOG).findByEan("5900000000011"))
+                .map(AvailabilityAndPrice::getPimId).contains("C");
+    }
 }
