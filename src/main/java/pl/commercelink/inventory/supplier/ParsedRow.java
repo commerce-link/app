@@ -3,16 +3,11 @@ package pl.commercelink.inventory.supplier;
 import pl.commercelink.inventory.supplier.api.CsvRowParser;
 import pl.commercelink.inventory.supplier.api.FeedItem;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
+import pl.commercelink.products.brand.NoNameBrand;
 
-import java.util.Locale;
 import java.util.Optional;
-import java.util.Set;
 
 public record ParsedRow(InventoryItem item, SupplierProduct product) {
-
-    private static final Set<String> MISSING_BRAND_PLACEHOLDERS = Set.of(
-            "no name", "noname", "no-name", "oem", "inne", "inny", "brak", "sonstige", "diverse", "mix",
-            "unknown", "other", "n/a", "none", "-");
 
     public static ParsedRow of(FeedItem feedItem, SupplierInfo supplierInfo) {
         String brand = brandOf(feedItem.getBrand());
@@ -44,6 +39,6 @@ public record ParsedRow(InventoryItem item, SupplierProduct product) {
         if (brand == null || brand.isBlank()) {
             return null;
         }
-        return MISSING_BRAND_PLACEHOLDERS.contains(brand.trim().toLowerCase(Locale.ROOT)) ? null : brand;
+        return NoNameBrand.isPlaceholder(brand) ? null : brand;
     }
 }

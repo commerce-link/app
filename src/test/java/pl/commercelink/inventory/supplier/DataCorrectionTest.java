@@ -14,6 +14,7 @@ import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimIdentifier;
 import pl.commercelink.pim.api.PimIdentifierType;
 import pl.commercelink.products.brand.BrandMapper;
+import pl.commercelink.products.brand.NoNameBrand;
 import pl.commercelink.taxonomy.Taxonomy;
 
 import java.util.List;
@@ -322,7 +323,7 @@ class DataCorrectionTest {
         InventoryItem result = correction.run(offer(null, "5900000000002", "910-006559"));
 
         // then
-        assertThat(result.brand()).isNull();
+        assertThat(result.brand()).isEqualTo(NoNameBrand.NAME);
     }
 
     @Test
@@ -334,7 +335,22 @@ class DataCorrectionTest {
         InventoryItem result = correction.run(offer(null, "5900000000009", "23647"));
 
         // then
-        assertThat(result.brand()).isNull();
+        assertThat(result.brand()).isEqualTo(NoNameBrand.NAME);
+    }
+
+    @Test
+    void offerWithoutBrandUnknownToPimIsNoNameAndSoIsItsTaxonomy() {
+        // given
+        SupplierProduct fromFeed = new SupplierProduct("5900000000009", "11T105", null, "FeedName", 3, null, null);
+
+        // when
+        InventoryItem offer = dataCorrection.run(offerOf(fromFeed));
+        Taxonomy result = dataCorrection.run(fromFeed, offer);
+
+        // then
+        assertThat(offer.brand()).isEqualTo(NoNameBrand.NAME);
+        assertThat(result.brand()).isEqualTo(NoNameBrand.NAME);
+        assertThat(result.name()).isEqualTo("FeedName");
     }
 
     @Test

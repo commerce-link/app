@@ -1,6 +1,7 @@
 package pl.commercelink.taxonomy;
 
 import pl.commercelink.inventory.supplier.SupplierProduct;
+import pl.commercelink.products.brand.NoNameBrand;
 
 import java.util.Comparator;
 import java.util.Objects;
@@ -58,12 +59,25 @@ public record Taxonomy(String ean, String mfn, String brand, String name,
 
     public Taxonomy mergedWith(Taxonomy incoming) {
         Taxonomy winner = winnerAgainst(incoming);
+        Taxonomy branded = winner.withRealBrandFrom(winner == incoming ? this : incoming);
         Integer net = weightOfBetterSource(incoming, Taxonomy::netWeightInGrams);
         Integer gross = weightOfBetterSource(incoming, Taxonomy::grossWeightInGrams);
-        if (Objects.equals(net, winner.netWeightInGrams) && Objects.equals(gross, winner.grossWeightInGrams)) {
-            return winner;
+        if (Objects.equals(net, branded.netWeightInGrams) && Objects.equals(gross, branded.grossWeightInGrams)) {
+            return branded;
         }
-        return winner.withWeights(net, gross);
+        return branded.withWeights(net, gross);
+    }
+
+    boolean hasRealBrand() {
+        return brand != null && !brand.isBlank() && !NoNameBrand.is(brand);
+    }
+
+    Taxonomy withRealBrandFrom(Taxonomy other) {
+        if (other == null || !NoNameBrand.is(brand) || !other.hasRealBrand()) {
+            return this;
+        }
+        return new Taxonomy(ean, mfn, other.brand, name, category, dataAccuracyScore,
+                netWeightInGrams, grossWeightInGrams, rawCategory, categoryId);
     }
 
     private Taxonomy winnerAgainst(Taxonomy incoming) {

@@ -1,6 +1,7 @@
 package pl.commercelink.taxonomy;
 
 import org.apache.commons.lang3.StringUtils;
+import pl.commercelink.products.brand.NoNameBrand;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,7 +16,7 @@ class TaxonomyCodeIndex {
     private final ConcurrentHashMap<String, String> brandKeys = new ConcurrentHashMap<>();
 
     void link(String mfn, String brand, String ean) {
-        if (StringUtils.isAnyBlank(mfn, brand)) return;
+        if (StringUtils.isAnyBlank(mfn, brand) || NoNameBrand.is(brand)) return;
         CodeEntry entry = entry(brand, ean);
         entriesByMfn.compute(mfn, (key, entries) -> {
             if (entries == null) return List.of(entry);

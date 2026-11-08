@@ -50,6 +50,15 @@ class TaxonomyCodeIndexTest {
     }
 
     @Test
+    void noNameRowIsNotIndexed() {
+        // given
+        index.link("11T105", "NoName", "111");
+
+        // when / then
+        assertThat(index.eansOf("11T105", "NoName")).isEmpty();
+    }
+
+    @Test
     void lookupWithoutCodeOrBrandFindsNothing() {
         // given
         index.link("920", "Logitech", "111");

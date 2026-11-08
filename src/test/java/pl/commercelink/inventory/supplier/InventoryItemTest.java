@@ -39,6 +39,16 @@ class InventoryItemTest {
         assertFalse(item.isOfBrand("Kingston"));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"NoName", "noname"})
+    void noNameOfferIsOfNoBrand(String other) {
+        // given
+        InventoryItem item = new InventoryItem("NoName", null, "1234567890123", "MFN-1", "Action", 10.0, "PLN", 5, 1, true, false, false);
+
+        // when / then
+        assertFalse(item.isOfBrand(other));
+    }
+
     @Test
     void codeContainingADotIsARealCode() {
         // given

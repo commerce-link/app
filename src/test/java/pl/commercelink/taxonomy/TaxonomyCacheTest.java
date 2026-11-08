@@ -283,6 +283,90 @@ class TaxonomyCacheTest {
     }
 
     @Test
+    void noNameWinnerTakesTheBrandOfTheLosingRecord() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "ST-UCMBAM", "Satechi", "Kosatec name", "Huby USB", 4, null, null));
+
+        // when
+        cache.add(new Taxonomy(EAN_1, "ST-UCMBAM", "NoName", "Action name", "Huby USB", 3, null, null));
+
+        // then
+        Taxonomy result = cache.findByEan(EAN_1);
+        assertEquals("Action name", result.name());
+        assertEquals("Satechi", result.brand());
+        assertEquals(3, result.dataAccuracyScore());
+    }
+
+    @Test
+    void realBrandArrivingLaterReplacesOnlyTheNoNameOfTheWinner() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "ST-UCMBAM", "NoName", "Action name", "Huby USB", 3, null, null));
+
+        // when
+        cache.add(new Taxonomy(EAN_1, "ST-UCMBAM", "Satechi", "Kosatec name", "Huby USB", 4, null, null));
+
+        // then
+        Taxonomy result = cache.findByEan(EAN_1);
+        assertEquals("Action name", result.name());
+        assertEquals("Satechi", result.brand());
+    }
+
+    @Test
+    void noNameRowDoesNotTakeTheRealBrandBack() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "ST-UCMBAM", "Satechi", "Kosatec name", "Huby USB", 4, null, null));
+        cache.add(new Taxonomy(EAN_1, "ST-UCMBAM", "NoName", "Action name", "Huby USB", 3, null, null));
+
+        // when
+        cache.add(new Taxonomy(EAN_1, "ST-UCMBAM", "NoName", "Action name", "Huby USB", 3, null, null));
+
+        // then
+        assertEquals("Satechi", cache.findByEan(EAN_1).brand());
+    }
+
+    @Test
+    void twoNoNameRecordsStayNoName() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "11T105", "NoName", "Morele name", "Taśmy", 1, null, null));
+
+        // when
+        cache.add(new Taxonomy(EAN_1, "11T105", "NoName", "Action name", "Taśmy", 3, null, null));
+
+        // then
+        Taxonomy result = cache.findByEan(EAN_1);
+        assertEquals("Morele name", result.name());
+        assertEquals("NoName", result.brand());
+    }
+
+    @Test
+    void noNameGroupRecordTakesTheBrandOfTheBestBrandedRecord() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "MFN-A", "NoName", "Name A", "CPU", 2, null, null));
+        cache.add(new Taxonomy(EAN_2, "MFN-B", "Satechi", "Name B", "CPU", 5, null, null));
+        cache.add(new Taxonomy(EAN_3, "MFN-C", "Other", "Name C", "CPU", 6, null, null));
+        InventoryKey key = new InventoryKey(Set.of(EAN_1, EAN_2, EAN_3), Set.of());
+
+        // when
+        Taxonomy result = cache.find(key);
+
+        // then
+        assertEquals("Name A", result.name());
+        assertEquals("Satechi", result.brand());
+    }
+
+    @Test
+    void noNameRecordGivesNoCategoryByCode() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "11T105", "NoName", "Morele name", "Taśmy", 1, null, null));
+
+        // when
+        Taxonomy source = cache.findCategorySource(new Taxonomy(EAN_2, "11T105", "NoName", "Action name", null, 3, null, null));
+
+        // then
+        assertNull(source);
+    }
+
+    @Test
     void findPrefersCategorizedEntryOverPendingWithBetterScore() {
         // given
         cache.add(uncategorized(EAN_1, 1));

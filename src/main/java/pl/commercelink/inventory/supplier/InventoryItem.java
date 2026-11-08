@@ -1,5 +1,7 @@
 package pl.commercelink.inventory.supplier;
 
+import pl.commercelink.products.brand.NoNameBrand;
+
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -84,7 +86,8 @@ public record InventoryItem(
     }
 
     public boolean isOfBrand(String other) {
-        return brand != null && !brand.isBlank() && other != null && brand.trim().equalsIgnoreCase(other.trim());
+        return brand != null && !brand.isBlank() && other != null && brand.trim().equalsIgnoreCase(other.trim())
+                && !NoNameBrand.is(brand);
     }
 
     public boolean isSellable() {

@@ -46,6 +46,22 @@ class TaxonomyRepositoryTest {
                 && "Kable sieciowe".equals(t.category()));
     }
 
+    @Test
+    void placeholderBrandsOfTheFileLoadAsNoName() {
+        // given
+        String csv = "ean;mfn;brand;name;category;category_id;data_accuracy_score;net_weight_g;gross_weight_g\r\n"
+                + "4050255030426;7062518;No name;Akumulator 18V;Akumulatory;100;3;;\r\n"
+                + "5904569400286;SILIKON;OEM;Pasta silikonowa;Pasty termoprzewodzące;200;2;;\r\n"
+                + "5099206075078;960-001194;Logitech;Logitech BRIO;Kamery internetowe;577;4;;\r\n";
+        givenTaxonomyFile(csv);
+
+        // when
+        List<Taxonomy> taxonomies = taxonomyRepository.loadNewest().getRight();
+
+        // then
+        assertThat(taxonomies).extracting(Taxonomy::brand).containsExactly("NoName", "NoName", "Logitech");
+    }
+
     private void givenTaxonomyFile(String csv) {
         byte[] bytes = csv.getBytes(StandardCharsets.UTF_8);
         when(fileStorage.findNewestFileNameByLastModified(any(), anyString())).thenReturn(Optional.of("taxonomy-merged-full.csv"));

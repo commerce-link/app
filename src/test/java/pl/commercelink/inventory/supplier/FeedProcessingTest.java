@@ -2,8 +2,19 @@ package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.inventory.supplier.api.FeedItem;
+import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
+import pl.commercelink.inventory.supplier.api.ShippingPolicy;
+import pl.commercelink.inventory.supplier.api.ShippingTerms;
+import pl.commercelink.inventory.supplier.api.SupplierInfo;
+import pl.commercelink.inventory.supplier.api.SupplierType;
+import pl.commercelink.pim.ScopedPimCatalog;
+import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.products.brand.BrandMapper;
+import pl.commercelink.products.brand.NoNameBrand;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
@@ -34,6 +45,9 @@ class FeedProcessingTest {
     @Mock
     private FeedParseStats stats;
 
+    private static final SupplierInfo ACME = new SupplierInfo("Acme", SupplierType.Distributor, 5, "PL",
+            new ShippingPolicy(new ShippingTerms(1, new ShippingCostPolicy.Free())));
+
     private final InventoryItem sellableItem =
             new InventoryItem("1234567890123", "MFN-1", 10.0, "PLN", 5, 1, "Acme", true);
     private final SupplierProduct feedProduct =
@@ -62,6 +76,30 @@ class FeedProcessingTest {
         verify(stats, never()).markImportedCategorized();
         verify(stats, never()).markInvalid();
         verify(stats).log();
+    }
+
+    @Test
+    void feedRowWithNoNameBrandIsProcessableAndEntersTheInventory() {
+        // given
+        PimCatalog pimWithoutTheProduct = ScopedPimCatalog.of();
+        DataCorrection realCorrection = new DataCorrection(pimWithoutTheProduct, new BrandMapper(pimWithoutTheProduct));
+        when(enrichment.enrichFromOwnRecord(any()))
+                .thenAnswer(invocation -> invocation.<Taxonomy>getArgument(0).withCategory("Kable", "120"));
+        FeedProcessing processing = new FeedProcessing(realCorrection, taxonomyCache, enrichment, stats, 0);
+
+        // when
+        processing.add(ParsedRow.of(feedItemWithBrand("No Name"), ACME));
+        List<InventoryItem> result = processing.finish();
+
+        // then
+        assertEquals(1, result.size());
+        assertEquals(NoNameBrand.NAME, result.get(0).brand());
+        ArgumentCaptor<Taxonomy> added = ArgumentCaptor.forClass(Taxonomy.class);
+        verify(taxonomyCache).add(added.capture());
+        assertEquals(NoNameBrand.NAME, added.getValue().brand());
+        assertTrue(added.getValue().isProcessable());
+        verify(stats).markImported();
+        verify(stats, never()).markIncomplete();
     }
 
     @Test
@@ -367,6 +405,19 @@ class FeedProcessingTest {
             return new Taxonomy(offer.ean(), offer.mfn(), offer.brand(), product.name(), null, 5, null, null);
         });
         when(enrichment.enrichFromOwnRecord(any())).then(returnsFirstArg());
+    }
+
+    private static FeedItem feedItemWithBrand(String brand) {
+        return new FeedItem() {
+            public String getEan() { return "5901234567890"; }
+            public String getMfn() { return "KAB-HDMI-2M"; }
+            public String getBrand() { return brand; }
+            public String getName() { return "Kabel HDMI 2 m"; }
+            public String getCategory() { return "Kable"; }
+            public double getNetPrice() { return 12.50; }
+            public String getCurrency() { return "PLN"; }
+            public int getQty() { return 3; }
+        };
     }
 
     private static ParsedRow row(String ean, String mfn, String name) {
