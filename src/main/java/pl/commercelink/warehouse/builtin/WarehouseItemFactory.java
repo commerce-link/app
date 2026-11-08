@@ -1,33 +1,31 @@
 package pl.commercelink.warehouse.builtin;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.deliveries.DeliveryItem;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.fulfilment.FulfilmentItem;
 import pl.commercelink.orders.fulfilment.FulfilmentSource;
+import pl.commercelink.products.ProductData;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.products.StoreCategoryResolver;
 import pl.commercelink.taxonomy.Categories;
-import pl.commercelink.taxonomy.TaxonomyResolver;
-import pl.commercelink.taxonomy.TaxonomyResolver.ResolvedProduct;
 import pl.commercelink.warehouse.api.GoodsReceiptItem;
 import pl.commercelink.warehouse.api.ReservationRemovalItem;
 
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class WarehouseItemFactory {
 
-    private final TaxonomyResolver taxonomyResolver;
+    private final ProductDataResolver productDataResolver;
     private final StoreCategoryResolver storeCategoryResolver;
 
-    WarehouseItemFactory(TaxonomyResolver taxonomyResolver, StoreCategoryResolver storeCategoryResolver) {
-        this.taxonomyResolver = taxonomyResolver;
-        this.storeCategoryResolver = storeCategoryResolver;
-    }
-
     WarehouseItem create(String storeId, ReservationRemovalItem item) {
-        ResolvedProduct resolved = taxonomyResolver.resolve(item.getEan(), item.getName(), item.getCategory());
+        ProductData product = productOf(storeId, item.getEan(), item.getName(), item.getCategory());
         WarehouseItem warehouseItem = new WarehouseItem(
-                storeId, item.getDeliveryId(), categoryFor(storeId, resolved), nameOrUnknown(resolved.name()),
+                storeId, item.getDeliveryId(), categoryFor(storeId, product), nameOrUnknown(product.name()),
                 item.getEan(), item.getMfn(), item.getUnitPrice(), item.getQty()
         );
         warehouseItem.setTax(item.getTax());
@@ -39,9 +37,9 @@ class WarehouseItemFactory {
     }
 
     WarehouseItem create(String storeId, GoodsReceiptItem item) {
-        ResolvedProduct resolved = taxonomyResolver.resolve(item.getEan(), item.getName(), item.getCategory());
+        ProductData product = productOf(storeId, item.getEan(), item.getName(), item.getCategory());
         WarehouseItem warehouseItem = new WarehouseItem(
-                storeId, item.getDeliveryId(), categoryFor(storeId, resolved), nameOrUnknown(resolved.name()),
+                storeId, item.getDeliveryId(), categoryFor(storeId, product), nameOrUnknown(product.name()),
                 item.getEan(), item.getMfn(), item.getUnitPrice(), item.getQty()
         );
         warehouseItem.setTax(item.getTax());
@@ -53,12 +51,12 @@ class WarehouseItemFactory {
 
     WarehouseItem create(String storeId, FulfilmentItem item) {
         FulfilmentSource source = item.getSource();
-        ResolvedProduct resolved = taxonomyResolver.resolve(source.getEan(), source.getName(), source.getCategory());
+        ProductData product = productOf(storeId, source.getEan(), source.getName(), source.getCategory());
         return new WarehouseItem(
                 storeId,
                 source.getProvider(),
-                categoryFor(storeId, resolved),
-                nameOrUnknown(resolved.name()),
+                categoryFor(storeId, product),
+                nameOrUnknown(product.name()),
                 source.getEan(),
                 source.getMfn(),
                 source.getPriceNet(),
@@ -71,16 +69,23 @@ class WarehouseItemFactory {
     }
 
     WarehouseItem create(String storeId, String provider, DeliveryItem item, int qty) {
-        ResolvedProduct resolved = taxonomyResolver.resolve(item.getEan(), item.getName(), Categories.UNCATEGORIZED);
+        ProductData product = productOf(storeId, item.getEan(), item.getName(), Categories.UNCATEGORIZED);
         return new WarehouseItem(
-                storeId, provider, categoryFor(storeId, resolved), nameOrUnknown(resolved.name()),
+                storeId, provider, categoryFor(storeId, product), nameOrUnknown(product.name()),
                 item.getEan(), item.getMfn(), item.getUnitCost(), qty
         );
     }
 
-    private String categoryFor(String storeId, ResolvedProduct resolved) {
-        return storeCategoryResolver.findCategoryName(storeId, resolved.categoryId())
-                .orElse(resolved.category());
+    private ProductData productOf(String storeId, String ean, String itemName, String itemCategory) {
+        ProductData fromItem = new ProductData(itemName, null, itemCategory, null, null, null, null, null);
+        return productDataResolver.ofEan(storeId, ean)
+                .map(found -> found.orElse(fromItem))
+                .orElse(fromItem);
+    }
+
+    private String categoryFor(String storeId, ProductData product) {
+        return storeCategoryResolver.findCategoryName(storeId, product.categoryId())
+                .orElse(product.category());
     }
 
     private static String nameOrUnknown(String name) {

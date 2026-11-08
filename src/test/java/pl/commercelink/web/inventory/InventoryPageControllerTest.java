@@ -299,7 +299,7 @@ class InventoryPageControllerTest {
         when(inventorySearch.search(STORE_ID, "5901000000001"))
                 .thenReturn(new InventorySearchResult.KnownWithoutOffers(MatchedBy.EAN, header));
         CategoryLine view = new CategoryLine(List.of(), "Karty graficzne", "Karty graficzne", List.of());
-        when(productCategoryLines.build(header)).thenReturn(Optional.of(view));
+        when(productCategoryLines.build(STORE_ID, header)).thenReturn(Optional.of(view));
         ConcurrentModel model = new ConcurrentModel();
 
         // when

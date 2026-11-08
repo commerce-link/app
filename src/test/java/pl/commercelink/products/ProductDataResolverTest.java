@@ -51,7 +51,7 @@ class ProductDataResolverTest {
         Optional<ProductData> product = resolver.ofEan(STORE_ID, EAN);
 
         // then
-        assertThat(product).contains(new ProductData("Global g1", "Brand", "GPU", EAN, "M-1", 1000, 1200));
+        assertThat(product).contains(new ProductData("Global g1", "Brand", "GPU", null, EAN, "M-1", 1000, 1200));
     }
 
     @Test
@@ -64,7 +64,49 @@ class ProductDataResolverTest {
         Optional<ProductData> product = resolver.ofEan(STORE_ID, EAN);
 
         // then
-        assertThat(product).contains(new ProductData("Global g1", "Samsung", "Dyski SSD", EAN, "M-1", 9, 60));
+        assertThat(product).contains(new ProductData("Global g1", "Samsung", "Dyski SSD", "pim-ssd", EAN, "M-1", 9, 60));
+    }
+
+    @Test
+    void categoryOfThePimEntryComesWithItsId() {
+        // given
+        taxonomy.add(record(EAN));
+        ProductDataResolver resolver = resolver(entryWithCategory("g1", EAN, "Karty graficzne", "pim-gpu"));
+
+        // when
+        Optional<ProductData> product = resolver.ofEan(STORE_ID, EAN);
+
+        // then
+        assertThat(product).map(ProductData::category).contains("Karty graficzne");
+        assertThat(product).map(ProductData::categoryId).contains("pim-gpu");
+    }
+
+    @Test
+    void categoryOfThePimEntryWithoutAnIdDoesNotTakeTheIdOfTheTaxonomy() {
+        // given
+        taxonomy.add(record(EAN));
+        ProductDataResolver resolver = resolver(entryWithCategory("g1", EAN, "Karty graficzne", null));
+
+        // when
+        Optional<ProductData> product = resolver.ofEan(STORE_ID, EAN);
+
+        // then
+        assertThat(product).map(ProductData::category).contains("Karty graficzne");
+        assertThat(product).map(ProductData::categoryId).isEmpty();
+    }
+
+    @Test
+    void pimEntryWithoutACategoryTakesBothTheCategoryAndItsIdFromTheTaxonomy() {
+        // given
+        taxonomy.add(record(EAN));
+        ProductDataResolver resolver = resolver(entryWithCategory("g1", EAN, " ", "pim-gpu"));
+
+        // when
+        Optional<ProductData> product = resolver.ofEan(STORE_ID, EAN);
+
+        // then
+        assertThat(product).map(ProductData::category).contains("Dyski SSD");
+        assertThat(product).map(ProductData::categoryId).contains("pim-ssd");
     }
 
     @Test
@@ -77,7 +119,7 @@ class ProductDataResolverTest {
         Optional<ProductData> product = resolver.ofGroup(STORE_ID, InventoryKey.fromPimIdAndEan("g1", EAN));
 
         // then
-        assertThat(product).contains(new ProductData("Global g1", "Samsung", "Dyski SSD", EAN, "M-1", 9, 60));
+        assertThat(product).contains(new ProductData("Global g1", "Samsung", "Dyski SSD", "pim-ssd", EAN, "M-1", 9, 60));
     }
 
     @Test
@@ -90,7 +132,7 @@ class ProductDataResolverTest {
         Optional<ProductData> product = resolver.ofPimId(STORE_ID, "g1");
 
         // then
-        assertThat(product).contains(new ProductData("Global g1", "Samsung", "Dyski SSD", EAN, "M-1", 9, 60));
+        assertThat(product).contains(new ProductData("Global g1", "Samsung", "Dyski SSD", "pim-ssd", EAN, "M-1", 9, 60));
     }
 
     @Test
@@ -103,7 +145,7 @@ class ProductDataResolverTest {
         Optional<ProductData> product = resolver.ofEan(STORE_ID, EAN);
 
         // then
-        assertThat(product).contains(new ProductData("Taxonomy name", "Samsung", "Dyski SSD", EAN, "M-1", 9, 60));
+        assertThat(product).contains(new ProductData("Taxonomy name", "Samsung", "Dyski SSD", "pim-ssd", EAN, "M-1", 9, 60));
     }
 
     @Test
@@ -213,7 +255,12 @@ class ProductDataResolverTest {
                 null, null);
     }
 
+    private static PimEntry entryWithCategory(String pimId, String gtin, String category, String categoryId) {
+        return new PimEntry(pimId, ScopedPimCatalog.identifiers(gtin, null), "Brand", "Global " + pimId, category, null,
+                true, null, null, categoryId);
+    }
+
     private static Taxonomy record(String ean) {
-        return new Taxonomy(ean, "M-1", "Samsung", "Taxonomy name", "Dyski SSD", 1, 9, 60);
+        return new Taxonomy(ean, "M-1", "Samsung", "Taxonomy name", "Dyski SSD", 1, 9, 60, null, "pim-ssd");
     }
 }

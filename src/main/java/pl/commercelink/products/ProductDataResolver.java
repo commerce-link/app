@@ -45,13 +45,13 @@ public class ProductDataResolver {
     }
 
     private static ProductData of(PimEntry entry) {
-        return new ProductData(entry.name(), entry.brand(), entry.category(),
+        return new ProductData(entry.name(), entry.brand(), entry.category(), entry.categoryId(),
                 entry.primaryGtin().orElse(null), entry.primaryMpn().orElse(null),
                 entry.netWeightInGrams(), entry.grossWeightInGrams());
     }
 
     private static ProductData of(Taxonomy taxonomy) {
-        return new ProductData(taxonomy.name(), taxonomy.brand(), taxonomy.category(), taxonomy.ean(), taxonomy.mfn(),
-                taxonomy.netWeightInGrams(), taxonomy.grossWeightInGrams());
+        return new ProductData(taxonomy.name(), taxonomy.brand(), taxonomy.category(), taxonomy.categoryId(),
+                taxonomy.ean(), taxonomy.mfn(), taxonomy.netWeightInGrams(), taxonomy.grossWeightInGrams());
     }
 }

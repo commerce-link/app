@@ -1,16 +1,18 @@
 package pl.commercelink.externaloffers;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.externaloffers.ResolvedOffer.Source;
+import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.StoreCategoryResolver;
 import pl.commercelink.products.information.StorePimAliases;
@@ -56,8 +58,17 @@ class ExternalOfferResolverTest {
     @Mock
     private StoreCategoryResolver storeCategories;
 
-    @InjectMocks
     private ExternalOfferResolver resolver;
+
+    @BeforeEach
+    void setUp() {
+        resolver = resolverWith();
+    }
+
+    private ExternalOfferResolver resolverWith(PimEntry... pimEntries) {
+        return new ExternalOfferResolver(links, aliases, products, catalogs,
+                new ProductDataResolver(ScopedPimCatalog.of(pimEntries), taxonomy), storeCategories);
+    }
 
     private void inTaxonomy(String ean, String category, String categoryId) {
         when(taxonomy.findByEan(ean)).thenReturn(new Taxonomy(ean, "MFN-" + ean, "Brand", "Name " + ean, category, 1,
@@ -278,7 +289,7 @@ class ExternalOfferResolverTest {
     }
 
     @Test
-    void resolvesALinkToItsEanWithoutReadingTheCatalogsOrThePimData() {
+    void resolvesALinkToItsEanWithoutReadingTheCatalogs() {
         // given
         link("K", "5901234567890");
 
@@ -307,6 +318,24 @@ class ExternalOfferResolverTest {
         // then
         assertThat(result).map(ResolvedOffer::category).contains("Procesory");
         verifyNoInteractions(catalogs, products);
+    }
+
+    @Test
+    void aLinkedLineTakesTheCategoryOfTheStoresPimEntryOfItsEanBeforeTheTaxonomy() {
+        // given
+        link("K", "5901234567890");
+        inTaxonomy("5901234567890", "Processors", "pim-cpu");
+        when(storeCategories.categoryNamesByPimCategoryId(STORE))
+                .thenReturn(Map.of("pim-cpu", "Procesory", "pim-gpu", "Karty graficzne"));
+        ExternalOfferResolver resolver = resolverWith(new PimEntry("s1-1",
+                ScopedPimCatalog.identifiers("5901234567890", null), "Brand", "Name", "Graphics Cards", null, true,
+                null, null, "pim-gpu", STORE));
+
+        // when
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K");
+
+        // then
+        assertThat(result).map(ResolvedOffer::category).contains("Karty graficzne");
     }
 
     @Test
@@ -435,7 +464,7 @@ class ExternalOfferResolverTest {
     }
 
     @Test
-    void looksEachEanUpInTheTaxonomyOncePerScope() {
+    void looksEachEanUpOncePerScope() {
         // given the same goods on several lines of one import, one EAN the taxonomy knows and one it does not
         when(taxonomy.findByEan("2000000001012")).thenReturn(null);
         inTaxonomy("2000000001029", "Lamps", null);
@@ -445,7 +474,7 @@ class ExternalOfferResolverTest {
         ResolvedOffer first = offers.linked(List.of("2000000001012", "2000000001029"));
         ResolvedOffer second = offers.linked(List.of("2000000001012", "2000000001029"));
 
-        // then the taxonomy is a scan of every entry, so a repeated EAN is not looked up again
+        // then a repeated EAN is not looked up again
         assertThat(first.category()).isEqualTo("Lamps");
         assertThat(second.category()).isEqualTo("Lamps");
         verify(taxonomy, times(1)).findByEan("2000000001012");

@@ -124,9 +124,11 @@ public class InventoryPageController {
             model.addAttribute("validationError", true);
             return false;
         }
-        InventorySearchResult result = isSuperAdmin()
+        boolean superAdmin = isSuperAdmin();
+        String storeId = superAdmin ? null : CustomSecurityContext.getStoreId();
+        InventorySearchResult result = superAdmin
                 ? inventorySearch.searchGlobal(query)
-                : inventorySearch.search(CustomSecurityContext.getStoreId(), query);
+                : inventorySearch.search(storeId, query);
         model.addAttribute("result", result);
         ProductHeader header = switch (result) {
             case InventorySearchResult.Found found -> found.product();
@@ -134,7 +136,7 @@ public class InventoryPageController {
             case null, default -> null;
         };
         if (header != null) {
-            productCategoryLines.build(header).ifPresent(line -> model.addAttribute("productCategory", line));
+            productCategoryLines.build(storeId, header).ifPresent(line -> model.addAttribute("productCategory", line));
         }
         return true;
     }

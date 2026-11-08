@@ -3,7 +3,6 @@ package pl.commercelink.externaloffers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.orders.FulfilmentStatus;
@@ -14,7 +13,9 @@ import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.StoreCategoryResolver;
 import pl.commercelink.products.information.StorePimAliases;
@@ -71,14 +72,14 @@ class ExternalOfferLinkingImportParityTest {
     @Mock
     private OrderItemsRepository orderItemsRepository;
 
-    @InjectMocks
     private ExternalOfferResolver resolver;
-
     private ExternalOfferLinking linking;
     private final AtomicReference<ExternalOfferLink> savedLink = new AtomicReference<>();
 
     @BeforeEach
     void setUp() {
+        resolver = new ExternalOfferResolver(linkRepository, pimAliases, productRepository, productCatalogRepository,
+                new ProductDataResolver(ScopedPimCatalog.of(), taxonomyCache), storeCategoryResolver);
         linking = new ExternalOfferLinking(linkRepository, resolver, ordersRepository, orderItemsRepository,
                 Clock.fixed(NOW, ZoneId.of("Europe/Warsaw")));
         doAnswer(invocation -> {
