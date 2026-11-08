@@ -8,7 +8,7 @@ public final class NoNameBrand {
     public static final String NAME = "NoName";
 
     private static final Set<String> PLACEHOLDERS = Set.of(
-            "no name", "noname", "no-name", "oem", "inne", "inny", "brak", "sonstige", "mix",
+            "no name", "noname", "no-name", "oem", "inne", "inny", "brak", "sonstige", "diverse", "mix",
             "unknown", "other", "n/a", "none", "-");
 
     private NoNameBrand() {

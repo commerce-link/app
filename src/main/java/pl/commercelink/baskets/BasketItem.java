@@ -257,7 +257,7 @@ public class BasketItem {
             return new BasketItem(
                     "",
                     taxonomy.name(),
-                    taxonomy.ean(),
+                    ean,
                     taxonomy.category(),
                     matchedInventory.getMedianPrice().grossValue(),
                     // client 2026-10-27: an item outside the price list costs the estimate, not the lowest price
