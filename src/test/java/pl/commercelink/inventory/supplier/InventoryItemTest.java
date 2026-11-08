@@ -147,6 +147,19 @@ class InventoryItemTest {
     }
 
     @Test
+    void itemWithAnInvalidEanIsUnsellable() {
+        // given
+        InventoryItem item = new InventoryItem("9999999999999", "MFN-1", 10.0, "PLN", 5, 1, "Ingram Micro");
+
+        // when
+        boolean sellable = item.isSellable();
+
+        // then
+        assertFalse(item.hasEan());
+        assertFalse(sellable);
+    }
+
+    @Test
     void copyWithTheSameBrandAndEanIsTheSameRecord() {
         // given
         InventoryItem item = new InventoryItem("ASUS", "101", "1234567890123", "MFN-1", "Elko",

@@ -24,7 +24,6 @@ public record InventoryItem(
         boolean inDelivery
 ) {
 
-    private static final String MISSING_EAN_PLACEHOLDER = "1111111111111";
     private static final Set<String> MISSING_MFN_PLACEHOLDERS = Set.of("0", "?", ".");
 
     public InventoryItem {
@@ -66,7 +65,7 @@ public record InventoryItem(
     }
 
     public boolean hasEan() {
-        return ean != null && !ean.isBlank() && !MISSING_EAN_PLACEHOLDER.equalsIgnoreCase(ean);
+        return Ean.isValid(ean);
     }
 
     public boolean requiresEanCorrection() {
