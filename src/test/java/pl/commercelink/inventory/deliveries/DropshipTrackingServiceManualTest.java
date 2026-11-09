@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.deliveries;
 
+import pl.commercelink.carriers.InMemoryCarrierDictionaries;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,7 +66,7 @@ class DropshipTrackingServiceManualTest {
     void setUp() {
         service = new DropshipTrackingService(deliveriesQueryService, deliveriesRepository, ordersRepository,
                 providerResolver, completion, DropshipTrackingProperties.defaults(),
-                Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE));
+                InMemoryCarrierDictionaries.none(), Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE));
         delivery = new Delivery(STORE_ID, "ACME-DS-ref-1", "Acme");
         delivery.setType(DeliveryType.DROPSHIP);
         delivery.setPurchaseRef("ref-1");

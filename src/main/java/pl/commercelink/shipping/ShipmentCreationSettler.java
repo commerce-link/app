@@ -3,6 +3,8 @@ package pl.commercelink.shipping;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import pl.commercelink.carriers.CarrierDictionary;
+import pl.commercelink.carriers.CarrierTranslator;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.shipping.api.ShipmentResult;
 
@@ -20,9 +22,11 @@ public class ShipmentCreationSettler {
 
     private final ShipmentOwners owners;
     private final ImmediatePickup immediatePickup;
+    private final CarrierTranslator carrierTranslator;
 
     public void succeeded(ShipmentCreationCheckRequest request, ShipmentResult result) {
         List<Shipment> created = ShipmentResults.toShipments(result, request.getProvider(), request.getPickUpAddressId());
+        replaceLabelCodesWithCarriers(request.getProvider(), created);
         if (!owners.get(request.getOwnerType()).succeeded(request, created)) {
             log.warn("Creation result dropped, nothing waits for it: store={} owner={} {} command={}",
                     request.getStoreId(), request.getOwnerType(), request.getOwnerId(), request.getCommandId());
@@ -31,6 +35,14 @@ public class ShipmentCreationSettler {
         if (IMMEDIATE.contains(request.getOwnerType())) {
             orderPickup(request, created);
         }
+    }
+
+    private void replaceLabelCodesWithCarriers(String provider, List<Shipment> created) {
+        if (provider == null) {
+            return;
+        }
+        String dictionary = CarrierDictionary.shippingLabelCarrierCodes(provider);
+        created.forEach(shipment -> shipment.setCarrier(carrierTranslator.carrierFor(dictionary, shipment.getCarrier())));
     }
 
     private void orderPickup(ShipmentCreationCheckRequest request, List<Shipment> created) {
