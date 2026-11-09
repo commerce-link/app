@@ -4,20 +4,11 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
-import com.amazonaws.services.dynamodbv2.model.AttributeValue;
-import com.amazonaws.services.dynamodbv2.model.QueryRequest;
-import com.amazonaws.services.dynamodbv2.model.QueryResult;
-import com.amazonaws.services.dynamodbv2.model.ScanRequest;
-import com.amazonaws.services.dynamodbv2.model.ScanResult;
-import org.apache.commons.lang3.StringUtils;
+import com.amazonaws.services.dynamodbv2.model.*;
 import org.springframework.stereotype.Component;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -200,24 +191,6 @@ public class ProductRepository extends DynamoDbRepository<Product> {
         return detached;
     }
 
-    public List<Product> findAllProductsThatQualifiesForRestock(ProductCatalog catalog) {
-        List<String> categoryIds = getCategoryIds(catalog);
-        List<Product> result = new ArrayList<>();
-        for (String categoryId : categoryIds) {
-            Map<String, AttributeValue> eav = new HashMap<>();
-            eav.put(":categoryId", new AttributeValue().withS(categoryId));
-            eav.put(":stockExpectedQty", new AttributeValue().withN("0"));
-
-            QueryRequest queryRequest = new QueryRequest()
-                    .withTableName(TABLE)
-                    .withKeyConditionExpression("categoryId = :categoryId")
-                    .withFilterExpression("stockExpectedQty > :stockExpectedQty")
-                    .withExpressionAttributeValues(eav);
-            result.addAll(query(queryRequest, Product.class));
-        }
-        return result;
-    }
-
     private static List<String> getCategoryIds(ProductCatalog catalog) {
         return catalog.getCategories()
                 .stream()
@@ -266,9 +239,9 @@ public class ProductRepository extends DynamoDbRepository<Product> {
         return result;
     }
 
-    public List<Product> findAllWithoutPimIdByEanOrMfn(List<String> eans, List<String> mfnCodes) {
+    public List<Product> findAllWithoutPimIdByEan(List<String> eans) {
         Map<String, AttributeValue> eav = new HashMap<>();
-        String filter = withoutPimIdByEanOrMfnFilter(eans, mfnCodes, eav);
+        String filter = withoutPimIdByEanFilter(eans, eav);
         if (filter == null) {
             return new ArrayList<>();
         }
@@ -280,13 +253,9 @@ public class ProductRepository extends DynamoDbRepository<Product> {
         return dynamoDBMapper.scan(Product.class, scanExpression);
     }
 
-    public List<Product> findAllWithoutPimIdByEanOrMfnInCategories(Collection<String> categoryIds, List<String> eans, List<String> mfnCodes) {
-        return findAllInCategories(categoryIds, eav -> withoutPimIdByEanOrMfnFilter(eans, mfnCodes, eav));
-    }
-
-    /** Products of the given categories whose EAN or MFN is among the codes, pinned to a PIM entry or not. */
-    public List<Product> findAllByEanOrMfnInCategories(Collection<String> categoryIds, List<String> eans, List<String> mfnCodes) {
-        return findAllInCategories(categoryIds, eav -> eanOrMfnCondition(eans, mfnCodes, eav));
+    /** Products of the given categories whose EAN is among the given ones, pinned to a PIM entry or not. */
+    public List<Product> findAllByEanInCategories(Collection<String> categoryIds, List<String> eans) {
+        return findAllInCategories(categoryIds, eav -> eanCondition(eans, eav));
     }
 
     private List<Product> findAllInCategories(Collection<String> categoryIds,
@@ -311,11 +280,11 @@ public class ProductRepository extends DynamoDbRepository<Product> {
     }
 
     /**
-     * Builds the filter "pimId missing or null, and ean or mfn among the given codes", adding its values to {@code eav}.
-     * Returns null when both lists are empty, i.e. nothing can match.
+     * Builds the filter "pimId missing or null, and ean among the given ones", adding its values to {@code eav}.
+     * Returns null when the list is empty, i.e. nothing can match.
      */
-    private static String withoutPimIdByEanOrMfnFilter(List<String> eans, List<String> mfnCodes, Map<String, AttributeValue> eav) {
-        String codes = eanOrMfnCondition(eans, mfnCodes, eav);
+    private static String withoutPimIdByEanFilter(List<String> eans, Map<String, AttributeValue> eav) {
+        String codes = eanCondition(eans, eav);
         if (codes == null) {
             return null;
         }
@@ -324,123 +293,20 @@ public class ProductRepository extends DynamoDbRepository<Product> {
     }
 
     /**
-     * Builds the condition "ean or mfn among the given codes", adding its values to {@code eav}.
-     * Returns null when both lists are empty, i.e. nothing can match.
+     * Builds the condition "ean among the given ones", adding its values to {@code eav}.
+     * Returns null when the list is empty, i.e. nothing can match.
      */
-    private static String eanOrMfnCondition(List<String> eans, List<String> mfnCodes, Map<String, AttributeValue> eav) {
-        List<String> conditions = new ArrayList<>();
-
-        List<String> eanPlaceholders = new ArrayList<>();
-        for (int i = 0; i < eans.size(); i++) {
-            String key = ":ean" + i;
-            eanPlaceholders.add(key);
-            eav.put(key, new AttributeValue().withS(eans.get(i)));
-        }
-        if (!eanPlaceholders.isEmpty()) {
-            conditions.add("ean IN (" + String.join(", ", eanPlaceholders) + ")");
-        }
-
-        List<String> mfnPlaceholders = new ArrayList<>();
-        for (int i = 0; i < mfnCodes.size(); i++) {
-            String key = ":mfn" + i;
-            mfnPlaceholders.add(key);
-            eav.put(key, new AttributeValue().withS(mfnCodes.get(i)));
-        }
-        if (!mfnPlaceholders.isEmpty()) {
-            conditions.add("mfn IN (" + String.join(", ", mfnPlaceholders) + ")");
-        }
-
-        if (conditions.isEmpty()) {
+    private static String eanCondition(List<String> eans, Map<String, AttributeValue> eav) {
+        if (eans.isEmpty()) {
             return null;
         }
-
-        return "(" + String.join(" OR ", conditions) + ")";
-    }
-
-    public List<Product> findAllProductsPaginated(String categoryId, Boolean enabled, String brand, String label, String pimId, String ean, String mfn, Boolean pimIdExists, Integer minStockExpectedQty, Boolean marketplacesNotEmpty, Integer minSuggestedRetailPrice, Integer minMaxRetailPrice, int page, int pageSize) {
-        Map<String, AttributeValue> eav = new HashMap<>();
-        eav.put(":categoryId", new AttributeValue().withS(categoryId));
-
-        StringBuilder filterExpression = new StringBuilder();
-
-        if (enabled != null) {
-            filterExpression.append("enabled = :enabled");
-            eav.put(":enabled", new AttributeValue().withN(enabled ? "1" : "0"));
+        List<String> placeholders = new ArrayList<>();
+        for (int i = 0; i < eans.size(); i++) {
+            String key = ":ean" + i;
+            placeholders.add(key);
+            eav.put(key, new AttributeValue().withS(eans.get(i)));
         }
-
-        if (StringUtils.isNotBlank(brand)) {
-            if (filterExpression.length() > 0) filterExpression.append(" AND ");
-            filterExpression.append("brand = :brand");
-            eav.put(":brand", new AttributeValue().withS(brand));
-        }
-
-        if (StringUtils.isNotBlank(label)) {
-            if (filterExpression.length() > 0) filterExpression.append(" AND ");
-            filterExpression.append("label = :label");
-            eav.put(":label", new AttributeValue().withS(label));
-        }
-
-        if (StringUtils.isNotBlank(pimId)) {
-            if (filterExpression.length() > 0) filterExpression.append(" AND ");
-            filterExpression.append("pimId = :pimId");
-            eav.put(":pimId", new AttributeValue().withS(pimId));
-        }
-
-        if (StringUtils.isNotBlank(ean)) {
-            if (filterExpression.length() > 0) filterExpression.append(" AND ");
-            filterExpression.append("ean = :ean");
-            eav.put(":ean", new AttributeValue().withS(ean));
-        }
-
-        if (StringUtils.isNotBlank(mfn)) {
-            if (filterExpression.length() > 0) filterExpression.append(" AND ");
-            filterExpression.append("mfn = :mfn");
-            eav.put(":mfn", new AttributeValue().withS(mfn));
-        }
-
-        if (pimIdExists != null) {
-            if (filterExpression.length() > 0) filterExpression.append(" AND ");
-            if (pimIdExists) {
-                filterExpression.append("attribute_exists(pimId)");
-            } else {
-                filterExpression.append("attribute_not_exists(pimId) OR pimId = :nullValue");
-                eav.put(":nullValue", new AttributeValue().withNULL(true));
-            }
-        }
-
-        if (minStockExpectedQty != null) {
-            if (filterExpression.length() > 0) filterExpression.append(" AND ");
-            filterExpression.append("stockExpectedQty >= :minStockExpectedQty");
-            eav.put(":minStockExpectedQty", new AttributeValue().withN(String.valueOf(minStockExpectedQty)));
-        }
-
-        if (Boolean.TRUE.equals(marketplacesNotEmpty)) {
-            if (filterExpression.length() > 0) filterExpression.append(" AND ");
-            filterExpression.append("attribute_exists(marketplaces) AND size(marketplaces) > :zero");
-            eav.put(":zero", new AttributeValue().withN("0"));
-        }
-
-        if (minSuggestedRetailPrice != null) {
-            if (filterExpression.length() > 0) filterExpression.append(" AND ");
-            filterExpression.append("suggestedRetailPrice >= :minSuggestedRetailPrice");
-            eav.put(":minSuggestedRetailPrice", new AttributeValue().withN(String.valueOf(minSuggestedRetailPrice)));
-        }
-
-        if (minMaxRetailPrice != null) {
-            if (filterExpression.length() > 0) filterExpression.append(" AND ");
-            filterExpression.append("maxRetailPrice >= :minMaxRetailPrice");
-            eav.put(":minMaxRetailPrice", new AttributeValue().withN(String.valueOf(minMaxRetailPrice)));
-        }
-
-        DynamoDBQueryExpression<Product> queryExpression = new DynamoDBQueryExpression<Product>()
-                .withKeyConditionExpression("categoryId = :categoryId")
-                .withExpressionAttributeValues(eav);
-
-        if (filterExpression.length() > 0) {
-            queryExpression.withFilterExpression(filterExpression.toString());
-        }
-
-        return queryWithPagination(queryExpression, page, pageSize, Product.class);
+        return "ean IN (" + String.join(", ", placeholders) + ")";
     }
 
 }

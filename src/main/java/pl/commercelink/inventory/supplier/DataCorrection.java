@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.products.brand.BrandMapper;
+import pl.commercelink.products.brand.NoNameBrand;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.taxonomy.Taxonomy;
@@ -74,7 +75,7 @@ class DataCorrection {
                 .filter(PimEntry::approved)
                 .map(PimEntry::brand)
                 .filter(StringUtils::isNotBlank)
-                .orElse(null);
+                .orElse(NoNameBrand.NAME);
     }
 
     private Optional<PimEntry> resolveFromPim(InventoryItem offer) {

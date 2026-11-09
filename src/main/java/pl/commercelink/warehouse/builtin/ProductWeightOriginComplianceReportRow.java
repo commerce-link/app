@@ -7,7 +7,7 @@ public record ProductWeightOriginComplianceReportRow(
         String category,
         String brand,
         String name,
-        String mfn,
+        String ean,
         int qty,
         Integer weightNetG,
         Integer weightGrossG,
@@ -17,7 +17,7 @@ public record ProductWeightOriginComplianceReportRow(
 
     public static String[] headers() {
         return new String[]{
-                "Country", "Category", "Brand", "Name", "MFN", "Quantity",
+                "Country", "Category", "Brand", "Name", "EAN", "Quantity",
                 "Net weight (g)", "Gross weight (g)",
                 "Total net weight (g)", "Total gross weight (g)"
         };
@@ -30,7 +30,7 @@ public record ProductWeightOriginComplianceReportRow(
                 category != null ? category : "",
                 brand != null ? brand : "",
                 name != null ? name : "",
-                mfn != null ? mfn : "",
+                ean != null ? ean : "",
                 String.valueOf(qty),
                 weightNetG != null ? String.valueOf(weightNetG) : "",
                 weightGrossG != null ? String.valueOf(weightGrossG) : "",

@@ -17,7 +17,7 @@ public class WarehouseItemAddForm {
 
     private static final Pattern PLAIN_DECIMAL = Pattern.compile("\\d+(\\.\\d+)?");
 
-    private String manufacturerCode;
+    private String ean;
     private String cost;
     private String priceType = "net";
     private String qty = "1";
@@ -25,19 +25,19 @@ public class WarehouseItemAddForm {
     private String supplier;
     private String customSupplier;
     private String name;
-    private String ean;
+    private String manufacturerCode;
     private String category;
-    /** The product data group was on the page this form was sent from, so empty name and EAN are errors now. */
+    /** The product data group was on the page this form was sent from, so empty name and manufacturer code are errors now. */
     private boolean productDataShown;
 
     public Map<String, String> validate(boolean productDataNeeded) {
         Map<String, String> errors = new LinkedHashMap<>();
-        if (StringUtils.isBlank(manufacturerCode)) errors.put("manufacturerCode", "warehouse.item.new.error.mfn");
+        if (StringUtils.isBlank(ean)) errors.put("ean", "warehouse.item.new.error.ean");
         if (amount() == null || amount() < 0) errors.put("cost", "warehouse.item.new.error.cost");
         if (quantity() < 1) errors.put("qty", "warehouse.item.new.error.qty");
         if (statusValue() == null) errors.put("status", "warehouse.item.new.error.status");
         if (productDataNeeded && StringUtils.isBlank(name)) errors.put("name", "warehouse.item.new.error.name");
-        if (productDataNeeded && StringUtils.isBlank(ean)) errors.put("ean", "warehouse.item.new.error.ean");
+        if (productDataNeeded && StringUtils.isBlank(manufacturerCode)) errors.put("manufacturerCode", "warehouse.item.new.error.mfn");
         return errors;
     }
 

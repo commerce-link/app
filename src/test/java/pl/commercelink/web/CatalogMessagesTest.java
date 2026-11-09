@@ -118,4 +118,15 @@ class CatalogMessagesTest {
             throw new IllegalStateException(e);
         }
     }
+
+    @Test
+    void theDuplicateProductMessageNamesOnlyWhatTheCheckCompares() throws Exception {
+        // when
+        String pl = catalogMessages("messages_pl.properties").get("product.error.duplicate");
+        String en = catalogMessages("messages_en.properties").get("product.error.duplicate");
+
+        // then
+        assertThat(pl).contains("EAN").doesNotContain("kod producenta");
+        assertThat(en).contains("EAN").doesNotContain("manufacturer code");
+    }
 }

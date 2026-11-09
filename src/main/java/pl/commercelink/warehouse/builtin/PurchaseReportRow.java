@@ -7,12 +7,12 @@ public record PurchaseReportRow(
         String supplier,
         String brand,
         String name,
-        String mfn,
+        String ean,
         int qty
 ) implements CSVReady {
 
     public static String[] headers() {
-        return new String[]{"Category", "Supplier", "Brand", "Name", "MFN", "Quantity"};
+        return new String[]{"Category", "Supplier", "Brand", "Name", "EAN", "Quantity"};
     }
 
     @Override
@@ -22,7 +22,7 @@ public record PurchaseReportRow(
                 supplier != null ? supplier : "",
                 brand != null ? brand : "",
                 name != null ? name : "",
-                mfn != null ? mfn : "",
+                ean != null ? ean : "",
                 String.valueOf(qty)
         };
     }

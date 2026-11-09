@@ -94,19 +94,24 @@ public class TaxonomyCache {
 
     public Taxonomy find(InventoryKey inventoryKey) {
         Taxonomy taxonomy = Taxonomy.EMPTY;
+        Taxonomy branded = null;
 
         for (Taxonomy t : recordsOf(inventoryKey.getProductEans())) {
             if (t.isPreferredOver(taxonomy)) {
                 taxonomy = t;
             }
+            if (t.hasRealBrand() && (branded == null || t.isPreferredOver(branded))) {
+                branded = t;
+            }
         }
 
-        return taxonomy;
+        return taxonomy.withRealBrandFrom(branded);
     }
 
-    @Deprecated
-    public Taxonomy findByMfn(String mfn) {
-        return best(recordsOf(codeIndex.eansOfSingleBrand(mfn)));
+    public void blockCodeSource(String mfn, String brand, String ean) {
+        String key = unifyEan(ean);
+        if (StringUtils.isBlank(key)) return;
+        codeIndex.block(mfn, brand, key);
     }
 
     public Taxonomy findCategorySource(Taxonomy row) {

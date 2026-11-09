@@ -1,18 +1,18 @@
 package pl.commercelink.externaloffers;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.externaloffers.ResolvedOffer.Source;
-import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.PimEntry;
-import pl.commercelink.pim.api.PimView;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.StoreCategoryResolver;
 import pl.commercelink.products.information.StorePimAliases;
@@ -48,10 +48,6 @@ class ExternalOfferResolverTest {
     @Mock
     private ExternalOfferLinkRepository links;
     @Mock
-    private PimCatalog pimCatalog;
-    @Mock
-    private PimView view;
-    @Mock
     private StorePimAliases aliases;
     @Mock
     private ProductRepository products;
@@ -62,8 +58,17 @@ class ExternalOfferResolverTest {
     @Mock
     private StoreCategoryResolver storeCategories;
 
-    @InjectMocks
     private ExternalOfferResolver resolver;
+
+    @BeforeEach
+    void setUp() {
+        resolver = resolverWith();
+    }
+
+    private ExternalOfferResolver resolverWith(PimEntry... pimEntries) {
+        return new ExternalOfferResolver(links, aliases, products, catalogs,
+                new ProductDataResolver(ScopedPimCatalog.of(pimEntries), taxonomy), storeCategories);
+    }
 
     private void inTaxonomy(String ean, String category, String categoryId) {
         when(taxonomy.findByEan(ean)).thenReturn(new Taxonomy(ean, "MFN-" + ean, "Brand", "Name " + ean, category, 1,
@@ -107,11 +112,6 @@ class ExternalOfferResolverTest {
         when(aliases.effectiveEntry(STORE, pimId)).thenReturn(Optional.of(entry));
     }
 
-    private void mpnIn(String mpn, PimEntry entry) {
-        when(pimCatalog.withStoreData(STORE)).thenReturn(view);
-        when(view.findByMpn(mpn)).thenReturn(Optional.of(entry));
-    }
-
     private void catalogCategory(String categoryId, String name) {
         CategoryDefinition category = new CategoryDefinition();
         category.setCategoryId(categoryId);
@@ -140,7 +140,7 @@ class ExternalOfferResolverTest {
         storeSees("k7m2xq9pz4", globalEntry("k7m2xq9pz4", "5900000000011", "M1", "cat-a"));
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "k7m2xq9pz4", null);
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "k7m2xq9pz4");
 
         // then
         assertThat(result).map(ResolvedOffer::source).contains(Source.OWN_OFFER);
@@ -155,7 +155,7 @@ class ExternalOfferResolverTest {
                 "k7m2xq9pz4", List.of("2001000000043"), ExternalOfferLinkSource.MANUAL, "u", Instant.now())));
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "k7m2xq9pz4", null);
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "k7m2xq9pz4");
 
         // then the offer is recognised as before offer links existed
         assertThat(result).map(ResolvedOffer::source).contains(Source.OWN_OFFER);
@@ -164,14 +164,14 @@ class ExternalOfferResolverTest {
     }
 
     @Test
-    void anOfferCommerceLinkPublishedWithoutCodesFallsToTheManufacturerCodeNotToALink() {
+    void anOfferCommerceLinkPublishedWithoutCodesIsUnresolvedNotTakenOverByALink() {
         // given
         storeSees("pim-9", globalEntry("pim-9", null, null, "cat-a"));
         lenient().when(links.find(STORE, EMPIK, "pim-9")).thenReturn(Optional.of(ExternalOfferLink.of(STORE, EMPIK,
                 "pim-9", List.of("2001000000043"), ExternalOfferLinkSource.MANUAL, "u", Instant.now())));
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "pim-9", null);
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "pim-9");
 
         // then
         assertThat(result).isEmpty();
@@ -194,7 +194,7 @@ class ExternalOfferResolverTest {
         storeSees("src", cloneEntry("clone", STORE, "src", "5900000000011", "M1", "cat-a"));
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "src", null);
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "src");
 
         // then
         assertThat(result).map(ResolvedOffer::pimId).contains("clone");
@@ -202,16 +202,13 @@ class ExternalOfferResolverTest {
     }
 
     @Test
-    void fallsBackToManufacturerCodeAsBeforeWithoutReadingTheCatalogs() {
-        // given
-        mpnIn("DMW-1001", globalEntry("pim-2", "5900000000022", "DMW-1001", "cat-b"));
-
+    void aLineWithoutAnOfferKeyIsUnresolvedWithoutReadingAnything() {
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, null, "DMW-1001");
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, null);
 
         // then
-        assertThat(result).contains(new ResolvedOffer("pim-2", "5900000000022", "DMW-1001", "cat-b", Source.MFN));
-        verifyNoInteractions(catalogs, products, links, aliases);
+        assertThat(result).isEmpty();
+        verifyNoInteractions(catalogs, products, links, aliases, taxonomy);
     }
 
     @Test
@@ -220,7 +217,7 @@ class ExternalOfferResolverTest {
         storeSees("pim-3", globalEntry("pim-3", "05900000000033", null, "cat-c"));
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "pim-3", null);
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "pim-3");
 
         // then
         assertThat(result).contains(new ResolvedOffer("pim-3", "5900000000033", null, "cat-c", Source.OWN_OFFER));
@@ -233,7 +230,7 @@ class ExternalOfferResolverTest {
         storeSees("pim-3", globalEntry("pim-3", null, null, "cat-c"));
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "pim-3", null);
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "pim-3");
 
         // then
         assertThat(result).isEmpty();
@@ -241,11 +238,8 @@ class ExternalOfferResolverTest {
 
     @Test
     void returnsEmptyWhenNothingMatches() {
-        // given
-        when(pimCatalog.withStoreData(STORE)).thenReturn(view);
-
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "unknown", "nope");
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "unknown");
 
         // then
         assertThat(result).isEmpty();
@@ -295,12 +289,12 @@ class ExternalOfferResolverTest {
     }
 
     @Test
-    void resolvesALinkToItsEanWithoutReadingTheCatalogsOrThePimData() {
+    void resolvesALinkToItsEanWithoutReadingTheCatalogs() {
         // given
         link("K", "5901234567890");
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", "DMW-1001");
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K");
 
         // then the goods need not be in a catalog: fulfilment finds them by the EAN
         assertThat(result).contains(new ResolvedOffer(null, "5901234567890", null, null, Source.LINK));
@@ -308,7 +302,7 @@ class ExternalOfferResolverTest {
         // the only question is whether the key is one of CommerceLink's own offers, which links leave alone
         verify(aliases).effectiveEntry(STORE, "K");
         verifyNoMoreInteractions(aliases);
-        verifyNoInteractions(pimCatalog, catalogs, products);
+        verifyNoInteractions(catalogs, products);
     }
 
     @Test
@@ -319,11 +313,29 @@ class ExternalOfferResolverTest {
         when(storeCategories.categoryNamesByPimCategoryId(STORE)).thenReturn(Map.of("pim-cpu", "Procesory"));
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", null);
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K");
 
         // then
         assertThat(result).map(ResolvedOffer::category).contains("Procesory");
-        verifyNoInteractions(pimCatalog, catalogs, products);
+        verifyNoInteractions(catalogs, products);
+    }
+
+    @Test
+    void aLinkedLineTakesTheCategoryOfTheStoresPimEntryOfItsEanBeforeTheTaxonomy() {
+        // given
+        link("K", "5901234567890");
+        inTaxonomy("5901234567890", "Processors", "pim-cpu");
+        when(storeCategories.categoryNamesByPimCategoryId(STORE))
+                .thenReturn(Map.of("pim-cpu", "Procesory", "pim-gpu", "Karty graficzne"));
+        ExternalOfferResolver resolver = resolverWith(new PimEntry("s1-1",
+                ScopedPimCatalog.identifiers("5901234567890", null), "Brand", "Name", "Graphics Cards", null, true,
+                null, null, "pim-gpu", STORE));
+
+        // when
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K");
+
+        // then
+        assertThat(result).map(ResolvedOffer::category).contains("Karty graficzne");
     }
 
     @Test
@@ -334,7 +346,7 @@ class ExternalOfferResolverTest {
         when(storeCategories.categoryNamesByPimCategoryId(STORE)).thenReturn(Map.of());
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", null);
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K");
 
         // then
         assertThat(result).map(ResolvedOffer::category).contains("Processors");
@@ -348,7 +360,7 @@ class ExternalOfferResolverTest {
         inTaxonomy("5901234567890", "Lamps", null);
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", null);
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K");
 
         // then
         assertThat(result).map(ResolvedOffer::category).contains("Lamps");
@@ -361,7 +373,7 @@ class ExternalOfferResolverTest {
         link("K", "5901234567890");
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", null);
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K");
 
         // then the line is still resolved by its EAN
         assertThat(result).map(ResolvedOffer::sku).contains("5901234567890");
@@ -380,8 +392,8 @@ class ExternalOfferResolverTest {
         ExternalOfferResolver.StoreOffers offers = resolver.forStore(STORE);
 
         // when
-        Optional<ResolvedOffer> first = offers.resolve(EMPIK, "K1", null);
-        Optional<ResolvedOffer> second = offers.resolve(EMPIK, "K2", null);
+        Optional<ResolvedOffer> first = offers.resolve(EMPIK, "K1");
+        Optional<ResolvedOffer> second = offers.resolve(EMPIK, "K2");
 
         // then
         assertThat(first).map(ResolvedOffer::category).contains("Procesory");
@@ -395,7 +407,7 @@ class ExternalOfferResolverTest {
         link("K", "5900000000099", "5901234567890");
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", null);
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K");
 
         // then
         assertThat(result).map(ResolvedOffer::ean).contains("5900000000099");
@@ -408,23 +420,22 @@ class ExternalOfferResolverTest {
         link("K", "0730143315555", "730143315555");
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", null);
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K");
 
         // then
         assertThat(result).map(ResolvedOffer::sku).contains("730143315555");
     }
 
     @Test
-    void aLinkWithoutEansFallsThroughToTheManufacturerCodeStep() {
+    void aLinkWithoutEansIsNoLinkAndLeavesTheLineUnresolved() {
         // given
         link("K");
-        mpnIn("DMW-1001", globalEntry("pim-2", "5900000000022", "DMW-1001", "cat-b"));
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", "DMW-1001");
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K");
 
         // then
-        assertThat(result).contains(new ResolvedOffer("pim-2", "5900000000022", "DMW-1001", "cat-b", Source.MFN));
+        assertThat(result).isEmpty();
     }
 
     @Test
@@ -433,7 +444,7 @@ class ExternalOfferResolverTest {
         link("K", "N/A", "2000000001012", "123:456");
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", null);
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K");
 
         // then
         assertThat(result).map(ResolvedOffer::sku).contains("2000000001012");
@@ -441,20 +452,19 @@ class ExternalOfferResolverTest {
     }
 
     @Test
-    void aLinkWithoutAValidEanFallsThroughToTheManufacturerCodeStep() {
+    void aLinkWithoutAValidEanIsNoLinkAndLeavesTheLineUnresolved() {
         // given
         link("K", "N/A", "20070000001A");
-        mpnIn("DMW-1001", globalEntry("pim-2", "5900000000022", "DMW-1001", "cat-b"));
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", "DMW-1001");
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K");
 
         // then
-        assertThat(result).contains(new ResolvedOffer("pim-2", "5900000000022", "DMW-1001", "cat-b", Source.MFN));
+        assertThat(result).isEmpty();
     }
 
     @Test
-    void looksEachEanUpInTheTaxonomyOncePerScope() {
+    void looksEachEanUpOncePerScope() {
         // given the same goods on several lines of one import, one EAN the taxonomy knows and one it does not
         when(taxonomy.findByEan("2000000001012")).thenReturn(null);
         inTaxonomy("2000000001029", "Lamps", null);
@@ -464,7 +474,7 @@ class ExternalOfferResolverTest {
         ResolvedOffer first = offers.linked(List.of("2000000001012", "2000000001029"));
         ResolvedOffer second = offers.linked(List.of("2000000001012", "2000000001029"));
 
-        // then the taxonomy is a scan of every entry, so a repeated EAN is not looked up again
+        // then a repeated EAN is not looked up again
         assertThat(first.category()).isEqualTo("Lamps");
         assertThat(second.category()).isEqualTo("Lamps");
         verify(taxonomy, times(1)).findByEan("2000000001012");
@@ -489,7 +499,7 @@ class ExternalOfferResolverTest {
         when(products.findByProductId("c1", "p1")).thenReturn(full);
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "pim-1", null);
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "pim-1");
 
         // then
         assertThat(result).contains(new ResolvedOffer("pim-1", "5901234567890", "DMW-2001", "cat-a", Source.OWN_OFFER));
@@ -506,7 +516,7 @@ class ExternalOfferResolverTest {
         when(products.findAllByPimId("pim-1")).thenReturn(List.of(foreign));
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "pim-1", null);
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "pim-1");
 
         // then
         assertThat(result).contains(new ResolvedOffer("pim-1", "5900000000011", "M1", "cat-a", Source.OWN_OFFER));
@@ -522,7 +532,7 @@ class ExternalOfferResolverTest {
         catalogProduct("c1", "p1", "src", "5901234567890", "DMW-2001");
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "src", null);
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "src");
 
         // then
         assertThat(result).contains(new ResolvedOffer("clone", "5901234567890", "DMW-2001", "cat-a", Source.OWN_OFFER));
@@ -537,7 +547,7 @@ class ExternalOfferResolverTest {
         when(products.findAllByPimId("clone")).thenReturn(List.of());
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "src", null);
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "src");
 
         // then
         assertThat(result).contains(new ResolvedOffer("clone", "5900000000011", "M1", "cat-a", Source.OWN_OFFER));
@@ -553,7 +563,7 @@ class ExternalOfferResolverTest {
         catalogProduct("c1", "p1", "pim-1", "5901234567890", "DMW-2001");
 
         // when
-        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "pim-1", null);
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "pim-1");
 
         // then
         assertThat(result).map(ResolvedOffer::category).contains("Krzesła");
@@ -575,8 +585,8 @@ class ExternalOfferResolverTest {
         when(products.findAllByPimId("pim-2")).thenReturn(List.of(foreign));
 
         // when
-        Optional<ResolvedOffer> own = resolver.resolve(STORE, EMPIK, "pim-1", null);
-        Optional<ResolvedOffer> other = resolver.resolve(STORE, EMPIK, "pim-2", null);
+        Optional<ResolvedOffer> own = resolver.resolve(STORE, EMPIK, "pim-1");
+        Optional<ResolvedOffer> other = resolver.resolve(STORE, EMPIK, "pim-2");
 
         // then
         assertThat(own).map(ResolvedOffer::mfn).contains("DMW-2001");

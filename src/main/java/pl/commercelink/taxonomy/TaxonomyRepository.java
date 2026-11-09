@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 import pl.commercelink.inventory.supplier.api.support.ProductFeedPurifier;
 import pl.commercelink.products.brand.BrandMapper;
+import pl.commercelink.products.brand.NoNameBrand;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.starter.csv.CSVLoader;
 
@@ -46,7 +47,7 @@ public class TaxonomyRepository {
                 try {
                     Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
                     Taxonomy unified = new Taxonomy(parsed.ean(), parsed.mfn(),
-                            brandMapper.unifyBrand(parsed.brand()),
+                            NoNameBrand.isPlaceholder(parsed.brand()) ? NoNameBrand.NAME : brandMapper.unifyBrand(parsed.brand()),
                             parsed.name(), parsed.category(), parsed.dataAccuracyScore(),
                             parsed.netWeightInGrams(), parsed.grossWeightInGrams(),
                             parsed.rawCategory(), parsed.categoryId());

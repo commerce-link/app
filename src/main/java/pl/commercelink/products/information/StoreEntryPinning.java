@@ -12,7 +12,6 @@ import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
-import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.util.Collection;
@@ -23,15 +22,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 /**
- * Keeps product pins in step with a store's own PIM entry whose codes changed, and with any deleted entry.
- * Only the codes an edit removed can unpin a product: products are often pinned through a sibling code of their
- * supplier group, so "own code not in the entry" alone would unpin them wrongly. A store's clone of a global entry
- * takes over the store's products of its source once PIM's delayed announcement arrives, and gives them back when the
- * clone is deleted.
+ * Keeps product pins in step with a store's own PIM entry whose EANs changed, and with any deleted entry. Only EANs
+ * pin and unpin: an entry's MPNs never move a product. Only the EANs an edit removed can unpin a product: products are
+ * often pinned through a sibling EAN of their supplier group, so "own EAN not in the entry" alone would unpin them
+ * wrongly. A store's clone of a global entry takes over the store's products of its source once PIM's delayed
+ * announcement arrives, and gives them back when the clone is deleted.
  */
 @Slf4j
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
@@ -40,7 +38,6 @@ class StoreEntryPinning {
     private final ProductRepository productRepository;
     private final ProductCatalogRepository productCatalogRepository;
     private final StoreEntryCodeHistory codeHistory;
-    private final BrandMapper brandMapper;
 
     void onStoreEntryAnnounced(PIMEntryAddedEvent event, PimCatalog catalog) {
         String ownerStoreId = event.ownerStoreId();
@@ -48,24 +45,23 @@ class StoreEntryPinning {
             return;
         }
         List<String> ownerCategoryIds = categoryIdsOf(ownerStoreId);
-        Codes announced = Codes.of(event.eans(), event.mfnCodes());
+        Codes announced = Codes.of(event.eans());
         PimView storeView = catalog.withStoreData(ownerStoreId);
-        // the codes before the event: the copy holds them until its next refresh, and a refresh triggered meanwhile by
+        // the EANs before the event: the copy holds them until its next refresh, and a refresh triggered meanwhile by
         // another event leaves them only in the history
         Codes inCopy = storeView.findByPimId(event.pimId())
-                .map(entry -> Codes.of(entry.gtins(), entry.mpns()))
+                .map(entry -> Codes.of(entry.gtins()))
                 .orElse(Codes.EMPTY);
-        Codes before = inCopy.plus(Codes.of(codeHistory.eansOf(event.pimId()), codeHistory.mpnsOf(event.pimId())));
+        Codes before = inCopy.plus(Codes.of(codeHistory.eansOf(event.pimId())));
 
         int unpinned = detachProductsOfRemovedCodes(event.pimId(), ownerStoreId, announced, inCopy, before,
                 ownerCategoryIds, catalog);
-        int pinned = attachMatchingProducts(event.pimId(), ownerStoreId, announced, event.brand(), storeView,
-                ownerCategoryIds);
+        int pinned = attachMatchingProducts(event.pimId(), ownerStoreId, announced, storeView, ownerCategoryIds);
         // one line per event, also when nothing changed: with two instances, it shows which one handled the event and
-        // whether that instance knew the codes the edit replaced (a product pinned by an unknown code stays pinned)
-        log.info("PIM entry {} of store {} with EANs {} and MPNs {}: {} products unpinned, {} pinned or moved here{}",
-                event.pimId(), ownerStoreId, announced.eans(), announced.mfnCodes(), unpinned, pinned,
-                before.isEmpty() ? "; its codes before this event are unknown to this instance (a new entry, or one "
+        // whether that instance knew the EANs the edit replaced (a product pinned by an unknown EAN stays pinned)
+        log.info("PIM entry {} of store {} with EANs {}: {} products unpinned, {} pinned or moved here{}",
+                event.pimId(), ownerStoreId, announced.eans(), unpinned, pinned,
+                before.isEmpty() ? "; its EANs before this event are unknown to this instance (a new entry, or one "
                         + "created or changed after this instance last loaded the PIM index)" : "");
     }
 
@@ -111,22 +107,21 @@ class StoreEntryPinning {
                 .toList();
         onSource.forEach(product -> repin(product, sourcePimId, event.pimId(), event.pimId(),
                 "moved from the source to the store's clone"));
-        // the clone's codes in the refreshed copy, not the ones the event carries: the store may have changed them
-        // during the delay, and those code-change events were already handled as for any store entry
-        Codes current = Codes.of(clone.get().gtins(), clone.get().mpns());
-        int pinned = attachMatchingProducts(event.pimId(), ownerStoreId, current, clone.get().brand(), storeView,
-                ownerCategoryIds);
-        log.info("PIM clone {} of {} in store {} with EANs {} and MPNs {}: {} products moved from the source, {} pinned "
-                        + "or moved here by code", event.pimId(), sourcePimId, ownerStoreId, current.eans(),
-                current.mfnCodes(), onSource.size(), pinned);
+        // the clone's EANs in the refreshed copy, not the ones the event carries: the store may have changed them
+        // during the delay, and those change events were already handled as for any store entry
+        Codes current = Codes.of(clone.get().gtins());
+        int pinned = attachMatchingProducts(event.pimId(), ownerStoreId, current, storeView, ownerCategoryIds);
+        log.info("PIM clone {} of {} in store {} with EANs {}: {} products moved from the source, {} pinned or moved "
+                        + "here by EAN", event.pimId(), sourcePimId, ownerStoreId, current.eans(), onSource.size(),
+                pinned);
     }
 
     /**
      * A product of a deleted clone goes back to the clone's source while the source is still global in the copy
-     * (R18), also when only a sibling code pinned it; a product that matches the clone's own codes but none of the
-     * source's was attached by codes the store gave the clone, so it follows the code rule instead. For any other
-     * entry the code rule applies. The copy is not refreshed yet when this runs, so it still holds the deleted entry,
-     * its codes and its source.
+     * (R18), also when only a sibling EAN pinned it; a product whose EAN is among the clone's own but none of the
+     * source's was attached by EANs the store gave the clone, so it follows the EAN rule instead. For any other entry
+     * the EAN rule applies. The copy is not refreshed yet when this runs, so it still holds the deleted entry, its EANs
+     * and its source.
      */
     void onEntryDeleted(String pimId, PimCatalog catalog) {
         List<Product> detached = productRepository.detachPimFromProducts(pimId);
@@ -188,11 +183,10 @@ class StoreEntryPinning {
             return source.map(PimEntry::pimId);
         }
 
-        // the store may have changed the clone's codes, which pins its products with those codes to the clone; such a
-        // product is not the source's product, while one matching neither entry came by a sibling code (or the move)
+        // the store may have changed the clone's EANs, which pins its products with those EANs to the clone; such a
+        // product is not the source's product, while one matching neither entry came by a sibling EAN (or the move)
         private static boolean attachedByTheClonesOwnCodes(Product product, PimEntry clone, PimEntry source) {
-            return Codes.of(clone.gtins(), clone.mpns()).matchesUnified(product)
-                    && !Codes.of(source.gtins(), source.mpns()).matchesUnified(product);
+            return Codes.of(clone.gtins()).matchesUnified(product) && !Codes.of(source.gtins()).matchesUnified(product);
         }
 
         private Map<String, String> storeOfCategory() {
@@ -208,16 +202,15 @@ class StoreEntryPinning {
         }
     }
 
-    // codes known to neither the copy nor the history unpin nothing: the product stays pinned
+    // EANs known to neither the copy nor the history unpin nothing: the product stays pinned
     private int detachProductsOfRemovedCodes(String pimId, String ownerStoreId, Codes announced, Codes inCopy,
                                              Codes before, List<String> ownerCategoryIds, PimCatalog catalog) {
         Codes removed = before.minus(announced);
         if (removed.isEmpty()) {
             return 0;
         }
-        log.info("PIM entry {} of store {}: codes removed by the edit {} {} (only in the history: {} {})", pimId,
-                ownerStoreId, removed.eans(), removed.mfnCodes(), removed.minus(inCopy).eans(),
-                removed.minus(inCopy).mfnCodes());
+        log.info("PIM entry {} of store {}: EANs removed by the edit {} (only in the history: {})", pimId,
+                ownerStoreId, removed.eans(), removed.minus(inCopy).eans());
         Set<String> categoryIds = Set.copyOf(ownerCategoryIds);
         List<Product> toDetach = productRepository.findAllByPimId(pimId).stream()
                 .filter(projection -> categoryIds.contains(projection.getCategoryId()))
@@ -230,21 +223,19 @@ class StoreEntryPinning {
         }
         PimView globalView = catalog.withGlobalData();
         toDetach.forEach(product -> repin(product, product.getPimId(),
-                pinToGlobalEntry(product, pimId, globalView).orElse(null), pimId, "its code was removed from the entry"));
+                pinToGlobalEntry(product, pimId, globalView).orElse(null), pimId, "its EAN was removed from the entry"));
         return toDetach.size();
     }
 
-    private int attachMatchingProducts(String pimId, String ownerStoreId, Codes announced, String entryBrand,
-                                       PimView storeView, List<String> ownerCategoryIds) {
-        List<Product> toAttach = productRepository
-                .findAllByEanOrMfnInCategories(ownerCategoryIds, announced.eanList(), announced.mfnList()).stream()
-                .filter(product -> announced.matchesEan(product)
-                        || brandMapper.compatible(product.getBrand(), entryBrand))
+    private int attachMatchingProducts(String pimId, String ownerStoreId, Codes announced, PimView storeView,
+                                       List<String> ownerCategoryIds) {
+        List<Product> toAttach = productRepository.findAllByEanInCategories(ownerCategoryIds, announced.eanList())
+                .stream()
                 .filter(product -> isBlank(product.getPimId())
                         || isOtherEntryOfSameStore(product.getPimId(), pimId, ownerStoreId, storeView))
                 .toList();
         toAttach.forEach(product -> repin(product, product.getPimId(), pimId, pimId, isBlank(product.getPimId())
-                ? "its code matches the entry" : "its code moved here from another entry of the store"));
+                ? "its EAN matches the entry" : "its EAN moved here from another entry of the store"));
         return toAttach.size();
     }
 
@@ -257,7 +248,7 @@ class StoreEntryPinning {
                 product.getProductId(), oldPimId, newPimId, reason);
     }
 
-    // a code belongs to one entry within a store, so a product of the store on another of its entries moves here;
+    // an EAN belongs to one entry within a store, so a product of the store on another of its entries moves here;
     // products pinned to a global entry stay where they are
     private static boolean isOtherEntryOfSameStore(String currentPimId, String pimId, String ownerStoreId,
                                                    PimView storeView) {
@@ -270,8 +261,8 @@ class StoreEntryPinning {
     }
 
     // the handled entry may still sit in the copy of the index, so it is never the result
-    private Optional<String> pinToGlobalEntry(Product product, String handledPimId, PimView globalView) {
-        return ProductEntryLookup.find(globalView, product, brandMapper)
+    private static Optional<String> pinToGlobalEntry(Product product, String handledPimId, PimView globalView) {
+        return globalView.findByGtin(product.getEan())
                 .map(PimEntry::pimId)
                 .filter(globalPimId -> !globalPimId.equals(handledPimId));
     }
@@ -289,68 +280,47 @@ class StoreEntryPinning {
         return value == null || value.isBlank();
     }
 
-    private record Codes(Set<String> eans, Set<String> mfnCodes) {
+    private record Codes(Set<String> eans) {
 
-        static final Codes EMPTY = new Codes(Set.of(), Set.of());
+        static final Codes EMPTY = new Codes(Set.of());
 
-        static Codes of(Collection<String> eans, Collection<String> mfnCodes) {
-            return new Codes(unified(eans, UnifiedProductIdentifiers::unifyEan),
-                    unified(mfnCodes, UnifiedProductIdentifiers::unifyMfn));
-        }
-
-        private static Set<String> unified(Collection<String> codes, UnaryOperator<String> unify) {
-            if (codes == null) {
-                return Set.of();
+        static Codes of(Collection<String> eans) {
+            if (eans == null) {
+                return EMPTY;
             }
-            return codes.stream()
-                    .filter(code -> code != null && !code.isBlank())
-                    .map(unify)
-                    .collect(Collectors.toUnmodifiableSet());
+            return new Codes(eans.stream()
+                    .filter(ean -> ean != null && !ean.isBlank())
+                    .map(UnifiedProductIdentifiers::unifyEan)
+                    .collect(Collectors.toUnmodifiableSet()));
         }
 
         Codes plus(Codes other) {
-            Set<String> allEans = new HashSet<>(eans);
-            allEans.addAll(other.eans);
-            Set<String> allMfnCodes = new HashSet<>(mfnCodes);
-            allMfnCodes.addAll(other.mfnCodes);
-            return new Codes(allEans, allMfnCodes);
+            Set<String> all = new HashSet<>(eans);
+            all.addAll(other.eans);
+            return new Codes(all);
         }
 
         Codes minus(Codes other) {
-            Set<String> remainingEans = new HashSet<>(eans);
-            remainingEans.removeAll(other.eans);
-            Set<String> remainingMfnCodes = new HashSet<>(mfnCodes);
-            remainingMfnCodes.removeAll(other.mfnCodes);
-            return new Codes(remainingEans, remainingMfnCodes);
+            Set<String> remaining = new HashSet<>(eans);
+            remaining.removeAll(other.eans);
+            return new Codes(remaining);
         }
 
         boolean isEmpty() {
-            return eans.isEmpty() && mfnCodes.isEmpty();
+            return eans.isEmpty();
         }
 
-        // the product's codes unified as the entry's are, for codes stored before unification
+        // the product's EAN unified as the entry's are, for EANs stored before unification
         boolean matchesUnified(Product product) {
-            String ean = product.getEan() == null ? null : UnifiedProductIdentifiers.unifyEan(product.getEan());
-            String mfn = product.getManufacturerCode() == null ? null
-                    : UnifiedProductIdentifiers.unifyMfn(product.getManufacturerCode());
-            return (ean != null && eans.contains(ean)) || (mfn != null && mfnCodes.contains(mfn));
+            return product.getEan() != null && eans.contains(UnifiedProductIdentifiers.unifyEan(product.getEan()));
         }
 
         boolean matches(Product product) {
-            String mfn = product.getManufacturerCode();
-            return matchesEan(product) || (mfn != null && mfnCodes.contains(mfn));
-        }
-
-        boolean matchesEan(Product product) {
             return product.getEan() != null && eans.contains(product.getEan());
         }
 
         List<String> eanList() {
             return List.copyOf(eans);
-        }
-
-        List<String> mfnList() {
-            return List.copyOf(mfnCodes);
         }
     }
 }

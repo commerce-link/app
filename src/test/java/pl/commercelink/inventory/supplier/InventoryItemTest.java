@@ -39,6 +39,16 @@ class InventoryItemTest {
         assertFalse(item.isOfBrand("Kingston"));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"NoName", "noname"})
+    void noNameOfferIsOfNoBrand(String other) {
+        // given
+        InventoryItem item = new InventoryItem("NoName", null, "1234567890123", "MFN-1", "Action", 10.0, "PLN", 5, 1, true, false, false);
+
+        // when / then
+        assertFalse(item.isOfBrand(other));
+    }
+
     @Test
     void codeContainingADotIsARealCode() {
         // given
@@ -134,6 +144,19 @@ class InventoryItemTest {
     void itemWithAnEanRequiresNoEanCorrection() {
         // when / then
         assertFalse(new InventoryItem("1234567890123", "MFN-1", 10.0, "PLN", 5, 1, "Elko").requiresEanCorrection());
+    }
+
+    @Test
+    void itemWithAnInvalidEanIsUnsellable() {
+        // given
+        InventoryItem item = new InventoryItem("9999999999999", "MFN-1", 10.0, "PLN", 5, 1, "Ingram Micro");
+
+        // when
+        boolean sellable = item.isSellable();
+
+        // then
+        assertFalse(item.hasEan());
+        assertFalse(sellable);
     }
 
     @Test

@@ -1,69 +1,43 @@
 package pl.commercelink.externaloffers;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.externaloffers.ResolvedOffer.Source;
-import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
-import pl.commercelink.products.Product;
-import pl.commercelink.products.ProductCatalog;
-import pl.commercelink.products.ProductCatalogRepository;
-import pl.commercelink.products.ProductRepository;
-import pl.commercelink.products.StoreCategoryResolver;
+import pl.commercelink.products.*;
 import pl.commercelink.products.information.StorePimAliases;
-import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Resolves a marketplace order line to the EAN fulfilment looks goods up by: first the seller offer key taken as our own
  * pimId (an offer CommerceLink published, for which no link is ever read), then for any other key an explicit offer link
  * (its EANs, taken as they are: fulfilment finds the goods in the warehouse and the suppliers' feeds, so the product need
- * not be in a catalog; the category comes from the taxonomy), then the manufacturer code as MPN. See
+ * not be in a catalog; the category comes from {@link ProductDataResolver}). The line's manufacturer code is never looked
+ * up: without a brand it can name another product, such as another size of the same model. See
  * {@link ResolvedOffer#sku()}.
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class ExternalOfferResolver {
 
     private final ExternalOfferLinkRepository linkRepository;
-    private final PimCatalog pimCatalog;
     private final StorePimAliases pimAliases;
     private final ProductRepository productRepository;
     private final ProductCatalogRepository productCatalogRepository;
-    private final TaxonomyCache taxonomyCache;
+    private final ProductDataResolver productDataResolver;
     private final StoreCategoryResolver storeCategoryResolver;
-
-    public ExternalOfferResolver(ExternalOfferLinkRepository linkRepository, PimCatalog pimCatalog,
-                                    StorePimAliases pimAliases, ProductRepository productRepository,
-                                    ProductCatalogRepository productCatalogRepository, TaxonomyCache taxonomyCache,
-                                    StoreCategoryResolver storeCategoryResolver) {
-        this.linkRepository = linkRepository;
-        this.pimCatalog = pimCatalog;
-        this.pimAliases = pimAliases;
-        this.productRepository = productRepository;
-        this.productCatalogRepository = productCatalogRepository;
-        this.taxonomyCache = taxonomyCache;
-        this.storeCategoryResolver = storeCategoryResolver;
-    }
 
     /**
      * Resolutions for the lines of one import message or one operator action. What a line needs is read lazily and then
      * kept for the scope: the store's catalog list at most twice (once for the catalog categories of own offers, once
      * through {@link StoreCategoryResolver} for the category names of linked lines), the products of every catalog
-     * category at most once (only {@link StoreOffers#catalogProducts()} reads them), and the taxonomy once per EAN. An own
-     * offer's product is still looked up by pimId for each line. Not meant to outlive that call, so catalog changes are
-     * seen by the next one.
+     * category at most once (only {@link StoreOffers#catalogProducts()} reads them), and the product data once per EAN.
+     * An own offer's product is still looked up by pimId for each line. Not meant to outlive that call, so catalog changes
+     * are seen by the next one.
      */
     public StoreOffers forStore(String storeId) {
         return new StoreOffers(storeId);
@@ -77,8 +51,8 @@ public class ExternalOfferResolver {
         return StringUtils.isNotBlank(offerKey) && pimAliases.effectiveEntry(storeId, offerKey).isPresent();
     }
 
-    public Optional<ResolvedOffer> resolve(String storeId, String orderSource, String offerKey, String manufacturerCode) {
-        return forStore(storeId).resolve(orderSource, offerKey, manufacturerCode);
+    public Optional<ResolvedOffer> resolve(String storeId, String orderSource, String offerKey) {
+        return forStore(storeId).resolve(orderSource, offerKey);
     }
 
     public class StoreOffers {
@@ -87,37 +61,23 @@ public class ExternalOfferResolver {
         private Map<String, String> categoryNamesById;
         private List<Product> catalogProducts;
         private Map<String, String> storeCategoryNamesByPimCategoryId;
-        // findByEan scans the whole taxonomy, and one import can bring the same offer in many orders
-        private final Map<String, Optional<Taxonomy>> taxonomyByEan = new HashMap<>();
+        // one import can bring the same offer in many orders
+        private final Map<String, Optional<ProductData>> productByEan = new HashMap<>();
 
         private StoreOffers(String storeId) {
             this.storeId = storeId;
         }
 
-        public Optional<ResolvedOffer> resolve(String orderSource, String offerKey, String manufacturerCode) {
+        public Optional<ResolvedOffer> resolve(String orderSource, String offerKey) {
             if (isOwnOffer(storeId, offerKey)) {
-                // an offer CommerceLink published is resolved by its pimId and a link never applies to it; one whose entry
-                // has no code goes on to the manufacturer code, not to a link
-                Optional<ResolvedOffer> own = pimAliases.effectiveEntry(storeId, offerKey)
+                return pimAliases.effectiveEntry(storeId, offerKey)
                         .map(entry -> fromEntry(entry, Source.OWN_OFFER))
-                        .filter(offer -> hasProductCode(offer, offerKey));
-                if (own.isPresent()) {
-                    return own;
-                }
-            } else if (StringUtils.isNotBlank(offerKey)) {
-                Optional<ResolvedOffer> linked = linkRepository.find(storeId, orderSource, offerKey)
-                        .flatMap(this::fromLink);
-                if (linked.isPresent()) {
-                    return linked;
-                }
+                        .filter(offer -> offer.sku() != null);
             }
-
-            if (StringUtils.isNotBlank(manufacturerCode)) {
-                return pimCatalog.withStoreData(storeId).findByMpn(manufacturerCode)
-                        .map(entry -> new ResolvedOffer(entry.pimId(), OfferEans.unify(entry.primaryGtin().orElse(null)),
-                                manufacturerCode, entry.category(), Source.MFN));
+            if (StringUtils.isBlank(offerKey)) {
+                return Optional.empty();
             }
-            return Optional.empty();
+            return linkRepository.find(storeId, orderSource, offerKey).flatMap(this::fromLink);
         }
 
         /**
@@ -145,16 +105,6 @@ public class ExternalOfferResolver {
             return catalogProducts;
         }
 
-        // without a code the item would carry the marketplace's raw code as its sku while looking resolved
-        private boolean hasProductCode(ResolvedOffer offer, String offerKey) {
-            if (offer.sku() != null) {
-                return true;
-            }
-            log.warn("Offer {} of store {} matches {} ({}), which has neither an EAN nor a manufacturer code; treated as"
-                    + " unresolved", offerKey, storeId, offer.pimId(), offer.source());
-            return false;
-        }
-
         /**
          * A marketplace offer is one product, so a link listing several EANs lists codes of the same goods (Empik gives
          * an EAN-13 and its 12-digit UPC form, which unify to one; a product can also carry two codes): all of them go
@@ -166,27 +116,25 @@ public class ExternalOfferResolver {
             return eans.isEmpty() ? Optional.empty() : Optional.of(linked(eans));
         }
 
-        /** What a line linked to these unified EANs gets: the EANs, and the category the taxonomy gives the goods. */
+        /** What a line linked to these unified EANs gets: the EANs, and the category of the goods. */
         public ResolvedOffer linked(List<String> eans) {
-            return ResolvedOffer.linked(eans, taxonomyCategory(eans));
+            return ResolvedOffer.linked(eans, productCategory(eans));
         }
 
         /**
-         * The category of the first EAN the taxonomy knows with a category (one still waiting for its category is
-         * skipped), named as the store calls the PIM category in its catalogs, else as the taxonomy does; null when none
-         * is known. A warehouse item takes its category from the same taxonomy and names it the same way, but looks it
-         * up by the manufacturer code of the delivered goods, not by EAN ({@code WarehouseItemFactory}): the two agree
-         * while the taxonomy's entries for the goods agree, and can differ where its entries for the EAN and the code
-         * name different categories.
+         * The category of the first EAN {@link ProductDataResolver} knows with a category (one still waiting for its
+         * category is skipped), named as the store calls the PIM category in its catalogs, else by its own name; null
+         * when none is known. A warehouse item takes its category the same way, from its own EAN
+         * ({@code WarehouseItemFactory}).
          */
-        private String taxonomyCategory(List<String> eans) {
+        private String productCategory(List<String> eans) {
             for (String ean : eans) {
-                Taxonomy taxonomy = taxonomyByEan.computeIfAbsent(ean,
-                        key -> Optional.ofNullable(taxonomyCache.findByEan(key))).orElse(null);
-                if (TaxonomyCache.hasCategory(taxonomy)) {
-                    String storeName = StringUtils.isBlank(taxonomy.categoryId()) ? null
-                            : storeCategoryNames().get(taxonomy.categoryId());
-                    return StringUtils.isNotBlank(storeName) ? storeName : taxonomy.category();
+                ProductData product = productByEan.computeIfAbsent(ean,
+                        key -> productDataResolver.ofEan(storeId, key)).orElse(null);
+                if (product != null && StringUtils.isNotBlank(product.category())) {
+                    String storeName = StringUtils.isBlank(product.categoryId()) ? null
+                            : storeCategoryNames().get(product.categoryId());
+                    return StringUtils.isNotBlank(storeName) ? storeName : product.category();
                 }
             }
             return null;

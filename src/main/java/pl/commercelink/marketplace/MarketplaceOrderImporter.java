@@ -82,7 +82,7 @@ public class MarketplaceOrderImporter {
             rawKeysByBasketItemId.put(basketItemId, product.manufacturerCode());
 
             String sellerOfferKey = StringUtils.trimToNull(product.sellerOfferKey());
-            Optional<ResolvedOffer> resolved = offers.resolve(marketplaceName, sellerOfferKey, product.manufacturerCode());
+            Optional<ResolvedOffer> resolved = offers.resolve(marketplaceName, sellerOfferKey);
             resolvedByBasketItemId.put(basketItemId, new ResolvedLine(sellerOfferKey, resolved.orElse(null)));
 
             basketItems.add(new BasketItem(

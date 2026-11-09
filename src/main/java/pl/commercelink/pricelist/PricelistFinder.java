@@ -15,17 +15,16 @@ public class PricelistFinder {
     private final StorePimAliases aliases;
 
     public List<AvailabilityAndPrice> availabilityAndPrices(String storeId, String catalogId) {
-        Pricelist pricelist = newestPricelist(storeId, catalogId);
-        return pricelist == null ? List.of() : pricelist.getAvailabilityAndPrices();
+        return newestPricelist(storeId, catalogId).getAvailabilityAndPrices();
     }
 
     public Optional<AvailabilityAndPrice> findByPimId(String storeId, String catalogId, String pimId) {
-        Pricelist pricelist = newestPricelist(storeId, catalogId);
-        return pricelist == null ? Optional.empty() : aliases.find(storeId, pricelist, pimId);
+        return aliases.find(storeId, newestPricelist(storeId, catalogId), pimId);
     }
 
-    private Pricelist newestPricelist(String storeId, String catalogId) {
+    public Pricelist newestPricelist(String storeId, String catalogId) {
         String pricelistId = pricelistRepository.findNewestPricelistIdCached(storeId, catalogId);
-        return pricelistId == null ? null : pricelistRepository.find(storeId, catalogId, pricelistId);
+        Pricelist pricelist = pricelistId == null ? null : pricelistRepository.find(storeId, catalogId, pricelistId);
+        return pricelist == null ? Pricelist.empty() : pricelist;
     }
 }

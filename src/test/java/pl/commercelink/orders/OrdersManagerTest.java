@@ -10,7 +10,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.taxonomy.Taxonomy;
@@ -128,7 +127,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(matchedInventory, 1)));
+        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(matchedInventory, "EAN-1", 1)));
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -157,7 +156,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(matchedInventory, 1)));
+        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(matchedInventory, "EAN-N", 1)));
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -168,25 +167,23 @@ class OrdersManagerTest {
     }
 
     @Test
-    @DisplayName("addOrderItem from matched inventory with no offers falls back to Inne category and uses the EAN from inventory key")
+    @DisplayName("addOrderItem from matched inventory with no offers falls back to Inne category and uses the chosen EAN")
     void addOrderItemFromMatchedInventoryWithoutOffersFallsBackToUncategorized() {
         // given
         Order order = orderWithTotalPrice(0.0);
-        InventoryKey key = new InventoryKey("EAN-Z", "MFN-MISSING");
         when(matchedInventory.hasAnyOffers()).thenReturn(false);
-        when(matchedInventory.getInventoryKey()).thenReturn(key);
         when(matchedInventory.getEstimatedDeliveryDays()).thenReturn(7);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(matchedInventory, 1)));
+        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(matchedInventory, "EAN-Z", 1)));
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
         assertThat(itemCaptor.getValue().getCategory()).isEqualTo("Uncategorized");
-        assertThat(itemCaptor.getValue().getName()).isEmpty();
+        assertThat(itemCaptor.getValue().getName()).isEqualTo("Brak produktu");
         assertThat(itemCaptor.getValue().getPrice()).isEqualTo(0);
         assertThat(itemCaptor.getValue().getSku()).isEqualTo("EAN-Z");
     }
@@ -196,11 +193,10 @@ class OrdersManagerTest {
         // given
         Order order = orderWithTotalPrice(0.0);
         when(matchedInventory.hasAnyOffers()).thenReturn(false);
-        when(matchedInventory.getInventoryKey()).thenReturn(InventoryKey.fromEan("5901234123457"));
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
 
         // when
-        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(matchedInventory, 1)));
+        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(matchedInventory, "5901234123457", 1)));
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -224,7 +220,7 @@ class OrdersManagerTest {
                 productAt(0, "Laptops"), productAt(1, "Monitors"), productAt(2, "Mice")));
 
         // when
-        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(matchedInventory, 1)));
+        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(matchedInventory, "EAN-S", 1)));
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);

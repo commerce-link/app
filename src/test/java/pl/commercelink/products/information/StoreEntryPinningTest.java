@@ -18,7 +18,6 @@ import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
-import pl.commercelink.products.brand.BrandMapper;
 
 import java.time.Clock;
 import java.util.ArrayList;
@@ -33,7 +32,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.doThrow;
@@ -77,14 +75,12 @@ class StoreEntryPinningTest {
                 .filter(product -> product.getCategoryId().equals(invocation.getArgument(0))
                         && product.getProductId().equals(invocation.getArgument(1)))
                 .findFirst().orElse(null));
-        when(productRepository.findAllByEanOrMfnInCategories(any(), any(), any())).thenAnswer(invocation -> {
+        when(productRepository.findAllByEanInCategories(any(), any())).thenAnswer(invocation -> {
             Collection<String> categoryIds = invocation.getArgument(0);
             List<String> eans = invocation.getArgument(1);
-            List<String> mfnCodes = invocation.getArgument(2);
             return products.stream()
                     .filter(product -> categoryIds.contains(product.getCategoryId()))
-                    .filter(product -> (product.getEan() != null && eans.contains(product.getEan()))
-                            || (product.getManufacturerCode() != null && mfnCodes.contains(product.getManufacturerCode())))
+                    .filter(product -> product.getEan() != null && eans.contains(product.getEan()))
                     .toList();
         });
         when(productRepository.detachPimFromProducts(anyString())).thenAnswer(invocation -> {
@@ -94,57 +90,22 @@ class StoreEntryPinningTest {
             detached.forEach(product -> product.setPimId(null));
             return detached;
         });
-        pinning = new StoreEntryPinning(productRepository, productCatalogRepository, history,
-                new BrandMapper(mock(PimCatalog.class)));
+        pinning = new StoreEntryPinning(productRepository, productCatalogRepository, history);
     }
 
     @Test
-    void storeEntryIsNotPinnedToAProductOfAnotherBrand() {
-        // given
-        PimCatalog copy = ScopedPimCatalog.of(storeEntry("X", STORE, List.of(E1), List.of("A1")));
-        Product otherBrand = branded(product("p1", STORE_CATEGORY, null, E9, "A1"), "Gembird");
-        Product sameBrand = branded(product("p2", STORE_CATEGORY, null, E2, "A1"), "brand");
-
-        // when
-        pinning.onStoreEntryAnnounced(event("X", List.of(E1), List.of("A1")), copy);
-
-        // then
-        assertThat(otherBrand.getPimId()).isNull();
-        assertThat(sameBrand.getPimId()).isEqualTo("X");
-    }
-
-    @Test
-    void cloneIsNotPinnedToAProductOfAnotherBrandByCode() {
+    void detachedProductIsNotPinnedToAGlobalEntryByItsManufacturerCode() {
         // given
         PimCatalog copy = ScopedPimCatalog.of(
-                ScopedPimCatalog.globalEntry("S", E1, null, "cat"),
-                ScopedPimCatalog.cloneEntry("C", STORE, "S", E2, "A1", "cat"));
-        Product otherBrand = branded(product("p1", STORE_CATEGORY, null, E9, "A1"), "Gembird");
-        Product sameBrand = branded(product("p2", STORE_CATEGORY, null, E3, "A1"), "Brand");
-
-        // when
-        pinning.onCloneAnnounced(cloneEvent("C", "S", List.of(E2)), copy);
-
-        // then
-        assertThat(otherBrand.getPimId()).isNull();
-        assertThat(sameBrand.getPimId()).isEqualTo("C");
-    }
-
-    @Test
-    void detachedProductIsPinnedToAGlobalEntryByCodeOnlyUnderItsBrand() {
-        // given
-        PimCatalog copy = ScopedPimCatalog.of(
-                storeEntry("X", STORE, List.of(E1, E2), List.of()),
+                storeEntry("X", STORE, List.of(E1), List.of()),
                 ScopedPimCatalog.globalEntry("G", E3, "A1", "cat"));
-        Product otherBrand = branded(product("p1", STORE_CATEGORY, "X", E1, "A1"), "Gembird");
-        Product sameBrand = branded(product("p2", STORE_CATEGORY, "X", E2, "A1"), "Brand");
+        Product product = branded(product("p1", STORE_CATEGORY, "X", E1, "A1"), "Brand");
 
         // when
         pinning.onStoreEntryAnnounced(event("X", List.of(E9), List.of()), copy);
 
         // then
-        assertThat(otherBrand.getPimId()).isNull();
-        assertThat(sameBrand.getPimId()).isEqualTo("G");
+        assertThat(product.getPimId()).isNull();
     }
 
     @Test
@@ -214,13 +175,26 @@ class StoreEntryPinningTest {
     }
 
     @Test
-    void productStillMatchingByMpnStays() {
+    void productWhoseEanWasRemovedIsDetachedThoughTheEntryKeepsItsMpn() {
         // given
         PimCatalog copy = ScopedPimCatalog.of(storeEntry("X", STORE, List.of(E1), List.of("M1")));
         Product product = product("p1", STORE_CATEGORY, "X", E1, "M1");
 
         // when
-        pinning.onStoreEntryAnnounced(event("X", List.of(E2), List.of("m 1")), copy);
+        pinning.onStoreEntryAnnounced(event("X", List.of(E2), List.of("M1")), copy);
+
+        // then
+        assertThat(product.getPimId()).isNull();
+    }
+
+    @Test
+    void productWhoseMpnWasRemovedStays() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of(storeEntry("X", STORE, List.of(E1), List.of("M1")));
+        Product product = product("p1", STORE_CATEGORY, "X", E9, "M1");
+
+        // when
+        pinning.onStoreEntryAnnounced(event("X", List.of(E1), List.of()), copy);
 
         // then
         assertThat(product.getPimId()).isEqualTo("X");
@@ -688,12 +662,12 @@ class StoreEntryPinningTest {
         // given: the store changed the clone's EAN from E1 to E2, which pinned an unrelated product to it; the copy
         // is not refreshed yet when the clone is deleted
         Product unrelated = product("p1", STORE_CATEGORY, "C", E2, null);
-        Product unrelatedWithoutGlobalMatch = product("p2", STORE_CATEGORY, "C", null, "MFN-ONLY-ON-CLONE");
+        Product unrelatedWithoutGlobalMatch = product("p2", STORE_CATEGORY, "C", E3, null);
         Product fromTheSource = product("p3", STORE_CATEGORY, "C", E1, null);
         PimCatalog copy = ScopedPimCatalog.of(
                 ScopedPimCatalog.globalEntry("S", E1, null, "cat"),
                 ScopedPimCatalog.globalEntry("G", E2, null, "cat"),
-                cloneWithCodes("C", STORE, "S", List.of(E2), List.of("MFN-ONLY-ON-CLONE")));
+                cloneWithCodes("C", STORE, "S", List.of(E2, E3), List.of()));
 
         // when
         pinning.onEntryDeleted("C", copy);
@@ -702,6 +676,21 @@ class StoreEntryPinningTest {
         assertThat(unrelated.getPimId()).isEqualTo("G");
         assertThat(unrelatedWithoutGlobalMatch.getPimId()).isNull();
         assertThat(fromTheSource.getPimId()).isEqualTo("S");
+    }
+
+    @Test
+    void productMatchingOnlyTheClonesMpnReturnsToTheSource() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("S", E1, null, "cat"),
+                cloneWithCodes("C", STORE, "S", List.of(E1), List.of("M1")));
+        Product product = product("p1", STORE_CATEGORY, "C", E9, "M1");
+
+        // when
+        pinning.onEntryDeleted("C", copy);
+
+        // then
+        assertThat(product.getPimId()).isEqualTo("S");
     }
 
     @Test

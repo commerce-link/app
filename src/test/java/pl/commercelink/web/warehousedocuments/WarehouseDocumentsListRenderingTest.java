@@ -58,7 +58,7 @@ class WarehouseDocumentsListRenderingTest {
         // then
         assertThat(html).contains("data-cl-list-results").contains("data-cl-list-fragment=\"/dashboard/warehouse-documents/list\"")
                 .containsPattern("<a class=\"cl-segment\" href=\"/dashboard/warehouse-documents\\?type=PZ\"\\s+data-cl-list-nav title=\"Przyjęcie zewnętrzne\" aria-current=\"page\"")
-                .contains("placeholder=\"Nr dokumentu, EAN, kod producenta\"");
+                .contains("placeholder=\"Nr dokumentu, EAN\"");
     }
 
     @Test

@@ -38,11 +38,11 @@ class WarehouseDocumentItemHistoryServiceTest {
         when(documents.findByDocumentId("s1", "d1")).thenReturn(doc("d1", "PZ/MAG1/2026/000210"));
 
         // when
-        MfnHistory history = service.history("s1", "del-1", EAN);
+        EanHistory history = service.history("s1", "del-1", EAN);
 
         // then
-        assertThat(history.rows()).extracting(MfnHistoryRow::documentNo).containsExactly("PZ/MAG1/2026/000210");
-        assertThat(history.rows()).extracting(MfnHistoryRow::stockAfter).containsExactly(5);
+        assertThat(history.rows()).extracting(EanHistoryRow::documentNo).containsExactly("PZ/MAG1/2026/000210");
+        assertThat(history.rows()).extracting(EanHistoryRow::stockAfter).containsExactly(5);
         assertThat(history.productName()).isEqualTo("Samsung 990 PRO");
     }
 
@@ -56,12 +56,12 @@ class WarehouseDocumentItemHistoryServiceTest {
         when(documents.findByDocumentId("s1", "d2")).thenReturn(doc("d2", "WZ/MAG1/2026/001179"));
 
         // when
-        MfnHistory history = service.history("s1", "del-1", EAN);
+        EanHistory history = service.history("s1", "del-1", EAN);
 
         // then
         assertThat(history.productName()).isEqualTo("Samsung 990 PRO");
-        assertThat(history.rows()).extracting(MfnHistoryRow::documentNo).containsExactly("PZ/MAG1/2026/000210", "WZ/MAG1/2026/001179");
-        assertThat(history.rows()).extracting(MfnHistoryRow::stockAfter).containsExactly(5, 3);
+        assertThat(history.rows()).extracting(EanHistoryRow::documentNo).containsExactly("PZ/MAG1/2026/000210", "WZ/MAG1/2026/001179");
+        assertThat(history.rows()).extracting(EanHistoryRow::stockAfter).containsExactly(5, 3);
     }
 
     @Test
@@ -71,7 +71,7 @@ class WarehouseDocumentItemHistoryServiceTest {
         when(documents.findByDocumentId("s1", "dx")).thenReturn(null);
 
         // when
-        MfnHistory history = service.history("s1", "del-x", EAN);
+        EanHistory history = service.history("s1", "del-x", EAN);
 
         // then
         assertThat(history.rows()).isEmpty();
@@ -85,10 +85,10 @@ class WarehouseDocumentItemHistoryServiceTest {
         when(documents.findByDocumentId("s1", "d1")).thenReturn(doc("d1", "X/1"));
 
         // when
-        MfnHistory history = service.history("s1", "del-1", EAN);
+        EanHistory history = service.history("s1", "del-1", EAN);
 
         // then
-        assertThat(history.rows()).extracting(MfnHistoryRow::stockChange).containsExactly(0);
+        assertThat(history.rows()).extracting(EanHistoryRow::stockChange).containsExactly(0);
     }
 
     @Test
@@ -105,11 +105,11 @@ class WarehouseDocumentItemHistoryServiceTest {
         when(documents.findByDocumentId("s1", "d2")).thenReturn(destruction);
 
         // when
-        MfnHistory history = service.history("s1", "del-1", EAN);
+        EanHistory history = service.history("s1", "del-1", EAN);
 
         // then
-        assertThat(history.rows()).extracting(MfnHistoryRow::reason).containsExactly(null, DocumentReason.Destruction);
-        assertThat(history.rows()).extracting(MfnHistoryRow::note).containsExactly(null, "Zalany w magazynie B");
+        assertThat(history.rows()).extracting(EanHistoryRow::reason).containsExactly(null, DocumentReason.Destruction);
+        assertThat(history.rows()).extracting(EanHistoryRow::note).containsExactly(null, "Zalany w magazynie B");
         verify(documents, times(2)).findByDocumentId(org.mockito.ArgumentMatchers.eq("s1"), org.mockito.ArgumentMatchers.anyString());
     }
 

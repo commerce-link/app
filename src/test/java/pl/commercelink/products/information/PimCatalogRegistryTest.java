@@ -9,8 +9,6 @@ import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
-import pl.commercelink.products.brand.BrandMapper;
-import pl.commercelink.pim.api.Brand;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCatalogDescriptor;
 import pl.commercelink.pim.api.PimEntry;
@@ -87,90 +85,14 @@ class PimCatalogRegistryTest {
     void globalEntryAttachesToProductsOfEveryStore() {
         // given
         Product product = productWithEan("e1");
-        when(productRepository.findAllWithoutPimIdByEanOrMfn(List.of("e1"), List.of("m1"))).thenReturn(List.of(product));
+        when(productRepository.findAllWithoutPimIdByEan(List.of("e1"))).thenReturn(List.of(product));
 
         // when
-        PimCatalogRegistry.attachEntryToProducts(event(), productRepository, brandMapper);
+        PimCatalogRegistry.attachEntryToProducts(event(), productRepository);
 
         // then
         assertThat(product.getPimId()).isEqualTo("pim-1");
         verify(productRepository).save(product);
-    }
-
-    @Test
-    void newEntryIsNotPinnedToAProductOfAnotherBrandByCode() {
-        // given
-        Product gembird = product("e9", "A1", "Gembird");
-        when(productRepository.findAllWithoutPimIdByEanOrMfn(List.of("e1"), List.of("A1"))).thenReturn(List.of(gembird));
-
-        // when
-        PimCatalogRegistry.attachEntryToProducts(globalEvent("Logitech", "e1", "A1"), productRepository, brandMapper);
-
-        // then
-        assertThat(gembird.getPimId()).isNull();
-        verify(productRepository, never()).save(any());
-    }
-
-    @Test
-    void newEntryUnderAnAliasOfTheBrandIsPinnedByCode() {
-        // given
-        when(brandsCatalog.allBrands()).thenReturn(List.of(new Brand("Western Digital", List.of("sandisk"))));
-        Product sandisk = product("e9", "A1", "SanDisk");
-        when(productRepository.findAllWithoutPimIdByEanOrMfn(List.of("e1"), List.of("A1"))).thenReturn(List.of(sandisk));
-
-        // when
-        PimCatalogRegistry.attachEntryToProducts(globalEvent("Western Digital", "e1", "A1"), productRepository,
-                brandMapper);
-
-        // then
-        assertThat(sandisk.getPimId()).isEqualTo("pim-1");
-        verify(productRepository).save(sandisk);
-    }
-
-    @Test
-    void newEntryIsPinnedToAProductWithoutBrandByEanOnly() {
-        // given
-        Product byEan = product("e1", "B2", null);
-        Product byCode = product("e9", "A1", null);
-        when(productRepository.findAllWithoutPimIdByEanOrMfn(List.of("e1"), List.of("A1")))
-                .thenReturn(List.of(byEan, byCode));
-
-        // when
-        PimCatalogRegistry.attachEntryToProducts(globalEvent("Logitech", "e1", "A1"), productRepository, brandMapper);
-
-        // then
-        assertThat(byEan.getPimId()).isEqualTo("pim-1");
-        assertThat(byCode.getPimId()).isNull();
-    }
-
-    @Test
-    void newEntryAnnouncedWithoutBrandIsPinnedByEanOnly() {
-        // given
-        Product byEan = product("e1", "B2", "Logitech");
-        Product byCode = product("e9", "A1", "Logitech");
-        when(productRepository.findAllWithoutPimIdByEanOrMfn(List.of("e1"), List.of("A1")))
-                .thenReturn(List.of(byEan, byCode));
-
-        // when
-        PimCatalogRegistry.attachEntryToProducts(globalEvent(null, "e1", "A1"), productRepository, brandMapper);
-
-        // then
-        assertThat(byEan.getPimId()).isEqualTo("pim-1");
-        assertThat(byCode.getPimId()).isNull();
-    }
-
-    private final PimCatalog brandsCatalog = mock(PimCatalog.class);
-    private final BrandMapper brandMapper = new BrandMapper(brandsCatalog);
-
-    private static PIMEntryAddedEvent globalEvent(String brand, String ean, String mfn) {
-        return new PIMEntryAddedEvent("pim-1", brand, List.of(ean), List.of(mfn), null, null);
-    }
-
-    private static Product product(String ean, String mfn, String brand) {
-        Product product = productWithEan(ean);
-        product.setManufacturerCode(mfn);
-        product.setBrand(brand);
-        return product;
     }
 
     private static Product productWithEan(String ean) {
@@ -205,7 +127,7 @@ class PimCatalogRegistryTest {
     void entryAddedTriggersAnIndexRefreshAfterPinning() {
         // given
         Product product = productWithEan("e1");
-        when(productRepository.findAllWithoutPimIdByEanOrMfn(List.of("e1"), List.of("m1"))).thenReturn(List.of(product));
+        when(productRepository.findAllWithoutPimIdByEan(List.of("e1"))).thenReturn(List.of(product));
 
         // when
         entryAddedHandler().accept(event());
@@ -246,7 +168,7 @@ class PimCatalogRegistryTest {
     void refreshFailureDoesNotFailTheEventHandler() {
         // given
         Product product = productWithEan("e1");
-        when(productRepository.findAllWithoutPimIdByEanOrMfn(List.of("e1"), List.of("m1"))).thenReturn(List.of(product));
+        when(productRepository.findAllWithoutPimIdByEan(List.of("e1"))).thenReturn(List.of(product));
         doThrow(new IllegalStateException("pim down")).when(catalogMock).refresh();
 
         // when
@@ -262,7 +184,7 @@ class PimCatalogRegistryTest {
     void globalEntryEventBehavesAsBefore() {
         // given
         Product product = productWithEan("e1");
-        when(productRepository.findAllWithoutPimIdByEanOrMfn(List.of("e1"), List.of("m1"))).thenReturn(List.of(product));
+        when(productRepository.findAllWithoutPimIdByEan(List.of("e1"))).thenReturn(List.of(product));
 
         // when
         entryAddedHandler().accept(event());
@@ -271,7 +193,7 @@ class PimCatalogRegistryTest {
         assertThat(product.getPimId()).isEqualTo("pim-1");
         verify(productRepository, never()).findAllByPimId(any());
         verify(productRepository, never()).detachPimFromProducts(any());
-        verify(productRepository, never()).findAllByEanOrMfnInCategories(any(), any(), any());
+        verify(productRepository, never()).findAllByEanInCategories(any(), any());
         verify(catalogMock, timeout(2000)).refresh();
     }
 
@@ -407,7 +329,7 @@ class PimCatalogRegistryTest {
         captor.getValue().accept(new PIMEntryAddedEvent("C", "Brand", List.of("5900000000011"), List.of(), "s1", " "));
 
         // then: the code matching of a plain store event, then its background refresh; no move from the source
-        verify(productRepository).findAllByEanOrMfnInCategories(List.of("c1"), List.of("5900000000011"), List.of());
+        verify(productRepository).findAllByEanInCategories(List.of("c1"), List.of("5900000000011"));
         verify(copy, timeout(2000)).refresh();
         assertThat(product.getPimId()).isEqualTo("S");
         verify(productRepository, never()).findAllByPimId("S");

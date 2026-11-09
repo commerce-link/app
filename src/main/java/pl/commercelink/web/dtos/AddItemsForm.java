@@ -11,7 +11,7 @@ import java.util.List;
 /**
  * Entries picked in the "add items" dialog of an offer or an order, posted as indexed fields
  * ({@code items[0].source}, {@code items[0].pimId}, ...). An entry comes either from a pricelist
- * (catalog + pimId) or from the inventory (EAN and/or manufacturer code).
+ * (catalog + pimId) or from the inventory (the EAN of a product the dialog listed).
  */
 @Getter
 @Setter
@@ -36,7 +36,6 @@ public class AddItemsForm {
         private String catalogId;
         private String pimId;
         private String ean = "";
-        private String mfn = "";
         private int qty = 1;
 
         public static Entry fromPricelist(String catalogId, String pimId, int qty) {
@@ -48,11 +47,10 @@ public class AddItemsForm {
             return entry;
         }
 
-        public static Entry fromInventory(String ean, String mfn, int qty) {
+        public static Entry fromInventory(String ean, int qty) {
             Entry entry = new Entry();
             entry.source = SOURCE_INVENTORY;
             entry.ean = ean;
-            entry.mfn = mfn;
             entry.qty = qty;
             return entry;
         }
@@ -70,14 +68,14 @@ public class AddItemsForm {
         }
 
         public InventoryKey inventoryKey() {
-            return new InventoryKey(trimmed(ean), trimmed(mfn));
+            return InventoryKey.fromEan(trimmed(ean));
         }
 
         boolean isComplete() {
             if (isFromPricelist()) {
                 return notBlank(catalogId) && notBlank(pimId);
             }
-            return isFromInventory() && (notBlank(ean) || notBlank(mfn));
+            return isFromInventory() && notBlank(ean);
         }
 
         private static boolean notBlank(String value) {

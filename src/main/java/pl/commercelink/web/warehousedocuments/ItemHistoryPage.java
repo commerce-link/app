@@ -1,8 +1,8 @@
 package pl.commercelink.web.warehousedocuments;
 
 import org.springframework.context.MessageSource;
-import pl.commercelink.warehouse.builtin.MfnHistory;
-import pl.commercelink.warehouse.builtin.MfnHistoryRow;
+import pl.commercelink.warehouse.builtin.EanHistory;
+import pl.commercelink.warehouse.builtin.EanHistoryRow;
 import pl.commercelink.web.deliveries.details.DeliveryLinks;
 
 import java.net.URLEncoder;
@@ -26,11 +26,11 @@ public record ItemHistoryPage(String backHref, String backLabel, String productN
         return new ItemHistoryPage(backHref, backLabel, productName, ean, deliveryShortId, href, movesTitle, moves, summary, emptyText);
     }
 
-    public static ItemHistoryPage of(MfnHistory history, String deliveryId, String ean, String backHref, String backLabel,
+    public static ItemHistoryPage of(EanHistory history, String deliveryId, String ean, String backHref, String backLabel,
                                      MessageSource messages, Locale locale) {
         int in = 0, out = 0, after = 0;
         List<Move> moves = new ArrayList<>();
-        for (MfnHistoryRow r : history.rows()) {
+        for (EanHistoryRow r : history.rows()) {
             DocumentKind kind = r.documentType() == null ? null : DocumentKind.of(r.documentType()).orElse(null);
             if (r.stockChange() > 0) in += r.stockChange(); else out -= r.stockChange();
             after = r.stockAfter();
@@ -50,7 +50,7 @@ public record ItemHistoryPage(String backHref, String backLabel, String productN
                 moves.isEmpty() ? messages.getMessage("warehouse.documents.history.empty", null, locale) : null);
     }
 
-    private static String typeName(MfnHistoryRow r, DocumentKind kind, MessageSource messages, Locale locale) {
+    private static String typeName(EanHistoryRow r, DocumentKind kind, MessageSource messages, Locale locale) {
         if (kind != null) return messages.getMessage("warehouse.documents.kind." + kind.code(), null, locale);
         if (r.documentType() == null) return messages.getMessage("warehouse.documents.list.none", null, locale);
         return messages.getMessage("DocumentType." + r.documentType().name(), null, locale);

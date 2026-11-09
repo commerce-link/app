@@ -36,6 +36,7 @@ import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.receipts.ReceiptAlerts;
 import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.receipts.ReceiptPageProblem;
@@ -46,7 +47,6 @@ import pl.commercelink.receipts.ReceiptAttemptState;
 import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.web.orders.OrderPageModel;
 import pl.commercelink.web.orders.OrderPageModelFactory;
@@ -131,7 +131,7 @@ class OrderDetailsTemplateTest {
         ReceiptAttemptService receiptService = mock(ReceiptAttemptService.class);
         when(receiptService.orderState(any(), any(), any(), any())).thenReturn(receipts);
         OrderPageModelFactory factory = new OrderPageModelFactory(stores, events, dropship, new DeliveryRedirectResolver(),
-                pl.commercelink.web.orders.DropshipEligibilityStubs.acceptingEverySupplier(), labels, carrierOptions, mock(ProductCatalogRepository.class), mock(TaxonomyCache.class), messages,
+                pl.commercelink.web.orders.DropshipEligibilityStubs.acceptingEverySupplier(), labels, carrierOptions, mock(ProductCatalogRepository.class), mock(ProductDataResolver.class), messages,
                 receiptService, mock(ReceiptAlerts.class), courierAvailable(),
                 pl.commercelink.shipping.ShippingIntegrationNamesFixture.names(), mock(pl.commercelink.externaloffers.ExternalOfferResolver.class));
         ReflectionTestUtils.setField(factory, "appDomain", "https://app.example");
@@ -1209,6 +1209,18 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void theWarehouseDialogShowsAndSearchesTheEanOfTheItems() {
+        // when
+        String html = page(render(order(OrderStatus.New), ADMIN));
+
+        // then
+        String dialog = html.substring(html.indexOf("id=\"assign-warehouse-dialog\""));
+        dialog = dialog.substring(0, dialog.indexOf("</dialog>"));
+        assertThat(dialog).contains("<th scope=\"col\">EAN</th>").doesNotContain("<th scope=\"col\">SKU</th>")
+                .contains("Szukaj po nazwie, EAN-ie lub numerze seryjnym");
+    }
+
+    @Test
     void theSkuTypedByHandIsNotCheckedForItsFormat() {
         // when
         String html = page(render(order(OrderStatus.New), ADMIN));
@@ -1661,7 +1673,7 @@ class OrderDetailsTemplateTest {
 
     @Test
     void theMissingEanMessageAppearsAboveTheItemsCard() {
-        // given: order.items.add.error.no.mfn flashes through the shared errorMessage banner, which the layout
+        // given: an error flashes through the shared errorMessage banner, which the layout
         // renders once, above <main>, so it lands above every card on this page
         Order order = order(OrderStatus.New);
         OrderPageModel page = factory(Set.of()).build(order, items(order), ADMIN, PL);

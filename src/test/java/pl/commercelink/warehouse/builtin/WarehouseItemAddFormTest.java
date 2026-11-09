@@ -7,9 +7,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class WarehouseItemAddFormTest {
 
-    private static WarehouseItemAddForm form(String mfn, String cost, String type, String qty, String status) {
+    private static WarehouseItemAddForm form(String ean, String cost, String type, String qty, String status) {
         WarehouseItemAddForm form = new WarehouseItemAddForm();
-        form.setManufacturerCode(mfn);
+        form.setEan(ean);
         form.setCost(cost);
         form.setPriceType(type);
         form.setQty(qty);
@@ -36,7 +36,7 @@ class WarehouseItemAddFormTest {
     void namesEveryBadField() {
         // when / then
         assertThat(form(" ", "abc", "net", "0", "Delivered").validate(false))
-                .containsOnlyKeys("manufacturerCode", "cost", "qty", "status");
+                .containsOnlyKeys("ean", "cost", "qty", "status");
         assertThat(form("X1", "-1", "net", "1.5", "New").validate(false)).containsOnlyKeys("cost", "qty");
     }
 
@@ -49,12 +49,12 @@ class WarehouseItemAddFormTest {
     }
 
     @Test
-    void productDataIsRequiredOnlyForAnUnknownCode() {
+    void productDataIsRequiredOnlyForAnUnknownEan() {
         // given
         WarehouseItemAddForm form = form("X1", "10", "net", "1", "New");
 
         // when / then
         assertThat(form.validate(false)).isEmpty();
-        assertThat(form.validate(true)).containsOnlyKeys("name", "ean");
+        assertThat(form.validate(true)).containsOnlyKeys("name", "manufacturerCode");
     }
 }

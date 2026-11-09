@@ -283,10 +283,6 @@ public class MatchedInventory {
         return key.getProductEans();
     }
 
-    public Collection<String> getMfnCodes(){
-        return key.getProductCodes();
-    }
-
     public int getEstimatedDeliveryDays() {
         return getInventoryItems()
                 .stream()

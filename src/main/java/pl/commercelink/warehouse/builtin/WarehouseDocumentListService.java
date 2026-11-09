@@ -41,15 +41,15 @@ public class WarehouseDocumentListService {
                 q.from() == null ? null : q.from().atStartOfDay(),
                 q.to() == null ? null : q.to().atTime(LocalTime.MAX),
                 q.numberFragments(warehouseId(store)));
-        List<WarehouseDocument> found = search.search(criteria, q.productCode(), q.page(), WarehouseDocumentListQuery.PAGE_SIZE);
+        List<WarehouseDocument> found = search.search(criteria, q.ean(), q.page(), WarehouseDocumentListQuery.PAGE_SIZE);
         boolean hasNext = found.size() > WarehouseDocumentListQuery.PAGE_SIZE;
         List<WarehouseDocument> shown = hasNext ? found.subList(0, WarehouseDocumentListQuery.PAGE_SIZE) : found;
 
         String detailsBase = superAdmin ? "/dashboard/store/" + storeId : "/dashboard";
         DocumentRowMapper mapper = new DocumentRowMapper(messages, locale, superAdmin, detailsBase);
         List<DocumentRow> rows = shown.stream().map(mapper::row).toList();
-        // the last page also knows the total of a product-code search, which is not counted up front
-        OptionalInt total = hasNext ? search.count(criteria, q.productCode())
+        // the last page also knows the total of an EAN search, which is not counted up front
+        OptionalInt total = hasNext ? search.count(criteria, q.ean())
                 : OptionalInt.of((Math.max(q.page(), 1) - 1) * WarehouseDocumentListQuery.PAGE_SIZE + rows.size());
         // a page past the end (hand-typed page=9) is an empty list, not "201-200" with a link back
         Pagination pagination;

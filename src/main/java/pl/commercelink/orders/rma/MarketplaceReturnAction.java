@@ -25,7 +25,7 @@ public record MarketplaceReturnAction(
         items = items == null ? List.of() : items;
     }
 
-    /** @param marketplaceKey the order item's marketplace key (externalItemId, else sku, else manufacturerCode). */
+    /** @param marketplaceKey the order item's marketplace key (externalItemId, else sku). */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Item(String marketplaceKey, int quantity) {
     }

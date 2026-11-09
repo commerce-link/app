@@ -31,7 +31,7 @@ public class XmlProductFeedLoader {
     private final InventoryRepository inventoryRepository;
     private final StoreFeedRepository storeFeedRepository;
     private final DataCleanup dataCleanup;
-    private final FeedRowProcessor feedRowProcessor;
+    private final FeedProcessor feedProcessor;
 
     public <V extends XmlItem> List<InventoryItem> load(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo) {
         String supplierName = supplierInfo.name();
@@ -76,18 +76,16 @@ public class XmlProductFeedLoader {
         JAXBContext jaxbContext = JAXBContext.newInstance(itemClass);
         Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
 
-        List<InventoryItem> res = new LinkedList<>();
-        FeedParseStats stats = new FeedParseStats(supplierInfo.name());
+        FeedProcessing processing = feedProcessor.start(supplierInfo.name(), taxonomyPenalty);
 
         try {
             while (xsr.hasNext()) {
                 if (xsr.isStartElement() && xsr.getLocalName().equals(itemElementName)) {
                     V xmlItem = unmarshaller.unmarshal(xsr, itemClass).getValue();
                     if (ParsedRow.hasQty(xmlItem)) {
-                        feedRowProcessor.process(ParsedRow.of(xmlItem, supplierInfo), taxonomyPenalty, stats)
-                                .ifPresent(res::add);
+                        processing.add(ParsedRow.of(xmlItem, supplierInfo));
                     } else {
-                        stats.markInvalid();
+                        processing.skipInvalid();
                     }
                 } else {
                     xsr.next();
@@ -97,8 +95,7 @@ public class XmlProductFeedLoader {
             xsr.close();
         }
 
-        stats.log();
-        return dataCleanup.run(res);
+        return dataCleanup.run(processing.finish());
     }
 
 }

@@ -133,7 +133,7 @@ class ProductLabelsDynamoDbIntegrationTest {
     }
 
     @Test
-    void attachableProductsInCategoriesAreOnlyThoseWithoutPimIdMatchingTheCodes() {
+    void attachableProductsAreOnlyThoseWithoutPimIdMatchingTheEans() {
         // given
         products.save(unattached("cat-own", "p1", "E1", "M1", null));
         products.save(unattached("cat-own", "p2", "E1", "M1", "already"));
@@ -141,12 +141,11 @@ class ProductLabelsDynamoDbIntegrationTest {
         products.save(unattached("cat-foreign", "p4", "E1", "M1", null));
 
         // when
-        List<Product> found = products.findAllWithoutPimIdByEanOrMfnInCategories(
-                List.of("cat-own", "cat-none"), List.of("E1"), List.of());
+        List<Product> found = products.findAllWithoutPimIdByEan(List.of("E1"));
 
         // then
-        assertThat(found).extracting(Product::getProductId).containsExactly("p1");
-        assertThat(products.findAllWithoutPimIdByEanOrMfnInCategories(List.of("cat-own"), List.of(), List.of())).isEmpty();
+        assertThat(found).extracting(Product::getProductId).containsExactlyInAnyOrder("p1", "p4");
+        assertThat(products.findAllWithoutPimIdByEan(List.of())).isEmpty();
     }
 
     private static Product unattached(String categoryId, String productId, String ean, String mfn, String pimId) {

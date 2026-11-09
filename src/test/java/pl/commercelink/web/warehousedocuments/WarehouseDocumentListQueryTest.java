@@ -94,7 +94,7 @@ class WarehouseDocumentListQueryTest {
         assertThat(query("pz/mag1").numberFragments(null)).containsExactly("pz/mag1", "PZ/MAG1");
         assertThat(query("5901234123457").searchMode()).isEqualTo(SearchMode.PRODUCT);
         assertThat(query("910-006559").searchMode()).isEqualTo(SearchMode.PRODUCT);
-        assertThat(query("910-006559").productCode()).isEqualTo("910-006559");
+        assertThat(query("910-006559").ean()).isEqualTo("910-006559");
         assertThat(query("910-006559").numberFragments("MAG1")).isEmpty();
         assertThat(query(null).searchMode()).isNull();
     }

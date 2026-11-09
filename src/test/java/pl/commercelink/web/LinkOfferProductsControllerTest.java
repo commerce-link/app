@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
+import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistFinder;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.Product;
@@ -67,9 +68,9 @@ class LinkOfferProductsControllerTest {
                 product("p3", null, "5900000000035", "Bez karty", "DMW-X1"),
                 product("p4", "pim-no-ean", null, "Bez EAN", "DMW-X2"),
                 product("p5", "pim-no-mfn", "5900000000042", "Bez kodu", " ")));
-        when(pricelistFinder.availabilityAndPrices(STORE_ID, CATALOG_ID)).thenReturn(List.of(
+        when(pricelistFinder.newestPricelist(STORE_ID, CATALOG_ID)).thenReturn(new Pricelist("p1", List.of(
                 new AvailabilityAndPrice("pim-kettle", "5900000000011", "DMW-CZ17", "Domowik", "Domowik", "Czajnik",
-                        "Dom i kuchnia", 129, 5, 2, 129, false)));
+                        "Dom i kuchnia", 129, 5, 2, 129, false))));
 
         // when
         List<LinkOfferProduct> products = controller.products(CATALOG_ID);
@@ -89,9 +90,9 @@ class LinkOfferProductsControllerTest {
         when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
         when(productRepository.findAll(catalog)).thenReturn(List.of(
                 product("p1", null, "5900000000011", "Czajnik", "DMW-CZ17")));
-        when(pricelistFinder.availabilityAndPrices(STORE_ID, CATALOG_ID)).thenReturn(List.of(
+        when(pricelistFinder.newestPricelist(STORE_ID, CATALOG_ID)).thenReturn(new Pricelist("p1", List.of(
                 new AvailabilityAndPrice(null, "05900000000011", "DMW-CZ17", "Domowik", "Domowik", "Czajnik",
-                        "Dom i kuchnia", 149, 5, 2, 149, false)));
+                        "Dom i kuchnia", 149, 5, 2, 149, false))));
 
         // when
         List<LinkOfferProduct> products = controller.products(CATALOG_ID);
@@ -109,7 +110,7 @@ class LinkOfferProductsControllerTest {
                 product("p1", null, "2001000000012", "Czajnik", "DMW-CZ17"),
                 product("p2", null, "brak kodu", "Kubek", "DMW-KB1"),
                 product("p3", null, "2001000000029:2001000000036", "Lampka", "DMW-LN1")));
-        when(pricelistFinder.availabilityAndPrices(STORE_ID, CATALOG_ID)).thenReturn(List.of());
+        when(pricelistFinder.newestPricelist(STORE_ID, CATALOG_ID)).thenReturn(Pricelist.empty());
 
         // when
         List<LinkOfferProduct> products = controller.products(CATALOG_ID);

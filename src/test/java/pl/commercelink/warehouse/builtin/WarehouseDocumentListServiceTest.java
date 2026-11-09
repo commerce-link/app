@@ -97,7 +97,7 @@ class WarehouseDocumentListServiceTest {
     }
 
     @Test
-    void productCodeSearchWithANextPageIsNotCounted() {
+    void eanSearchWithANextPageIsNotCounted() {
         // given
         givenStore(true);
         when(search.search(any(), eq("5901234123457"), eq(1), eq(25))).thenReturn(documents(26));
@@ -175,7 +175,7 @@ class WarehouseDocumentListServiceTest {
     }
 
     @Test
-    void criteriaCarryKindReasonsDatesAndNumberAndTheProductCodeGoesAside() {
+    void criteriaCarryKindReasonsDatesAndNumberAndTheEanGoesAside() {
         // given
         givenStore(true);
         ArgumentCaptor<WarehouseDocumentCriteria> criteria = ArgumentCaptor.forClass(WarehouseDocumentCriteria.class);

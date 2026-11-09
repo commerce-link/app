@@ -152,7 +152,7 @@ class InventoryAutoDiscoveryTest {
         MatchedInventory matched = result.iterator().next();
         assertThat(matched.getInventoryItems()).containsExactlyInAnyOrder(known, sameEanOtherMfn);
         assertThat(matched.getInventoryKey().getId()).isEqualTo("PIM1");
-        assertThat(matched.getMfnCodes()).contains("MFN1", "MFN1-ALT");
+        assertThat(matched.getInventoryKey().getProductCodes()).contains("MFN1", "MFN1-ALT");
     }
 
     @Test
@@ -415,6 +415,52 @@ class InventoryAutoDiscoveryTest {
         assertThat(result).filteredOn(m -> m.getInventoryKey().getId() == null)
                 .extracting(m -> List.copyOf(m.getInventoryItems()))
                 .containsExactlyInAnyOrder(List.of(sharedFirst), List.of(sharedSecond));
+    }
+
+    @Test
+    void noNameOffersUnderTheSameCodeFormTheirOwnGroups() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        InventoryItem action = item("EAN1", "11T105", 20, "Action", "NoName");
+        InventoryItem morele = item("EAN2", "11T105", 21, "Morele", "NoName");
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(List.of(action, morele));
+
+        // then
+        assertThat(result).extracting(m -> List.copyOf(m.getInventoryItems()))
+                .containsExactlyInAnyOrder(List.of(action), List.of(morele));
+    }
+
+    @Test
+    void noNameOffersOfOneEanStayInOneGroup() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        InventoryItem action = item("EAN1", "11T105", 20, "Action", "NoName");
+        InventoryItem morele = item("EAN1", "MOR-11T105", 21, "Morele", "NoName");
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(List.of(action, morele));
+
+        // then
+        assertThat(result).singleElement().satisfies(m ->
+                assertThat(m.getInventoryItems()).containsExactlyInAnyOrder(action, morele));
+    }
+
+    @Test
+    void pimEntryOfNoNameTakesNoOfferByCode() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of(pimEntry("PIM1", "NoName", gtin("EAN9"), mpn("11T105"))));
+        InventoryItem action = item("EAN1", "11T105", 20, "Action", "NoName");
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(List.of(action));
+
+        // then
+        assertThat(result).singleElement().satisfies(m -> {
+            assertThat(m.getInventoryKey().getId()).isNull();
+            assertThat(m.getInventoryItems()).containsExactly(action);
+        });
     }
 
     private InventoryItem item(String ean, String mfn, double netPrice, String supplier) {

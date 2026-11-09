@@ -7,8 +7,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
-
 import java.util.List;
 import java.util.OptionalInt;
 import java.util.Set;
@@ -68,22 +66,35 @@ class WarehouseDocumentSearchServiceTest {
     }
 
     @Test
-    @DisplayName("a product code keeps documents with an item of that EAN or MFN, normalised like stored items")
-    void searchFiltersDocumentsByProductCode() {
+    @DisplayName("an EAN keeps documents with an item of that EAN, normalised like stored items")
+    void searchFiltersDocumentsByEan() {
         // given
         when(warehouseDocumentRepository.findAllMatching(CRITERIA))
                 .thenReturn(List.of(document("doc-1"), document("doc-2"), document("doc-3")));
-        when(warehouseDocumentItemRepository.containsProduct(eq("doc-1"), any(), any())).thenReturn(true);
-        when(warehouseDocumentItemRepository.containsProduct(eq("doc-2"), any(), any())).thenReturn(false);
-        when(warehouseDocumentItemRepository.containsProduct(eq("doc-3"), any(), any())).thenReturn(true);
+        when(warehouseDocumentItemRepository.containsProduct(eq("doc-1"), any())).thenReturn(true);
+        when(warehouseDocumentItemRepository.containsProduct(eq("doc-2"), any())).thenReturn(false);
+        when(warehouseDocumentItemRepository.containsProduct(eq("doc-3"), any())).thenReturn(true);
+
+        // when
+        List<WarehouseDocument> result = warehouseDocumentSearchService.search(CRITERIA, " 05901234123457 ", 1, 25);
+
+        // then
+        assertThat(result).extracting(WarehouseDocument::getDocumentId).containsExactly("doc-1", "doc-3");
+        verify(warehouseDocumentItemRepository).containsProduct("doc-1", "5901234123457");
+    }
+
+    @Test
+    @DisplayName("a manufacturer code is looked up as an EAN, so a document with only that code is not found")
+    void manufacturerCodeFindsNoDocument() {
+        // given
+        when(warehouseDocumentRepository.findAllMatching(CRITERIA)).thenReturn(List.of(document("doc-1")));
+        when(warehouseDocumentItemRepository.containsProduct("doc-1", "mz-v9p2t0bw")).thenReturn(false);
 
         // when
         List<WarehouseDocument> result = warehouseDocumentSearchService.search(CRITERIA, " mz-v9p2t0bw ", 1, 25);
 
         // then
-        assertThat(result).extracting(WarehouseDocument::getDocumentId).containsExactly("doc-1", "doc-3");
-        verify(warehouseDocumentItemRepository).containsProduct("doc-1",
-                UnifiedProductIdentifiers.unifyEan("mz-v9p2t0bw"), UnifiedProductIdentifiers.unifyMfn("mz-v9p2t0bw"));
+        assertThat(result).isEmpty();
     }
 
     @Test
@@ -92,7 +103,7 @@ class WarehouseDocumentSearchServiceTest {
         // given
         List<WarehouseDocument> all = IntStream.rangeClosed(1, 27).mapToObj(i -> document("doc-" + i)).toList();
         when(warehouseDocumentRepository.findAllMatching(CRITERIA)).thenReturn(all);
-        when(warehouseDocumentItemRepository.containsProduct(any(), any(), any())).thenReturn(true);
+        when(warehouseDocumentItemRepository.containsProduct(any(), any())).thenReturn(true);
 
         // when
         List<WarehouseDocument> page2 = warehouseDocumentSearchService.search(CRITERIA, "5901234123457", 2, 25);
@@ -107,14 +118,14 @@ class WarehouseDocumentSearchServiceTest {
         // given
         List<WarehouseDocument> all = IntStream.rangeClosed(1, 100).mapToObj(i -> document("doc-" + i)).toList();
         when(warehouseDocumentRepository.findAllMatching(CRITERIA)).thenReturn(all);
-        when(warehouseDocumentItemRepository.containsProduct(any(), any(), any())).thenReturn(true);
+        when(warehouseDocumentItemRepository.containsProduct(any(), any())).thenReturn(true);
 
         // when
         List<WarehouseDocument> page1 = warehouseDocumentSearchService.search(CRITERIA, "5901234123457", 1, 25);
 
         // then
         assertThat(page1).hasSize(26);
-        verify(warehouseDocumentItemRepository, times(26)).containsProduct(any(), any(), any());
+        verify(warehouseDocumentItemRepository, times(26)).containsProduct(any(), any());
     }
 
     private WarehouseDocument document(String documentId) {

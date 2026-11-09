@@ -28,7 +28,7 @@ public class CsvOfferImporter implements OfferImporter {
         BasketItem item = new BasketItem(
                 "", // pimId - empty for CSV imports
                 asString(row[1]), // name
-                asStringOrDefault(row, 5, ""), // manufacturer code
+                asStringOrDefault(row, 5, ""), // sku (EAN)
                 asString(row[0]), // category
                 asLong(row[3]), // price
                 asDouble(row[4]),
