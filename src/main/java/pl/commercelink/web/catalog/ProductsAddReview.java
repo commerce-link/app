@@ -22,6 +22,7 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductRecommendation;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.brand.BrandMapper;
+import pl.commercelink.products.information.PimEntryRequester;
 import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
 import pl.commercelink.web.inventory.InventoryBrowseController;
@@ -56,6 +57,7 @@ public class ProductsAddReview {
     private final MessageSource messageSource;
     private final CatalogPlacement catalogPlacement;
     private final StorePimAliases pimAliases;
+    private final PimEntryRequester pimEntryRequester;
 
     /**
      * @param resetRows rows whose label or pricing group, kept from the previous category, the new one does not offer and
@@ -166,7 +168,7 @@ public class ProductsAddReview {
                 .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toCollection(HashSet::new));
         InventoryView enabled = inventory.withEnabledSuppliersOnly(storeId);
-        int added = 0;
+        List<Product> saved = new ArrayList<>();
         for (int index = 0; index < form.getProducts().size(); index++) {
             // The category and the id are the application's to give, and so is the PIM entry: a pim id taken from the
             // form would bind the product to an arbitrary entry of the catalog.
@@ -194,12 +196,15 @@ public class ProductsAddReview {
             }
             alreadyInCategory.add(key);
             entry.ifPresent(found -> pimIdsInCategory.add(found.pimId()));
-            added++;
+            saved.add(product);
         }
-        if (added > 0) {
+        if (!saved.isEmpty()) {
             catalogPlacement.evict(storeId);
+            // after all the writes, so the requests do not interleave with the saves; the requester decides which
+            // products need one
+            pimEntryRequester.requestMissingEntries(storeId, saved);
         }
-        return added;
+        return saved.size();
     }
 
     /**

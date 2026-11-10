@@ -39,6 +39,7 @@ import pl.commercelink.products.ProductRecommendation;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.brand.BrandMapper;
+import pl.commercelink.products.information.PimEntryRequester;
 import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.security.model.CustomUser;
@@ -72,6 +73,7 @@ import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -95,6 +97,8 @@ class CatalogProductsControllerTest {
 
     private static final String STORE_ID = "store-1";
 
+    @Mock
+    private PimEntryRequester pimEntryRequester;
     @Mock
     private CatalogAccess access;
     @Mock
@@ -169,7 +173,8 @@ class CatalogProductsControllerTest {
         mvc = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
                 brandMapper, messageSource, optimisticLockingExecutor, catalogPlacement,
-                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement, new StorePimAliases(pimCatalog))))
+                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement, new StorePimAliases(pimCatalog), pimEntryRequester),
+                pimEntryRequester))
                 .build();
     }
 
@@ -1466,6 +1471,115 @@ class CatalogProductsControllerTest {
         assertThat(saved.getValue().isEnabled()).isTrue();
     }
 
+    @Test
+    void createdProductIsHandedToThePimRequester() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(pimView.findByGtin("4719331361600")).thenReturn(Optional.empty());
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/new")
+                        .param("name", "MSI RTX 5070").param("ean", "4719331361600").param("manufacturerCode", "MFN-1")
+                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default")
+                        .param("enabled", "true"))
+                .andExpect(redirectedUrl(categoryPath() + "?status=active"));
+
+        // then
+        verify(pimEntryRequester).requestMissingEntry(eq(STORE_ID),
+                argThat(p -> "4719331361600".equals(p.getEan()) && p.getPimId() == null));
+    }
+
+    @Test
+    void rejectedNewProductAsksNothingOfThePim() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        Product existing = new Product(gpu.getCategoryId(), null, "4719331361600", "MFN-1", null, "l", "MSI RTX 5070", "Default");
+        existing.setProductId("p1");
+        when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(existing));
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/new").header("X-Requested-With", "fetch")
+                        .param("name", "").param("ean", "4719331361699").param("manufacturerCode", "MFN-2")
+                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default")
+                        .param("enabled", "true"))
+                .andExpect(status().isUnprocessableEntity());
+        mvc.perform(post(categoryPath() + "/products/new").header("X-Requested-With", "fetch")
+                        .param("name", "MSI RTX 5070").param("ean", "4719331361600").param("manufacturerCode", "MFN-1")
+                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default")
+                        .param("enabled", "true"))
+                .andExpect(status().isUnprocessableEntity());
+
+        // then
+        verify(productRepository, never()).save(any());
+        verifyNoInteractions(pimEntryRequester);
+    }
+
+    @Test
+    void savedPendingProductIsHandedToThePimRequester() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        Product pending = new Product(gpu.getCategoryId(), null, "4719331361699", "MFN-1", null, "l", "MSI RTX 5070", "Default");
+        pending.setProductId("p1");
+        when(access.requireProduct(gpu, "p1")).thenReturn(pending);
+        when(pimView.findByGtin("4719331361600")).thenReturn(Optional.empty());
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/p1")
+                        .param("name", "MSI RTX 5070").param("ean", "4719331361600").param("manufacturerCode", "MFN-1")
+                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default")
+                        .param("enabled", "true"))
+                .andExpect(redirectedUrl(categoryPath() + "?status=active"));
+
+        // then
+        verify(pimEntryRequester).requestMissingEntry(eq(STORE_ID),
+                argThat(p -> "4719331361600".equals(p.getEan())));
+    }
+
+    @Test
+    void savedProductThatJoinedAnEntryIsHandedOverWithItsPimId() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        Product pending = new Product(gpu.getCategoryId(), null, "4719331361699", "MFN-1", null, "l", "MSI RTX 5070", "Default");
+        pending.setProductId("p1");
+        when(access.requireProduct(gpu, "p1")).thenReturn(pending);
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.pimId()).thenReturn("pim-1");
+        when(entry.brand()).thenReturn("msi");
+        when(pimView.findByGtin("4719331361600")).thenReturn(Optional.of(entry));
+        when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/p1")
+                        .param("name", "MSI RTX 5070").param("ean", "4719331361600").param("manufacturerCode", "MFN-1")
+                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default")
+                        .param("enabled", "true"))
+                .andExpect(redirectedUrl(categoryPath() + "?status=active"));
+
+        // then
+        verify(pimEntryRequester).requestMissingEntry(eq(STORE_ID), argThat(p -> "pim-1".equals(p.getPimId())));
+    }
+
+    @Test
+    void conflictingSaveAsksNothingOfThePim() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        Product pending = new Product(gpu.getCategoryId(), null, "4719331361699", "MFN-1", null, "l", "MSI RTX 5070", "Default");
+        pending.setProductId("p1");
+        when(access.requireProduct(gpu, "p1")).thenReturn(pending);
+        when(pimView.findByGtin("4719331361600")).thenReturn(Optional.empty());
+        doThrow(new ConditionalCheckFailedException("version changed")).when(productRepository).save(pending);
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/p1").header("X-Requested-With", "fetch")
+                        .param("name", "MSI RTX 5070").param("ean", "4719331361600").param("manufacturerCode", "MFN-1")
+                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default")
+                        .param("enabled", "true"))
+                .andExpect(status().isUnprocessableEntity());
+
+        // then
+        verifyNoInteractions(pimEntryRequester);
+    }
+
     /**
      * RF-1: "Dodaj i edytuj" shows the product with the PIM entry its inventory key resolves to; the save resolves it
      * the same way, so an entry the catalogue holds under a sibling EAN of the key is not lost on the way.
@@ -1851,7 +1965,8 @@ class CatalogProductsControllerTest {
         MockMvc real = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
                 brandMapper, messageSource, RetryingOptimisticLockingExecutor.create(), catalogPlacement,
-                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement, new StorePimAliases(pimCatalog))))
+                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement, new StorePimAliases(pimCatalog), pimEntryRequester),
+                pimEntryRequester))
                 .build();
 
         // when / then
