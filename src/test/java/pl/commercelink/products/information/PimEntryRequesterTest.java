@@ -17,15 +17,21 @@ import pl.commercelink.pim.api.PimView;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.brand.BrandMapper;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -39,6 +45,8 @@ class PimEntryRequesterTest {
 
     private static final String STORE_ID = "store-1";
     private static final String EAN = "4719331361699";
+    private static final String SECOND_EAN = "5901234567890";
+    private static final String THIRD_EAN = "5901234567891";
 
     @Mock
     private PimCatalog pimCatalog;
@@ -246,5 +254,139 @@ class PimEntryRequesterTest {
 
         // then
         verify(pimCatalog).submit(new PimEntryRequest(EAN, "MFN-1", "MSI", 100));
+    }
+
+    @Test
+    void singleProductIsHandedToTheExecutorAndNotSentOnTheCallersThread() {
+        // given
+        RecordingExecutor executor = new RecordingExecutor();
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "prod", executor);
+
+        // when
+        requester.requestMissingEntry(STORE_ID, product(null, EAN, "MFN-1", "MSI"));
+
+        // then
+        verify(pimCatalog, never()).submit(any());
+        assertThat(executor.tasks).hasSize(1);
+
+        // when
+        executor.tasks.get(0).run();
+
+        // then
+        verify(pimCatalog).submit(new PimEntryRequest(EAN, "MFN-1", "MSI", 100));
+    }
+
+    @Test
+    void failedSubmitIsLoggedWithItsRootCause() {
+        // given
+        doThrow(new RuntimeException("Failed to submit PIM entry request",
+                new IllegalStateException("The specified queue does not exist"))).when(pimCatalog).submit(any());
+
+        // when
+        try (CapturedLogs logs = CapturedLogs.of(PimEntryRequester.class)) {
+            requester("prod").requestMissingEntry(STORE_ID, product(null, EAN, "MFN-1", "MSI"));
+
+            // then
+            assertThat(logs.warnings()).singleElement().asString()
+                    .contains(EAN)
+                    .contains("IllegalStateException: The specified queue does not exist");
+        }
+    }
+
+    @Test
+    void productsThatNeedNoRequestDoNotTakeAPlaceInTheQueue() {
+        // given
+        RecordingExecutor executor = new RecordingExecutor();
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "prod", executor);
+
+        // when
+        requester.requestMissingEntry(STORE_ID, product("pim-1", EAN, "MFN-1", "MSI"));
+        requester.requestMissingEntries(STORE_ID, List.of(product("pim-1", EAN, "MFN-1", "MSI"),
+                product(null, " ", "MFN-2", "ASUS"), product(null, SECOND_EAN, "MFN-3", "ASUS")));
+
+        // then
+        assertThat(executor.tasks).hasSize(1);
+
+        // when
+        executor.tasks.get(0).run();
+
+        // then
+        verify(pimCatalog).submit(new PimEntryRequest(SECOND_EAN, "MFN-3", "ASUS", 100));
+        verify(pimCatalog).submit(any());
+    }
+
+    @Test
+    void shutdownWaitsForTheBatchesStillQueued() throws InterruptedException {
+        // given
+        CompletableFuture<Void> sqs = new CompletableFuture<>();
+        CountDownLatch firstSendStarted = new CountDownLatch(1);
+        blockSendOf(EAN, firstSendStarted, sqs);
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "prod", PimEntryRequester.newWorker());
+        requester.requestMissingEntry(STORE_ID, product(null, EAN, "MFN-1", "MSI"));
+        requester.requestMissingEntry(STORE_ID, product(null, SECOND_EAN, "MFN-2", "ASUS"));
+        assertThat(firstSendStarted.await(5, TimeUnit.SECONDS)).isTrue();
+        Thread shutdown = new Thread(requester::shutdown);
+
+        // when
+        shutdown.start();
+        shutdown.join(200);
+        boolean stillWaitingWhileSqsHangs = shutdown.isAlive();
+        sqs.complete(null);
+        shutdown.join(5000);
+
+        // then
+        assertThat(stillWaitingWhileSqsHangs).isTrue();
+        assertThat(shutdown.isAlive()).isFalse();
+        verify(pimCatalog).submit(new PimEntryRequest(SECOND_EAN, "MFN-2", "ASUS", 100));
+    }
+
+    @Test
+    void shutdownReportsTheProductsTheWaitLeftUnsentAndStopsTheRunningBatch() throws InterruptedException {
+        // given
+        CompletableFuture<Void> sqs = new CompletableFuture<>();
+        CountDownLatch firstSendStarted = new CountDownLatch(1);
+        blockSendOf(EAN, firstSendStarted, sqs);
+        ThreadPoolExecutor worker = PimEntryRequester.newWorker();
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "prod", worker, Duration.ofMillis(50));
+        requester.requestMissingEntries(STORE_ID, List.of(
+                product(null, EAN, "MFN-1", "MSI"), product(null, SECOND_EAN, "MFN-2", "ASUS")));
+        requester.requestMissingEntry(STORE_ID, product(null, THIRD_EAN, "MFN-3", "MSI"));
+        assertThat(firstSendStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+        try (CapturedLogs logs = CapturedLogs.of(PimEntryRequester.class)) {
+            // when
+            requester.shutdown();
+            sqs.complete(null);
+
+            // then
+            assertThat(worker.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(logs.warnings()).singleElement().asString().contains("3 products left to the sweeper");
+        }
+        verify(pimCatalog, never()).submit(new PimEntryRequest(SECOND_EAN, "MFN-2", "ASUS", 100));
+        verify(pimCatalog, never()).submit(new PimEntryRequest(THIRD_EAN, "MFN-3", "MSI", 100));
+    }
+
+    /** A send that hangs like the adapter's {@code join()} on a stuck SQS: an interrupt does not end it. */
+    private void blockSendOf(String ean, CountDownLatch started, CompletableFuture<Void> sqs) {
+        doAnswer(invocation -> {
+            started.countDown();
+            sqs.join();
+            return null;
+        }).when(pimCatalog).submit(new PimEntryRequest(ean, "MFN-1", "MSI", 100));
+    }
+
+    @Test
+    void requestAfterShutdownIsLeftToTheSweeperAndDoesNotReachTheCaller() {
+        // given
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "prod", PimEntryRequester.newWorker());
+        requester.shutdown();
+
+        // when / then
+        try (CapturedLogs logs = CapturedLogs.of(PimEntryRequester.class)) {
+            assertThatCode(() -> requester.requestMissingEntry(STORE_ID, product(null, EAN, "MFN-1", "MSI")))
+                    .doesNotThrowAnyException();
+            assertThat(logs.warnings()).singleElement().asString().contains("shutting down");
+        }
+        verify(pimCatalog, never()).submit(any());
     }
 }
