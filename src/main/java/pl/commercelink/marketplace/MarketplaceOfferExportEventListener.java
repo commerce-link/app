@@ -130,7 +130,7 @@ public class MarketplaceOfferExportEventListener {
             }
             // An automatic category keeps the products of its manual days only for a return to manual: they are not its
             // products, so its offers leave the marketplace with the next run and come back if it turns manual again.
-            if (!category.hasType(CategoryDefinitionType.Managed)) {
+            if (category.hasType(CategoryDefinitionType.Dynamic)) {
                 continue;
             }
 

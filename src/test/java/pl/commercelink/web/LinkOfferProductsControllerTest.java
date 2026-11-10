@@ -144,6 +144,22 @@ class LinkOfferProductsControllerTest {
     }
 
     @Test
+    void listsTheProductsOfACategoryOfNoKnownType() {
+        // given
+        ProductCatalog catalog = catalog();
+        catalog.getCategories().get(0).setType(null);
+        when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
+        when(productRepository.findAll(catalog)).thenReturn(List.of(product("p1", "pim-kettle", "5900000000011", "Czajnik", "DMW-CZ17")));
+        when(pricelistFinder.newestPricelist(STORE_ID, CATALOG_ID)).thenReturn(new Pricelist("p1", List.of()));
+
+        // when
+        List<LinkOfferProduct> products = controller.products(CATALOG_ID);
+
+        // then
+        assertThat(products).extracting(LinkOfferProduct::productId).containsExactly("p1");
+    }
+
+    @Test
     void anUnknownCatalogOfTheStoreListsNothing() {
         // given
         when(productCatalogRepository.findById(STORE_ID, "other")).thenReturn(null);

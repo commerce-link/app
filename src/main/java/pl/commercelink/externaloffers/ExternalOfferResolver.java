@@ -199,7 +199,7 @@ public class ExternalOfferResolver {
                         .flatMap(catalog -> catalog.getCategories().stream())
                         .forEach(category -> {
                             names.putIfAbsent(category.getCategoryId(), category.getName());
-                            if (category.hasType(CategoryDefinitionType.Managed)) {
+                            if (!category.hasType(CategoryDefinitionType.Dynamic)) {
                                 manual.add(category.getCategoryId());
                             }
                         });

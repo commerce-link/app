@@ -1219,6 +1219,48 @@ class CatalogCategoryControllerTest {
     }
 
     @Test
+    void theBasicsOfAnAutomaticCategoryOpenWhenItsListCannotBeRead() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        when(dynamicCategoryProducts.candidates(STORE_ID, gpu)).thenThrow(new IllegalStateException("PIM unavailable"));
+
+        // when / then
+        mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics"))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeDoesNotExist("dynamicListCount"));
+    }
+
+    @Test
+    void turningItManualIsRefusedWhileItsListCannotBeRead() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        gpu.setPimCategoryIds(List.of("pim-gpu"));
+        when(dynamicCategoryProducts.candidates(STORE_ID, gpu)).thenThrow(new IllegalStateException("PIM unavailable"));
+
+        // when / then
+        mvc.perform(turnManual(gpu).param("dynamicProducts", "skip"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("errors", hasEntry("type", "catalog.category.type.managed.unavailable")));
+        verify(definitions, never()).saveBasics(any(), any(), any(), any());
+        verify(dynamicCategoryProducts, times(1)).candidates(any(), any());
+    }
+
+    @Test
+    void savingAnAutomaticCategoryAsAutomaticNeverReadsItsList() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        gpu.setType(CategoryDefinitionType.Dynamic);
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics")
+                        .param("name", "GPU").param("type", "Dynamic").param("maxQty", "1"))
+                .andExpect(status().is3xxRedirection());
+        verify(dynamicCategoryProducts, never()).candidates(any(), any());
+    }
+
+    @Test
     void theBasicsOfAManualCategoryDoNotComputeTheAutomaticList() throws Exception {
         // given
         CategoryDefinition gpu = categoryOf("GPU");

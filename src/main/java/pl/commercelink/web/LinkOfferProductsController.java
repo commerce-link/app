@@ -50,7 +50,7 @@ public class LinkOfferProductsController extends BaseController {
         // Manual categories only: an automatic one keeps the products of its manual days just for a return to manual.
         Map<String, String> manualCategoryNames = new HashMap<>();
         for (CategoryDefinition category : catalog.getCategories()) {
-            if (category.getCategoryId() != null && category.hasType(CategoryDefinitionType.Managed)) {
+            if (category.getCategoryId() != null && !category.hasType(CategoryDefinitionType.Dynamic)) {
                 manualCategoryNames.putIfAbsent(category.getCategoryId(), category.getName());
             }
         }

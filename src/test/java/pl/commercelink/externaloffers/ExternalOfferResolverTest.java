@@ -306,6 +306,23 @@ class ExternalOfferResolverTest {
     }
 
     @Test
+    void aProductOfACategoryOfNoKnownTypeCanBeChosenForALink() {
+        // given
+        CategoryDefinition untyped = category("c1", "Krzesła");
+        untyped.setType(null);
+        storeCatalogs(catalog("a", untyped));
+        Product chair = product("c1", "p1", null, "2001000000012", "M1");
+        when(products.findByProductId("c1", "p1")).thenReturn(chair);
+        ExternalOfferResolver.StoreOffers offers = resolver.forStore(STORE);
+
+        // when
+        Optional<Product> chosen = offers.catalogProduct("c1", "p1");
+
+        // then
+        assertThat(chosen).contains(chair);
+    }
+
+    @Test
     void resolvesALinkToItsEanWithoutReadingTheCatalogs() {
         // given
         link("K", "5901234567890");

@@ -14,7 +14,7 @@ import pl.commercelink.stores.StoresRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -60,7 +60,7 @@ class ProductCleanupSchedulerTest {
         scheduler.cleanUpOrphanedProducts("tick");
 
         // then
-        verify(productRepository).delete(leftOver);
+        verify(productRepository).deleteWhateverItsVersion(leftOver.get(0));
     }
 
     @Test
@@ -77,7 +77,7 @@ class ProductCleanupSchedulerTest {
         scheduler.cleanUpOrphanedProducts("tick");
 
         // then
-        verify(productRepository).delete(leftOver);
+        verify(productRepository).deleteWhateverItsVersion(leftOver.get(0));
     }
 
     @Test
@@ -93,7 +93,7 @@ class ProductCleanupSchedulerTest {
         scheduler.cleanUpOrphanedProducts("tick");
 
         // then
-        verify(productRepository, never()).delete(anyList());
+        verify(productRepository, never()).deleteWhateverItsVersion(any());
     }
 
     @Test
@@ -109,7 +109,7 @@ class ProductCleanupSchedulerTest {
         scheduler.cleanUpOrphanedProducts("tick");
 
         // then
-        verify(productRepository, never()).delete(anyList());
+        verify(productRepository, never()).deleteWhateverItsVersion(any());
     }
 
     @Test
@@ -125,7 +125,7 @@ class ProductCleanupSchedulerTest {
         scheduler.cleanUpOrphanedProducts("tick");
 
         // then
-        verify(productRepository, never()).delete(anyList());
+        verify(productRepository, never()).deleteWhateverItsVersion(any());
     }
 
     @Test
@@ -140,7 +140,7 @@ class ProductCleanupSchedulerTest {
         scheduler.cleanUpOrphanedProducts("tick");
 
         // then
-        verify(productRepository, never()).delete(anyList());
+        verify(productRepository, never()).deleteWhateverItsVersion(any());
     }
 
     @Test
@@ -159,7 +159,7 @@ class ProductCleanupSchedulerTest {
         InOrder order = inOrder(productRepository, productCatalogRepository);
         order.verify(productRepository).findAll(CATEGORY_ID);
         order.verify(productCatalogRepository).findByIdConsistently(STORE_ID, read.getCatalogId());
-        order.verify(productRepository).delete(anyList());
+        order.verify(productRepository).deleteWhateverItsVersion(any());
     }
 
     @Test
@@ -174,7 +174,7 @@ class ProductCleanupSchedulerTest {
 
         // then
         verify(productCatalogRepository, never()).findByIdConsistently(STORE_ID, read.getCatalogId());
-        verify(productRepository, never()).delete(anyList());
+        verify(productRepository, never()).deleteWhateverItsVersion(any());
     }
 
     private void storeHolds(ProductCatalog catalog) {

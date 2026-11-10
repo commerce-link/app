@@ -234,6 +234,21 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     @Test
+    void aCategoryOfNoKnownTypeIsStillExported() {
+        // given: a stored type the enum no longer knows maps to none; only an automatic category is left out
+        Product product = product("pim-A", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        catalog.getCategories().get(0).setType(null);
+        priceFor(product, 100, 2);
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(capturePublishedOffers()).extracting(MarketplaceOffer::productId).containsExactly("pim-A");
+    }
+
+    @Test
     void aProductLeavingTheCatalogIsUnpublishedEvenWhenAnotherProductSharesItsEan() {
         // given pim-B left the catalog; pim-A, still exported, carries the same EAN (the marketplace keys offers by id)
         Product product = product("pim-A", "EAN-A");

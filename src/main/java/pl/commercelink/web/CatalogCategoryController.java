@@ -187,7 +187,7 @@ public class CatalogCategoryController {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
         return renderBasics(catalog, category, CategoryBasicsForm.from(category), Map.of(), model, locale,
-                automaticListOf(category, null));
+                new AutomaticList(category).forThePage());
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/settings/basics")
@@ -199,25 +199,28 @@ public class CatalogCategoryController {
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
         boolean async = SettingsPaths.isAsync(requestedWith);
         boolean turnsManual = category.hasType(CategoryDefinitionType.Dynamic) && form.isManaged();
-        // The list the operator was asked about: read once, from the category as this page saw it, before the save.
-        List<ManagedCategoryProducts.Candidate> automaticList = turnsManual
-                ? dynamicCategoryProducts.candidates(storeId(), category) : null;
+        // The list the operator is asked about, from the category as this request read it, before the save.
+        AutomaticList automaticList = new AutomaticList(category);
         Map<String, String> errors = form.validate(otherNames(catalog, category), category.getName(),
-                turnsManual && !automaticList.isEmpty());
+                turnsManual && automaticList.read().filter(list -> !list.isEmpty()).isPresent());
+        if (turnsManual && automaticList.read().isEmpty()) {
+            // Nobody can agree to a list nobody could read: the category stays automatic until it can be read again.
+            errors.put("type", "catalog.category.type.managed.unavailable");
+        }
         if (!errors.isEmpty()) {
-            return rejected(renderBasics(catalog, category, form, errors, model, locale, automaticListOf(category, automaticList)),
+            return rejected(renderBasics(catalog, category, form, errors, model, locale, automaticList.forThePage()),
                     BASICS_FRAGMENT, async, response);
         }
         boolean becomesDynamic = category.hasType(CategoryDefinitionType.Managed) && form.isDynamic();
         CategoryDefinitions.Basics basics = form.toBasics();
         List<ManagedCategoryProducts.Candidate> agreedProducts = turnsManual && form.storesDynamicProducts()
-                ? automaticList : List.of();
+                ? automaticList.read().orElseThrow() : List.of();
         CategoryDefinitions.BasicsSaved saved;
         try {
             saved = definitions.saveBasics(catalog, category, basics, agreedProducts);
         } catch (OptimisticLockingExhaustedException e) {
             return conflict(renderBasics(catalog, category, form, conflictAt(BASICS_FORM), model, locale,
-                    automaticListOf(category, automaticList)), BASICS_FRAGMENT, async, response);
+                    automaticList.forThePage()), BASICS_FRAGMENT, async, response);
         }
         // The service saves a fresh read of the catalog, so the name the category now has is the one just posted.
         String message = messageSource.getMessage("catalog.category.basics.saved",
@@ -230,7 +233,7 @@ public class CatalogCategoryController {
         if (turnsManual && saved.becameManaged()) {
             if (saved.productsIncomplete()) {
                 warning = messageSource.getMessage("catalog.category.type.changed.managed.incomplete", null, locale);
-            } else if (automaticList.isEmpty()) {
+            } else if (automaticList.read().orElseThrow().isEmpty()) {
                 warning = messageSource.getMessage("catalog.category.type.changed.managed.empty", null, locale);
             } else if (form.storesDynamicProducts()) {
                 message += " " + messageSource.getMessage("catalog.category.type.changed.managed",
@@ -577,16 +580,40 @@ public class CatalogCategoryController {
     }
 
     /**
-     * The automatic list of the category, for the page that asks what becomes of it when the category turns manual:
-     * {@code known} when this request has read it already, else read now; null for a manual category, which is asked
-     * nothing.
+     * The automatic list of a category, read at most once per request and only when something needs it. A manual
+     * category has none. Reading it asks the inventory and the PIM; when they cannot answer, the list is absent and the
+     * page works on without it (a WARN, the way {@link #emptyListWarning} treats the same inventory), instead of
+     * failing the Basics page of every automatic category.
      */
-    private List<ManagedCategoryProducts.Candidate> automaticListOf(CategoryDefinition category,
-                                                                    List<ManagedCategoryProducts.Candidate> known) {
-        if (!category.hasType(CategoryDefinitionType.Dynamic)) {
-            return null;
+    private final class AutomaticList {
+
+        private final CategoryDefinition category;
+        private Optional<List<ManagedCategoryProducts.Candidate>> read;
+
+        private AutomaticList(CategoryDefinition category) {
+            this.category = category;
         }
-        return known != null ? known : dynamicCategoryProducts.candidates(storeId(), category);
+
+        Optional<List<ManagedCategoryProducts.Candidate>> read() {
+            if (read == null) {
+                read = category.hasType(CategoryDefinitionType.Dynamic) ? readNow() : Optional.empty();
+            }
+            return read;
+        }
+
+        /** What the page shows: null asks nothing, as for a manual category. */
+        List<ManagedCategoryProducts.Candidate> forThePage() {
+            return read().orElse(null);
+        }
+
+        private Optional<List<ManagedCategoryProducts.Candidate>> readNow() {
+            try {
+                return Optional.of(dynamicCategoryProducts.candidates(storeId(), category));
+            } catch (RuntimeException e) {
+                log.warn("The automatic list of category {} could not be read", category.getCategoryId(), e);
+                return Optional.empty();
+            }
+        }
     }
 
     /** The page without the automatic list: a new category, or the form a successful save re-renders before it navigates. */

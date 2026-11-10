@@ -393,6 +393,25 @@ class CategoryTypeSwitchingDynamoDbIntegrationTest {
     }
 
     @Test
+    void aProductSavedWhileTheCleanupRunsIsDeletedAllTheSame() throws Exception {
+        // given: an automatic category past the retention, one of its products moved onto another entry mid-run
+        categoryOf(CategoryDefinitionType.Managed);
+        offers(offer("pim-1", "5901000000011", "MSI RTX 5060"));
+        stored("pim-1", "5901000000011", product -> product.setName("Moja karta"));
+        stored("pim-2", "5901000000028", product -> product.setName("Druga karta"));
+        save("Dynamic", null);
+        daysPass(8);
+        ProductCleanupScheduler cleanupMeetingASave = cleanupOver(productsSavedJustAfterTheRead(
+                () -> edit("pim-2", product -> product.setPimId("pim-2-moved"))));
+
+        // when
+        cleanupMeetingASave.cleanUpOrphanedProducts("tick");
+
+        // then
+        assertThat(inCategory()).isEmpty();
+    }
+
+    @Test
     void theAutomaticListKeepsOfferingTheProductsLeftInTheTableUnderTheirPimData() throws Exception {
         // given
         categoryOf(CategoryDefinitionType.Managed);
@@ -698,6 +717,27 @@ class CategoryTypeSwitchingDynamoDbIntegrationTest {
                     }
                 }
                 return super.findAll(category);
+            }
+        };
+    }
+
+    /** The products table as a cleanup run reads it, with a save landing right after the run read the category's products. */
+    private ProductRepository productsSavedJustAfterTheRead(ThrowingRunnable save) {
+        return new ProductRepository(client) {
+            private boolean saved;
+
+            @Override
+            public List<Product> findAll(String category) {
+                List<Product> read = super.findAll(category);
+                if (!saved && category.equals(categoryId)) {
+                    saved = true;
+                    try {
+                        save.run();
+                    } catch (Exception e) {
+                        throw new IllegalStateException(e);
+                    }
+                }
+                return read;
             }
         };
     }

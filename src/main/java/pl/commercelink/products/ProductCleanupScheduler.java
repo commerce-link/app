@@ -46,7 +46,9 @@ public class ProductCleanupScheduler {
                     // products, so a product read here that the switch stored is always seen with the manual type below.
                     List<Product> productsToDelete = productRepository.findAll(category.getCategoryId());
                     if (!productsToDelete.isEmpty() && stillPastRetention(catalog, category, thresholdDate)) {
-                        productRepository.delete(productsToDelete);
+                        // Whatever their version: a product saved since the read (moved onto a clone, say) still belongs
+                        // to a category automatic past the retention, and a version conflict would fail the whole run.
+                        productsToDelete.forEach(productRepository::deleteWhateverItsVersion);
                     }
                 }
             }
