@@ -1,13 +1,6 @@
 package pl.commercelink.products;
 
-import com.amazonaws.auth.AWSStaticCredentialsProvider;
-import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
-import com.amazonaws.services.dynamodbv2.model.CreateTableRequest;
-import com.amazonaws.services.dynamodbv2.model.ProvisionedThroughput;
 import com.amazonaws.services.dynamodbv2.model.QueryRequest;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -16,6 +9,7 @@ import org.mockito.Mockito;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import pl.commercelink.testsupport.DynamoDbLocal;
 import pl.commercelink.testsupport.DynamoDbLocalImage;
 
 import java.util.List;
@@ -41,18 +35,8 @@ class ProductFindAllDynamoDbIntegrationTest {
 
     @BeforeAll
     static void createTheProductsTable() {
-        client = AmazonDynamoDBClientBuilder.standard()
-                .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(
-                        "http://" + DYNAMODB.getHost() + ":" + DYNAMODB.getMappedPort(8000), "eu-central-1"))
-                .withCredentials(new AWSStaticCredentialsProvider(new BasicAWSCredentials("local", "local")))
-                .build();
-        ProvisionedThroughput throughput = new ProvisionedThroughput(1L, 1L);
-        CreateTableRequest request = new DynamoDBMapper(client).generateCreateTableRequest(Product.class)
-                .withProvisionedThroughput(throughput);
-        if (request.getGlobalSecondaryIndexes() != null) {
-            request.getGlobalSecondaryIndexes().forEach(index -> index.withProvisionedThroughput(throughput));
-        }
-        client.createTable(request);
+        client = DynamoDbLocal.clientOf(DYNAMODB);
+        DynamoDbLocal.createTables(client, Product.class);
         products = new ProductRepository(client);
     }
 

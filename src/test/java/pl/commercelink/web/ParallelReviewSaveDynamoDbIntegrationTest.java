@@ -1,13 +1,6 @@
 package pl.commercelink.web;
 
-import com.amazonaws.auth.AWSStaticCredentialsProvider;
-import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
-import com.amazonaws.services.dynamodbv2.model.CreateTableRequest;
-import com.amazonaws.services.dynamodbv2.model.ProvisionedThroughput;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -41,6 +34,7 @@ import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.testsupport.DynamoDbLocal;
 import pl.commercelink.testsupport.DynamoDbLocalImage;
 import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.ProductsAddReview;
@@ -81,18 +75,8 @@ class ParallelReviewSaveDynamoDbIntegrationTest {
 
     @BeforeAll
     static void createTheProductsTable() {
-        client = AmazonDynamoDBClientBuilder.standard()
-                .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(
-                        "http://" + DYNAMODB.getHost() + ":" + DYNAMODB.getMappedPort(8000), "eu-central-1"))
-                .withCredentials(new AWSStaticCredentialsProvider(new BasicAWSCredentials("local", "local")))
-                .build();
-        ProvisionedThroughput throughput = new ProvisionedThroughput(1L, 1L);
-        CreateTableRequest request = new DynamoDBMapper(client).generateCreateTableRequest(Product.class)
-                .withProvisionedThroughput(throughput);
-        if (request.getGlobalSecondaryIndexes() != null) {
-            request.getGlobalSecondaryIndexes().forEach(index -> index.withProvisionedThroughput(throughput));
-        }
-        client.createTable(request);
+        client = DynamoDbLocal.clientOf(DYNAMODB);
+        DynamoDbLocal.createTables(client, Product.class);
     }
 
     @AfterEach
