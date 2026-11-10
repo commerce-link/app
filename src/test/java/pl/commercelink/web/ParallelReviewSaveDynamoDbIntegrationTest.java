@@ -189,10 +189,12 @@ class ParallelReviewSaveDynamoDbIntegrationTest {
         BrandMapper brandMapper = mock(BrandMapper.class);
         MessageSource messageSource = mock(MessageSource.class);
         CatalogPlacement placement = mock(CatalogPlacement.class);
+        PimEntryRequester pimEntryRequester = mock(PimEntryRequester.class);
         return new CatalogProductsController(access, products, mock(StoresRepository.class),
                 mock(ProductRecommendationEngine.class), inventory, mock(MarketplaceConnections.class),
                 mock(PimCategoryOptions.class), mock(SupplierLabels.class), pimCatalog, brandMapper,
                 messageSource, mock(OptimisticLockingExecutor.class), placement,
-                new ProductsAddReview(products, inventory, pimCatalog, brandMapper, messageSource, placement, new StorePimAliases(pimCatalog), mock(PimEntryRequester.class)));
+                new ProductsAddReview(products, inventory, pimCatalog, brandMapper, messageSource, placement, new StorePimAliases(pimCatalog), pimEntryRequester),
+                pimEntryRequester);
     }
 }
