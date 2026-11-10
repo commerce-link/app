@@ -183,7 +183,7 @@ class WarehouseDocumentsControllerTest {
     void itemHistoryWithoutFromGoesBackToTheDelivery() throws Exception {
         // given
         securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
-        when(historyService.history("s1", "del-1", "880")).thenReturn(new MfnHistory(null, List.of()));
+        when(historyService.history("s1", "del-1", "880")).thenReturn(new EanHistory(null, List.of()));
 
         // when
         var result = mockMvc.perform(get("/dashboard/warehouse-documents/item-history")
@@ -199,7 +199,7 @@ class WarehouseDocumentsControllerTest {
     void itemHistoryFromADocumentOfTheStoreGoesBackToTheDocument() throws Exception {
         // given
         securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
-        when(historyService.history("s1", "del-1", "880")).thenReturn(new MfnHistory(null, List.of()));
+        when(historyService.history("s1", "del-1", "880")).thenReturn(new EanHistory(null, List.of()));
         when(warehouseDocumentRepository.findByDocumentId("s1", "doc-1")).thenReturn(receipt());
 
         // when
@@ -217,7 +217,7 @@ class WarehouseDocumentsControllerTest {
     void itemHistoryFromAForeignDocumentFallsBackToTheDelivery() throws Exception {
         // given
         securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
-        when(historyService.history("s1", "del-1", "880")).thenReturn(new MfnHistory(null, List.of()));
+        when(historyService.history("s1", "del-1", "880")).thenReturn(new EanHistory(null, List.of()));
         when(warehouseDocumentRepository.findByDocumentId("s1", "foreign")).thenReturn(null);
 
         // when
@@ -234,7 +234,7 @@ class WarehouseDocumentsControllerTest {
     void itemHistoryOpenedFromAnItemLeadsBackToIt() throws Exception {
         // given
         securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
-        when(historyService.history("s1", "del-1", "880")).thenReturn(new MfnHistory(null, List.of()));
+        when(historyService.history("s1", "del-1", "880")).thenReturn(new EanHistory(null, List.of()));
         WarehouseItem item = new WarehouseItem("s1", "del-1", "SSD", "Samsung 990", "880", "MZ-1", 1.0, 1);
         item.setItemId("w-1");
         when(warehouseRepository.findById("s1", "w-1")).thenReturn(item);
@@ -254,7 +254,7 @@ class WarehouseDocumentsControllerTest {
     void itemHistoryOpenedFromAnItemWithoutADeliveryLinksNoDelivery() throws Exception {
         // given
         securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
-        when(historyService.history("s1", "Acme", "880")).thenReturn(new MfnHistory(null, List.of()));
+        when(historyService.history("s1", "Acme", "880")).thenReturn(new EanHistory(null, List.of()));
         WarehouseItem item = new WarehouseItem("s1", "Acme", "SSD", "Kabel", "880", "MZ-1", 1.0, 1);
         item.setItemId("w-2");
         when(warehouseRepository.findById("s1", "w-2")).thenReturn(item);
@@ -275,7 +275,7 @@ class WarehouseDocumentsControllerTest {
     void itemHistoryOpenedFromAnItemWithADeliveryLinksIt() throws Exception {
         // given
         securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
-        when(historyService.history("s1", "del-1", "880")).thenReturn(new MfnHistory(null, List.of()));
+        when(historyService.history("s1", "del-1", "880")).thenReturn(new EanHistory(null, List.of()));
         WarehouseItem item = new WarehouseItem("s1", "del-1", "SSD", "Samsung 990", "880", "MZ-1", 1.0, 1);
         item.setItemId("w-1");
         when(warehouseRepository.findById("s1", "w-1")).thenReturn(item);
@@ -295,7 +295,7 @@ class WarehouseDocumentsControllerTest {
     void itemHistoryFromAForeignItemFallsBackToTheDelivery() throws Exception {
         // given
         securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
-        when(historyService.history("s1", "del-1", "880")).thenReturn(new MfnHistory(null, List.of()));
+        when(historyService.history("s1", "del-1", "880")).thenReturn(new EanHistory(null, List.of()));
         when(warehouseRepository.findById("s1", "w-x")).thenReturn(null);
 
         // when

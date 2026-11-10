@@ -1,12 +1,11 @@
 package pl.commercelink.web.inventory;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
-import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.search.ProductHeader;
 import pl.commercelink.products.PimCategoryTree;
-import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.products.ProductDataResolver;
 
 import java.util.Optional;
 
@@ -18,14 +17,12 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ProductCategoryLineFactory {
 
-    private final TaxonomyCache taxonomyCache;
+    private final ProductDataResolver productDataResolver;
     private final PimCategoryTree tree;
 
-    public Optional<CategoryLine> build(ProductHeader product) {
-        Taxonomy taxonomy = taxonomyCache.find(new InventoryKey(product.ean(), product.mfn()));
-        if (!TaxonomyCache.hasCategory(taxonomy)) {
-            return Optional.empty();
-        }
-        return Optional.of(CategoryLine.of(tree, taxonomy.categoryId(), taxonomy.category(), false));
+    public Optional<CategoryLine> build(String storeId, ProductHeader product) {
+        return productDataResolver.ofEan(storeId, product.ean())
+                .filter(found -> StringUtils.isNotBlank(found.category()))
+                .map(found -> CategoryLine.of(tree, found.categoryId(), found.category(), false));
     }
 }

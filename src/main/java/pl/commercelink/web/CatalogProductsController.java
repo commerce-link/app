@@ -107,7 +107,7 @@ public class CatalogProductsController {
     /** The id of the product form: the key of an error that belongs to the whole form, so the summary links to it. */
     private static final String PRODUCT_FORM = "product-form";
 
-    /** The product being created is in the category already (same EAN, manufacturer code or PIM entry). */
+    /** The product being created is in the category already (same EAN or PIM entry). */
     private static final String DUPLICATE = "product.error.duplicate";
 
     private final CatalogAccess access;
@@ -542,16 +542,6 @@ public class CatalogProductsController {
         return "redirect:" + CatalogPaths.category(catalogId, categoryId);
     }
 
-    /**
-     * The PIM entry of a product being added, resolved the way the review resolved it: through the inventory key the
-     * suppliers know the item by, which carries every EAN and product code listed under it. Asking with the two
-     * identifiers of the row alone would miss an entry the catalogue holds under a sibling code, and the product would
-     * be saved without a pim id -- out of the price list and out of every marketplace offer.
-     *
-     * <p>The row's own two codes are asked about whenever the key answers nothing: the product may have left the
-     * inventory between the review and the save, and the key the inventory does know it by may not carry the
-     * identifier the operator has just corrected in the review.
-     */
     private static List<String> marketplaceNames(Store store) {
         return store.getMarketplaces().stream().map(MarketplaceIntegration::getName).toList();
     }

@@ -25,25 +25,24 @@ class StoreEntryCodeHistoryTest {
     @Test
     void remembersTheCodesAnEntryHadBeforeItsEdit() {
         // given
-        history.remember(List.of(entry("X", E1, "M1")));
+        history.remember(List.of(entry("X", E1)));
         clock.advance(Duration.ofMinutes(5));
 
         // when
-        history.remember(List.of(entry("X", E2, "M1")));
+        history.remember(List.of(entry("X", E2)));
 
         // then
         assertThat(history.eansOf("X")).containsExactlyInAnyOrder(E1, E2);
-        assertThat(history.mpnsOf("X")).containsExactly("M1");
     }
 
     @Test
     void forgetsCodesNotSeenForLongerThanTheKeepPeriod() {
         // given
-        history.remember(List.of(entry("X", E1, "M1")));
+        history.remember(List.of(entry("X", E1)));
         clock.advance(StoreEntryCodeHistory.KEEP.plusSeconds(1));
 
         // when
-        history.remember(List.of(entry("X", E2, "M1")));
+        history.remember(List.of(entry("X", E2)));
 
         // then
         assertThat(history.eansOf("X")).containsExactly(E2);
@@ -52,7 +51,7 @@ class StoreEntryCodeHistoryTest {
     @Test
     void codesExpireForReadsEvenWithoutAFurtherRefresh() {
         // given
-        history.remember(List.of(entry("X", E1, null)));
+        history.remember(List.of(entry("X", E1)));
 
         // when
         clock.advance(StoreEntryCodeHistory.KEEP.plusSeconds(1));
@@ -67,11 +66,9 @@ class StoreEntryCodeHistoryTest {
         assertThat(history.eansOf("unknown")).isEmpty();
     }
 
-    private static PimEntry entry(String pimId, String gtin, String mpn) {
-        List<PimIdentifier> identifiers = mpn == null
-                ? List.of(new PimIdentifier(gtin, PimIdentifierType.GTIN))
-                : List.of(new PimIdentifier(gtin, PimIdentifierType.GTIN), new PimIdentifier(mpn, PimIdentifierType.MPN));
-        return new PimEntry(pimId, identifiers, "Brand", "Name", null, null, true, null, null, null, "s1");
+    private static PimEntry entry(String pimId, String gtin) {
+        return new PimEntry(pimId, List.of(new PimIdentifier(gtin, PimIdentifierType.GTIN)), "Brand", "Name", null, null,
+                true, null, null, null, "s1");
     }
 
     private static final class MovableClock extends Clock {

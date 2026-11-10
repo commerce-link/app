@@ -190,7 +190,7 @@ public class ProductsAddReview {
 
     /** The PIM entry of an inventory group: by its pim id, else by any of its EANs, never by a manufacturer code. */
     public Optional<PimEntry> pimEntryOfGroup(String storeId, InventoryKey group) {
-        return pimCatalog.withStoreData(storeId).findByPimIdOrGtinsOrMpns(group.getId(), group.getProductEans(), List.of());
+        return pimCatalog.withStoreData(storeId).findByPimIdOrGtins(group.getId(), group.getProductEans());
     }
 
     /**

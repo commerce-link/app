@@ -151,6 +151,24 @@ class BuiltInStockQueryServiceTest {
     }
 
     @Test
+    void summarizeAvailableCountsProductsByEan() {
+        // given
+        WarehouseItem firstDelivery = anAvailableItem(20.0);
+        WarehouseItem sameEanOtherCode = new WarehouseItem("store-1", "delivery-2", Categories.UNCATEGORIZED, "Widget", "5901234123457", "MFN-1/EU", 20.0, 1);
+        sameEanOtherCode.setStatus(FulfilmentStatus.Delivered);
+        WarehouseItem otherProduct = new WarehouseItem("store-1", "delivery-3", Categories.UNCATEGORIZED, "Gadget", "5900000000001", "MFN-2", 10.0, 1);
+        otherProduct.setStatus(FulfilmentStatus.Delivered);
+        when(warehouseRepository.findAllFiltered("store-1", null, List.of(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered)))
+                .thenReturn(List.of(firstDelivery, sameEanOtherCode, otherProduct));
+
+        // when
+        StockSummary summary = new BuiltInStockQueryService(warehouseRepository).summarizeAvailable("store-1");
+
+        // then
+        assertThat(summary.products()).isEqualTo(2);
+    }
+
+    @Test
     void excludesNotSealedItemsFromAvailableStockFoundByEans() {
         // given
         WarehouseItem sealed = anAvailableItem(20.0);

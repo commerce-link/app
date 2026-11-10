@@ -19,30 +19,28 @@ class WarehouseDocumentSearchService {
     private final WarehouseDocumentItemRepository warehouseDocumentItemRepository;
 
     /**
-     * How many documents match, or empty for a product code: that would read the items of every document in the range,
+     * How many documents match, or empty for an EAN: that would read the items of every document in the range,
      * so the list then only knows whether a next page exists.
      */
-    OptionalInt count(WarehouseDocumentCriteria criteria, String productCode) {
-        return isBlank(productCode) ? OptionalInt.of(warehouseDocumentRepository.count(criteria)) : OptionalInt.empty();
+    OptionalInt count(WarehouseDocumentCriteria criteria, String ean) {
+        return isBlank(ean) ? OptionalInt.of(warehouseDocumentRepository.count(criteria)) : OptionalInt.empty();
     }
 
     /**
-     * One page of documents, newest first, plus one more when a next page exists. A product code is matched against
-     * every document's items (EAN or manufacturer code, normalised like stored items); the read stops at the page + 1.
+     * One page of documents, newest first, plus one more when a next page exists. An EAN is matched against every
+     * document's items (normalised like stored items); the read stops at the page + 1.
      */
-    List<WarehouseDocument> search(WarehouseDocumentCriteria criteria, String productCode, int page, int pageSize) {
-        if (isBlank(productCode)) {
+    List<WarehouseDocument> search(WarehouseDocumentCriteria criteria, String ean, int page, int pageSize) {
+        if (isBlank(ean)) {
             return warehouseDocumentRepository.search(criteria, page, pageSize);
         }
-        String code = productCode.trim();
-        String ean = UnifiedProductIdentifiers.unifyEan(code);
-        String mfn = UnifiedProductIdentifiers.unifyMfn(code);
+        String unifiedEan = UnifiedProductIdentifiers.unifyEan(ean.trim());
 
         List<WarehouseDocument> result = new ArrayList<>(pageSize + 1);
         int skip = Math.max(page - 1, 0) * pageSize;
         int matched = 0;
         for (WarehouseDocument document : warehouseDocumentRepository.findAllMatching(criteria)) {
-            if (!warehouseDocumentItemRepository.containsProduct(document.getDocumentId(), ean, mfn)) {
+            if (!warehouseDocumentItemRepository.containsProduct(document.getDocumentId(), unifiedEan)) {
                 continue;
             }
             if (matched++ >= skip) {

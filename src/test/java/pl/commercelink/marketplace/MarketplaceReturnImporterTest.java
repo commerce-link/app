@@ -1,5 +1,8 @@
 package pl.commercelink.marketplace;
 
+import pl.commercelink.carriers.CarrierDictionary;
+import pl.commercelink.carriers.CarrierTranslator;
+import pl.commercelink.carriers.InMemoryCarrierDictionaries;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -7,6 +10,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -62,6 +66,9 @@ class MarketplaceReturnImporterTest {
     @Mock private StoreNotificationService notificationService;
     @Mock private OrderItemFamily orderItemFamily;
     @Mock private OpenRmaCoverage openRmaCoverage;
+    @Spy private CarrierTranslator carrierTranslator = new InMemoryCarrierDictionaries()
+            .with(CarrierDictionary.marketplaceStatusCarrierCodes("Allegro"), "INPOST=InPost", "INPOST=InPost Kurier")
+            .translator();
     @Mock private Order order;
     @Mock private OrderItem orderItem;
 
@@ -81,6 +88,7 @@ class MarketplaceReturnImporterTest {
         when(order.getEmail()).thenReturn("buyer@allegro.pl");
         when(order.getShippingDetails()).thenReturn(new ShippingDetails());
         when(orderItem.getItemId()).thenReturn("item-1");
+        when(orderItem.getExternalItemId()).thenReturn("SKU-1");
         when(orderItem.getManufacturerCode()).thenReturn("SKU-1");
         when(orderItem.getQty()).thenReturn(3);
         when(orderItem.getPrice()).thenReturn(100.0);
@@ -159,7 +167,7 @@ class MarketplaceReturnImporterTest {
         assertFalse(rma.isEmailNotificationsEnabled());
         assertEquals(LocalDateTime.of(2026, 8, 20, 12, 0), rma.getCreatedAt());
         assertEquals("0000123456", rma.getShipments().get(0).getTrackingNo());
-        assertEquals("INPOST", rma.getShipments().get(0).getCarrier());
+        assertEquals("InPost", rma.getShipments().get(0).getCarrier());
         assertEquals(200.0, rma.getShippingInsurance(), 0.001);
 
         ArgumentCaptor<List<RMAItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
@@ -177,36 +185,6 @@ class MarketplaceReturnImporterTest {
         inOrder.verify(rmaRepository).save(any());
         // a return matched on the very first poll never had a stale warning, so this resolve is a harmless no-op
         inOrder.verify(notificationService).resolve(STORE_ID, StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED, "r-1");
-    }
-
-    @Test
-    void matchesByThePersistedExternalItemIdWhenManufacturerCodeWasOverwrittenBySupplierAssignment() {
-        // given
-        when(orderItem.getExternalItemId()).thenReturn("SKU-1");
-        when(orderItem.getManufacturerCode()).thenReturn("SUPPLIER-CODE-1");
-        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
-
-        // when
-        importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.IN_TRANSIT, item("SKU-1", 1)));
-
-        // then
-        ArgumentCaptor<List<RMAItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
-        verify(rmaItemsRepository).batchSave(itemsCaptor.capture());
-        assertEquals("item-1", itemsCaptor.getValue().get(0).getItemId());
-    }
-
-    @Test
-    void matchesLegacyOrderItemsWhoseManufacturerCodeWasNormalisedAtImport() {
-        // given: an order imported before externalItemId existed — mfn went through unifyMfn
-        OrderItem legacy = orderItem("item-1", null, "K7M2XQ9PZ4", 1);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(legacy));
-        MarketplaceReturn ret = returnWithItem("k7m2xq9pz4", 1);
-
-        // when
-        importer.importReturn(store, MARKETPLACE, ret);
-
-        // then
-        verify(rmaRepository).save(any(RMA.class));
     }
 
     @Test
@@ -238,21 +216,6 @@ class MarketplaceReturnImporterTest {
         ArgumentCaptor<List<RMAItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
         verify(rmaItemsRepository).batchSave(itemsCaptor.capture());
         assertEquals("item-legacy", itemsCaptor.getValue().get(0).getItemId());
-    }
-
-    @Test
-    void fallsBackToManufacturerCodeWhenExternalItemIdIsBlank() {
-        // given
-        when(orderItem.getExternalItemId()).thenReturn(null);
-        when(rmaRepository.findByExternalReturnId(STORE_ID, MARKETPLACE, "r-1")).thenReturn(null);
-
-        // when
-        importer.importReturn(store, MARKETPLACE, marketplaceReturn("r-1", MarketplaceReturnStatus.IN_TRANSIT, item("SKU-1", 1)));
-
-        // then
-        ArgumentCaptor<List<RMAItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
-        verify(rmaItemsRepository).batchSave(itemsCaptor.capture());
-        assertEquals("item-1", itemsCaptor.getValue().get(0).getItemId());
     }
 
     @Test
@@ -514,7 +477,7 @@ class MarketplaceReturnImporterTest {
         assertEquals(MarketplaceReturnStatus.DECLARED, existing.getExternalReturnStatus());
         assertEquals(1, existing.getShipments().size());
         assertEquals("0000123456", existing.getShipments().get(0).getTrackingNo());
-        assertEquals("INPOST", existing.getShipments().get(0).getCarrier());
+        assertEquals("InPost", existing.getShipments().get(0).getCarrier());
         verify(rmaRepository).save(existing);
     }
 

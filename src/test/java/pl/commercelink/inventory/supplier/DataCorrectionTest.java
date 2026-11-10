@@ -14,6 +14,7 @@ import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimIdentifier;
 import pl.commercelink.pim.api.PimIdentifierType;
 import pl.commercelink.products.brand.BrandMapper;
+import pl.commercelink.products.brand.NoNameBrand;
 import pl.commercelink.taxonomy.Taxonomy;
 
 import java.util.List;
@@ -322,7 +323,7 @@ class DataCorrectionTest {
         InventoryItem result = correction.run(offer(null, "5900000000002", "910-006559"));
 
         // then
-        assertThat(result.brand()).isNull();
+        assertThat(result.brand()).isEqualTo(NoNameBrand.NAME);
     }
 
     @Test
@@ -334,25 +335,40 @@ class DataCorrectionTest {
         InventoryItem result = correction.run(offer(null, "5900000000009", "23647"));
 
         // then
-        assertThat(result.brand()).isNull();
+        assertThat(result.brand()).isEqualTo(NoNameBrand.NAME);
     }
 
     @Test
-    void offerWithoutBrandAndEanHasNoBrand() {
-        // given -- the EAN filled in from the entry under the code is no proof the entry is this product
+    void offerWithoutBrandUnknownToPimIsNoNameAndSoIsItsTaxonomy() {
+        // given
+        SupplierProduct fromFeed = new SupplierProduct("5900000000009", "11T105", null, "FeedName", 3, null, null);
+
+        // when
+        InventoryItem offer = dataCorrection.run(offerOf(fromFeed));
+        Taxonomy result = dataCorrection.run(fromFeed, offer);
+
+        // then
+        assertThat(offer.brand()).isEqualTo(NoNameBrand.NAME);
+        assertThat(result.brand()).isEqualTo(NoNameBrand.NAME);
+        assertThat(result.name()).isEqualTo("FeedName");
+    }
+
+    @Test
+    void offerWithoutBrandTakesNoEanFromAnEntryFoundByALongCode() {
+        // given -- without a brand even a long code can name another product
         DataCorrection correction = correctionWith(entryWithBrand("Western Digital", true, "5900000000002", "SDSSDA-1T00"));
 
         // when
         InventoryItem result = correction.run(offer(null, "", "SDSSDA-1T00"));
 
         // then
-        assertThat(result.ean()).isEqualTo("5900000000002");
+        assertThat(result.ean()).isEmpty();
         assertThat(result.brand()).isNull();
     }
 
     @Test
     void offerWithThePlaceholderEanTakesNoBrandFromPim() {
-        // given -- the EAN comes from the entry under the code; another entry carries the placeholder as its GTIN
+        // given -- another entry carries the placeholder as its GTIN
         DataCorrection correction = correctionWith(
                 entryWithBrand("Trust", true, "5900000000002", "TRUST-23647"),
                 entryWithBrand("Logitech", true, "1111111111111", "910-006559"));

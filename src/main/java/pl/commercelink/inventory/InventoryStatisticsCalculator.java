@@ -21,7 +21,7 @@ final class InventoryStatisticsCalculator {
                                          StoreEntryKeys storeEntries) {
         Tally tally = new Tally();
         boolean hasOwn = !ownIndex.all().isEmpty();
-        // an own group's key unions the eans/mfns of all its items, so it can match several global groups;
+        // an own group's key unions the EANs of all its items, so it can match several global groups;
         // it must join only the first one it matches, or it is counted into bySupplier more than once
         Set<MatchedInventory> claimedOwnGroups = Collections.newSetFromMap(new IdentityHashMap<>());
         for (MatchedInventory group : globalIndex.all()) {

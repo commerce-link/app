@@ -85,8 +85,8 @@ class BuiltInStockQueryService implements StockQueryService {
         int inStockQty = 0;
         int inDeliveryQty = 0;
         for (WarehouseItem item : items) {
-            if (item.getManufacturerCode() != null) {
-                products.add(item.getManufacturerCode());
+            if (item.getEan() != null) {
+                products.add(item.getEan());
             }
             if (item.getStatus() == FulfilmentStatus.Ordered) {
                 inDeliveryQty += item.getQty();

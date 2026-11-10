@@ -47,7 +47,15 @@ class TaxonomyCodeIndexTest {
 
         // when / then
         assertThat(index.eansOf("920", "Logitech")).isEmpty();
-        assertThat(index.eansOfSingleBrand("920")).isEmpty();
+    }
+
+    @Test
+    void noNameRowIsNotIndexed() {
+        // given
+        index.link("11T105", "NoName", "111");
+
+        // when / then
+        assertThat(index.eansOf("11T105", "NoName")).isEmpty();
     }
 
     @Test
@@ -57,28 +65,48 @@ class TaxonomyCodeIndexTest {
 
         // when / then
         assertThat(index.eansOf("920", null)).isEmpty();
-        assertThat(index.eansOf(null, "Logitech")).isEmpty();
-        assertThat(index.eansOfSingleBrand(" ")).isEmpty();
+        assertThat(index.eansOf(" ", "Logitech")).isEmpty();
     }
 
     @Test
-    void codeWithOneBrandGivesAllItsEans() {
+    void blockedEanIsNotGivenForItsCodeAndBrand() {
         // given
-        index.link("920", "Logitech", "111");
-        index.link("920", "logitech", "222");
+        index.link("BRAK", "Brand", "111");
+        index.link("BRAK", "Brand", "222");
+        index.link("BRAK", "Other", "111");
 
-        // when / then
-        assertThat(index.eansOfSingleBrand("920")).containsExactly("111", "222");
+        // when
+        index.block("BRAK", " brand ", "111");
+
+        // then
+        assertThat(index.eansOf("BRAK", "Brand")).containsExactly("222");
+        assertThat(index.eansOf("BRAK", "Other")).containsExactly("111");
     }
 
     @Test
-    void codeThatCameWithTwoBrandsGivesNothing() {
+    void blockWithoutCodeOrBrandBlocksNothing() {
         // given
         index.link("920", "Logitech", "111");
-        index.link("920", "Natec", "111");
 
-        // when / then
-        assertThat(index.eansOfSingleBrand("920")).isEmpty();
+        // when
+        index.block("920", null, "111");
+        index.block(null, "Logitech", "111");
+
+        // then
+        assertThat(index.eansOf("920", "Logitech")).containsExactly("111");
+    }
+
+    @Test
+    void clearForgetsTheBlocksToo() {
+        // given
+        index.block("920", "Logitech", "111");
+
+        // when
+        index.clear();
+        index.link("920", "Logitech", "111");
+
+        // then
+        assertThat(index.eansOf("920", "Logitech")).containsExactly("111");
     }
 
     @Test

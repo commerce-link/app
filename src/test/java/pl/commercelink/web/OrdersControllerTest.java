@@ -81,6 +81,10 @@ import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.pim.ScopedPimCatalog;
+import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimView;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
@@ -191,6 +195,10 @@ class OrdersControllerTest {
     @Mock
     private TaxonomyCache taxonomyCache;
     @Mock
+    private PimCatalog pimCatalog;
+    @Mock
+    private PimView storePim;
+    @Mock
     private StoreCategories storeCategories;
     @Mock
     private SupplierLabels supplierLabels;
@@ -250,6 +258,12 @@ class OrdersControllerTest {
     }
 
     @BeforeEach
+    void realProductData() {
+        when(pimCatalog.withStoreData(STORE_ID)).thenReturn(storePim);
+        ReflectionTestUtils.setField(ordersController, "productDataResolver", new ProductDataResolver(pimCatalog, taxonomyCache));
+    }
+
+    @BeforeEach
     void setUpSupplierLabels() {
         when(supplierLabels.forStore(any())).thenReturn(new SupplierLabels(mock(StoresRepository.class)).forStore(null));
         // no e-receipt locks the order unless a test says so
@@ -275,11 +289,11 @@ class OrdersControllerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(pricelistFinder.findByPimId(STORE_ID, "cat-1", "pim-1")).thenReturn(Optional.of(laptop));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        when(inventoryView.findByInventoryKey(any())).thenReturn(MatchedInventory.empty(new InventoryKey("EAN-X", "MFN-X")));
+        when(inventoryView.findByInventoryKey(any())).thenReturn(MatchedInventory.empty(InventoryKey.fromEan("EAN-X")));
         AddItemsForm form = new AddItemsForm();
         form.setItems(List.of(
                 AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 2),
-                AddItemsForm.Entry.fromInventory("EAN-X", "MFN-X", 1)));
+                AddItemsForm.Entry.fromInventory("EAN-X", 1)));
 
         // when
         String view = ordersController.addOrderItems(ORDER_ID, form, redirectAttributes, Locale.ENGLISH);
@@ -5404,6 +5418,25 @@ class OrdersControllerTest {
 
             // then
             assertThat(item.getManufacturerCode()).isEqualTo("SM-G991B");
+            assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+        }
+
+        @Test
+        void theCodeOfTheStoresPimEntryComesBeforeTheTaxonomy() {
+            // given
+            OrderItem item = supplierItem(1.23);
+            when(storePim.findByGtin(SUPPLIER_EAN)).thenReturn(Optional.of(
+                    ScopedPimCatalog.storeEntry("s1-1", STORE_ID, SUPPLIER_EAN, "SM-G991B/DS", "Smartfony")));
+            when(taxonomyCache.findByEan(SUPPLIER_EAN)).thenReturn(
+                    new Taxonomy(SUPPLIER_EAN, "SM-G991B", "Samsung", "Galaxy S21", "Smartfony", 1, null, null, "raw"));
+
+            // when
+            ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net"), null,
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(),
+                    new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(item.getManufacturerCode()).isEqualTo("SM-G991B/DS");
             assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
         }
 

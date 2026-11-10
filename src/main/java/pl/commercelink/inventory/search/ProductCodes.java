@@ -31,7 +31,7 @@ record ProductCodes(String ean, String code) {
     }
 
     ProductCodes orElse(String fallbackEan, String fallbackCode) {
-        return new ProductCodes(ean != null ? ean : CodeMatch.blankToNull(fallbackEan), code != null ? code : CodeMatch.blankToNull(fallbackCode));
+        return new ProductCodes(ean != null ? ean : fallbackEan, code != null ? code : fallbackCode);
     }
 
     private static String unifiedEanOf(String value) {

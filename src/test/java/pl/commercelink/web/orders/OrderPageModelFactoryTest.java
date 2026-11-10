@@ -40,7 +40,11 @@ import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
+import pl.commercelink.pim.ScopedPimCatalog;
+import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.receipts.ReceiptAlerts;
 import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.receipts.ReceiptAttemptState;
@@ -49,7 +53,7 @@ import pl.commercelink.receipts.ReceiptOrderView;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptOrderState;
 import pl.commercelink.receipts.ReceiptPageProblem;
-import pl.commercelink.shipping.CarrierDictionary;
+import pl.commercelink.carriers.CarriersRepository;
 import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.shipping.ShippingProviders;
 import pl.commercelink.shipping.ShippingService;
@@ -66,6 +70,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.Locale;
 import java.util.Set;
@@ -91,6 +96,8 @@ class OrderPageModelFactoryTest {
     @Mock private ShipmentCarrierOptions shipmentCarrierOptions;
     @Mock private ProductCatalogRepository productCatalogRepository;
     @Mock private TaxonomyCache taxonomyCache;
+    @Mock private PimCatalog pimCatalog;
+    @Mock private PimView storePim;
     @Mock private ReceiptAttemptService receiptAttemptService;
     @Mock private ReceiptAlerts receiptAlerts;
     @Mock private ShippingService shippingService;
@@ -111,8 +118,10 @@ class OrderPageModelFactoryTest {
 
     @BeforeEach
     void setUp() {
+        when(pimCatalog.withStoreData("store-1")).thenReturn(storePim);
         factory = new OrderPageModelFactory(storesRepository, orderEventsRepository, dropshipItemLookup,
-                deliveryRedirectResolver, dropshipEligibility, supplierLabels, shipmentCarrierOptions, productCatalogRepository, taxonomyCache,
+                deliveryRedirectResolver, dropshipEligibility, supplierLabels, shipmentCarrierOptions, productCatalogRepository,
+                new ProductDataResolver(pimCatalog, taxonomyCache),
                 messageSource, receiptAttemptService, receiptAlerts, shippingService,
                 ShippingIntegrationNamesFixture.names(), mock(pl.commercelink.externaloffers.ExternalOfferResolver.class));
         ReflectionTestUtils.setField(factory, "appDomain", "https://app.example");
@@ -953,7 +962,8 @@ class OrderPageModelFactoryTest {
         ReflectionTestUtils.setField(realShipping, "shippingProviders", mock(ShippingProviders.class));
         OrderPageModelFactory withRealShipping = new OrderPageModelFactory(storesRepository, orderEventsRepository,
                 dropshipItemLookup, deliveryRedirectResolver, dropshipEligibility, supplierLabels,
-                new ShipmentCarrierOptions(new CarrierDictionary()), productCatalogRepository, taxonomyCache,
+                new ShipmentCarrierOptions(mock(CarriersRepository.class)), productCatalogRepository,
+                new ProductDataResolver(pimCatalog, taxonomyCache),
                 messageSource, receiptAttemptService, receiptAlerts, realShipping,
                 ShippingIntegrationNamesFixture.names(), mock(pl.commercelink.externaloffers.ExternalOfferResolver.class));
         ReflectionTestUtils.setField(withRealShipping, "appDomain", "https://app.example");
@@ -1729,6 +1739,25 @@ class OrderPageModelFactoryTest {
         assertThat(page.items().splitPreviews().get(set.getItemId()).components())
                 .extracting(SplitGroupPreviewDto.Component::sku, SplitGroupPreviewDto.Component::name)
                 .containsExactly(tuple("5901234567890", "Galaxy S21"), tuple("4006381333931", ""));
+    }
+
+    @Test
+    void theSplitPreviewNamesAComponentAfterTheStoresPimEntryBeforeTheTaxonomy() {
+        // given
+        OrderItem set = item(FulfilmentStatus.New);
+        set.setSku("#1x5901234567890|2x4006381333931");
+        when(storePim.findByGtin("5901234567890")).thenReturn(Optional.of(
+                ScopedPimCatalog.storeEntry("s1-1", "store-1", "5901234567890", "SM-G991B", "Smartfony")));
+        when(taxonomyCache.findByEan("5901234567890")).thenReturn(
+                new Taxonomy("5901234567890", "SM-G991B", "Samsung", "Galaxy S21", "Smartfony", 1, null, null));
+
+        // when
+        OrderPageModel page = factory.build(order(OrderStatus.New), List.of(set), ADMIN, PL);
+
+        // then
+        assertThat(page.items().splitPreviews().get(set.getItemId()).components())
+                .extracting(SplitGroupPreviewDto.Component::sku, SplitGroupPreviewDto.Component::name)
+                .containsExactly(tuple("5901234567890", "Store s1-1"), tuple("4006381333931", ""));
     }
 
     @Test

@@ -5,6 +5,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
+import pl.commercelink.carriers.CarrierDictionary;
+import pl.commercelink.carriers.CarrierTranslator;
 import pl.commercelink.marketplace.api.MarketplaceCustomer;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProduct;
@@ -13,9 +15,7 @@ import pl.commercelink.externaloffers.ExternalOfferResolver;
 import pl.commercelink.externaloffers.ResolvedOffer;
 import pl.commercelink.orders.*;
 import pl.commercelink.taxonomy.Categories;
-import pl.commercelink.shipping.CarrierDictionary;
 import pl.commercelink.starter.util.CountryCodeConverter;
-import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 
 import java.math.BigDecimal;
@@ -32,7 +32,7 @@ public class MarketplaceOrderImporter {
     private OrdersManager ordersManager;
 
     @Autowired
-    private CarrierDictionary carrierDictionary;
+    private CarrierTranslator carrierTranslator;
 
     /**
      * Imports one fetch of a marketplace's orders in one {@link ExternalOfferResolver.StoreOffers} scope, not one per
@@ -82,7 +82,7 @@ public class MarketplaceOrderImporter {
             rawKeysByBasketItemId.put(basketItemId, product.manufacturerCode());
 
             String sellerOfferKey = StringUtils.trimToNull(product.sellerOfferKey());
-            Optional<ResolvedOffer> resolved = offers.resolve(marketplaceName, sellerOfferKey, product.manufacturerCode());
+            Optional<ResolvedOffer> resolved = offers.resolve(marketplaceName, sellerOfferKey);
             resolvedByBasketItemId.put(basketItemId, new ResolvedLine(sellerOfferKey, resolved.orElse(null)));
 
             basketItems.add(new BasketItem(
@@ -120,7 +120,7 @@ public class MarketplaceOrderImporter {
                 .withExternalOrderId(marketplaceOrder.externalOrderId())
                 .withExternalSupplierId(marketplaceOrder.externalSupplierId())
                 .withPayment(payment)
-                .withDeliveryCarrier(toCarrierName(store, marketplaceName, marketplaceOrder.shipping().carrier()))
+                .withDeliveryCarrier(carrierFor(marketplaceName, marketplaceOrder.shipping().carrier()))
                 .withPreferredShippingAt(marketplaceOrder.shipping().estimatedShippingAt());
 
         String collectionPointCode = toCollectionPointCode(marketplaceOrder.shipping().pickupPoint());
@@ -149,10 +149,8 @@ public class MarketplaceOrderImporter {
         return ordersManager.saveWithFulfilment(order, orderItems);
     }
 
-    String toCarrierName(Store store, String marketplaceName, String shippingCarrier) {
-        return carrierDictionary
-                .translate(marketplaceName, store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER), shippingCarrier)
-                .orElse(shippingCarrier);
+    String carrierFor(String marketplaceName, String orderCarrierText) {
+        return carrierTranslator.carrierFor(CarrierDictionary.marketplaceOrderCarrierTexts(marketplaceName), orderCarrierText);
     }
 
     static String toCollectionPointCode(PickupPoint pickupPoint) {

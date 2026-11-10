@@ -44,15 +44,17 @@ public record ResolvedOffer(String pimId, String ean, String mfn, String categor
         LINK,
         /** The seller offer key is our own pimId, published by CommerceLink. */
         OWN_OFFER,
-        /** The manufacturer code from the order line matched a PIM MPN. */
+        /**
+         * The manufacturer code from the order line matched a PIM MPN. Lines are no longer recognised that way; only
+         * items imported before carry it, and linking an offer still re-fills them.
+         */
         MFN
     }
 
     /**
      * The order item's sku: the EAN, which fulfilment looks goods up by, followed by the other EANs of the same goods
      * joined with ":" (fulfilment tries each and takes the cheapest offer, as for an item given several codes with
-     * "Assign SKU"). Only a product without an EAN falls back to its manufacturer code, which fulfilment still looks up
-     * while items keyed by it remain; null without either.
+     * "Assign SKU"). Only a product without an EAN falls back to its manufacturer code; null without either.
      */
     public String sku() {
         if (StringUtils.isNotBlank(ean)) {

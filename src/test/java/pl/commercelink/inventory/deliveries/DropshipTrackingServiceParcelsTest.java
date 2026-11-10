@@ -1,5 +1,7 @@
 package pl.commercelink.inventory.deliveries;
 
+import pl.commercelink.carriers.CarrierDictionary;
+import pl.commercelink.carriers.InMemoryCarrierDictionaries;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -76,6 +78,7 @@ class DropshipTrackingServiceParcelsTest {
     void setUp() {
         service = new DropshipTrackingService(deliveriesQueryService, deliveriesRepository, ordersRepository,
                 providerResolver, completion, DropshipTrackingProperties.defaults(),
+                new InMemoryCarrierDictionaries().with(CarrierDictionary.supplierDeliveryMethods(STORE_ID, "Acme"), "5=DPD").translator(),
                 Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE));
         order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);
@@ -123,6 +126,23 @@ class DropshipTrackingServiceParcelsTest {
             beforeSave.accept(invocation.getArgument(1), result);
             return OperationResult.success(result);
         };
+    }
+
+    @Test
+    void supplierMethodOfTheConnectionDictionaryBecomesOurCarrier() {
+        // given
+        supplierReports(SupplierOrderState.SHIPPED,
+                new SupplierParcel("5", "PKG-1", "https://t/PKG-1", SUPPLIER_SHIPPED_AT, List.of()));
+        when(completion.confirmShipped(eq(STORE_ID), same(delivery), anyList(), anyList(), any(), any()))
+                .thenAnswer(confirmedAs(DropshipShipmentResult.COMPLETED));
+
+        // when
+        service.check(STORE_ID, delivery.getDeliveryId(), false);
+
+        // then
+        ArgumentCaptor<DropshipShipment> shipment = ArgumentCaptor.forClass(DropshipShipment.class);
+        verify(completion).confirmShipped(eq(STORE_ID), same(delivery), anyList(), anyList(), shipment.capture(), any());
+        assertThat(shipment.getValue().carrier()).isEqualTo("DPD");
     }
 
     @Test

@@ -70,7 +70,7 @@ class ProductsAddReviewTest {
         MatchedInventory gone = mock(MatchedInventory.class);
         when(gone.isEmpty()).thenReturn(true);
         when(view.findByEan(anyString())).thenReturn(gone);
-        when(pimView.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+        when(pimView.findByPimIdOrGtins(any(), any())).thenReturn(Optional.empty());
         when(productRepository.findAll(anyString())).thenReturn(List.of());
         product("1", "MSI RTX 5070");
         product("2", "ASUS RTX 5060");

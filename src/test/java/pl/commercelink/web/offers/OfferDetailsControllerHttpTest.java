@@ -265,7 +265,7 @@ class OfferDetailsControllerHttpTest {
                         .param("basketItems[0].unitPrice", "10")
                         .param("items[0].source", "pricelist").param("items[0].catalogId", "cat-1")
                         .param("items[0].pimId", "pim-1").param("items[0].qty", "2")
-                        .param("items[1].source", "inventory").param("items[1].mfn", "GONE-1"))
+                        .param("items[1].source", "inventory").param("items[1].ean", "5900000000999"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("offers/details :: itemsDraft"))
                 .andReturn().getResponse().getContentAsString();

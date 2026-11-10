@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.deliveries;
 
+import pl.commercelink.carriers.InMemoryCarrierDictionaries;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -64,7 +65,7 @@ class DropshipTrackingServiceTest {
     @BeforeEach
     void setUp() {
         service = new DropshipTrackingService(deliveriesQueryService, deliveriesRepository, ordersRepository,
-                providerResolver, completion, properties, Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE));
+                providerResolver, completion, properties, InMemoryCarrierDictionaries.none(), Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE));
     }
 
     static Delivery trackableDelivery() {

@@ -10,7 +10,6 @@ import pl.commercelink.inventory.InventoryRepository;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -21,7 +20,7 @@ public class CsvProductFeedLoader {
     private final InventoryRepository inventoryRepository;
     private final StoreFeedRepository storeFeedRepository;
     private final DataCleanup dataCleanup;
-    private final FeedRowProcessor feedRowProcessor;
+    private final FeedProcessor feedProcessor;
 
     public List<InventoryItem> fetch(CsvRowParser parser, Character separator, SupplierInfo supplierInfo) {
         String supplierName = supplierInfo.name();
@@ -52,15 +51,10 @@ public class CsvProductFeedLoader {
     }
 
     private List<InventoryItem> parseRows(CsvRowParser parser, Character separator, Reader reader, SupplierInfo supplierInfo, int taxonomyPenalty) {
-        List<InventoryItem> res = new ArrayList<>();
-        FeedParseStats stats = new FeedParseStats(supplierInfo.name());
+        FeedProcessing processing = feedProcessor.start(supplierInfo.name(), taxonomyPenalty);
         new CSVLoader(reader).readRows(separator, row ->
-                ParsedRow.tryParse(parser, row, supplierInfo)
-                        .ifPresentOrElse(
-                                parsed -> feedRowProcessor.process(parsed, taxonomyPenalty, stats).ifPresent(res::add),
-                                stats::markInvalid));
-        stats.log();
-        return dataCleanup.run(res);
+                ParsedRow.tryParse(parser, row, supplierInfo).ifPresentOrElse(processing::add, processing::skipInvalid));
+        return dataCleanup.run(processing.finish());
     }
 
 }

@@ -16,7 +16,7 @@ import java.util.Set;
  * size), the brand itself or a customs heading rather than a product, so offers under it join others only by EAN.
  * A code is shared per supplier: the same code at another supplier, with one EAN, still joins as before.
  */
-final class SharedManufacturerCodes {
+public final class SharedManufacturerCodes {
 
     private final Set<InventoryItem> offersUnderSharedCode;
 
@@ -24,7 +24,7 @@ final class SharedManufacturerCodes {
         this.offersUnderSharedCode = offersUnderSharedCode;
     }
 
-    static SharedManufacturerCodes of(Collection<InventoryItem> offers) {
+    public static SharedManufacturerCodes of(Collection<InventoryItem> offers) {
         Set<SupplierCode> sharedCodes = sharedCodes(offers);
 
         // by identity: callers ask about the same instances, and a record would compare all of its fields
@@ -39,8 +39,12 @@ final class SharedManufacturerCodes {
         return new SharedManufacturerCodes(offersUnderSharedCode);
     }
 
-    boolean isShared(InventoryItem offer) {
+    public boolean isShared(InventoryItem offer) {
         return offersUnderSharedCode.contains(offer);
+    }
+
+    public Set<InventoryItem> offersUnderSharedCode() {
+        return Collections.unmodifiableSet(offersUnderSharedCode);
     }
 
     private static Set<SupplierCode> sharedCodes(Collection<InventoryItem> offers) {

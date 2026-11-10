@@ -54,7 +54,6 @@
             window.location.reload();
             return;
         }
-        row.setAttribute('data-mfn', answer.mfn);
         row.querySelector('[data-cl-item-ean]').textContent = answer.ean;
         row.querySelector('[data-cl-item-mfn]').textContent = answer.mfn;
         row.querySelector('[data-cl-item-ean-input]').value = answer.ean;

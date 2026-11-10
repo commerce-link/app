@@ -4,6 +4,7 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.PaginatedQueryList;
+import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,35 +37,22 @@ class WarehouseDocumentItemRepositoryTest {
     }
 
     @Test
-    @DisplayName("containsProduct matches an item by EAN or by manufacturer code")
-    void containsProductMatchesEanOrMfn() {
+    @DisplayName("containsProduct matches an item by its EAN alone, never by manufacturer code")
+    void productSearchMatchesOnlyTheEan() {
         // given
         ArgumentCaptor<DynamoDBQueryExpression<WarehouseDocumentItem>> queryCaptor = ArgumentCaptor.forClass(DynamoDBQueryExpression.class);
         when(dynamoDBMapper.query(eq(WarehouseDocumentItem.class), queryCaptor.capture())).thenReturn(queryList);
         when(queryList.isEmpty()).thenReturn(false);
 
         // when
-        boolean result = warehouseDocumentItemRepository.containsProduct("doc-1", "5901234123457", "MZ-V9P2T0BW");
+        boolean result = warehouseDocumentItemRepository.containsProduct("doc-1", "5901234123457");
 
         // then
         assertThat(result).isTrue();
         assertThat(queryCaptor.getValue().getKeyConditionExpression()).isEqualTo("documentId = :documentId");
-        assertThat(queryCaptor.getValue().getFilterExpression()).isEqualTo("ean = :ean or mfn = :mfn");
-    }
-
-    @Test
-    @DisplayName("containsProduct with only a manufacturer code filters on it alone")
-    void containsProductWithMfnOnly() {
-        // given
-        ArgumentCaptor<DynamoDBQueryExpression<WarehouseDocumentItem>> queryCaptor = ArgumentCaptor.forClass(DynamoDBQueryExpression.class);
-        when(dynamoDBMapper.query(eq(WarehouseDocumentItem.class), queryCaptor.capture())).thenReturn(queryList);
-        when(queryList.isEmpty()).thenReturn(true);
-
-        // when
-        boolean result = warehouseDocumentItemRepository.containsProduct("doc-1", null, "HDMI21-2M");
-
-        // then
-        assertThat(result).isFalse();
-        assertThat(queryCaptor.getValue().getFilterExpression()).isEqualTo("mfn = :mfn");
+        assertThat(queryCaptor.getValue().getFilterExpression()).isEqualTo("ean = :ean");
+        assertThat(queryCaptor.getValue().getExpressionAttributeValues())
+                .containsOnlyKeys(":documentId", ":ean")
+                .containsEntry(":ean", new AttributeValue().withS("5901234123457"));
     }
 }

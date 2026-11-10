@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import pl.commercelink.externaloffers.OfferEans;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
+import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistFinder;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.ProductCatalog;
@@ -51,24 +52,16 @@ public class LinkOfferProductsController extends BaseController {
                 categoryNames.putIfAbsent(category.getCategoryId(), category.getName());
             }
         }
-        Map<String, Long> pricesByPimId = new HashMap<>();
-        Map<String, Long> pricesByEan = new HashMap<>();
-        for (AvailabilityAndPrice row : pricelistFinder.availabilityAndPrices(storeId, catalogId)) {
-            if (row.getPimId() != null) {
-                pricesByPimId.putIfAbsent(row.getPimId(), row.getPrice());
-            }
-            if (StringUtils.isNotBlank(row.getEan())) {
-                pricesByEan.putIfAbsent(OfferEans.unify(row.getEan()), row.getPrice());
-            }
-        }
+        Pricelist pricelist = pricelistFinder.newestPricelist(storeId, catalogId);
         return productRepository.findAll(catalog).stream()
                 // a product without a valid EAN would give a link the import skips
                 .filter(product -> OfferEans.unifyValid(product.getEan()) != null)
                 .map(product -> new LinkOfferProduct(product.getCategoryId(), product.getProductId(), product.getEan(),
                         product.getName(), product.getLabel(), product.getManufacturerCode(),
                         categoryNames.get(product.getCategoryId()),
-                        StringUtils.isNotBlank(product.getPimId()) ? pricesByPimId.get(product.getPimId())
-                                : pricesByEan.get(OfferEans.unify(product.getEan()))))
+                        (StringUtils.isNotBlank(product.getPimId()) ? pricelist.findByPimId(product.getPimId())
+                                : pricelist.findByEan(product.getEan()))
+                                .map(AvailabilityAndPrice::getPrice).orElse(null)))
                 .sorted(Comparator.comparing(LinkOfferProduct::name, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
                 .toList();
     }

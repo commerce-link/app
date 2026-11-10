@@ -7,8 +7,7 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 /**
  * The key that links an order item to a marketplace offer, in both directions. Current orders store the raw
  * marketplace key in externalItemId. Orders imported before that field existed carry it only in sku,
- * normalised by Basket.setBasketItems (unifyMfn); manufacturerCode is the supplier's part number after
- * fulfilment and is kept as a last resort only. The Allegro adapter mirrors the exact-then-normalised rule.
+ * normalised by Basket.setBasketItems (unifyMfn). The Allegro adapter mirrors the exact-then-normalised rule.
  */
 public final class MarketplaceItemKey {
 
@@ -20,10 +19,7 @@ public final class MarketplaceItemKey {
         if (isNotBlank(orderItem.getExternalItemId())) {
             return orderItem.getExternalItemId();
         }
-        if (isNotBlank(orderItem.getSku())) {
-            return orderItem.getSku();
-        }
-        return orderItem.getManufacturerCode();
+        return orderItem.getSku();
     }
 
     /** Whether a key received from the marketplace identifies this order item. */
@@ -35,8 +31,6 @@ public final class MarketplaceItemKey {
         if (isNotBlank(externalItemId)) {
             return marketplaceKey.equals(externalItemId);
         }
-        String normalisedKey = UnifiedProductIdentifiers.unifyMfn(marketplaceKey);
-        return normalisedKey.equals(UnifiedProductIdentifiers.unifyMfn(orderItem.getSku()))
-                || normalisedKey.equals(UnifiedProductIdentifiers.unifyMfn(orderItem.getManufacturerCode()));
+        return UnifiedProductIdentifiers.unifyMfn(marketplaceKey).equals(UnifiedProductIdentifiers.unifyMfn(orderItem.getSku()));
     }
 }

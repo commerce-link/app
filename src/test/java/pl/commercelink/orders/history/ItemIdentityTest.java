@@ -42,7 +42,7 @@ class ItemIdentityTest {
     }
 
     @Test
-    void countsDifferentProductsByEanOrManufacturerCode() {
+    void countsDifferentProductsByEan() {
         // given
         OrderLine a = product(order("o-1", OrderStatus.Completed, FulfilmentStatus.Delivered, at(9, 1)), "A", "590-A", "MFN-A");
         OrderLine b = product(order("o-2", OrderStatus.Completed, FulfilmentStatus.Delivered, at(9, 2)), "B", "590-B", "MFN-A");
@@ -54,6 +54,20 @@ class ItemIdentityTest {
         // then
         assertThat(identity.productCount()).isEqualTo(2);
         assertThat(ItemAmbiguity.of(List.of(a, b, c), identity)).isEqualTo(new ItemAmbiguity(true, 3, 2));
+    }
+
+    @Test
+    void oneEanUnderTwoManufacturerCodesIsOneProduct() {
+        // given
+        OrderLine sold = product(order("o-1", OrderStatus.Completed, FulfilmentStatus.Returned, at(9, 1)), "A", "590", "ABC-1");
+        WarehouseItemView back = new WarehouseItemView("store-1", "w-1", "A", "590", "ABC-1/EU", null, 1,
+                FulfilmentStatus.Delivered, ItemCondition.Sealed);
+
+        // when
+        ItemIdentity identity = ItemIdentity.of(List.of(sold), List.of(), List.of(back));
+
+        // then
+        assertThat(identity.productCount()).isEqualTo(1);
     }
 
     @Test

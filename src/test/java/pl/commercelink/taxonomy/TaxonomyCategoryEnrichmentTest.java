@@ -26,6 +26,7 @@ class TaxonomyCategoryEnrichmentTest {
     private static final String EAN_1 = "5901234567801";
     private static final String EAN_2 = "5901234567802";
     private static final String EAN_3 = "5901234567803";
+    private static final String EAN_4 = "5901234567804";
 
     private TaxonomyCache cache;
     private TaxonomyCategoryEnrichment enrichment;
@@ -125,6 +126,63 @@ class TaxonomyCategoryEnrichmentTest {
 
         // when / then
         assertNull(enrichment.enrich(incoming).category());
+    }
+
+    @Test
+    void ownRecordStepTakesOnlyTheCategoryOfTheRowsEan() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "920-002509", "Logitech", "K120 PL", "Klawiatury", 3, null, null, null, "194"));
+
+        // when
+        Taxonomy sameEan = enrichment.enrichFromOwnRecord(new Taxonomy(EAN_1, "920-002509", "Logitech", "K120", null, 10, null, null));
+        Taxonomy otherEan = enrichment.enrichFromOwnRecord(new Taxonomy(EAN_2, "920-002509", "Logitech", "K120 DE", null, 10, null, null));
+
+        // then
+        assertEquals("Klawiatury", sameEan.category());
+        assertEquals("194", sameEan.categoryId());
+        assertNull(otherEan.category());
+    }
+
+    @Test
+    void ownRecordStepKeepsTheRowsOwnCategory() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "MFN-1", "Brand", "Name", "GPU", 1, null, null, null, "170"));
+        Taxonomy row = taxonomy(EAN_1, "MFN-1", "CPU", 10);
+
+        // when / then
+        assertEquals(row, enrichment.enrichFromOwnRecord(row));
+    }
+
+    @Test
+    void eansUnderASharedCodeGiveNoCategoryToAnotherSupplier() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "BRAK", "Brand", "Lalka", "Lalki", 1, null, null, null, "12"));
+        cache.add(new Taxonomy(EAN_2, "BRAK", "Brand", "Auto", "Samochody", 1, null, null, null, "13"));
+        cache.blockCodeSource("BRAK", "Brand", EAN_1);
+        cache.blockCodeSource("BRAK", "Brand", "0" + EAN_2);
+
+        // when
+        Taxonomy result = enrichment.enrich(uncategorised(EAN_3, "BRAK", "Basen"));
+
+        // then
+        assertNull(result.category());
+    }
+
+    @Test
+    void anotherSuppliersSingleEanStillGivesCategoryUnderTheCode() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "BRAK", "Brand", "Lalka", "Lalki", 1, null, null, null, "12"));
+        cache.add(new Taxonomy(EAN_2, "BRAK", "Brand", "Auto", "Samochody", 1, null, null, null, "13"));
+        cache.add(new Taxonomy(EAN_3, "BRAK", "Brand", "Basen", "Baseny", 5, null, null, null, "77"));
+        cache.blockCodeSource("BRAK", "Brand", EAN_1);
+        cache.blockCodeSource("BRAK", "Brand", EAN_2);
+
+        // when
+        Taxonomy result = enrichment.enrich(uncategorised(EAN_4, "BRAK", "Basen XL"));
+
+        // then
+        assertEquals("Baseny", result.category());
+        assertEquals("77", result.categoryId());
     }
 
     @Test
@@ -361,6 +419,10 @@ class TaxonomyCategoryEnrichmentTest {
 
     private static Taxonomy taxonomy(String ean, String mfn, String category, int score) {
         return new Taxonomy(ean, mfn, "Brand", "Name", category, score, null, null);
+    }
+
+    private static Taxonomy uncategorised(String ean, String mfn, String name) {
+        return new Taxonomy(ean, mfn, "Brand", name, null, 10, null, null);
     }
 
     private static Taxonomy pendingWithRawCategory(String ean, String mfn, String rawCategory) {

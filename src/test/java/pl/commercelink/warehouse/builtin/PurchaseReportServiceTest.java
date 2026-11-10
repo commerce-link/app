@@ -1,10 +1,8 @@
 package pl.commercelink.warehouse.builtin;
 
 import org.junit.jupiter.api.BeforeEach;
-import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -17,6 +15,11 @@ import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimIdentifier;
+import pl.commercelink.pim.api.PimView;
+import pl.commercelink.products.ProductDataResolver;
+import pl.commercelink.taxonomy.Taxonomy;
+import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyRepository;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -28,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,26 +43,27 @@ class PurchaseReportServiceTest {
     private static final String STORE_ID = "store-1";
     private static final LocalDate FROM = LocalDate.of(2026, 5, 1);
     private static final LocalDate TO = LocalDate.of(2026, 5, 31);
+    private static final String CODE = "MZ-V9P2T0BW";
+    private static final String EAN_PLAIN = "8806094215038";
+    private static final String EAN_HEATSINK = "8806094215045";
 
     @Mock private WarehouseDocumentRepository documentRepository;
     @Mock private WarehouseDocumentItemRepository itemRepository;
     @Mock private DeliveriesRepository deliveriesRepository;
     @Mock private PimCatalog pimCatalog;
-    @Mock
-    private PimView pimView;
+    @Mock private PimView pimView;
 
-    @InjectMocks private PurchaseReportService service;
-
-    @org.junit.jupiter.api.BeforeEach
-    void pimStoreViewIsTheCatalog() {
-        org.mockito.Mockito.lenient().when(pimCatalog.withStoreData(org.mockito.ArgumentMatchers.any())).thenReturn(pimView);
-        org.mockito.Mockito.lenient().when(pimCatalog.withGlobalData()).thenReturn(pimView);
-    }
-
+    private TaxonomyCache taxonomy;
+    private PurchaseReportService service;
 
     @BeforeEach
     void setUp() {
+        when(pimCatalog.withStoreData(any())).thenReturn(pimView);
+        when(pimCatalog.withGlobalData()).thenReturn(pimView);
         when(documentRepository.findAllInDateRange(anyString(), any(), any())).thenReturn(List.of());
+        taxonomy = new TaxonomyCache(mock(TaxonomyRepository.class));
+        service = new PurchaseReportService(documentRepository, itemRepository, deliveriesRepository,
+                new ProductDataResolver(pimCatalog, taxonomy));
     }
 
     @Test
@@ -76,7 +81,117 @@ class PurchaseReportServiceTest {
         List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
 
         // then
-        assertThat(rows).containsExactly(new PurchaseReportRow("GPU", "AcmeA", "ASUS", "DUAL RTX 4070", "RTX4070-DUAL", 5));
+        assertThat(rows).containsExactly(
+                new PurchaseReportRow("GPU", "AcmeA", "ASUS", "DUAL RTX 4070", "5901234567890", 5));
+    }
+
+    @Test
+    void twoProductsUnderOneCodeGiveTwoRows() {
+        // given
+        givenDocuments(goodsReceiptDoc("doc-1", "delivery-1", "Acme"));
+        givenDelivery("delivery-1", "AcmeA");
+        when(itemRepository.findByDocumentId("doc-1")).thenReturn(List.of(
+                item("doc-1", EAN_PLAIN, CODE, "Samsung 990 Pro 2TB", 2),
+                item("doc-1", EAN_HEATSINK, CODE, "Samsung 990 Pro 2TB z radiatorem", 3)));
+        taxonomy.add(record(EAN_PLAIN, "Dyski SSD"));
+        taxonomy.add(record(EAN_HEATSINK, "Dyski SSD"));
+
+        // when
+        List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
+
+        // then
+        assertThat(rows).containsExactly(
+                new PurchaseReportRow("Dyski SSD", "AcmeA", "Samsung", "Samsung 990 Pro 2TB", EAN_PLAIN, 2),
+                new PurchaseReportRow("Dyski SSD", "AcmeA", "Samsung", "Samsung 990 Pro 2TB z radiatorem", EAN_HEATSINK, 3));
+    }
+
+    @Test
+    void itemTakesTheRecordOfItsEan() {
+        // given
+        givenDocuments(goodsReceiptDoc("doc-1", "delivery-1", "Acme"));
+        givenDelivery("delivery-1", "AcmeA");
+        when(itemRepository.findByDocumentId("doc-1"))
+                .thenReturn(List.of(item("doc-1", EAN_HEATSINK, CODE, "Samsung 990 Pro 2TB z radiatorem", 1)));
+        taxonomy.add(new Taxonomy(EAN_PLAIN, CODE, "Samsung", "Samsung 990 Pro 2TB", "Dyski SSD", 1, null, null));
+        taxonomy.add(new Taxonomy(EAN_HEATSINK, CODE, "Samsung Electronics", "Samsung 990 Pro 2TB z radiatorem",
+                "Dyski SSD z radiatorem", 5, null, null));
+
+        // when
+        List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
+
+        // then
+        assertThat(rows).extracting(PurchaseReportRow::category, PurchaseReportRow::brand)
+                .containsExactly(tuple("Dyski SSD z radiatorem", "Samsung Electronics"));
+    }
+
+    @Test
+    void pimEntryComesBeforeTheRecord() {
+        // given
+        givenDocuments(goodsReceiptDoc("doc-1", "delivery-1", "Acme"));
+        givenDelivery("delivery-1", "AcmeA");
+        when(itemRepository.findByDocumentId("doc-1"))
+                .thenReturn(List.of(item("doc-1", EAN_PLAIN, CODE, "Samsung 990 Pro 2TB", 1)));
+        taxonomy.add(record(EAN_PLAIN, "Dyski SSD"));
+        when(pimView.findByGtin(EAN_PLAIN)).thenReturn(Optional.of(pimEntry("GPU")));
+
+        // when
+        List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
+
+        // then
+        assertThat(rows).extracting(PurchaseReportRow::category, PurchaseReportRow::brand)
+                .containsExactly(tuple("GPU", "ASUS"));
+    }
+
+    @Test
+    void pimEntryWithoutCategoryTakesTheCategoryOfTheRecord() {
+        // given
+        givenDocuments(goodsReceiptDoc("doc-1", "delivery-1", "Acme"));
+        givenDelivery("delivery-1", "AcmeA");
+        when(itemRepository.findByDocumentId("doc-1"))
+                .thenReturn(List.of(item("doc-1", EAN_PLAIN, CODE, "Samsung 990 Pro 2TB", 1)));
+        taxonomy.add(record(EAN_PLAIN, "Dyski SSD"));
+        when(pimView.findByGtin(EAN_PLAIN)).thenReturn(Optional.of(pimEntry(null)));
+
+        // when
+        List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
+
+        // then
+        assertThat(rows).extracting(PurchaseReportRow::category, PurchaseReportRow::brand)
+                .containsExactly(tuple("Dyski SSD", "ASUS"));
+    }
+
+    @Test
+    void itemWhoseRecordWaitsForCategoryIsUnknown() {
+        // given
+        givenDocuments(goodsReceiptDoc("doc-1", "delivery-1", "Acme"));
+        givenDelivery("delivery-1", "AcmeA");
+        when(itemRepository.findByDocumentId("doc-1"))
+                .thenReturn(List.of(item("doc-1", EAN_PLAIN, CODE, "Samsung 990 Pro 2TB", 1)));
+        taxonomy.add(record(EAN_PLAIN, null));
+
+        // when
+        List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
+
+        // then
+        assertThat(rows).extracting(PurchaseReportRow::category, PurchaseReportRow::brand)
+                .containsExactly(tuple("Unknown", "Samsung"));
+    }
+
+    @Test
+    void itemWithoutRecordTakesThePimEntry() {
+        // given
+        givenDocuments(goodsReceiptDoc("doc-1", "delivery-1", "Acme"));
+        givenDelivery("delivery-1", "AcmeA");
+        when(itemRepository.findByDocumentId("doc-1"))
+                .thenReturn(List.of(item("doc-1", EAN_PLAIN, CODE, "Samsung 990 Pro 2TB", 1)));
+        when(pimView.findByGtin(EAN_PLAIN)).thenReturn(Optional.of(pimEntry("GPU")));
+
+        // when
+        List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
+
+        // then
+        assertThat(rows).extracting(PurchaseReportRow::category, PurchaseReportRow::brand)
+                .containsExactly(tuple("GPU", "ASUS"));
     }
 
     @Test
@@ -113,23 +228,7 @@ class PurchaseReportServiceTest {
     }
 
     @Test
-    void skipsItemsWithBlankMfn() {
-        // given
-        WarehouseDocument doc = goodsReceiptDoc("doc-blank", "delivery-1", "Acme");
-        givenDocuments(doc);
-        givenDelivery("delivery-1", "AcmeA");
-        when(itemRepository.findByDocumentId("doc-blank"))
-                .thenReturn(List.of(item("doc-blank", "5901111111111", "", "Something", 3)));
-
-        // when
-        List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
-
-        // then
-        assertThat(rows).isEmpty();
-    }
-
-    @Test
-    void sumsQuantitiesWhenSameMfnFromSameSupplierAppearsInTwoDocuments() {
+    void sumsQuantitiesWhenSameEanFromSameSupplierAppearsInTwoDocuments() {
         // given
         givenDocuments(goodsReceiptDoc("doc-1", "delivery-1", "Acme"), goodsReceiptDoc("doc-2", "delivery-2", "Acme"));
         givenDelivery("delivery-1", "AcmeA");
@@ -144,11 +243,11 @@ class PurchaseReportServiceTest {
         List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
 
         // then
-        assertThat(rows).containsExactly(new PurchaseReportRow("GPU", "AcmeA", "ASUS", "Name A", "MFN-A", 5));
+        assertThat(rows).containsExactly(new PurchaseReportRow("GPU", "AcmeA", "ASUS", "Name A", "5900000000001", 5));
     }
 
     @Test
-    void emitsSeparateRowsWhenSameMfnComesFromDifferentSuppliers() {
+    void emitsSeparateRowsWhenSameEanComesFromDifferentSuppliers() {
         // given
         givenDocuments(goodsReceiptDoc("doc-1", "delivery-1", "Acme"), goodsReceiptDoc("doc-2", "delivery-2", "AcmeB"));
         givenDelivery("delivery-1", "AcmeA");
@@ -180,7 +279,7 @@ class PurchaseReportServiceTest {
         List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
 
         // then
-        assertThat(rows).containsExactly(new PurchaseReportRow("Unknown", "AcmeA", null, "Mystery", "MFN-MISS", 4));
+        assertThat(rows).containsExactly(new PurchaseReportRow("Unknown", "AcmeA", null, "Mystery", "5900000000002", 4));
     }
 
     @Test
@@ -191,13 +290,15 @@ class PurchaseReportServiceTest {
         when(itemRepository.findByDocumentId("doc-1"))
                 .thenReturn(List.of(item("doc-1", "5909999999999", "RTX4070-DUAL", "DUAL RTX 4070", 2)));
         PurchaseReportService report = new PurchaseReportService(documentRepository, itemRepository, deliveriesRepository,
-                ScopedPimCatalog.of(ScopedPimCatalog.globalEntry("pim-1", "5900000000001", "RTX4070-DUAL", "GPU")));
+                new ProductDataResolver(ScopedPimCatalog.of(ScopedPimCatalog.globalEntry("pim-1", "5900000000001", "RTX4070-DUAL", "GPU")),
+                        taxonomy));
 
         // when
         List<PurchaseReportRow> rows = report.generate(STORE_ID, FROM, TO);
 
         // then
-        assertThat(rows).containsExactly(new PurchaseReportRow("Unknown", "AcmeA", null, "DUAL RTX 4070", "RTX4070-DUAL", 2));
+        assertThat(rows).containsExactly(
+                new PurchaseReportRow("Unknown", "AcmeA", null, "DUAL RTX 4070", "5909999999999", 2));
     }
 
     @Test
@@ -268,34 +369,31 @@ class PurchaseReportServiceTest {
     }
 
     @Test
-    void sortsResultByCategoryThenSupplierThenMfn() {
+    void sortsResultByCategoryThenSupplierThenEan() {
         // given
-        givenDocuments(
-                goodsReceiptDoc("doc-1", "delivery-1", "Acme"),
-                goodsReceiptDoc("doc-2", "delivery-1", "Acme"),
-                goodsReceiptDoc("doc-3", "delivery-2", "AcmeB"),
-                goodsReceiptDoc("doc-4", "delivery-2", "AcmeB"));
+        givenDocuments(goodsReceiptDoc("doc-1", "delivery-1", "Acme"), goodsReceiptDoc("doc-2", "delivery-2", "AcmeB"));
         givenDelivery("delivery-1", "Zeta");
         givenDelivery("delivery-2", "Alpha");
-        when(itemRepository.findByDocumentId("doc-1")).thenReturn(List.of(item("doc-1", "ean-1", "M-Z-GPU", "Z GPU", 1)));
-        when(itemRepository.findByDocumentId("doc-2")).thenReturn(List.of(item("doc-2", "ean-2", "M-Z-PSU", "Z PSU", 1)));
-        when(itemRepository.findByDocumentId("doc-3")).thenReturn(List.of(item("doc-3", "ean-3", "M-A-PSU", "A PSU", 1)));
-        when(itemRepository.findByDocumentId("doc-4")).thenReturn(List.of(item("doc-4", "ean-4", "M-A-GPU", "A GPU", 1)));
+        when(itemRepository.findByDocumentId("doc-1")).thenReturn(List.of(
+                item("doc-1", "ean-2", "M-A", "Z GPU A", 1),
+                item("doc-1", "ean-1", "M-Z", "Z GPU Z", 1),
+                item("doc-1", "ean-5", "M-PSU", "Z PSU", 1)));
+        when(itemRepository.findByDocumentId("doc-2")).thenReturn(List.of(item("doc-2", "ean-3", "M-GPU", "A GPU", 1)));
         when(pimView.findByGtin("ean-1")).thenReturn(Optional.of(pimEntry("GPU")));
-        when(pimView.findByGtin("ean-2")).thenReturn(Optional.of(pimEntry("PSU")));
-        when(pimView.findByGtin("ean-3")).thenReturn(Optional.of(pimEntry("PSU")));
-        when(pimView.findByGtin("ean-4")).thenReturn(Optional.of(pimEntry("GPU")));
+        when(pimView.findByGtin("ean-2")).thenReturn(Optional.of(pimEntry("GPU")));
+        when(pimView.findByGtin("ean-3")).thenReturn(Optional.of(pimEntry("GPU")));
+        when(pimView.findByGtin("ean-5")).thenReturn(Optional.of(pimEntry("PSU")));
 
         // when
         List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
 
         // then
-        assertThat(rows).extracting(PurchaseReportRow::category, PurchaseReportRow::supplier, PurchaseReportRow::mfn)
+        assertThat(rows).extracting(PurchaseReportRow::category, PurchaseReportRow::supplier, PurchaseReportRow::ean)
                 .containsExactly(
-                        tuple("GPU", "Alpha", "M-A-GPU"),
-                        tuple("GPU", "Zeta", "M-Z-GPU"),
-                        tuple("PSU", "Alpha", "M-A-PSU"),
-                        tuple("PSU", "Zeta", "M-Z-PSU"));
+                        tuple("GPU", "Alpha", "ean-3"),
+                        tuple("GPU", "Zeta", "ean-1"),
+                        tuple("GPU", "Zeta", "ean-2"),
+                        tuple("PSU", "Zeta", "ean-5"));
     }
 
     private void givenDocuments(WarehouseDocument... docs) {
@@ -328,12 +426,16 @@ class PurchaseReportServiceTest {
     private static WarehouseDocumentItem item(String documentId, String ean, String mfn, String name, int qty) {
         WarehouseDocumentItem item = new WarehouseDocumentItem();
         item.setDocumentId(documentId);
-        item.setItemId("item-" + mfn);
+        item.setItemId("item-" + ean);
         item.setEan(ean);
         item.setMfn(mfn);
         item.setName(name);
         item.setQty(qty);
         return item;
+    }
+
+    private static Taxonomy record(String ean, String category) {
+        return new Taxonomy(ean, CODE, "Samsung", "Samsung 990 Pro 2TB", category, 1, null, null);
     }
 
     private static PimEntry pimEntry(String category) {

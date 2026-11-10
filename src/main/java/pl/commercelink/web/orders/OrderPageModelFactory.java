@@ -34,6 +34,8 @@ import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.ProductData;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.receipts.ReceiptAlerts;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptAttemptState;
@@ -50,8 +52,6 @@ import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.SplitGroupPreviewDto;
 
@@ -84,7 +84,7 @@ public class OrderPageModelFactory {
     private final SupplierLabels supplierLabels;
     private final ShipmentCarrierOptions shipmentCarrierOptions;
     private final ProductCatalogRepository productCatalogRepository;
-    private final TaxonomyCache taxonomyCache;
+    private final ProductDataResolver productDataResolver;
     private final MessageSource messageSource;
     private final ReceiptAttemptService receiptAttemptService;
     private final ReceiptAlerts receiptAlerts;
@@ -301,7 +301,8 @@ public class OrderPageModelFactory {
         boolean selectable = !readOnly && !hasWarehouseDocument;
         Map<String, SplitGroupPreviewDto> previews = readOnly ? Map.of() : items.stream()
                 .filter(OrderItem::isNew).filter(OrderItem::isGroup)
-                .collect(Collectors.toMap(OrderItem::getItemId, i -> SplitGroupPreviewDto.from(i, this::taxonomyName)));
+                .collect(Collectors.toMap(OrderItem::getItemId,
+                        i -> SplitGroupPreviewDto.from(i, ean -> productName(order.getStoreId(), ean))));
         return new OrderPageModel.ItemsCard(products, services, items.size(), selectable,
                 !readOnly && addReason == null, readOnly ? null : addReason,
                 !readOnly && !order.hasStatus(OrderStatus.New) && !serialItems.isEmpty(), serialItems,
@@ -392,9 +393,8 @@ public class OrderPageModelFactory {
         return links.forViewer(href);
     }
 
-    private String taxonomyName(String ean) {
-        Taxonomy taxonomy = taxonomyCache.findByEan(ean);
-        return taxonomy != null && taxonomy.name() != null ? taxonomy.name() : "";
+    private String productName(String storeId, String ean) {
+        return productDataResolver.ofEan(storeId, ean).map(ProductData::name).orElse("");
     }
 
     private OrderPageModel.ShipmentsCard shipments(Order order, Store store, boolean readOnly, Locale locale) {
@@ -403,7 +403,7 @@ public class OrderPageModelFactory {
         String details = "/dashboard/orders/" + order.getOrderId();
         Set<String> labelProviders = readOnly ? Set.of()
                 : ShipmentLinks.labelProviders(shipments, provider -> shippingService.supportsLabels(store, provider));
-        List<String> carriers = readOnly || store == null ? List.of() : shipmentCarrierOptions.forOrder(order, store);
+        List<String> carriers = readOnly || store == null ? List.of() : shipmentCarrierOptions.forOrder(order);
         String base = "/dashboard/orders/" + order.getOrderId() + "/shipments/";
         List<OrderPageModel.ShipmentRow> rows = new ArrayList<>();
         List<OrderShipmentForm> forms = new ArrayList<>();

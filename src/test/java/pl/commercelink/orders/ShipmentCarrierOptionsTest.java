@@ -5,11 +5,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import pl.commercelink.shipping.CarrierDictionary;
-import pl.commercelink.stores.IntegrationType;
-import pl.commercelink.stores.Store;
+import pl.commercelink.carriers.CarriersRepository;
 
-import java.util.Set;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
@@ -18,9 +16,7 @@ import static org.mockito.Mockito.when;
 class ShipmentCarrierOptionsTest {
 
     @Mock
-    private CarrierDictionary carrierDictionary;
-    @Mock
-    private Store store;
+    private CarriersRepository carriersRepository;
 
     @InjectMocks
     private ShipmentCarrierOptions options;
@@ -34,22 +30,20 @@ class ShipmentCarrierOptionsTest {
     }
 
     @Test
-    void combinesDictionaryCarriersWithCarriersAlreadyUsedByTheOrder() {
+    void combinesOurCarriersWithTextsAlreadyUsedByTheOrder() {
         // given
-        when(store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER)).thenReturn("furgonetka");
-        when(carrierDictionary.namesUsedBy("furgonetka")).thenReturn(Set.of("DPD"));
+        when(carriersRepository.names()).thenReturn(List.of("DPD", "InPost"));
 
         // when / then
-        assertThat(options.forOrder(orderShippedBy("InPost"), store)).containsExactlyInAnyOrder("DPD", "InPost");
+        assertThat(options.forOrder(orderShippedBy("my"))).containsExactly("DPD", "InPost", "my");
     }
 
     @Test
-    void returnsNoOptionsWhenTheStoreHasNoShippingIntegration() {
+    void returnsNoOptionsWithoutCarriersSoTheFormFallsBackToText() {
         // given
-        when(store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER)).thenReturn(null);
-        when(carrierDictionary.namesUsedBy(null)).thenReturn(Set.of());
+        when(carriersRepository.names()).thenReturn(List.of());
 
         // when / then
-        assertThat(options.forOrder(orderShippedBy("InPost"), store)).isEmpty();
+        assertThat(options.forOrder(orderShippedBy("InPost"))).isEmpty();
     }
 }

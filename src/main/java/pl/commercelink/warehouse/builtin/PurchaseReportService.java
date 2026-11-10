@@ -6,9 +6,8 @@ import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
-import pl.commercelink.pim.api.PimCatalog;
-import pl.commercelink.pim.api.PimView;
-import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.products.ProductData;
+import pl.commercelink.products.ProductDataResolver;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -28,7 +27,7 @@ public class PurchaseReportService {
     private final WarehouseDocumentRepository documentRepository;
     private final WarehouseDocumentItemRepository itemRepository;
     private final DeliveriesRepository deliveriesRepository;
-    private final PimCatalog pimCatalog;
+    private final ProductDataResolver productDataResolver;
 
     public List<PurchaseReportRow> generate(String storeId, LocalDate dateFrom, LocalDate dateTo) {
         LocalDateTime periodStart = dateFrom.atStartOfDay();
@@ -40,13 +39,12 @@ public class PurchaseReportService {
                 .map(PurchaseReportService::toRow)
                 .sorted(Comparator.comparing(PurchaseReportRow::category)
                         .thenComparing(PurchaseReportRow::supplier)
-                        .thenComparing(PurchaseReportRow::mfn))
+                        .thenComparing(PurchaseReportRow::ean))
                 .toList();
     }
 
     private Map<AggregateKey, Aggregate> aggregate(String storeId, LocalDateTime periodStart, LocalDateTime periodEnd) {
         Map<AggregateKey, Aggregate> aggregates = new HashMap<>();
-        PimView pim = pimCatalog.withStoreData(storeId);
         Map<String, String> supplierByDeliveryId = new HashMap<>();
         for (WarehouseDocument doc : documentRepository.findAllInDateRange(storeId, periodStart, periodEnd)) {
             if (doc.getType() != DocumentType.GoodsReceipt) continue;
@@ -54,22 +52,19 @@ public class PurchaseReportService {
 
             String supplier = resolveSupplier(storeId, doc, supplierByDeliveryId);
             for (WarehouseDocumentItem item : itemRepository.findByDocumentId(doc.getDocumentId())) {
-                accumulate(item, supplier, pim, aggregates);
+                accumulate(storeId, item, supplier, aggregates);
             }
         }
         return aggregates;
     }
 
-    private void accumulate(WarehouseDocumentItem item, String supplier, PimView pimLookup, Map<AggregateKey, Aggregate> aggregates) {
-        if (item.getMfn() == null || item.getMfn().isBlank()) return;
-        Optional<PimEntry> pim = pimLookup.findByGtin(item.getEan());
-        String category = pim.map(PimEntry::category).orElse(null);
-        String brand = pim.map(PimEntry::brand).orElse(null);
+    private void accumulate(String storeId, WarehouseDocumentItem item, String supplier, Map<AggregateKey, Aggregate> aggregates) {
+        ProductData product = productDataResolver.ofEan(storeId, item.getEan()).orElse(ProductData.EMPTY);
 
-        Aggregate agg = aggregates.computeIfAbsent(new AggregateKey(supplier, category, item.getMfn()), k -> new Aggregate());
+        Aggregate agg = aggregates.computeIfAbsent(new AggregateKey(supplier, product.category(), item.getEan()), k -> new Aggregate());
         agg.qty += item.getQty();
         if (item.getName() != null && !item.getName().isBlank()) agg.latestName = item.getName();
-        if (brand != null && !brand.isBlank()) agg.latestBrand = brand;
+        if (product.brand() != null && !product.brand().isBlank()) agg.latestBrand = product.brand();
     }
 
     private String resolveSupplier(String storeId, WarehouseDocument doc, Map<String, String> supplierByDeliveryId) {
@@ -98,11 +93,11 @@ public class PurchaseReportService {
                 k.supplier(),
                 a.latestBrand,
                 a.latestName,
-                k.mfn(),
+                k.ean(),
                 a.qty);
     }
 
-    private record AggregateKey(String supplier, String category, String mfn) {}
+    private record AggregateKey(String supplier, String category, String ean) {}
 
     private static class Aggregate {
         String latestName;

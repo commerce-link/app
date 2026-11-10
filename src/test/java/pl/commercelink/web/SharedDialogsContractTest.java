@@ -42,6 +42,24 @@ class SharedDialogsContractTest {
     }
 
     @Test
+    void theInventoryTabSearchesAnEanAndPostsTheEanOfTheChosenProduct() throws Exception {
+        // given
+        String script = read("src/main/resources/static/js/item-add-dialog.js");
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{fragments/item-add-modal :: itemAddModal('basket-1', '/dashboard/offer')}\"></div>",
+                Map.of("catalogs", List.of()));
+
+        // then
+        assertThat(html).contains("data-inventory-url=\"/dashboard/item-add/inventory\"")
+                .contains("id=\"itemAddEan\"").contains("id=\"itemAddInventoryRows\"")
+                .doesNotContain("id=\"itemAddMfn\"");
+        assertThat(script).contains("data-inventory-url").contains("'?ean=' + encodeURIComponent(ean)")
+                .contains("params[prefix + 'ean'] = entry.product.ean").doesNotContain("prefix + 'mfn'");
+    }
+
+    @Test
     void theDialogScriptGuardsFormSubmitsAndReopensServerOpenedDialogsAsModal() throws Exception {
         // given
         String script = read("src/main/resources/static/js/dialog.js");

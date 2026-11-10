@@ -58,6 +58,9 @@
                                 <a th:if="${supplier.editHref() != null}" class="cl-link-button" th:href="@{${supplier.editHref()}}"
                                    th:text="${state == 'INCOMPLETE'} ? #{settings.list.complete} : #{settings.list.edit}"
                                    th:attr="aria-label=${state == 'INCOMPLETE'} ? #{settings.list.complete.for(${supplier.title()})} : #{settings.list.edit.for(${supplier.title()})}"></a>
+                                <a th:if="${supplier.carriersHref() != null}" class="cl-link-button" th:href="@{${supplier.carriersHref()}}"
+                                   th:text="#{store.supplier.carriers.link}"
+                                   th:attr="aria-label=#{store.supplier.carriers.link.for(${supplier.title()})}"></a>
                                 <a class="cl-link-button is-danger" th:href="@{${supplier.removeHref()}}" data-cl-confirm
                                    th:text="${supplier.csv()} ? #{settings.list.delete} : #{settings.list.disconnect}"
                                    th:attr="aria-label=${supplier.csv()} ? #{settings.list.delete.for(${supplier.title()})} : #{settings.list.disconnect.for(${supplier.title()})},

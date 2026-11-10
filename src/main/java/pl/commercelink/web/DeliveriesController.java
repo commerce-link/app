@@ -982,7 +982,7 @@ public class DeliveriesController {
         Order dropshipOrder = delivery.isDropship() ? resolveDropshipOrder(storeId, delivery) : null;
         Store store = dropshipOrder == null ? null : storesRepository.findById(storeId);
         List<String> carrierOptions = dropshipOrder != null && store != null
-                ? shipmentCarrierOptions.forOrder(dropshipOrder, store) : List.of();
+                ? shipmentCarrierOptions.forOrder(dropshipOrder) : List.of();
         LocalDate suggested = delivery.isOrderFailed() || delivery.isOrderDispatched()
                 ? supplierPurchaseService.suggestEstimatedDeliveryAt(delivery) : null;
         String externalId = StringUtils.trimToNull(delivery.getExternalDeliveryId());

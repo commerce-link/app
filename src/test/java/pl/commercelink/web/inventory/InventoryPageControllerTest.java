@@ -230,17 +230,17 @@ class InventoryPageControllerTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("legacyCheckPriceLinks")
-    void legacyCheckPriceRedirectsToTheNewQuery(String rule, String mfn, String ean, String pimId, String expected) {
+    void legacyCheckPriceRedirectsToTheNewQuery(String rule, String ean, String pimId, String expected) {
         // when / then
-        assertThat(controller.legacyCheckPrice(mfn, ean, pimId, null)).isEqualTo(expected);
+        assertThat(controller.legacyCheckPrice(ean, pimId, null)).isEqualTo(expected);
     }
 
     @Test
     void legacyCheckPriceKeepsAValidBackLinkAndDropsAForeignOne() {
         // when
-        String kept = controller.legacyCheckPrice(null, "5900000000126", null, "/dashboard/inventory?cat=1571");
-        String plain = controller.legacyCheckPrice(null, null, null, "/dashboard/inventory?cat=1571");
-        String foreign = controller.legacyCheckPrice(null, "5900000000126", null, "https://evil.example/");
+        String kept = controller.legacyCheckPrice("5900000000126", null, "/dashboard/inventory?cat=1571");
+        String plain = controller.legacyCheckPrice(null, null, "/dashboard/inventory?cat=1571");
+        String foreign = controller.legacyCheckPrice("5900000000126", null, "https://evil.example/");
 
         // then
         assertThat(kept).isEqualTo("redirect:/dashboard/inventory/prices?q=5900000000126&from=%2Fdashboard%2Finventory%3Fcat%3D1571");
@@ -251,17 +251,17 @@ class InventoryPageControllerTest {
     private static Stream<Arguments> legacyCheckPriceLinks() {
         return Stream.of(
                 // URLEncoder encodes a space as '+'; the servlet container decodes '+' back to a space in a query string
-                Arguments.of("mfn link redirects to the new query", "MFN 1", "5901234123457", null,
-                        "redirect:/dashboard/inventory/prices?q=MFN+1"),
-                Arguments.of("a plus is encoded so it is not decoded as a space", "A+B", "5901234123457", null,
+                Arguments.of("a space is encoded as a plus", null, "PIM 1",
+                        "redirect:/dashboard/inventory/prices?q=PIM+1"),
+                Arguments.of("a plus is encoded so it is not decoded as a space", null, "A+B",
                         "redirect:/dashboard/inventory/prices?q=A%2BB"),
-                Arguments.of("curly braces are encoded so they are not treated as a URI template variable", "{x}",
-                        "5901234123457", null, "redirect:/dashboard/inventory/prices?q=%7Bx%7D"),
-                Arguments.of("pim id is preferred over mfn", "MFN-1", "5901234123457", "PIM-7",
+                Arguments.of("curly braces are encoded so they are not treated as a URI template variable", null,
+                        "{x}", "redirect:/dashboard/inventory/prices?q=%7Bx%7D"),
+                Arguments.of("pim id is preferred over ean", "5901234123457", "PIM-7",
                         "redirect:/dashboard/inventory/prices?q=PIM-7"),
-                Arguments.of("ean is the fallback when mfn is blank", " ", "5901234123457", "",
+                Arguments.of("ean is the fallback when pim id is blank", "5901234123457", " ",
                         "redirect:/dashboard/inventory/prices?q=5901234123457"),
-                Arguments.of("no parameters redirect to the plain page", null, null, null,
+                Arguments.of("no parameters redirect to the plain page", null, null,
                         "redirect:/dashboard/inventory/prices"));
     }
 
@@ -299,7 +299,7 @@ class InventoryPageControllerTest {
         when(inventorySearch.search(STORE_ID, "5901000000001"))
                 .thenReturn(new InventorySearchResult.KnownWithoutOffers(MatchedBy.EAN, header));
         CategoryLine view = new CategoryLine(List.of(), "Karty graficzne", "Karty graficzne", List.of());
-        when(productCategoryLines.build(header)).thenReturn(Optional.of(view));
+        when(productCategoryLines.build(STORE_ID, header)).thenReturn(Optional.of(view));
         ConcurrentModel model = new ConcurrentModel();
 
         // when

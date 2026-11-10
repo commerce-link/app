@@ -18,13 +18,13 @@ import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.settings.ConfirmAction;
 import pl.commercelink.web.settings.SettingsFlash;
-import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.products.ProductData;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.products.StoreCategories;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.taxonomy.Categories;
-import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.net.URLEncoder;
@@ -48,7 +48,7 @@ class WarehouseItemController {
     static final String NEW_SUPPLIER_FIELD = "new-supplier";
 
     @Autowired
-    private TaxonomyCache taxonomyCache;
+    private ProductDataResolver productDataResolver;
 
     @Autowired
     private MessageSource messageSource;
@@ -103,11 +103,11 @@ class WarehouseItemController {
     @PostMapping("/dashboard/warehouse/items/new")
     String addItem(@ModelAttribute("form") WarehouseItemAddForm form, Model model, Locale locale,
                    HttpServletResponse response, RedirectAttributes redirectAttributes) {
-        Taxonomy taxonomy = StringUtils.isBlank(form.getManufacturerCode()) ? null
-                : taxonomyCache.findByMfn(UnifiedProductIdentifiers.unifyMfn(form.getManufacturerCode()));
-        boolean known = taxonomy != null && StringUtils.isNoneBlank(taxonomy.name(), taxonomy.ean());
-        boolean productDataNeeded = !known && StringUtils.isNotBlank(form.getManufacturerCode());
-        // the first submit of an unknown code only reveals the product data group, so it carries no name/ean errors yet
+        ProductData product = StringUtils.isBlank(form.getEan()) ? null
+                : productDataResolver.ofEan(getStoreId(), UnifiedProductIdentifiers.unifyEan(form.getEan().trim())).orElse(null);
+        boolean known = product != null && StringUtils.isNotBlank(product.name());
+        boolean productDataNeeded = !known && StringUtils.isNotBlank(form.getEan());
+        // the first submit of an unknown EAN only reveals the product data group, so it carries no name/code errors yet
         boolean productDataAsked = productDataNeeded && (form.isProductDataShown() || hasAnyProductData(form));
         Map<String, String> errors = new LinkedHashMap<>(form.validate(productDataAsked));
         Map<String, Object[]> errorArgs = new HashMap<>();
@@ -125,12 +125,13 @@ class WarehouseItemController {
             return newItemPage(model, form, errors, errorArgs, productDataNeeded, null);
         }
 
-        String category = known ? StringUtils.defaultIfBlank(taxonomy.category(), Categories.UNCATEGORIZED)
+        String category = known ? StringUtils.defaultIfBlank(product.category(), Categories.UNCATEGORIZED)
                 : StringUtils.defaultIfBlank(form.getCategory(), Categories.UNCATEGORIZED);
         WarehouseItem item = new WarehouseItem(getStoreId(), supplier.identity(), category,
-                known ? taxonomy.name() : form.getName().trim(),
-                UnifiedProductIdentifiers.unifyEan(known ? taxonomy.ean() : form.getEan().trim()),
-                UnifiedProductIdentifiers.unifyMfn(form.getManufacturerCode()), form.netCost(), form.quantity());
+                known ? product.name() : form.getName().trim(),
+                UnifiedProductIdentifiers.unifyEan(form.getEan().trim()),
+                known ? product.mfn() : UnifiedProductIdentifiers.unifyMfn(form.getManufacturerCode()),
+                form.netCost(), form.quantity());
         item.setStatus(form.statusValue());
 
         OperationResult<?> result = warehouseInternalReceiptService.addItem(
@@ -160,15 +161,15 @@ class WarehouseItemController {
     }
 
     private static boolean hasAnyProductData(WarehouseItemAddForm form) {
-        return StringUtils.isNotBlank(form.getName()) || StringUtils.isNotBlank(form.getEan());
+        return StringUtils.isNotBlank(form.getName()) || StringUtils.isNotBlank(form.getManufacturerCode());
     }
 
     private String newItemPage(Model model, WarehouseItemAddForm form, Map<String, String> errors,
-                               Map<String, Object[]> errorArgs, boolean mfnUnknown, String errorMessage) {
+                               Map<String, Object[]> errorArgs, boolean eanUnknown, String errorMessage) {
         model.addAttribute("form", form);
         model.addAttribute("errors", errors);
         model.addAttribute("errorArgs", errorArgs);
-        model.addAttribute("mfnUnknown", mfnUnknown);
+        model.addAttribute("eanUnknown", eanUnknown);
         model.addAttribute("errorMessage", errorMessage);
         model.addAttribute("vatRate", Price.DEFAULT_VAT_RATE);
         model.addAttribute("statuses", NEW_ITEM_STATUSES);

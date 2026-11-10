@@ -602,7 +602,7 @@
         function render() {
             var term = search.value.trim().toLowerCase();
             var shown = data.filter(function (i) {
-                return !term || [i.name, i.mfn, i.serialNo].some(function (value) {
+                return !term || [i.name, i.ean, i.serialNo].some(function (value) {
                     return (value || '').toLowerCase().indexOf(term) >= 0;
                 });
             });
@@ -616,11 +616,11 @@
                 radio.type = 'radio';
                 radio.name = 'assign-warehouse-pick';
                 radio.checked = i.itemId === chosen;
-                radio.setAttribute('aria-label', i.name || i.mfn);
+                radio.setAttribute('aria-label', i.name || i.ean);
                 pick.appendChild(radio);
                 row.appendChild(pick);
                 cell(row, i.name);
-                cell(row, i.mfn, 'cl-table-code');
+                cell(row, i.ean, 'cl-table-code');
                 cell(row, i.serialNo, 'cl-table-code');
                 cell(row, i.qty, 'is-numeric');
                 var state = cell(row, '');

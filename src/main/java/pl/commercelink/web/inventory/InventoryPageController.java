@@ -105,12 +105,11 @@ public class InventoryPageController {
 
     // bookmarks of the former three-field form keep working
     @GetMapping(PAGE_PATH + "/check-price")
-    public String legacyCheckPrice(@RequestParam(value = "mfn", required = false) String mfn,
-                                   @RequestParam(value = "ean", required = false) String ean,
+    public String legacyCheckPrice(@RequestParam(value = "ean", required = false) String ean,
                                    @RequestParam(value = "pimId", required = false) String pimId,
                                    @RequestParam(value = "from", required = false) String from) {
         String back = InventoryReturnTo.safe(from).orElse(null);
-        return Stream.of(pimId, mfn, ean)
+        return Stream.of(pimId, ean)
                 .map(InventoryPageController::normalize)
                 .filter(value -> !value.isEmpty())
                 .findFirst()
@@ -125,9 +124,11 @@ public class InventoryPageController {
             model.addAttribute("validationError", true);
             return false;
         }
-        InventorySearchResult result = isSuperAdmin()
+        boolean superAdmin = isSuperAdmin();
+        String storeId = superAdmin ? null : CustomSecurityContext.getStoreId();
+        InventorySearchResult result = superAdmin
                 ? inventorySearch.searchGlobal(query)
-                : inventorySearch.search(CustomSecurityContext.getStoreId(), query);
+                : inventorySearch.search(storeId, query);
         model.addAttribute("result", result);
         ProductHeader header = switch (result) {
             case InventorySearchResult.Found found -> found.product();
@@ -135,7 +136,7 @@ public class InventoryPageController {
             case null, default -> null;
         };
         if (header != null) {
-            productCategoryLines.build(header).ifPresent(line -> model.addAttribute("productCategory", line));
+            productCategoryLines.build(storeId, header).ifPresent(line -> model.addAttribute("productCategory", line));
         }
         return true;
     }

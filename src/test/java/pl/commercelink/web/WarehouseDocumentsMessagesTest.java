@@ -89,4 +89,15 @@ class WarehouseDocumentsMessagesTest {
         assertThat(used.stream().filter(k -> !en.containsKey(k)).toList()).as("missing in EN").isEmpty();
     }
 
+    @Test
+    void theGuideOffersOnlyTheCodesTheSearchFinds() throws Exception {
+        // when
+        String pl = load("messages_pl.properties").getProperty("intro.warehouse-documents.item1.text");
+        String en = load("messages_en.properties").getProperty("intro.warehouse-documents.item1.text");
+
+        // then
+        assertThat(pl).contains("EAN").doesNotContain("kod producenta");
+        assertThat(en).contains("EAN").doesNotContain("manufacturer code");
+    }
+
 }

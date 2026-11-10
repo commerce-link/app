@@ -79,7 +79,7 @@ class DynamicCategoryPricelistTest {
 
         when(rollingPriceAggregateRepository.loadForStore(STORE_ID)).thenReturn(Map.of());
         when(sellingPriceHistoryRepository.load(STORE_ID, CATALOG_ID)).thenReturn(Map.of());
-        when(pimView.findByPimIdOrGtinsOrMpns(eq(PIM_ID), any(), any())).thenReturn(Optional.of(pimEntry()));
+        when(pimView.findByPimIdOrGtins(eq(PIM_ID), any())).thenReturn(Optional.of(pimEntry()));
 
         when(inventory.findAllByProductCategoryIds(List.of("170"))).thenReturn(Map.of("170", List.of(matchedInventory)));
         when(inventory.findByProduct(any())).thenReturn(matchedInventory);

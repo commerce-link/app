@@ -6,7 +6,7 @@ import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrdersRepository;
-import pl.commercelink.taxonomy.TaxonomyResolver;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.warehouse.api.*;
 
 @Component
@@ -31,7 +31,7 @@ class BuiltInWarehouse implements Warehouse {
     @Autowired
     private WarehouseItemFactory warehouseItemFactory;
     @Autowired
-    private TaxonomyResolver taxonomyResolver;
+    private ProductDataResolver productDataResolver;
 
     @Override
     public GoodsInHandler goodsInHandler(String storeId) {
@@ -85,6 +85,6 @@ class BuiltInWarehouse implements Warehouse {
     }
 
     private BuiltInDocumentCreationService getDocumentCreationService(String storeId) {
-        return new BuiltInDocumentCreationService(warehouseDocumentRepository, warehouseDocumentItemRepository, taxonomyResolver);
+        return new BuiltInDocumentCreationService(warehouseDocumentRepository, warehouseDocumentItemRepository, productDataResolver);
     }
 }

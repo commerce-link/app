@@ -43,7 +43,6 @@ import java.util.List;
 import java.util.Locale;
 import pl.commercelink.shipping.DeliveryTarget;
 import pl.commercelink.shipping.ShippingPageView;
-import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 
 @Controller
@@ -306,11 +305,9 @@ public class OrdersShippingController extends AbstractShippingController {
     @Override
     protected DeliveryTarget resolveDeliveryTarget(ShippingForm form) {
         Order order = requireOrder(form.getShippingEntityId());
-        String shippingProvider = getStore().getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
         return order.firstShipment()
-                .map(shipment -> new DeliveryTarget(shippingProvider, shipment.getCarrier(),
-                        shipment.getCollectionPointCode()))
-                .orElseGet(() -> new DeliveryTarget(null, null, null));
+                .map(shipment -> new DeliveryTarget(shipment.getCarrier(), shipment.getCollectionPointCode()))
+                .orElseGet(() -> new DeliveryTarget(null, null));
     }
 
     @Override
