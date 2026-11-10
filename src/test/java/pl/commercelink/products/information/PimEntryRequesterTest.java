@@ -17,9 +17,13 @@ import pl.commercelink.pim.api.PimView;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.brand.BrandMapper;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -54,7 +58,16 @@ class PimEntryRequesterTest {
     }
 
     private PimEntryRequester requester(String env) {
-        return new PimEntryRequester(pimCatalog, brandMapper, env);
+        return new PimEntryRequester(pimCatalog, brandMapper, env, Runnable::run);
+    }
+
+    private static class RecordingExecutor implements Executor {
+        private final List<Runnable> tasks = new ArrayList<>();
+
+        @Override
+        public void execute(Runnable task) {
+            tasks.add(task);
+        }
     }
 
     private static Product product(String pimId, String ean, String mfn, String brand) {
@@ -154,5 +167,84 @@ class PimEntryRequesterTest {
         // when / then
         assertThatCode(() -> requester("prod").requestMissingEntry(STORE_ID, product(null, EAN, "MFN-1", "MSI")))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void bulkRequestsAreHandedToTheExecutorAndNotSentOnTheCallersThread() {
+        // given
+        RecordingExecutor executor = new RecordingExecutor();
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "prod", executor);
+
+        // when
+        requester.requestMissingEntries(STORE_ID, List.of(
+                product(null, EAN, "MFN-1", "MSI"), product(null, "5901234567890", "MFN-2", "ASUS")));
+
+        // then
+        verify(pimCatalog, never()).submit(any());
+        assertThat(executor.tasks).hasSize(1);
+
+        // when
+        executor.tasks.get(0).run();
+
+        // then
+        verify(pimCatalog).submit(new PimEntryRequest(EAN, "MFN-1", "MSI", 100));
+        verify(pimCatalog).submit(new PimEntryRequest("5901234567890", "MFN-2", "ASUS", 100));
+    }
+
+    @Test
+    void nothingIsHandedToTheExecutorOutsideProd() {
+        // given
+        RecordingExecutor executor = new RecordingExecutor();
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "localhost", executor);
+
+        // when
+        requester.requestMissingEntries(STORE_ID, List.of(product(null, EAN, "MFN-1", "MSI")));
+
+        // then
+        assertThat(executor.tasks).isEmpty();
+        verifyNoInteractions(pimCatalog);
+    }
+
+    @Test
+    void emptyBatchIsNotHandedToTheExecutor() {
+        // given
+        RecordingExecutor executor = new RecordingExecutor();
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "prod", executor);
+
+        // when
+        requester.requestMissingEntries(STORE_ID, List.of());
+
+        // then
+        assertThat(executor.tasks).isEmpty();
+    }
+
+    @Test
+    void batchRejectedByTheExecutorDoesNotReachTheCaller() {
+        // given
+        Executor rejecting = task -> {
+            throw new RejectedExecutionException("queue full");
+        };
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "prod", rejecting);
+
+        // when / then
+        assertThatCode(() -> requester.requestMissingEntries(STORE_ID, List.of(product(null, EAN, "MFN-1", "MSI"))))
+                .doesNotThrowAnyException();
+        verify(pimCatalog, never()).submit(any());
+    }
+
+    @Test
+    void laterChangesToTheCallersListDoNotAffectTheBatch() {
+        // given
+        RecordingExecutor executor = new RecordingExecutor();
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "prod", executor);
+        List<Product> products = new ArrayList<>(List.of(product(null, EAN, "MFN-1", "MSI")));
+
+        // when
+        requester.requestMissingEntries(STORE_ID, products);
+        products.clear();
+        executor.tasks.get(0).run();
+
+        // then
+        verify(pimCatalog).submit(new PimEntryRequest(EAN, "MFN-1", "MSI", 100));
     }
 }
