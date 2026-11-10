@@ -28,6 +28,7 @@ public class ManagedCategoryProducts {
     public record Candidate(Product product, InventoryKey key) {
     }
 
+    /** @param alreadyInCategory the products the category held before the call, every one of them left as it was */
     public record Added(int added, int alreadyInCategory) {
     }
 
@@ -78,7 +79,7 @@ public class ManagedCategoryProducts {
         if (added > 0) {
             catalogPlacement.evict(storeId);
         }
-        return new Added(added, candidates.size() - added);
+        return new Added(added, inCategory.size());
     }
 
     private boolean holdsAny(Set<String> pimIds, String storeId, String pimId) {

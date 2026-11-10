@@ -49,7 +49,7 @@ class ManagedCategoryProductsTest {
                 List.of(sameEan, samePimId, missing));
 
         // then
-        assertThat(added).isEqualTo(new ManagedCategoryProducts.Added(1, 2));
+        assertThat(added).isEqualTo(new ManagedCategoryProducts.Added(1, 1));
         verify(productRepository).save(missing.product());
         verify(productRepository, times(1)).save(any(Product.class));
     }
@@ -81,13 +81,13 @@ class ManagedCategoryProductsTest {
         ManagedCategoryProducts.Added added = managedCategoryProducts.addMissing(STORE_ID, CATEGORY_ID, List.of(cheaper, dearer));
 
         // then
-        assertThat(added).isEqualTo(new ManagedCategoryProducts.Added(1, 1));
+        assertThat(added).isEqualTo(new ManagedCategoryProducts.Added(1, 0));
         verify(productRepository).save(cheaper.product());
         verify(productRepository, never()).save(dearer.product());
     }
 
     @Test
-    void countsACandidateAParallelSaveStoredFirstAsAlreadyInCategoryAndGuardsTheNextOnes() {
+    void aCandidateAParallelSaveStoredFirstIsNotCountedAsAddedAndGuardsTheNextOnes() {
         // given
         when(productRepository.findAll(CATEGORY_ID)).thenReturn(List.of());
         ManagedCategoryProducts.Candidate storedMeanwhile = candidate("pim-1", InventoryKey.fromEan("5900000000001"));
@@ -102,7 +102,7 @@ class ManagedCategoryProductsTest {
                 List.of(storedMeanwhile, sameEan, samePimId));
 
         // then
-        assertThat(added).isEqualTo(new ManagedCategoryProducts.Added(0, 3));
+        assertThat(added).isEqualTo(new ManagedCategoryProducts.Added(0, 0));
         verify(productRepository, times(1)).save(any(Product.class));
         verify(catalogPlacement, never()).evict(any());
     }
@@ -152,7 +152,7 @@ class ManagedCategoryProductsTest {
 
         // then
         assertThat(completed).containsExactly(first.product(), sameEntry.product());
-        assertThat(added).isEqualTo(new ManagedCategoryProducts.Added(1, 2));
+        assertThat(added).isEqualTo(new ManagedCategoryProducts.Added(1, 1));
         verify(productRepository).save(first.product());
         verify(productRepository, times(1)).save(any(Product.class));
     }

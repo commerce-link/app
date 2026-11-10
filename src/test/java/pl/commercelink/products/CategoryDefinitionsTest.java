@@ -9,13 +9,16 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.products.filters.InventoryFilterType;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.starter.dynamodb.Metadata;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
 import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -40,6 +43,10 @@ class CategoryDefinitionsTest {
     private OptimisticLockingExecutor optimisticLockingExecutor;
     @Mock
     private CatalogPlacement placement;
+    @Mock
+    private ManagedCategoryProducts managedCategoryProducts;
+    @Mock
+    private StorePimAliases pimAliases;
     @InjectMocks
     private CategoryDefinitions definitions;
 
@@ -161,7 +168,7 @@ class CategoryDefinitionsTest {
 
         // when
         definitions.create(catalog, basics);
-        definitions.saveBasics(catalog, gpu, basics);
+        definitions.saveBasics(catalog, gpu, basics, List.of());
         definitions.remove(catalog, gpu);
 
         // then
@@ -215,7 +222,7 @@ class CategoryDefinitionsTest {
     void saveBasicsLeavesPricingMarketplacesAndFiltersUntouched() {
         // when
         definitions.saveBasics(catalog, gpu, new CategoryDefinitions.Basics(
-                "Karty graficzne", 5, List.of("pim-gpu"), CategoryDefinitionType.Managed, 3, true, false, false, List.of("RTX 5060", "", "RTX 5070", "RTX 5060")));
+                "Karty graficzne", 5, List.of("pim-gpu"), CategoryDefinitionType.Managed, 3, true, false, false, List.of("RTX 5060", "", "RTX 5070", "RTX 5060")), List.of());
 
         // then
         assertThat(gpu.getName()).isEqualTo("Karty graficzne");
@@ -236,7 +243,7 @@ class CategoryDefinitionsTest {
     void changingTheTypeStampsTypeChangedAt() {
         // when
         definitions.saveBasics(catalog, gpu, new CategoryDefinitions.Basics(
-                "GPU", 1, List.of(), CategoryDefinitionType.Dynamic, 1, false, false, true, List.of()));
+                "GPU", 1, List.of(), CategoryDefinitionType.Dynamic, 1, false, false, true, List.of()), List.of());
 
         // then
         assertThat(gpu.getType()).isEqualTo(CategoryDefinitionType.Dynamic);
@@ -384,5 +391,129 @@ class CategoryDefinitionsTest {
         // when / then
         assertThat(definitions.productsInPriceGroup(gpu, "Premium")).isEqualTo(1);
         assertThat(definitions.productsInPriceGroup(gpu, "Ultra")).isZero();
+    }
+
+    @Test
+    void turningADynamicCategoryManagedStoresTheGivenProducts() {
+        // given
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        List<ManagedCategoryProducts.Candidate> list = List.of(candidate("pim-1", "5900000000001"), candidate("pim-2", "5900000000002"));
+        when(managedCategoryProducts.addMissing("store", gpu.getCategoryId(), list)).thenReturn(new ManagedCategoryProducts.Added(2, 0));
+
+        // when
+        CategoryDefinitions.BasicsSaved saved = definitions.saveBasics(catalog, gpu, managedBasics(), list);
+
+        // then
+        assertThat(saved).isEqualTo(new CategoryDefinitions.BasicsSaved(true, 2, 0, false));
+        assertThat(gpu.getType()).isEqualTo(CategoryDefinitionType.Managed);
+        assertThat(gpu.getTypeChangedAt()).isNotNull();
+    }
+
+    @Test
+    void turningItManagedAgainKeepsTheProductsLeftFromBeforeAndAddsOnlyTheMissingOnes() {
+        // given: a product of the earlier manual category, edited there: another EAN, switched off, approved for Allegro
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        Product leftOver = new Product(gpu.getCategoryId(), "pim-1", "5900000000099", "MFN-1", "MSI", "RTX 5070", "Moja karta", "Default");
+        leftOver.setEnabled(false);
+        leftOver.getMarketplaces().add("allegro");
+        when(products.findAll(gpu.getCategoryId())).thenReturn(List.of(leftOver));
+        when(pimAliases.aliasesOf("store", "pim-2")).thenReturn(Set.of("pim-2"));
+        ManagedCategoryProducts.Candidate sameEntry = candidate("pim-1", "5900000000001");
+        ManagedCategoryProducts.Candidate missing = candidate("pim-2", "5900000000002");
+        CategoryDefinitions withRealStore = new CategoryDefinitions(catalogs, products, optimisticLockingExecutor, placement,
+                new ManagedCategoryProducts(products, placement, pimAliases));
+
+        // when
+        CategoryDefinitions.BasicsSaved saved = withRealStore.saveBasics(catalog, gpu, managedBasics(), List.of(sameEntry, missing));
+
+        // then
+        assertThat(saved).isEqualTo(new CategoryDefinitions.BasicsSaved(true, 1, 1, false));
+        verify(products).save(missing.product());
+        verify(products, times(1)).save(any(Product.class));
+        assertThat(leftOver.getName()).isEqualTo("Moja karta");
+        assertThat(leftOver.isEnabled()).isFalse();
+        assertThat(leftOver.getMarketplaces()).containsExactly("allegro");
+    }
+
+    @Test
+    void theTypeIsSavedBeforeTheProducts() {
+        // given
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        List<ManagedCategoryProducts.Candidate> list = List.of(candidate("pim-1", "5900000000001"));
+        when(managedCategoryProducts.addMissing("store", gpu.getCategoryId(), list)).thenReturn(new ManagedCategoryProducts.Added(1, 0));
+
+        // when
+        definitions.saveBasics(catalog, gpu, managedBasics(), list);
+
+        // then
+        InOrder order = inOrder(catalogs, managedCategoryProducts);
+        order.verify(catalogs).save(catalog);
+        order.verify(managedCategoryProducts).addMissing("store", gpu.getCategoryId(), list);
+    }
+
+    @Test
+    void turningItManagedWithAnEmptyListStoresNoProducts() {
+        // given
+        gpu.setType(CategoryDefinitionType.Dynamic);
+
+        // when
+        CategoryDefinitions.BasicsSaved saved = definitions.saveBasics(catalog, gpu, managedBasics(), List.of());
+
+        // then
+        assertThat(saved).isEqualTo(new CategoryDefinitions.BasicsSaved(true, 0, 0, false));
+        assertThat(gpu.getType()).isEqualTo(CategoryDefinitionType.Managed);
+        verify(managedCategoryProducts, never()).addMissing(any(), any(), any());
+    }
+
+    @Test
+    void aFailedProductSaveLeavesTheCategoryManagedAndReportsItIncomplete() {
+        // given
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        List<ManagedCategoryProducts.Candidate> list = List.of(candidate("pim-1", "5900000000001"));
+        when(managedCategoryProducts.addMissing("store", gpu.getCategoryId(), list)).thenThrow(new IllegalStateException("table unavailable"));
+
+        // when
+        CategoryDefinitions.BasicsSaved saved = definitions.saveBasics(catalog, gpu, managedBasics(), list);
+
+        // then
+        assertThat(saved.becameManaged()).isTrue();
+        assertThat(saved.productsIncomplete()).isTrue();
+        assertThat(gpu.getType()).isEqualTo(CategoryDefinitionType.Managed);
+        verify(catalogs).save(catalog);
+    }
+
+    @Test
+    void productsGivenToACategoryThatWasManagedAlreadyAreIgnored() {
+        // when
+        CategoryDefinitions.BasicsSaved saved = definitions.saveBasics(catalog, gpu, managedBasics(),
+                List.of(candidate("pim-1", "5900000000001")));
+
+        // then
+        assertThat(saved).isEqualTo(CategoryDefinitions.BasicsSaved.UNCHANGED);
+        verify(managedCategoryProducts, never()).addMissing(any(), any(), any());
+    }
+
+    @Test
+    void turningAManagedCategoryDynamicStoresNoProducts() {
+        // when
+        CategoryDefinitions.BasicsSaved saved = definitions.saveBasics(catalog, gpu, new CategoryDefinitions.Basics(
+                "GPU", 1, List.of("pim-gpu"), CategoryDefinitionType.Dynamic, 1, false, false, true, List.of()),
+                List.of(candidate("pim-1", "5900000000001")));
+
+        // then
+        assertThat(saved).isEqualTo(CategoryDefinitions.BasicsSaved.UNCHANGED);
+        assertThat(gpu.getType()).isEqualTo(CategoryDefinitionType.Dynamic);
+        verify(managedCategoryProducts, never()).addMissing(any(), any(), any());
+    }
+
+    private static CategoryDefinitions.Basics managedBasics() {
+        return new CategoryDefinitions.Basics("GPU", 1, List.of("pim-gpu"), CategoryDefinitionType.Managed, 1, false,
+                false, true, List.of());
+    }
+
+    private ManagedCategoryProducts.Candidate candidate(String pimId, String ean) {
+        return new ManagedCategoryProducts.Candidate(
+                new Product(gpu.getCategoryId(), pimId, ean, null, "MSI", "RTX", "MSI RTX", "Default"),
+                InventoryKey.fromPimIdAndEan(pimId, ean));
     }
 }

@@ -201,7 +201,7 @@ public class CatalogCategoryController {
         boolean becomesDynamic = category.hasType(CategoryDefinitionType.Managed) && form.isDynamic();
         CategoryDefinitions.Basics basics = form.toBasics();
         try {
-            definitions.saveBasics(catalog, category, basics);
+            definitions.saveBasics(catalog, category, basics, List.of());
         } catch (OptimisticLockingExhaustedException e) {
             return conflict(renderBasics(catalog, category, form, conflictAt(BASICS_FORM), model, locale), BASICS_FRAGMENT, async,
                     response);

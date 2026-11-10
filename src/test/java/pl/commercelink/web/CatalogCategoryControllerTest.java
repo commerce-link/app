@@ -23,6 +23,7 @@ import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinitions;
+import pl.commercelink.products.ManagedCategoryProducts;
 import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
@@ -230,7 +231,7 @@ class CatalogCategoryControllerTest {
                 .andExpect(redirectedUrl("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings"))
                 .andExpect(flash().attribute("settingsSavedMessage", "Saved"));
         ArgumentCaptor<CategoryDefinitions.Basics> basics = ArgumentCaptor.forClass(CategoryDefinitions.Basics.class);
-        verify(definitions).saveBasics(eq(catalog), eq(gpu), basics.capture());
+        verify(definitions).saveBasics(eq(catalog), eq(gpu), basics.capture(), eq(List.of()));
         assertThat(basics.getValue().name()).isEqualTo("Karty graficzne");
         assertThat(basics.getValue().labels()).containsExactly("RTX 5060");
     }
@@ -246,7 +247,7 @@ class CatalogCategoryControllerTest {
         mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics")
                         .param("name", "GPU").param("type", "Managed").param("maxQty", "1"))
                 .andExpect(redirectedUrl("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings"));
-        verify(definitions).saveBasics(eq(catalog), eq(gpu), any());
+        verify(definitions).saveBasics(eq(catalog), eq(gpu), any(), eq(List.of()));
     }
 
     @Test
@@ -260,7 +261,7 @@ class CatalogCategoryControllerTest {
                         .param("name", "cpu").param("type", "Managed").param("maxQty", "1"))
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("errors", hasEntry("name", "catalog.category.name.duplicate")));
-        verify(definitions, never()).saveBasics(any(), any(), any());
+        verify(definitions, never()).saveBasics(any(), any(), any(), any());
     }
 
     /** An unticked protection box is not posted at all; the save must switch the protection off, not keep the old value. */
@@ -275,7 +276,7 @@ class CatalogCategoryControllerTest {
 
         // then
         ArgumentCaptor<CategoryDefinitions.Basics> basics = ArgumentCaptor.forClass(CategoryDefinitions.Basics.class);
-        verify(definitions).saveBasics(eq(catalog), eq(gpu), basics.capture());
+        verify(definitions).saveBasics(eq(catalog), eq(gpu), basics.capture(), eq(List.of()));
         assertThat(basics.getValue().deletionProtection()).isFalse();
     }
 
@@ -887,7 +888,7 @@ class CatalogCategoryControllerTest {
     void aBasicsSaveWithoutJavaScriptThatKeepsLosingTheRaceAnswers422WithThePage() throws Exception {
         // given
         CategoryDefinition gpu = categoryOf("GPU");
-        doThrow(exhausted()).when(definitions).saveBasics(any(), any(), any());
+        doThrow(exhausted()).when(definitions).saveBasics(any(), any(), any(), any());
 
         // when / then
         mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics")
@@ -1001,7 +1002,7 @@ class CatalogCategoryControllerTest {
      */
     private MockMvc overTheRealExecutor(ProductCatalogRepository catalogs) {
         CategoryDefinitions real = new CategoryDefinitions(catalogs, productRepository, RetryingOptimisticLockingExecutor.create(),
-                catalogPlacement);
+                catalogPlacement, mock(ManagedCategoryProducts.class));
         return MockMvcBuilders.standaloneSetup(new CatalogCategoryController(access, real, productRepository,
                 storesRepository, pimCategoryOptions, marketplaces, inventory, messageSource)).build();
     }

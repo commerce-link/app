@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
 import pl.commercelink.testsupport.RetryingOptimisticLockingExecutor;
 
@@ -30,6 +31,7 @@ class CategoryDefinitionsRetryTest {
     @Mock private ProductCatalogRepository catalogs;
     @Mock private ProductRepository products;
     @Mock private CatalogPlacement placement;
+    @Mock private ManagedCategoryProducts managedCategoryProducts;
     private CategoryDefinitions definitions;
 
     private ProductCatalog catalog;
@@ -37,7 +39,8 @@ class CategoryDefinitionsRetryTest {
 
     @BeforeEach
     void setUp() {
-        definitions = new CategoryDefinitions(catalogs, products, RetryingOptimisticLockingExecutor.create(), placement);
+        definitions = new CategoryDefinitions(catalogs, products, RetryingOptimisticLockingExecutor.create(), placement,
+                managedCategoryProducts);
         catalog = catalogWithGpu(false);
         gpu = catalog.getCategories().get(0);
     }
@@ -116,5 +119,27 @@ class CategoryDefinitionsRetryTest {
         assertThatThrownBy(() -> definitions.remove(catalog, gpu)).isExactlyInstanceOf(IllegalStateException.class);
         verify(catalogs, never()).save(any());
         verify(products, never()).findAll(any(String.class));
+    }
+
+    @Test
+    void aRetryThatFindsTheCategoryAlreadyManagedCreatesNoProducts() {
+        // given: the first save loses the race to another tab, which turned the category manual meanwhile
+        ProductCatalog dynamic = catalogWithGpu(false);
+        dynamic.getCategories().get(0).setType(CategoryDefinitionType.Dynamic);
+        ProductCatalog managedMeanwhile = catalogWithGpu(false);
+        when(catalogs.findById("store", "c1")).thenReturn(dynamic, managedMeanwhile);
+        doThrow(new ConditionalCheckFailedException("version changed")).doNothing().when(catalogs).save(any());
+        List<ManagedCategoryProducts.Candidate> list = List.of(new ManagedCategoryProducts.Candidate(
+                new Product("gpu", "pim-1", "5900000000001", null, "MSI", "RTX", "MSI RTX", "Default"),
+                InventoryKey.fromPimIdAndEan("pim-1", "5900000000001")));
+
+        // when
+        CategoryDefinitions.BasicsSaved saved = definitions.saveBasics(catalog, gpu, new CategoryDefinitions.Basics(
+                "GPU", 1, List.of("pim-gpu"), CategoryDefinitionType.Managed, 1, false, false, false, List.of()), list);
+
+        // then
+        assertThat(saved).isEqualTo(CategoryDefinitions.BasicsSaved.UNCHANGED);
+        verify(catalogs).save(managedMeanwhile);
+        verify(managedCategoryProducts, never()).addMissing(any(), any(), any());
     }
 }
