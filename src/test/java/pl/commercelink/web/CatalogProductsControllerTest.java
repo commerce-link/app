@@ -30,6 +30,7 @@ import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.ManagedCategoryProducts;
 import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
@@ -169,7 +170,7 @@ class CatalogProductsControllerTest {
         mvc = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
                 brandMapper, messageSource, optimisticLockingExecutor, catalogPlacement,
-                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement, new StorePimAliases(pimCatalog))))
+                addReview()))
                 .build();
     }
 
@@ -1851,7 +1852,7 @@ class CatalogProductsControllerTest {
         MockMvc real = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
                 brandMapper, messageSource, RetryingOptimisticLockingExecutor.create(), catalogPlacement,
-                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement, new StorePimAliases(pimCatalog))))
+                addReview()))
                 .build();
 
         // when / then
@@ -1873,5 +1874,12 @@ class CatalogProductsControllerTest {
                 .andExpect(flash().attribute("settingsSavedMessage", "catalog.products.bulk.deleted"));
         verify(productRepository).deleteWhateverItsVersion(a);
         verify(productRepository, never()).delete(any(Product.class));
+    }
+
+    /** The review as the application wires it, over this test's mocks. */
+    private ProductsAddReview addReview() {
+        StorePimAliases aliases = new StorePimAliases(pimCatalog);
+        return new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, aliases,
+                new ManagedCategoryProducts(productRepository, catalogPlacement, aliases));
     }
 }

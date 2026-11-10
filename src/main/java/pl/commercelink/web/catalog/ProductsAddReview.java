@@ -1,6 +1,5 @@
 package pl.commercelink.web.catalog;
 
-import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.MessageSource;
@@ -14,8 +13,8 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
-import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.ManagedCategoryProducts;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
@@ -27,14 +26,12 @@ import pl.commercelink.web.dtos.ProductsBulkAddForm;
 import pl.commercelink.web.inventory.InventoryBrowseController;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * "Uzupełnij dane": the review of products taken from the inventory before they are added to a manual catalog category,
@@ -54,8 +51,8 @@ public class ProductsAddReview {
     private final PimCatalog pimCatalog;
     private final BrandMapper brandMapper;
     private final MessageSource messageSource;
-    private final CatalogPlacement catalogPlacement;
     private final StorePimAliases pimAliases;
+    private final ManagedCategoryProducts managedCategoryProducts;
 
     /**
      * @param resetRows rows whose label or pricing group, kept from the previous category, the new one does not offer and
@@ -155,51 +152,20 @@ public class ProductsAddReview {
      * category as it is now.
      */
     public int save(String storeId, CategoryDefinition category, ProductsBulkAddForm form) {
-        List<Product> inCategory = productRepository.findAll(category.getCategoryId());
-        List<InventoryKey> alreadyInCategory = new ArrayList<>(inCategory.stream()
-                .map(InventoryKey::fromProduct)
-                .toList());
-        // one PIM entry, one product of the category: two rows can lead to the same entry (a store entry matching
-        // codes of two inventory groups), and the price list keys products by pim id
-        Set<String> pimIdsInCategory = inCategory.stream()
-                .map(Product::getPimId)
-                .filter(StringUtils::isNotBlank)
-                .collect(Collectors.toCollection(HashSet::new));
         InventoryView enabled = inventory.withEnabledSuppliersOnly(storeId);
-        int added = 0;
+        List<ManagedCategoryProducts.Candidate> candidates = new ArrayList<>();
         for (int index = 0; index < form.getProducts().size(); index++) {
             // The category and the id are the application's to give, and so is the PIM entry: a pim id taken from the
             // form would bind the product to an arbitrary entry of the catalog.
             Product product = form.toProduct(index, category.getCategoryId());
-            InventoryKey key = InventoryKey.fromProduct(product);
-            if (alreadyInCategory.stream().anyMatch(key::matches)) {
-                continue;
-            }
-            Optional<PimEntry> entry = pimEntryOf(storeId, enabled, product);
-            if (entry.isPresent() && holdsAny(pimIdsInCategory, storeId, entry.get().pimId())) {
-                continue;
-            }
-            entry.ifPresent(found -> {
-                product.setPimId(found.pimId());
-                product.setBrand(brandMapper.unifyBrand(found.brand()));
-            });
-            try {
-                productRepository.save(product);
-            } catch (ConditionalCheckFailedException e) {
-                // The same review, saved by a parallel request that read the category at the same moment, wrote this
-                // row first under the same id: the category has it, exactly as if the read above had found it -- so
-                // its key guards the rows after it, as the key of a row saved here would.
-                alreadyInCategory.add(key);
-                continue;
-            }
-            alreadyInCategory.add(key);
-            entry.ifPresent(found -> pimIdsInCategory.add(found.pimId()));
-            added++;
+            // Keyed before the PIM entry is joined: the row is recognised by the codes the operator left in it.
+            candidates.add(new ManagedCategoryProducts.Candidate(product, InventoryKey.fromProduct(product)));
         }
-        if (added > 0) {
-            catalogPlacement.evict(storeId);
-        }
-        return added;
+        return managedCategoryProducts.addMissing(storeId, category.getCategoryId(), candidates,
+                product -> pimEntryOf(storeId, enabled, product).ifPresent(found -> {
+                    product.setPimId(found.pimId());
+                    product.setBrand(brandMapper.unifyBrand(found.brand()));
+                })).added();
     }
 
     /**
@@ -208,10 +174,6 @@ public class ProductsAddReview {
      */
     public Set<String> aliasesOf(String storeId, String pimId) {
         return pimAliases.aliasesOf(storeId, pimId);
-    }
-
-    private boolean holdsAny(Set<String> pimIds, String storeId, String pimId) {
-        return aliasesOf(storeId, pimId).stream().anyMatch(pimIds::contains);
     }
 
     /** The PIM entry of a product: by its group in the inventory when the inventory knows its EAN, else by its EAN. */

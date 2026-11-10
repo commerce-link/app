@@ -20,6 +20,7 @@ import pl.commercelink.pim.api.PimIdentifier;
 import pl.commercelink.pim.api.PimIdentifierType;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.ManagedCategoryProducts;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.brand.BrandMapper;
@@ -65,7 +66,9 @@ class ProductsAddReviewScopeTest {
         when(matched.getTaxonomy()).thenReturn(new Taxonomy(EAN, MFN, "Brand", "Taxonomy name", "GPU", 1, null, null));
         when(matched.getLowestPrice()).thenReturn(Price.fromGross(1000));
         when(view.findByEan(EAN)).thenReturn(matched);
-        return new ProductsAddReview(productRepository, inventory, catalog, brandMapper, messageSource, catalogPlacement, new StorePimAliases(catalog));
+        StorePimAliases aliases = new StorePimAliases(catalog);
+        return new ProductsAddReview(productRepository, inventory, catalog, brandMapper, messageSource, aliases,
+                new ManagedCategoryProducts(productRepository, catalogPlacement, aliases));
     }
 
     private static PimCatalog catalog() {
