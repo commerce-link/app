@@ -39,6 +39,7 @@ import pl.commercelink.products.ProductRecommendation;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.brand.BrandMapper;
+import pl.commercelink.products.information.PimEntryRequester;
 import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.security.model.CustomUser;
@@ -95,6 +96,7 @@ class CatalogProductsControllerTest {
 
     private static final String STORE_ID = "store-1";
 
+    @Mock private PimEntryRequester pimEntryRequester;
     @Mock
     private CatalogAccess access;
     @Mock
@@ -169,7 +171,7 @@ class CatalogProductsControllerTest {
         mvc = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
                 brandMapper, messageSource, optimisticLockingExecutor, catalogPlacement,
-                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement, new StorePimAliases(pimCatalog))))
+                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement, new StorePimAliases(pimCatalog), pimEntryRequester)))
                 .build();
     }
 
@@ -1851,7 +1853,7 @@ class CatalogProductsControllerTest {
         MockMvc real = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
                 brandMapper, messageSource, RetryingOptimisticLockingExecutor.create(), catalogPlacement,
-                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement, new StorePimAliases(pimCatalog))))
+                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement, new StorePimAliases(pimCatalog), pimEntryRequester)))
                 .build();
 
         // when / then
