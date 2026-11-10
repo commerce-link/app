@@ -19,6 +19,9 @@ import java.util.Set;
 @Setter
 public class CategoryBasicsForm {
 
+    public static final String STORE_DYNAMIC_PRODUCTS = "store";
+    public static final String SKIP_DYNAMIC_PRODUCTS = "skip";
+
     private String name;
     private String sequenceNumber;
     private List<String> pimCategoryIds = new ArrayList<>();
@@ -29,6 +32,8 @@ public class CategoryBasicsForm {
     // An unticked checkbox is absent from the POST, so a bound form must read as "protection off" unless the box came back.
     private boolean deletionProtection;
     private List<String> labels = new ArrayList<>();
+    // What becomes of the automatic list when the category turns manual; asked then, never chosen beforehand.
+    private String dynamicProducts;
 
     /** The form offered for a new category: protected, manual, one piece per order — the defaults of a saved category. */
     public static CategoryBasicsForm forNewCategory() {
@@ -58,6 +63,14 @@ public class CategoryBasicsForm {
      *                    over another category's name is refused.
      */
     public Map<String, String> validate(Set<String> otherNames, String currentName) {
+        return validate(otherNames, currentName, false);
+    }
+
+    /**
+     * @param dynamicProductsChoiceRequired the save turns an automatic category with a non-empty list manual, so the
+     *                                      operator has to say whether that list becomes the category's products
+     */
+    public Map<String, String> validate(Set<String> otherNames, String currentName, boolean dynamicProductsChoiceRequired) {
         Map<String, String> errors = new LinkedHashMap<>();
         if (FormRules.requireText(errors, "name", name, "catalog.category.name.required")
                 && !StringUtils.trimToEmpty(currentName).equalsIgnoreCase(name.trim())
@@ -81,6 +94,10 @@ public class CategoryBasicsForm {
         if (cleanLabels.stream().map(String::toLowerCase).distinct().count() != cleanLabels.size()) {
             errors.put("labels", "catalog.category.labels.duplicate");
         }
+        if (dynamicProductsChoiceRequired && !STORE_DYNAMIC_PRODUCTS.equals(dynamicProducts)
+                && !SKIP_DYNAMIC_PRODUCTS.equals(dynamicProducts)) {
+            errors.put("dynamicProducts", "catalog.category.type.managed.choice.required");
+        }
         return errors;
     }
 
@@ -92,6 +109,14 @@ public class CategoryBasicsForm {
 
     public boolean isDynamic() {
         return CategoryDefinitionType.Dynamic.name().equals(type);
+    }
+
+    public boolean isManaged() {
+        return CategoryDefinitionType.Managed.name().equals(type);
+    }
+
+    public boolean storesDynamicProducts() {
+        return STORE_DYNAMIC_PRODUCTS.equals(dynamicProducts);
     }
 
     private Optional<CategoryDefinitionType> parseType() {

@@ -22,6 +22,8 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.CategoryDefinitions;
+import pl.commercelink.products.DynamicCategoryProducts;
+import pl.commercelink.products.ManagedCategoryProducts;
 import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
@@ -115,6 +117,7 @@ public class CatalogCategoryController {
     private final MarketplaceConnections marketplaces;
     private final Inventory inventory;
     private final MessageSource messageSource;
+    private final DynamicCategoryProducts dynamicCategoryProducts;
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/settings")
     public String settings(@PathVariable String catalogId, @PathVariable String categoryId, Model model) {
@@ -183,7 +186,8 @@ public class CatalogCategoryController {
     public String basics(@PathVariable String catalogId, @PathVariable String categoryId, Model model, Locale locale) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
-        return renderBasics(catalog, category, CategoryBasicsForm.from(category), Map.of(), model, locale);
+        return renderBasics(catalog, category, CategoryBasicsForm.from(category), Map.of(), model, locale,
+                automaticListOf(category, null));
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/settings/basics")
@@ -194,17 +198,26 @@ public class CatalogCategoryController {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
         boolean async = SettingsPaths.isAsync(requestedWith);
-        Map<String, String> errors = form.validate(otherNames(catalog, category), category.getName());
+        boolean turnsManual = category.hasType(CategoryDefinitionType.Dynamic) && form.isManaged();
+        // The list the operator was asked about: read once, from the category as this page saw it, before the save.
+        List<ManagedCategoryProducts.Candidate> automaticList = turnsManual
+                ? dynamicCategoryProducts.candidates(storeId(), category) : null;
+        Map<String, String> errors = form.validate(otherNames(catalog, category), category.getName(),
+                turnsManual && !automaticList.isEmpty());
         if (!errors.isEmpty()) {
-            return rejected(renderBasics(catalog, category, form, errors, model, locale), BASICS_FRAGMENT, async, response);
+            return rejected(renderBasics(catalog, category, form, errors, model, locale, automaticListOf(category, automaticList)),
+                    BASICS_FRAGMENT, async, response);
         }
         boolean becomesDynamic = category.hasType(CategoryDefinitionType.Managed) && form.isDynamic();
         CategoryDefinitions.Basics basics = form.toBasics();
+        List<ManagedCategoryProducts.Candidate> agreedProducts = turnsManual && form.storesDynamicProducts()
+                ? automaticList : List.of();
+        CategoryDefinitions.BasicsSaved saved;
         try {
-            definitions.saveBasics(catalog, category, basics, List.of());
+            saved = definitions.saveBasics(catalog, category, basics, agreedProducts);
         } catch (OptimisticLockingExhaustedException e) {
-            return conflict(renderBasics(catalog, category, form, conflictAt(BASICS_FORM), model, locale), BASICS_FRAGMENT, async,
-                    response);
+            return conflict(renderBasics(catalog, category, form, conflictAt(BASICS_FORM), model, locale,
+                    automaticListOf(category, automaticList)), BASICS_FRAGMENT, async, response);
         }
         // The service saves a fresh read of the catalog, so the name the category now has is the one just posted.
         String message = messageSource.getMessage("catalog.category.basics.saved",
@@ -212,7 +225,25 @@ public class CatalogCategoryController {
         if (becomesDynamic) {
             message += " " + messageSource.getMessage("catalog.category.type.changed.dynamic", null, locale);
         }
-        return saved(CatalogPaths.categorySettings(catalogId, categoryId), message, emptyListWarning(form, locale), async, model,
+        String warning = emptyListWarning(form, locale);
+        // Only what this page asked about is reported: a save that finds the category manual already stores nothing.
+        if (turnsManual && saved.becameManaged()) {
+            if (saved.productsIncomplete()) {
+                warning = messageSource.getMessage("catalog.category.type.changed.managed.incomplete", null, locale);
+            } else if (automaticList.isEmpty()) {
+                warning = messageSource.getMessage("catalog.category.type.changed.managed.empty", null, locale);
+            } else if (form.storesDynamicProducts()) {
+                message += " " + messageSource.getMessage("catalog.category.type.changed.managed",
+                        new Object[]{saved.productsCreated()}, locale);
+                if (saved.productsAlreadyInCategory() > 0) {
+                    message += " " + messageSource.getMessage("catalog.category.type.changed.managed.kept",
+                            new Object[]{saved.productsAlreadyInCategory()}, locale);
+                }
+            } else {
+                message += " " + messageSource.getMessage("catalog.category.type.changed.managed.skipped", null, locale);
+            }
+        }
+        return saved(CatalogPaths.categorySettings(catalogId, categoryId), message, warning, async, model,
                 redirectAttributes, request, response, BASICS_FRAGMENT,
                 () -> renderBasics(catalog, category, form, Map.of(), model, locale));
     }
@@ -545,8 +576,28 @@ public class CatalogCategoryController {
                         new Object[]{preview.productsToDelete()}, locale);
     }
 
+    /**
+     * The automatic list of the category, for the page that asks what becomes of it when the category turns manual:
+     * {@code known} when this request has read it already, else read now; null for a manual category, which is asked
+     * nothing.
+     */
+    private List<ManagedCategoryProducts.Candidate> automaticListOf(CategoryDefinition category,
+                                                                    List<ManagedCategoryProducts.Candidate> known) {
+        if (!category.hasType(CategoryDefinitionType.Dynamic)) {
+            return null;
+        }
+        return known != null ? known : dynamicCategoryProducts.candidates(storeId(), category);
+    }
+
+    /** The page without the automatic list: a new category, or the form a successful save re-renders before it navigates. */
     private String renderBasics(ProductCatalog catalog, CategoryDefinition existing, CategoryBasicsForm form,
                                 Map<String, String> errors, Model model, Locale locale) {
+        return renderBasics(catalog, existing, form, errors, model, locale, null);
+    }
+
+    private String renderBasics(ProductCatalog catalog, CategoryDefinition existing, CategoryBasicsForm form,
+                                Map<String, String> errors, Model model, Locale locale,
+                                List<ManagedCategoryProducts.Candidate> automaticList) {
         Store store = storesRepository.findById(storeId());
         List<PimCategoryOptions.CategoryOption> options =
                 pimCategoryOptions.leafOptionsUnder(store.getEnabledCategories(), form.getPimCategoryIds());
@@ -580,6 +631,10 @@ public class CatalogCategoryController {
         List<Product> products = edit && existing.hasType(CategoryDefinitionType.Managed)
                 ? productRepository.findAll(existing.getCategoryId()) : List.of();
         model.addAttribute("managedProductsCount", products.size());
+        if (edit && automaticList != null) {
+            model.addAttribute("dynamicListCount", automaticList.size());
+            model.addAttribute("keptProductsCount", productRepository.labelsOf(existing.getCategoryId()).size());
+        }
         model.addAttribute("labelsOutsideCount", edit && existing.hasGrouping()
                 ? products.stream().filter(product -> !existing.getGroupingOrder().contains(product.getLabel())).count() : 0L);
         model.addAttribute("deleteHref", edit && !existing.isDeletionProtection()

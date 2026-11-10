@@ -23,11 +23,14 @@ import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinitions;
+import pl.commercelink.products.DynamicCategoryProducts;
 import pl.commercelink.products.ManagedCategoryProducts;
 import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
+import pl.commercelink.products.Product;
 import pl.commercelink.inventory.Inventory;
+import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.products.InventoryDefinition;
@@ -102,6 +105,8 @@ class CatalogCategoryControllerTest {
     private MessageSource messageSource;
     @Mock
     private Store store;
+    @Mock
+    private DynamicCategoryProducts dynamicCategoryProducts;
 
     private ProductCatalog catalog;
     private MockMvc mvc;
@@ -121,7 +126,7 @@ class CatalogCategoryControllerTest {
         lenient().when(productRepository.findAll(any(String.class))).thenReturn(List.of());
         lenient().when(messageSource.getMessage(any(String.class), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
         mvc = MockMvcBuilders.standaloneSetup(new CatalogCategoryController(access, definitions, productRepository,
-                storesRepository, pimCategoryOptions, marketplaces, inventory, messageSource)).build();
+                storesRepository, pimCategoryOptions, marketplaces, inventory, messageSource, dynamicCategoryProducts)).build();
     }
 
     @AfterEach
@@ -1004,7 +1009,7 @@ class CatalogCategoryControllerTest {
         CategoryDefinitions real = new CategoryDefinitions(catalogs, productRepository, RetryingOptimisticLockingExecutor.create(),
                 catalogPlacement, mock(ManagedCategoryProducts.class));
         return MockMvcBuilders.standaloneSetup(new CatalogCategoryController(access, real, productRepository,
-                storesRepository, pimCategoryOptions, marketplaces, inventory, messageSource)).build();
+                storesRepository, pimCategoryOptions, marketplaces, inventory, messageSource, dynamicCategoryProducts)).build();
     }
 
     @Test
@@ -1041,5 +1046,187 @@ class CatalogCategoryControllerTest {
         overTheRealExecutor(catalogs).perform(withParams(
                         post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/pricing"), PRICING))
                 .andExpect(status().isNotFound());
+    }
+
+    private static final String BASICS_SAVED = "catalog.category.basics.saved";
+
+    /** An automatic category of the catalog, mapped to a PIM category, whose list holds {@code listed} products. */
+    private CategoryDefinition automaticListing(List<ManagedCategoryProducts.Candidate> listed) {
+        CategoryDefinition gpu = categoryOf("GPU");
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        gpu.setPimCategoryIds(List.of("pim-gpu"));
+        when(dynamicCategoryProducts.candidates(STORE_ID, gpu)).thenReturn(listed);
+        return gpu;
+    }
+
+    private static List<ManagedCategoryProducts.Candidate> twoListed() {
+        return List.of(listed("pim-1", "5900000000001"), listed("pim-2", "5900000000002"));
+    }
+
+    private static ManagedCategoryProducts.Candidate listed(String pimId, String ean) {
+        return new ManagedCategoryProducts.Candidate(new Product("gpu", pimId, ean, null, "MSI", "RTX", "MSI RTX", "Default"),
+                InventoryKey.fromPimIdAndEan(pimId, ean));
+    }
+
+    private static org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder turnManual(CategoryDefinition category) {
+        return post("/dashboard/catalogs/c1/category/" + category.getCategoryId() + "/settings/basics")
+                .param("name", "GPU").param("type", "Managed").param("maxQty", "1").param("pimCategoryIds", "pim-gpu");
+    }
+
+    @Test
+    void turningAnAutomaticCategoryManualWithoutAChoiceIsRefused() throws Exception {
+        // given
+        CategoryDefinition gpu = automaticListing(twoListed());
+
+        // when / then
+        mvc.perform(turnManual(gpu))
+                .andExpect(status().isOk())
+                .andExpect(view().name("catalog/category-basics"))
+                .andExpect(model().attribute("errors", hasEntry("dynamicProducts", "catalog.category.type.managed.choice.required")))
+                .andExpect(model().attribute("dynamicListCount", 2));
+        mvc.perform(turnManual(gpu).header("X-Requested-With", "fetch"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(view().name("catalog/category-basics :: basicsForm"));
+        verify(definitions, never()).saveBasics(any(), any(), any(), any());
+    }
+
+    @Test
+    void storingTheListPassesItsProductsAndSaysHowManyItGot() throws Exception {
+        // given
+        List<ManagedCategoryProducts.Candidate> listed = twoListed();
+        CategoryDefinition gpu = automaticListing(listed);
+        when(definitions.saveBasics(eq(catalog), eq(gpu), any(), eq(listed)))
+                .thenReturn(new CategoryDefinitions.BasicsSaved(true, 2, 0, false));
+
+        // when / then
+        mvc.perform(turnManual(gpu).param("dynamicProducts", "store"))
+                .andExpect(redirectedUrl("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings"))
+                .andExpect(flash().attribute("settingsSavedMessage", BASICS_SAVED + " catalog.category.type.changed.managed"))
+                .andExpect(flash().attributeCount(1));
+    }
+
+    @Test
+    void turningItManualAgainSaysWhichProductsWereAlreadyThere() throws Exception {
+        // given
+        List<ManagedCategoryProducts.Candidate> listed = twoListed();
+        CategoryDefinition gpu = automaticListing(listed);
+        when(definitions.saveBasics(eq(catalog), eq(gpu), any(), eq(listed)))
+                .thenReturn(new CategoryDefinitions.BasicsSaved(true, 1, 3, false));
+
+        // when / then
+        mvc.perform(turnManual(gpu).param("dynamicProducts", "store"))
+                .andExpect(flash().attribute("settingsSavedMessage",
+                        BASICS_SAVED + " catalog.category.type.changed.managed catalog.category.type.changed.managed.kept"));
+    }
+
+    @Test
+    void skippingTheListPassesNoProductsAndSaysSo() throws Exception {
+        // given
+        CategoryDefinition gpu = automaticListing(twoListed());
+        when(definitions.saveBasics(eq(catalog), eq(gpu), any(), eq(List.of())))
+                .thenReturn(new CategoryDefinitions.BasicsSaved(true, 0, 0, false));
+
+        // when / then
+        mvc.perform(turnManual(gpu).param("dynamicProducts", "skip"))
+                .andExpect(flash().attribute("settingsSavedMessage", BASICS_SAVED + " catalog.category.type.changed.managed.skipped"));
+    }
+
+    @Test
+    void anEmptyListNeedsNoChoiceAndWarns() throws Exception {
+        // given
+        CategoryDefinition gpu = automaticListing(List.of());
+        when(definitions.saveBasics(eq(catalog), eq(gpu), any(), eq(List.of())))
+                .thenReturn(new CategoryDefinitions.BasicsSaved(true, 0, 0, false));
+
+        // when / then
+        mvc.perform(turnManual(gpu))
+                .andExpect(flash().attribute("settingsSavedMessage", BASICS_SAVED))
+                .andExpect(flash().attribute("catalogWarning", "catalog.category.type.changed.managed.empty"));
+    }
+
+    @Test
+    void anIncompleteConversionWarnsAndPointsToAddProducts() throws Exception {
+        // given
+        List<ManagedCategoryProducts.Candidate> listed = twoListed();
+        CategoryDefinition gpu = automaticListing(listed);
+        when(definitions.saveBasics(eq(catalog), eq(gpu), any(), eq(listed)))
+                .thenReturn(new CategoryDefinitions.BasicsSaved(true, 0, 0, true));
+
+        // when / then
+        mvc.perform(turnManual(gpu).param("dynamicProducts", "store"))
+                .andExpect(flash().attribute("settingsSavedMessage", BASICS_SAVED))
+                .andExpect(flash().attribute("catalogWarning", "catalog.category.type.changed.managed.incomplete"));
+    }
+
+    @Test
+    void theProductsComeFromTheListTheCategoryHadBeforeTheSave() throws Exception {
+        // given
+        List<ManagedCategoryProducts.Candidate> listed = twoListed();
+        CategoryDefinition gpu = automaticListing(listed);
+        when(definitions.saveBasics(eq(catalog), eq(gpu), any(), eq(listed)))
+                .thenReturn(new CategoryDefinitions.BasicsSaved(true, 2, 0, false));
+
+        // when: the same save moves the category onto another PIM category
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics")
+                .param("name", "GPU").param("type", "Managed").param("maxQty", "1").param("pimCategoryIds", "pim-cpu")
+                .param("dynamicProducts", "store"));
+
+        // then
+        verify(dynamicCategoryProducts).candidates(eq(STORE_ID), argThat(category -> category.getPimCategoryIds().equals(List.of("pim-gpu"))));
+    }
+
+    @Test
+    void theListIsComputedOnceForASave() throws Exception {
+        // given
+        List<ManagedCategoryProducts.Candidate> listed = twoListed();
+        CategoryDefinition gpu = automaticListing(listed);
+        when(definitions.saveBasics(eq(catalog), eq(gpu), any(), eq(listed)))
+                .thenReturn(new CategoryDefinitions.BasicsSaved(true, 2, 0, false));
+
+        // when
+        mvc.perform(turnManual(gpu).param("dynamicProducts", "store").header("X-Requested-With", "fetch"))
+                .andExpect(status().isOk());
+
+        // then
+        verify(dynamicCategoryProducts, times(1)).candidates(any(), any());
+    }
+
+    @Test
+    void aPageThatSawAManualCategoryAsksNothingAndStoresNothing() throws Exception {
+        // given: another tab turned the category automatic after this page was read, so the save turns it manual again
+        CategoryDefinition gpu = categoryOf("GPU");
+        when(definitions.saveBasics(eq(catalog), eq(gpu), any(), eq(List.of())))
+                .thenReturn(new CategoryDefinitions.BasicsSaved(true, 0, 0, false));
+
+        // when / then
+        mvc.perform(turnManual(gpu).param("dynamicProducts", "store"))
+                .andExpect(flash().attribute("settingsSavedMessage", BASICS_SAVED))
+                .andExpect(flash().attributeCount(1));
+        verify(dynamicCategoryProducts, never()).candidates(any(), any());
+    }
+
+    @Test
+    void theBasicsOfAnAutomaticCategoryCountItsList() throws Exception {
+        // given
+        CategoryDefinition gpu = automaticListing(twoListed());
+        when(productRepository.labelsOf(gpu.getCategoryId())).thenReturn(List.of("RTX", "RTX", "GTX"));
+
+        // when / then
+        mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("dynamicListCount", 2))
+                .andExpect(model().attribute("keptProductsCount", 3));
+    }
+
+    @Test
+    void theBasicsOfAManualCategoryDoNotComputeTheAutomaticList() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+
+        // when / then
+        mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics"))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeDoesNotExist("dynamicListCount"));
+        verify(dynamicCategoryProducts, never()).candidates(any(), any());
     }
 }
