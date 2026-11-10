@@ -50,7 +50,6 @@ class ProductRecommendationEngineScopeTest {
         CategoryDefinition definition = new CategoryDefinition().withGeneratedId();
         definition.setPimCategoryIds(new LinkedList<>(List.of("989")));
         InventoryKey key = new InventoryKey(EAN, MFN);
-        when(productRepository.findAll(definition.getCategoryId())).thenReturn(List.of());
         when(inventory.findAllByProductCategoryIds(List.of("989"))).thenReturn(Map.of("989", List.of(matchedInventory)));
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
         when(matchedInventory.getInventoryKey()).thenReturn(key);
@@ -82,7 +81,6 @@ class ProductRecommendationEngineScopeTest {
                 "Intel", "Core i7 (store)", "CPU", null, true, null, null, null, "s1");
         PimEntryIndex index = new PimEntryIndex(List.of(globalEntry, storeEntry), UnaryOperator.identity(), UnaryOperator.identity());
         InventoryKey key = InventoryKey.fromPimEntry(globalEntry);
-        when(productRepository.findAll(definition.getCategoryId())).thenReturn(List.of());
         when(inventory.findAllByProductCategoryIds(List.of("989"))).thenReturn(Map.of("989", List.of(matchedInventory)));
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
         when(matchedInventory.getInventoryKey()).thenReturn(key);
@@ -108,7 +106,6 @@ class ProductRecommendationEngineScopeTest {
                 "Intel", "Core i7 (store)", "CPU", null, true, null, null, null, "s1");
         PimEntryIndex index = new PimEntryIndex(List.of(storeEntry), UnaryOperator.identity(), UnaryOperator.identity());
         MatchedInventory second = org.mockito.Mockito.mock(MatchedInventory.class);
-        when(productRepository.findAll(definition.getCategoryId())).thenReturn(List.of());
         when(inventory.findAllByProductCategoryIds(List.of("989"))).thenReturn(Map.of("989", List.of(matchedInventory, second)));
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
         when(matchedInventory.getInventoryKey()).thenReturn(new InventoryKey(EAN, MFN));
@@ -140,7 +137,6 @@ class ProductRecommendationEngineScopeTest {
                 "Intel", "Core i7", "CPU", null, true, null, null);
         PimEntryIndex index = new PimEntryIndex(List.of(globalEntry), UnaryOperator.identity(), UnaryOperator.identity());
         MatchedInventory cheaper = org.mockito.Mockito.mock(MatchedInventory.class);
-        when(productRepository.findAll(definition.getCategoryId())).thenReturn(List.of());
         when(inventory.findAllByProductCategoryIds(List.of("989"))).thenReturn(Map.of("989", List.of(matchedInventory, cheaper)));
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
         when(matchedInventory.getInventoryKey()).thenReturn(new InventoryKey(EAN, MFN));

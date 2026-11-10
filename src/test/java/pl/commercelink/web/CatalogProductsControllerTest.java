@@ -522,7 +522,7 @@ class CatalogProductsControllerTest {
         when(recommendation.getAlternativeEans()).thenReturn(List.of("1", "2"));
         when(recommendation.getAlternativeProductCodes()).thenReturn(List.of("MFN-1"));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        when(recommendationEngine.getRecommendations(any(), eq(gpu), eq(inventoryView))).thenReturn(List.of(recommendation));
+        when(recommendationEngine.getRecommendationsNotInCategory(any(), eq(gpu), eq(inventoryView))).thenReturn(List.of(recommendation));
         when(supplierLabels.forStoreId(STORE_ID)).thenReturn(supplierLabelMap);
         when(supplierLabelMap.of("Acme")).thenReturn("Acme Parts");
 
@@ -553,7 +553,7 @@ class CatalogProductsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("hasMapping", false))
                 .andExpect(model().attribute("rows", List.of()));
-        verify(recommendationEngine, never()).getRecommendations(any(), any(), any());
+        verify(recommendationEngine, never()).getRecommendationsNotInCategory(any(), any(), any());
         verify(inventory, never()).withEnabledSuppliersOnly(anyString());
         verify(supplierLabels, never()).forStoreId(anyString());
     }

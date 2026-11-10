@@ -229,7 +229,7 @@ public class CatalogProductsController {
         List<RecommendationRow> rows = List.of();
         if (category.hasCategoryMapping()) {
             SupplierLabelMap labels = supplierLabels.forStoreId(storeId());
-            rows = recommendationEngine.getRecommendations(pimCatalog.withStoreData(storeId()), category, inventory.withEnabledSuppliersOnly(storeId())).stream()
+            rows = recommendationEngine.getRecommendationsNotInCategory(pimCatalog.withStoreData(storeId()), category, inventory.withEnabledSuppliersOnly(storeId())).stream()
                     .map(recommendation -> RecommendationRow.of(recommendation, catalogId, categoryId, labels::of))
                     .toList();
         }
