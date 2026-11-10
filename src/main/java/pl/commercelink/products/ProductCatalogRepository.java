@@ -1,6 +1,7 @@
 package pl.commercelink.products;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import org.springframework.stereotype.Component;
@@ -19,6 +20,11 @@ public class ProductCatalogRepository extends DynamoDbRepository<ProductCatalog>
 
     public ProductCatalog findById(String storeId, String catalogId) {
         return dynamoDBMapper.load(ProductCatalog.class, storeId, catalogId);
+    }
+
+    /** As {@link #findById}, with a strongly consistent read: a write acknowledged a moment ago is already seen. */
+    public ProductCatalog findByIdConsistently(String storeId, String catalogId) {
+        return dynamoDBMapper.load(ProductCatalog.class, storeId, catalogId, DynamoDBMapperConfig.ConsistentReads.CONSISTENT.config());
     }
 
     public List<ProductCatalog> findAll(String storeId) {

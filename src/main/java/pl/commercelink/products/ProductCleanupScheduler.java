@@ -1,8 +1,7 @@
 package pl.commercelink.products;
 
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import io.awspring.cloud.sqs.annotation.SqsListener;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -11,9 +10,10 @@ import pl.commercelink.stores.StoresRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Objects;
 
 @Component
+@RequiredArgsConstructor
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
 public class ProductCleanupScheduler {
 
@@ -23,15 +23,6 @@ public class ProductCleanupScheduler {
 
     @Value("${product.cleanup.days:7}")
     private int cleanupDays;
-
-    @Autowired
-    public ProductCleanupScheduler(ProductCatalogRepository productCatalogRepository, 
-                                   ProductRepository productRepository,
-                                   StoresRepository storesRepository) {
-        this.productCatalogRepository = productCatalogRepository;
-        this.productRepository = productRepository;
-        this.storesRepository = storesRepository;
-    }
 
     @SqsListener(
             value = "product-cleanup-queue",
@@ -44,21 +35,35 @@ public class ProductCleanupScheduler {
         List<Store> stores = storesRepository.findAll();
         for (Store store : stores) {
             List<ProductCatalog> catalogs = productCatalogRepository.findAll(store.getStoreId());
-            
+
             for (ProductCatalog catalog : catalogs) {
                 List<CategoryDefinition> categoriesToCleanup = catalog.getCategories().stream()
-                        .filter(category -> category.getType() == CategoryDefinitionType.Dynamic)
-                        .filter(category -> category.getTypeChangedAt() != null)
-                        .filter(category -> category.getTypeChangedAt().isBefore(thresholdDate))
-                        .collect(Collectors.toList());
-                
+                        .filter(category -> isPastRetention(category, thresholdDate))
+                        .toList();
+
                 for (CategoryDefinition category : categoriesToCleanup) {
+                    // Products first, then the category again: a switch to manual saves the type before it stores the
+                    // products, so a product read here that the switch stored is always seen with the manual type below.
                     List<Product> productsToDelete = productRepository.findAll(category.getCategoryId());
-                    if (!productsToDelete.isEmpty()) {
+                    if (!productsToDelete.isEmpty() && stillPastRetention(catalog, category, thresholdDate)) {
                         productRepository.delete(productsToDelete);
                     }
                 }
             }
         }
+    }
+
+    /** The run's read of the catalogs may be minutes old by now: the category could have turned manual or been removed. */
+    private boolean stillPastRetention(ProductCatalog catalog, CategoryDefinition category, LocalDateTime thresholdDate) {
+        ProductCatalog fresh = productCatalogRepository.findByIdConsistently(catalog.getStoreId(), catalog.getCatalogId());
+        return fresh != null && fresh.getCategories().stream()
+                .filter(current -> Objects.equals(current.getCategoryId(), category.getCategoryId()))
+                .anyMatch(current -> isPastRetention(current, thresholdDate));
+    }
+
+    private static boolean isPastRetention(CategoryDefinition category, LocalDateTime thresholdDate) {
+        return category.getType() == CategoryDefinitionType.Dynamic
+                && category.getTypeChangedAt() != null
+                && category.getTypeChangedAt().isBefore(thresholdDate);
     }
 }
