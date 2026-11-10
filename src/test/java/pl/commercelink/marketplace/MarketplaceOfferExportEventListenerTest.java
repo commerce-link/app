@@ -35,6 +35,7 @@ import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
@@ -212,6 +213,24 @@ class MarketplaceOfferExportEventListenerTest {
             assertThat(offer.productId()).isEqualTo("source-S");
             assertThat(offer.quantity()).isZero();
         });
+    }
+
+    @Test
+    void anAutomaticCategoryIsLeftOutOfTheExportAndItsOffersAreRemoved() {
+        // given: the category turned automatic; its products stay in the table only for a return to manual
+        Product product = product("pim-A", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        catalog.getCategories().get(0).setType(CategoryDefinitionType.Dynamic);
+        priceFor(product, 100, 2);
+        previousSnapshotContains(MarketplaceOfferSnapshot.published("pim-A", 100L, 10L, "EAN-A", "MFN-pim-A"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(capturePublishedOffers()).isEmpty();
+        assertThat(captureRemovedOffers()).extracting(MarketplaceOffer::productId).containsExactly("pim-A");
+        verify(productRepository, never()).findAllProductsWithPimId(CATEGORY_ID, true);
     }
 
     @Test

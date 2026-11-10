@@ -12,6 +12,7 @@ import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistFinder;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
@@ -111,6 +112,29 @@ class LinkOfferProductsControllerTest {
                 product("p2", null, "brak kodu", "Kubek", "DMW-KB1"),
                 product("p3", null, "2001000000029:2001000000036", "Lampka", "DMW-LN1")));
         when(pricelistFinder.newestPricelist(STORE_ID, CATALOG_ID)).thenReturn(Pricelist.empty());
+
+        // when
+        List<LinkOfferProduct> products = controller.products(CATALOG_ID);
+
+        // then
+        assertThat(products).extracting(LinkOfferProduct::productId).containsExactly("p1");
+    }
+
+    @Test
+    void leavesOutTheProductsLeftInAnAutomaticCategory() {
+        // given: an automatic category keeps the products of its manual days only for a return to manual
+        ProductCatalog catalog = catalog();
+        CategoryDefinition automatic = new CategoryDefinition();
+        automatic.setCategoryId("cat-auto");
+        automatic.setName("Automatyczna");
+        automatic.setType(CategoryDefinitionType.Dynamic);
+        catalog.setCategories(List.of(catalog.getCategories().get(0), automatic));
+        Product leftOver = new Product("cat-auto", "pim-left", "5900000000059", "DMW-L1", "Domowik", "Domowik", "Zostawiony", "Default");
+        leftOver.setProductId("p9");
+        when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
+        when(productRepository.findAll(catalog)).thenReturn(List.of(
+                product("p1", "pim-kettle", "5900000000011", "Czajnik", "DMW-CZ17"), leftOver));
+        when(pricelistFinder.newestPricelist(STORE_ID, CATALOG_ID)).thenReturn(new Pricelist("p1", List.of()));
 
         // when
         List<LinkOfferProduct> products = controller.products(CATALOG_ID);

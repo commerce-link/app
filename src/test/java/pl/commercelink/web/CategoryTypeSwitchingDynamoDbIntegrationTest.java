@@ -15,22 +15,36 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import pl.commercelink.externaloffers.ExternalOfferLinkRepository;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.invoicing.api.Price;
+import pl.commercelink.marketplace.MarketplaceExportRun;
+import pl.commercelink.marketplace.MarketplaceExportRunService;
+import pl.commercelink.marketplace.MarketplaceOfferExportEventListener;
+import pl.commercelink.marketplace.MarketplaceOfferExportRequest;
+import pl.commercelink.marketplace.MarketplaceOfferSnapshot;
+import pl.commercelink.marketplace.MarketplaceProviderFactory;
+import pl.commercelink.marketplace.api.MarketplaceOffer;
+import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimEntryIndex;
 import pl.commercelink.pim.api.PimIdentifier;
 import pl.commercelink.pim.api.PimIdentifierType;
+import pl.commercelink.pricelist.AvailabilityAndPrice;
+import pl.commercelink.pricelist.Pricelist;
+import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.CategoryDefinitions;
 import pl.commercelink.products.DynamicCategoryProducts;
 import pl.commercelink.products.ManagedCategoryProducts;
+import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
@@ -42,6 +56,7 @@ import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.SupplierScope;
 import pl.commercelink.taxonomy.Taxonomy;
@@ -63,11 +78,14 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -95,7 +113,9 @@ class CategoryTypeSwitchingDynamoDbIntegrationTest {
 
     private ProductRepository products;
     private ProductCatalogRepository catalogs;
+    private Store store;
     private StoresRepository stores;
+    private PimCatalog pim;
     private Inventory inventory;
     private ResourceBundleMessageSource messages;
     private CategoryDefinitions definitions;
@@ -136,7 +156,7 @@ class CategoryTypeSwitchingDynamoDbIntegrationTest {
         products = new ProductRepository(client);
         catalogs = new ProductCatalogRepository(client);
 
-        Store store = mock(Store.class);
+        store = mock(Store.class);
         when(store.getStoreId()).thenReturn(storeId);
         stores = mock(StoresRepository.class);
         when(stores.findAll()).thenReturn(List.of(store));
@@ -147,9 +167,11 @@ class CategoryTypeSwitchingDynamoDbIntegrationTest {
         inventory = mock(Inventory.class);
         when(inventory.withEnabledSuppliersAndWarehouseData(storeId, SupplierScope.PRICING)).thenReturn(view);
         when(inventory.withEnabledSuppliersOnly(storeId)).thenReturn(view);
-        PimCatalog pim = mock(PimCatalog.class);
+        pim = mock(PimCatalog.class);
         when(pim.withStoreData(any())).thenAnswer(call -> new PimEntryIndex(entries, UnaryOperator.identity(),
                 UnaryOperator.identity()).forStore(call.getArgument(0)));
+        when(pim.withGlobalData()).thenAnswer(call -> new PimEntryIndex(entries, UnaryOperator.identity(),
+                UnaryOperator.identity()).global());
 
         CatalogPlacement placement = mock(CatalogPlacement.class);
         dynamicCategoryProducts = new DynamicCategoryProducts(engineOver(products), pim, inventory);
@@ -345,6 +367,29 @@ class CategoryTypeSwitchingDynamoDbIntegrationTest {
         assertThat(typeOfCategory()).isEqualTo(CategoryDefinitionType.Managed);
         assertThat(inCategory()).extracting(Product::getPimId).containsExactlyInAnyOrder("pim-1", "pim-2");
         assertThat(productOf("pim-1").getName()).isEqualTo("Moja karta");
+    }
+
+    @Test
+    void anAutomaticCategoryLeavesTheMarketplaceAndComesBackWhenManualAgain() throws Exception {
+        // given: a manual category exported to Allegro, one of the offered cards stored in it
+        categoryOf(CategoryDefinitionType.Managed);
+        exportedTo("Allegro");
+        offers(offer("pim-1", "5901000000011", "MSI RTX 5060"), offer("pim-2", "5901000000028", "MSI RTX 5070"));
+        stored("pim-1", "5901000000011", product -> product.setName("Moja karta"));
+        MarketplaceExport allegro = marketplaceExport("Allegro");
+
+        // when: one export run per state, the automatic one with both cards priced on the price list
+        ExportRun whileManual = allegro.run();
+        save("Dynamic", null);
+        ExportRun whileAutomatic = allegro.run();
+        save("Managed", "skip");
+        ExportRun manualAgain = allegro.run();
+
+        // then: the products kept for a return to manual are not the automatic category's offers
+        assertThat(whileManual.published()).containsExactly("pim-1");
+        assertThat(whileAutomatic.published()).isEmpty();
+        assertThat(whileAutomatic.removed()).containsExactly("pim-1");
+        assertThat(manualAgain.published()).containsExactly("pim-1");
     }
 
     @Test
@@ -663,6 +708,87 @@ class CategoryTypeSwitchingDynamoDbIntegrationTest {
                 ProductRecommendationEngine.class.getDeclaredConstructor(ProductRepository.class);
         constructor.setAccessible(true);
         return constructor.newInstance(products);
+    }
+
+    // --- the marketplace export over the same tables ------------------------------------------------------------------
+
+    private record ExportRun(List<String> published, List<String> removed) {
+    }
+
+    /** One marketplace's offer export, run as the export queue runs it, each run starting from the one before. */
+    private final class MarketplaceExport {
+
+        private final MarketplaceOfferExportEventListener listener;
+        private final MarketplaceProvider provider;
+        private final String marketplace;
+
+        private MarketplaceExport(MarketplaceOfferExportEventListener listener, MarketplaceProvider provider, String marketplace) {
+            this.listener = listener;
+            this.provider = provider;
+            this.marketplace = marketplace;
+        }
+
+        ExportRun run() {
+            List<String> published = new ArrayList<>();
+            List<String> removed = new ArrayList<>();
+            doAnswer(call -> {
+                published.addAll(offerIdsOf(call.getArgument(0)));
+                removed.addAll(offerIdsOf(call.getArgument(1)));
+                return null;
+            }).when(provider).exportOffers(any(), any(), any());
+            listener.handleMessage(new MarketplaceOfferExportRequest(marketplace, storeId, catalogId, "pricelist"));
+            return new ExportRun(published, removed);
+        }
+
+        private static List<String> offerIdsOf(List<MarketplaceOffer> offers) {
+            return offers.stream().map(MarketplaceOffer::productId).toList();
+        }
+    }
+
+    private void exportedTo(String marketplace) {
+        ProductCatalog catalog = catalogs.findById(storeId, catalogId);
+        MarketplaceDefinition definition = new MarketplaceDefinition(marketplace, 1.0, 0, 0, 0, 0, 1);
+        definition.setEnabled(true);
+        catalog.findCategoryDefinition(categoryId).getMarketplaceDefinitions().add(definition);
+        catalogs.save(catalog);
+    }
+
+    /**
+     * The real export over the test's tables and PIM. Stand-ins: the price list (every offered card priced, as both an
+     * automatic and a manual category price it), the warehouse stock, the marketplace and the stored history of runs.
+     */
+    private MarketplaceExport marketplaceExport(String marketplace) {
+        when(store.hasActiveMarketplaceIntegration(marketplace)).thenReturn(true);
+        MatchedInventory stock = mock(MatchedInventory.class);
+        when(stock.atPricePoint(anyLong())).thenReturn(stock);
+        when(stock.getTotalAvailableQtyFromSupplier(SupplierRegistry.WAREHOUSE)).thenReturn(5L);
+        InventoryView exportView = mock(InventoryView.class);
+        when(exportView.findByProduct(any())).thenReturn(stock);
+        when(inventory.withEnabledSuppliersAndWarehouseData(storeId)).thenReturn(exportView);
+        PricelistRepository pricelists = mock(PricelistRepository.class);
+        when(pricelists.find(storeId, catalogId, "pricelist")).thenAnswer(call -> new Pricelist("pricelist", entries.stream()
+                .map(entry -> new AvailabilityAndPrice(entry.pimId(), entry.primaryGtin().orElse(null), null, "MSI", "Karta",
+                        entry.name(), "Karty graficzne", 1000L, 5L, 2, 1000L, false))
+                .toList()));
+        MarketplaceProvider provider = mock(MarketplaceProvider.class);
+        MarketplaceProviderFactory providers = mock(MarketplaceProviderFactory.class);
+        when(providers.get(store, marketplace)).thenReturn(provider);
+        AtomicReference<List<MarketplaceOfferSnapshot>> previousRun = new AtomicReference<>(List.of());
+        MarketplaceExportRunService runs = mock(MarketplaceExportRunService.class);
+        when(runs.loadPreviousExport(storeId, catalogId, marketplace)).thenAnswer(call -> previousRun.get());
+        doAnswer(call -> {
+            previousRun.set(call.getArgument(0, MarketplaceExportRun.class).toRows());
+            return null;
+        }).when(runs).saveRun(any());
+        StoreActivity activity = mock(StoreActivity.class);
+        when(activity.isActive(store)).thenReturn(true);
+        ExternalOfferLinkRepository links = mock(ExternalOfferLinkRepository.class);
+        when(links.findAll(storeId, marketplace)).thenReturn(List.of());
+        MarketplaceOfferExportEventListener listener = new MarketplaceOfferExportEventListener(stores, catalogs, products,
+                pricelists, inventory, providers, runs, activity, new StorePimAliases(pim), links);
+        ReflectionTestUtils.setField(listener, "removalRetryCount", 3);
+        ReflectionTestUtils.setField(listener, "unknownEntryMaxWaitingRuns", 3);
+        return new MarketplaceExport(listener, provider, marketplace);
     }
 
     // --- the inventory and the PIM the automatic list is computed from -------------------------------------------------

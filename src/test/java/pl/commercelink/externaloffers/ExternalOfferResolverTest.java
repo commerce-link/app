@@ -9,6 +9,7 @@ import pl.commercelink.externaloffers.ResolvedOffer.Source;
 import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
@@ -286,6 +287,22 @@ class ExternalOfferResolverTest {
         assertThat(foreign).isEmpty();
         verify(products, never()).findAll(anyString());
         verify(products, never()).findByProductId(eq("other-store-category"), anyString());
+    }
+
+    @Test
+    void aProductLeftInAnAutomaticCategoryCannotBeChosenForALink() {
+        // given
+        CategoryDefinition automatic = category("c2", "Automatyczna");
+        automatic.setType(CategoryDefinitionType.Dynamic);
+        storeCatalogs(catalog("a", category("c1", "Krzesła"), automatic));
+        ExternalOfferResolver.StoreOffers offers = resolver.forStore(STORE);
+
+        // when
+        Optional<Product> leftOver = offers.catalogProduct("c2", "p1");
+
+        // then
+        assertThat(leftOver).isEmpty();
+        verify(products, never()).findByProductId(eq("c2"), anyString());
     }
 
     @Test
