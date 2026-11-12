@@ -1,5 +1,6 @@
 package pl.commercelink.orders;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -8,6 +9,7 @@ import pl.commercelink.orders.fulfilment.AutomatedOrderFulfilment;
 import pl.commercelink.orders.fulfilment.ManualWarehouseItemFulfilment;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
+import pl.commercelink.products.information.PimEntryRequester;
 import pl.commercelink.stores.Store;
 import pl.commercelink.warehouse.api.Reservation;
 import pl.commercelink.warehouse.api.ReservationRemovalItem;
@@ -26,6 +28,7 @@ import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Component
 public class OrdersManager {
 
@@ -49,6 +52,8 @@ public class OrdersManager {
     private DropshipItemLookup dropshipItemLookup;
     @Autowired
     private OrderNotificationsEventPublisher notificationEventPublisher;
+    @Autowired
+    private PimEntryRequester pimEntryRequester;
 
     /**
      * Places the drafts in the order in the given sequence: a product joins the last item of its
@@ -88,6 +93,8 @@ public class OrdersManager {
         ordersRepository.save(order);
 
         automatedOrderFulfilment.run(order.getStoreId(), added);
+
+        requestPimEntries(order.getStoreId(), added);
     }
 
     private int positionFor(List<OrderItem> items, OrderItem orderItem) {
@@ -489,7 +496,22 @@ public class OrdersManager {
         orderLifecycle.update(order);
 
         orderFulfilmentEventPublisher.publish(order.getStoreId(), order.getOrderId());
+
+        requestPimEntries(order.getStoreId(), orderItems);
         return true;
+    }
+
+    // Last step of saving new items: it must never change the outcome of the save.
+    private void requestPimEntries(String storeId, Collection<OrderItem> items) {
+        try {
+            pimEntryRequester.requestMissingEntriesByEan(storeId, OrderItemPimEans.of(items));
+        } catch (RuntimeException e) {
+            Throwable root = e;
+            while (root.getCause() != null && root.getCause() != root) {
+                root = root.getCause();
+            }
+            log.warn("PIM entry request for the new items of store {} failed: {}", storeId, root.getMessage());
+        }
     }
 
     public static class Result {
