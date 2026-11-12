@@ -217,6 +217,20 @@ class PimEntryRequesterTest {
     }
 
     @Test
+    void nullOrderEansAreTreatedAsNone() {
+        // given
+        RecordingExecutor executor = new RecordingExecutor();
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "prod", executor);
+
+        // when
+        assertThatCode(() -> requester.requestMissingEntriesByEan(STORE_ID, null)).doesNotThrowAnyException();
+
+        // then
+        assertThat(executor.tasks).isEmpty();
+        verifyNoInteractions(pimCatalog);
+    }
+
+    @Test
     void emptyBatchIsNotHandedToTheExecutor() {
         // given
         RecordingExecutor executor = new RecordingExecutor();
@@ -562,6 +576,40 @@ class PimEntryRequesterTest {
                     .contains("order EANs")
                     .contains(ORDER_EAN)
                     .doesNotContain("sweeper");
+        }
+        verify(pimCatalog, never()).submit(orderRequest(ORDER_EAN));
+    }
+
+    @Test
+    void shutdownWithOnlyOrderEansLeftLogsNoCatalogLine() throws InterruptedException {
+        // given
+        CompletableFuture<Void> sqs = new CompletableFuture<>();
+        CountDownLatch firstSendStarted = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            firstSendStarted.countDown();
+            sqs.join();
+            return null;
+        }).when(pimCatalog).submit(orderRequest(SECOND_ORDER_EAN));
+        ThreadPoolExecutor worker = PimEntryRequester.newWorker();
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "prod", worker, Duration.ofMillis(50));
+        requester.requestMissingEntriesByEan(STORE_ID, List.of(SECOND_ORDER_EAN));
+        requester.requestMissingEntriesByEan(STORE_ID, List.of(ORDER_EAN));
+        assertThat(firstSendStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+        try (CapturedLogs logs = CapturedLogs.of(PimEntryRequester.class)) {
+            // when
+            requester.shutdown();
+            sqs.complete(null);
+
+            // then
+            assertThat(worker.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(logs.warnings()).hasSize(1);
+            assertThat(logs.warnings().get(0)).asString()
+                    .contains("order EANs")
+                    .contains(SECOND_ORDER_EAN)
+                    .contains(ORDER_EAN)
+                    .doesNotContain("sweeper")
+                    .doesNotContain("products left");
         }
         verify(pimCatalog, never()).submit(orderRequest(ORDER_EAN));
     }

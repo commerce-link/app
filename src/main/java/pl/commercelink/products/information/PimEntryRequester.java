@@ -92,7 +92,8 @@ public class PimEntryRequester {
 
     /**
      * Spring destroys this bean before the PIM catalog and the SQS client it depends on, so the queued batches
-     * can still be sent while waiting here. What is left after the wait is reported and left to the sweeper.
+     * can still be sent while waiting here. What is left after the wait is reported: catalog products are left to the
+     * sweeper, order EANs are logged with their EANs because nothing re-sends them.
      */
     @PreDestroy
     void shutdown() {
@@ -158,11 +159,14 @@ public class PimEntryRequester {
 
     /**
      * Asks the PIM for the entries of products sold in an order, by EAN alone; the EANs are expected to be valid
-     * already. Returns without waiting for the sends and never throws. Unlike a catalog product, a dropped request
+     * already; a null collection is treated like an empty one. Returns without waiting for the sends and never throws. Unlike a catalog product, a dropped request
      * is not sent again by anything, so every failure is logged with the EANs.
      */
     public void requestMissingEntriesByEan(String storeId, Collection<String> eans) {
         if (!"prod".equals(env)) {
+            return;
+        }
+        if (eans == null) {
             return;
         }
         List<String> pending = eans.stream().filter(StringUtils::isNotBlank).toList();

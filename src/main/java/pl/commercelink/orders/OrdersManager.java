@@ -2,6 +2,7 @@ package pl.commercelink.orders;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
@@ -506,11 +507,8 @@ public class OrdersManager {
         try {
             pimEntryRequester.requestMissingEntriesByEan(storeId, OrderItemPimEans.of(items));
         } catch (RuntimeException e) {
-            Throwable root = e;
-            while (root.getCause() != null && root.getCause() != root) {
-                root = root.getCause();
-            }
-            log.warn("PIM entry request for the new items of store {} failed: {}", storeId, root.getMessage());
+            log.warn("PIM entry request for the new items of store {} failed: {}", storeId,
+                    ExceptionUtils.getRootCauseMessage(e));
         }
     }
 

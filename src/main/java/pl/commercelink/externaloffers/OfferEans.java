@@ -47,7 +47,11 @@ public final class OfferEans {
         return isValid(unified) ? unified : null;
     }
 
-    /** The GTIN check digit: a typo in one digit, or most swaps of two neighbours, gives another last digit. */
+    /**
+     * The GTIN check digit: a typo in one digit, or most swaps of two neighbours, gives another last digit.
+     * The argument must be a non-empty string of ASCII digits (an empty string throws, other characters give a
+     * meaningless result); callers check the {@linkplain #isValid format} first.
+     */
     public static boolean hasValidCheckDigit(String digits) {
         int sum = 0;
         for (int i = digits.length() - 2, weight = 3; i >= 0; i--, weight = 4 - weight) {
