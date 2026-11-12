@@ -40,6 +40,7 @@ import pl.commercelink.products.ProductRecommendation;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.brand.BrandMapper;
+import pl.commercelink.products.information.PimEntryRequester;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -124,6 +125,7 @@ public class CatalogProductsController {
     private final OptimisticLockingExecutor optimisticLockingExecutor;
     private final CatalogPlacement catalogPlacement;
     private final ProductsAddReview review;
+    private final PimEntryRequester pimEntryRequester;
 
     /**
      * Raised for the review form, whose list grows to one entry per selected proposal; Spring stops at 256 by default
@@ -400,6 +402,7 @@ public class CatalogProductsController {
             product.setBrand(brandMapper.unifyBrand(entry.brand()));
         });
         productRepository.save(product);
+        pimEntryRequester.requestMissingEntry(storeId(), product);
         catalogPlacement.evict(storeId());
         return saved(CatalogPaths.category(catalogId, categoryId) + currentFilter.query(),
                 messageSource.getMessage("product.added", new Object[]{product.getName()}, locale), async, model,
@@ -493,6 +496,7 @@ public class CatalogProductsController {
                     Map.of(PRODUCT_FORM, "product.conflict"), null, currentFilter, model, locale);
             return async ? PRODUCT_FRAGMENT : view;
         }
+        pimEntryRequester.requestMissingEntry(storeId(), product);
         // An edit may change the codes the inventory's "W katalogu" compares.
         catalogPlacement.evict(storeId());
         return saved(CatalogPaths.category(catalogId, categoryId) + currentFilter.query(),

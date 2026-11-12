@@ -3,10 +3,12 @@ package pl.commercelink.products;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.InventoryKey;
+import pl.commercelink.products.information.PimEntryRequester;
 import pl.commercelink.products.information.StorePimAliases;
 
 import java.util.ArrayList;
@@ -17,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -31,6 +35,7 @@ class ManagedCategoryProductsTest {
     @Mock private ProductRepository productRepository;
     @Mock private CatalogPlacement catalogPlacement;
     @Mock private StorePimAliases pimAliases;
+    @Mock private PimEntryRequester pimEntryRequester;
 
     @InjectMocks
     private ManagedCategoryProducts managedCategoryProducts;
@@ -120,7 +125,29 @@ class ManagedCategoryProductsTest {
     }
 
     @Test
-    void leavesTheCatalogPlacementWhenNothingWasAdded() {
+    void asksThePimAfterAllTheWritesAboutTheProductsItStoredOnly() {
+        // given
+        when(productRepository.findAll(CATEGORY_ID)).thenReturn(List.of(product(null, "5900000000001")));
+        ManagedCategoryProducts.Candidate held = candidate(null, InventoryKey.fromEan("5900000000001"));
+        ManagedCategoryProducts.Candidate first = candidate(null, InventoryKey.fromEan("5900000000002"));
+        ManagedCategoryProducts.Candidate storedMeanwhile = candidate(null, InventoryKey.fromEan("5900000000003"));
+        ManagedCategoryProducts.Candidate second = candidate(null, InventoryKey.fromEan("5900000000004"));
+        // lenient: the other candidates are saved through the same method with other arguments
+        lenient().doThrow(new ConditionalCheckFailedException("stored by the other request")).when(productRepository)
+                .save(storedMeanwhile.product());
+
+        // when
+        managedCategoryProducts.addMissing(STORE_ID, CATEGORY_ID, List.of(held, first, storedMeanwhile, second));
+
+        // then
+        InOrder order = inOrder(productRepository, catalogPlacement, pimEntryRequester);
+        order.verify(productRepository).save(second.product());
+        order.verify(catalogPlacement).evict(STORE_ID);
+        order.verify(pimEntryRequester).requestMissingEntries(STORE_ID, List.of(first.product(), second.product()));
+    }
+
+    @Test
+    void leavesTheCatalogPlacementAndThePimAloneWhenNothingWasAdded() {
         // given
         when(productRepository.findAll(CATEGORY_ID)).thenReturn(List.of(product(null, "5900000000001")));
 
@@ -131,6 +158,7 @@ class ManagedCategoryProductsTest {
         // then
         assertThat(added).isEqualTo(new ManagedCategoryProducts.Added(0, 1));
         verify(catalogPlacement, never()).evict(any());
+        verify(pimEntryRequester, never()).requestMissingEntries(any(), any());
     }
 
     @Test

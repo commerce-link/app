@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.products.filters.InventoryFilterType;
+import pl.commercelink.products.information.PimEntryRequester;
 import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.starter.dynamodb.Metadata;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
@@ -47,6 +48,8 @@ class CategoryDefinitionsTest {
     private ManagedCategoryProducts managedCategoryProducts;
     @Mock
     private StorePimAliases pimAliases;
+    @Mock
+    private PimEntryRequester pimEntryRequester;
     @InjectMocks
     private CategoryDefinitions definitions;
 
@@ -421,7 +424,7 @@ class CategoryDefinitionsTest {
         ManagedCategoryProducts.Candidate sameEntry = candidate("pim-1", "5900000000001");
         ManagedCategoryProducts.Candidate missing = candidate("pim-2", "5900000000002");
         CategoryDefinitions withRealStore = new CategoryDefinitions(catalogs, products, optimisticLockingExecutor, placement,
-                new ManagedCategoryProducts(products, placement, pimAliases));
+                new ManagedCategoryProducts(products, placement, pimAliases, pimEntryRequester));
 
         // when
         CategoryDefinitions.BasicsSaved saved = withRealStore.saveBasics(catalog, gpu, managedBasics(), List.of(sameEntry, missing));

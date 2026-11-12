@@ -4,7 +4,6 @@ import org.junit.jupiter.api.BeforeEach;
 import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -16,8 +15,15 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.products.information.PimEntryRequester;
+import pl.commercelink.products.information.StorePimAliases;
+import org.mockito.ArgumentCaptor;
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
+import java.util.Collection;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.ManagedCategoryProducts;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductRepository;
@@ -32,7 +38,12 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,7 +61,9 @@ class ProductsAddReviewTest {
     @Mock private BrandMapper brandMapper;
     @Mock private MessageSource messageSource;
     @Mock private CatalogPlacement catalogPlacement;
-    @InjectMocks private ProductsAddReview review;
+    @Mock private StorePimAliases pimAliases;
+    @Mock private PimEntryRequester pimEntryRequester;
+    private ProductsAddReview review;
 
     @org.junit.jupiter.api.BeforeEach
     void pimStoreViewIsTheCatalog() {
@@ -63,6 +76,8 @@ class ProductsAddReviewTest {
 
     @BeforeEach
     void setUp() {
+        review = new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, pimAliases,
+                new ManagedCategoryProducts(productRepository, catalogPlacement, pimAliases, pimEntryRequester));
         gpu = new CategoryDefinition().withName("GPU").withGeneratedId();
         gpu.setPriceDefinitions(new ArrayList<>(List.of(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"),
                 new PriceDefinition(1.0, 0, 0, 0, 0, "Premium"))));
@@ -143,6 +158,86 @@ class ProductsAddReviewTest {
         // then
         assertThat(prepared.form().getProducts().get(0).getLabel()).isEqualTo("Anything");
         assertThat(prepared.resetRows()).isZero();
+    }
+
+    @Test
+    void savedRowsWithoutAPimEntryAreRequestedFromThePim() {
+        // given
+        ProductsBulkAddForm form = twoRows();
+
+        // when
+        review.save(STORE_ID, gpu, form);
+
+        // then
+        List<Product> requested = requested();
+        assertThat(requested).extracting(Product::getEan).containsExactlyInAnyOrder("1", "2");
+        assertThat(requested).extracting(Product::getPimId).containsOnlyNulls();
+    }
+
+    @Test
+    void savedRowThatJoinedAPimEntryIsLeftToTheRequesterToSkip() {
+        // given
+        PimEntry known = new PimEntry("pim-1", List.of(), "Brand", "MSI RTX 5070", "GPU", null, true, 1000, 1200);
+        when(pimView.findByGtin("1")).thenReturn(Optional.of(known));
+        when(pimView.findByGtin("2")).thenReturn(Optional.empty());
+
+        // when
+        review.save(STORE_ID, gpu, twoRows());
+
+        // then
+        assertThat(requested()).filteredOn(p -> "1".equals(p.getEan())).extracting(Product::getPimId).containsExactly("pim-1");
+    }
+
+    @Test
+    void rowsSkippedAsDuplicatesAreNotRequested() {
+        // given
+        when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
+                new Product(gpu.getCategoryId(), "pim", "1", "M-1", "MSI", "l", "MSI RTX 5070", "Default")));
+
+        // when
+        review.save(STORE_ID, gpu, twoRows());
+
+        // then
+        assertThat(requested()).extracting(Product::getEan).containsExactly("2");
+    }
+
+    @Test
+    void rowThatLostTheRaceIsNotRequested() {
+        // given
+        doThrow(new ConditionalCheckFailedException("lost")).when(productRepository)
+                .save(argThat((Product p) -> p != null && "1".equals(p.getEan())));
+
+        // when
+        review.save(STORE_ID, gpu, twoRows());
+
+        // then
+        assertThat(requested()).extracting(Product::getEan).containsExactly("2");
+    }
+
+    @Test
+    void nothingAddedAsksNothingOfThePim() {
+        // given
+        when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
+                new Product(gpu.getCategoryId(), "pim", "1", "M-1", "MSI", "l", "MSI RTX 5070", "Default"),
+                new Product(gpu.getCategoryId(), "pim", "2", "M-2", "ASUS", "l", "ASUS RTX 5060", "Default")));
+
+        // when
+        review.save(STORE_ID, gpu, twoRows());
+
+        // then
+        verify(pimEntryRequester, never()).requestMissingEntries(any(), any());
+    }
+
+    private ProductsBulkAddForm twoRows() {
+        return edited(row("1", "MSI RTX 5070", "1", "M-1", "MSI RTX 5070", "Default"),
+                row("2", "ASUS RTX 5060", "2", "M-2", "ASUS RTX 5060", "Default"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Product> requested() {
+        ArgumentCaptor<Collection<Product>> captor = ArgumentCaptor.forClass(Collection.class);
+        verify(pimEntryRequester).requestMissingEntries(eq(STORE_ID), captor.capture());
+        return new ArrayList<>(captor.getValue());
     }
 
     private void product(String ean, String name) {

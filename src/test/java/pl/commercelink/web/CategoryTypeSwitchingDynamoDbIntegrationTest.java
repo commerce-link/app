@@ -53,6 +53,7 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductCleanupScheduler;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.products.information.PimEntryRequester;
 import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.Store;
@@ -176,7 +177,8 @@ class CategoryTypeSwitchingDynamoDbIntegrationTest {
         CatalogPlacement placement = mock(CatalogPlacement.class);
         dynamicCategoryProducts = new DynamicCategoryProducts(engineOver(products), pim, inventory);
         definitions = new CategoryDefinitions(catalogs, products, executor, placement,
-                new ManagedCategoryProducts(products, placement, new StorePimAliases(pim)));
+                new ManagedCategoryProducts(products, placement, new StorePimAliases(pim),
+                        mock(PimEntryRequester.class)));
         messages = new ResourceBundleMessageSource();
         messages.setBasename("messages");
         messages.setDefaultEncoding("UTF-8");

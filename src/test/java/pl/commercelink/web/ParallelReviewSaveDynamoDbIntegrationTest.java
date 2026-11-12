@@ -30,6 +30,7 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.brand.BrandMapper;
+import pl.commercelink.products.information.PimEntryRequester;
 import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.security.model.CustomUser;
@@ -174,11 +175,13 @@ class ParallelReviewSaveDynamoDbIntegrationTest {
         MessageSource messageSource = mock(MessageSource.class);
         CatalogPlacement placement = mock(CatalogPlacement.class);
         StorePimAliases aliases = new StorePimAliases(pimCatalog);
+        PimEntryRequester pimEntryRequester = mock(PimEntryRequester.class);
         return new CatalogProductsController(access, products, mock(StoresRepository.class),
                 mock(ProductRecommendationEngine.class), inventory, mock(MarketplaceConnections.class),
                 mock(PimCategoryOptions.class), mock(SupplierLabels.class), pimCatalog, brandMapper,
                 messageSource, mock(OptimisticLockingExecutor.class), placement,
                 new ProductsAddReview(products, inventory, pimCatalog, brandMapper, messageSource, aliases,
-                        new ManagedCategoryProducts(products, placement, aliases)));
+                        new ManagedCategoryProducts(products, placement, aliases, pimEntryRequester)),
+                pimEntryRequester);
     }
 }

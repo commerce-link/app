@@ -24,6 +24,7 @@ import pl.commercelink.products.ManagedCategoryProducts;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.brand.BrandMapper;
+import pl.commercelink.products.information.PimEntryRequester;
 import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
@@ -52,6 +53,7 @@ class ProductsAddReviewScopeTest {
     @Mock private PimCatalog brandList;
     @Mock private MessageSource messageSource;
     @Mock private CatalogPlacement catalogPlacement;
+    @Mock private PimEntryRequester pimEntryRequester;
 
     private ProductsAddReview review(PimCatalog catalog) {
         BrandMapper brandMapper = new BrandMapper(brandList);
@@ -68,7 +70,7 @@ class ProductsAddReviewScopeTest {
         when(view.findByEan(EAN)).thenReturn(matched);
         StorePimAliases aliases = new StorePimAliases(catalog);
         return new ProductsAddReview(productRepository, inventory, catalog, brandMapper, messageSource, aliases,
-                new ManagedCategoryProducts(productRepository, catalogPlacement, aliases));
+                new ManagedCategoryProducts(productRepository, catalogPlacement, aliases, pimEntryRequester));
     }
 
     private static PimCatalog catalog() {

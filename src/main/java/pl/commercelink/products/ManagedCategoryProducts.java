@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.InventoryKey;
+import pl.commercelink.products.information.PimEntryRequester;
 import pl.commercelink.products.information.StorePimAliases;
 
 import java.util.ArrayList;
@@ -18,7 +19,8 @@ import java.util.stream.Collectors;
  * Stores products in a manual category, leaving out what the category already holds: a product its key matches (the
  * same pim id or a shared EAN), or one on the candidate's PIM entry, its clone or its source. The price list keys a
  * category's products by pim id, so one PIM entry is one product of the category. What a call stores guards the
- * candidates after it in the same way.
+ * candidates after it in the same way, and the PIM is asked at once for the entries of the stored products it may not
+ * know yet ({@link PimEntryRequester}).
  */
 @Component
 @RequiredArgsConstructor
@@ -35,6 +37,7 @@ public class ManagedCategoryProducts {
     private final ProductRepository productRepository;
     private final CatalogPlacement catalogPlacement;
     private final StorePimAliases pimAliases;
+    private final PimEntryRequester pimEntryRequester;
 
     public Added addMissing(String storeId, String categoryId, List<Candidate> candidates) {
         return addMissing(storeId, categoryId, candidates, product -> {
@@ -54,7 +57,7 @@ public class ManagedCategoryProducts {
                 .map(Product::getPimId)
                 .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toCollection(HashSet::new));
-        int added = 0;
+        List<Product> stored = new ArrayList<>();
         for (Candidate candidate : candidates) {
             if (keysInCategory.stream().anyMatch(candidate.key()::matches)) {
                 continue;
@@ -66,7 +69,7 @@ public class ManagedCategoryProducts {
             }
             try {
                 productRepository.save(candidate.product());
-                added++;
+                stored.add(candidate.product());
             } catch (ConditionalCheckFailedException e) {
                 // A parallel request stored this very product first under the same id (the same review sent twice):
                 // the category has it, exactly as if the read above had found it, so it guards the next candidates.
@@ -76,10 +79,13 @@ public class ManagedCategoryProducts {
                 pimIdsInCategory.add(pimId);
             }
         }
-        if (added > 0) {
+        if (!stored.isEmpty()) {
             catalogPlacement.evict(storeId);
+            // after all the writes, so the requests do not interleave with the saves; the requester decides which
+            // products need one
+            pimEntryRequester.requestMissingEntries(storeId, stored);
         }
-        return new Added(added, inCategory.size());
+        return new Added(stored.size(), inCategory.size());
     }
 
     private boolean holdsAny(Set<String> pimIds, String storeId, String pimId) {

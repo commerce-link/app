@@ -5,7 +5,7 @@ import pl.commercelink.products.CategoryDefinitionType;
 
 class PimQueuePriorityCalculator {
 
-    private static final int MAX_VALUE = 100;
+    static final int MAX_VALUE = 100;
     private static final int PROVIDER_COUNT_WEIGHT = 5;
     private static final int AVAILABILITY_WEIGHT = 1;
 

@@ -1,7 +1,6 @@
 package pl.commercelink.products.information;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.Inventory;
@@ -86,18 +85,9 @@ class PIMIndexEventScheduler {
 
         PimView pim = pimCatalog.withStoreData(storeId);
         return products.stream()
-                .filter(product -> !isKnown(pim, product))
+                .filter(product -> !PimEntryRequester.isKnown(pim, brandMapper, product))
                 .map(p -> toPimEntryRequest(storeId, categoryDefinition.getType(), p))
                 .collect(Collectors.toList());
-    }
-
-    private boolean isKnown(PimView pim, Product product) {
-        if (StringUtils.isBlank(product.getBrand())) {
-            return pim.findByGtin(product.getEan()).isPresent();
-        }
-        // pim-api compares brands without aliases, and PIM stores the unified name
-        return pim.findByGtinOrMpnAndBrand(product.getEan(), product.getManufacturerCode(),
-                brandMapper.unifyBrand(product.getBrand())).isPresent();
     }
 
     private PimEntryRequest toPimEntryRequest(String storeId, CategoryDefinitionType catalogType, Product p) {
