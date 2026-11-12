@@ -1,8 +1,5 @@
 package pl.commercelink.products.information;
 
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -18,6 +15,7 @@ import pl.commercelink.products.brand.BrandMapper;
 import jakarta.annotation.PreDestroy;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -29,21 +27,25 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Asks the PIM for a product's entry right after the product is saved in a catalog, instead of
- * waiting for the periodic {@link PIMIndexEventScheduler} sweep, which stays the safety net for
- * anything missed here. Requests go out with the highest priority, as for a managed catalog.
+ * Asks the PIM for a product's entry from two sources: a product saved in a catalog, and a product sold in an
+ * order. Requests go out with the highest priority, as for a managed catalog.
  * <p>
- * A product the PIM already knows by manufacturer code and brand is skipped: a request would change
+ * A catalog product the PIM already knows by manufacturer code and brand is skipped: a request would change
  * nothing, because {@code PimCatalogRegistry.attachEntryToProducts} pins entries to products by EAN only.
+ * That rule belongs to the catalog only; an order EAN is checked by the EAN alone, and requested with the EAN alone.
  * Does nothing outside {@code application.env=prod}. A failure never reaches the caller.
  * <p>
- * Both paths are asynchronous. Every request is a blocking SQS send with no time limit of its own, so on the
+ * Both sources are asynchronous. Every request is a blocking SQS send with no time limit of its own, so on the
  * request thread an SQS degradation would hold the operator's save until the SDK gives up (two minutes measured
  * locally, longer than the load balancer timeout), and thousands of products in a bulk add could exceed that
  * timeout even when SQS is healthy. A single product and a whole batch are handed alike to a single daemon
  * worker (batches stay ordered and the PIM is not hit in parallel) with a bounded queue of
- * {@value #QUEUE_CAPACITY} batches. A batch that finds the queue full is dropped with a warning; the sweeper
- * sends those products later, so a dropped batch loses nothing.
+ * {@value #QUEUE_CAPACITY} batches, shared by both sources.
+ * <p>
+ * The periodic {@link PIMIndexEventScheduler} sweep is the safety net for catalog products only: a catalog batch
+ * that finds the queue full is dropped with a warning and the sweeper sends those products later. Nothing re-sends
+ * a request for an order EAN, so a dropped order batch is logged with its EANs, the only trace from which they can
+ * be requested by hand.
  */
 @Component
 @Slf4j
@@ -57,7 +59,7 @@ public class PimEntryRequester {
     private final String env;
     private final Executor executor;
     private final Duration shutdownWait;
-    private volatile Batch inProgress;
+    private volatile Batch<?> inProgress;
 
     @Autowired
     public PimEntryRequester(PimCatalog pimCatalog, BrandMapper brandMapper, @Value("${application.env:}") String env) {
@@ -90,7 +92,8 @@ public class PimEntryRequester {
 
     /**
      * Spring destroys this bean before the PIM catalog and the SQS client it depends on, so the queued batches
-     * can still be sent while waiting here. What is left after the wait is reported and left to the sweeper.
+     * can still be sent while waiting here. What is left after the wait is reported: catalog products are left to the
+     * sweeper, order EANs are logged with their EANs because nothing re-sends them.
      */
     @PreDestroy
     void shutdown() {
@@ -105,13 +108,33 @@ public class PimEntryRequester {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        int queued = service.shutdownNow().stream()
-                .mapToInt(task -> task instanceof Batch batch ? batch.getProducts().size() : 0)
-                .sum();
+        List<Batch<?>> unsent = new ArrayList<>();
+        for (Runnable task : service.shutdownNow()) {
+            if (task instanceof Batch<?> batch) {
+                unsent.add(batch);
+            }
+        }
         // the interrupt stops the running batch after its current send, which itself cannot be interrupted
-        Batch running = inProgress;
-        int unfinished = running == null ? 0 : running.unfinished();
-        log.warn("PIM entry requests not sent before shutdown: {} products left to the sweeper", queued + unfinished);
+        Batch<?> running = inProgress;
+        if (running != null) {
+            unsent.add(running);
+        }
+        int catalogProducts = 0;
+        List<String> orderEans = new ArrayList<>();
+        for (Batch<?> batch : unsent) {
+            if (batch instanceof OrderBatch order) {
+                orderEans.addAll(order.unfinishedItems());
+            } else {
+                catalogProducts += batch.unfinishedItems().size();
+            }
+        }
+        if (catalogProducts > 0 || orderEans.isEmpty()) {
+            log.warn("PIM entry requests not sent before shutdown: {} products left to the sweeper", catalogProducts);
+        }
+        if (!orderEans.isEmpty()) {
+            log.warn("PIM entry requests not sent before shutdown: order EANs {} not requested; nothing will resend them",
+                    orderEans);
+        }
     }
 
     /** Returns without waiting for the send; see the class comment for why. */
@@ -131,17 +154,33 @@ public class PimEntryRequester {
         if (pending.isEmpty()) {
             return;
         }
-        Batch batch = new Batch(storeId, pending);
+        hand(new CatalogBatch(storeId, pending));
+    }
+
+    /**
+     * Asks the PIM for the entries of products sold in an order, by EAN alone; the EANs are expected to be valid
+     * already; a null collection is treated like an empty one. Returns without waiting for the sends and never throws. Unlike a catalog product, a dropped request
+     * is not sent again by anything, so every failure is logged with the EANs.
+     */
+    public void requestMissingEntriesByEan(String storeId, Collection<String> eans) {
+        if (!"prod".equals(env)) {
+            return;
+        }
+        if (eans == null) {
+            return;
+        }
+        List<String> pending = eans.stream().filter(StringUtils::isNotBlank).toList();
+        if (pending.isEmpty()) {
+            return;
+        }
+        hand(new OrderBatch(storeId, pending));
+    }
+
+    private void hand(Batch<?> batch) {
         try {
             executor.execute(batch);
         } catch (RejectedExecutionException e) {
-            if (executor instanceof ExecutorService service && service.isShutdown()) {
-                log.warn("Application is shutting down, {} products of store {} left to the sweeper for a PIM entry request",
-                        pending.size(), storeId);
-            } else {
-                log.warn("PIM entry request queue is full, dropping a batch of {} products for store {}; the sweeper will send them",
-                        pending.size(), storeId);
-            }
+            batch.logRejected(executor instanceof ExecutorService service && service.isShutdown());
         }
     }
 
@@ -149,33 +188,100 @@ public class PimEntryRequester {
         return StringUtils.isBlank(product.getPimId()) && StringUtils.isNotBlank(product.getEan());
     }
 
-    /** A named task rather than a lambda, so {@link #shutdown()} can count the products it leaves unsent. */
-    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-    private final class Batch implements Runnable {
-        private final String storeId;
-        @Getter
-        private final List<Product> products;
+    /** A named task rather than a lambda, so {@link #shutdown()} can list the items it leaves unsent. */
+    private abstract class Batch<T> implements Runnable {
+        final String storeId;
+        private final List<T> items;
         private final AtomicInteger started = new AtomicInteger();
+
+        Batch(String storeId, List<T> items) {
+            this.storeId = storeId;
+            this.items = items;
+        }
+
+        abstract void send(T item);
+
+        abstract void logRejected(boolean shuttingDown);
+
+        List<T> items() {
+            return items;
+        }
 
         @Override
         public void run() {
             inProgress = this;
             try {
-                for (Product product : products) {
+                for (T item : items) {
                     if (Thread.currentThread().isInterrupted()) {
                         return;
                     }
                     started.incrementAndGet();
-                    sendIfMissing(storeId, product);
+                    send(item);
                 }
             } finally {
                 inProgress = null;
             }
         }
 
-        /** The product being sent counts as unfinished: its send may still fail after the warning is logged. */
-        int unfinished() {
-            return Math.min(products.size(), products.size() - started.get() + 1);
+        /** The item being sent counts as unfinished: its send may still fail after the warning is logged. */
+        List<T> unfinishedItems() {
+            return items.subList(Math.max(0, started.get() - 1), items.size());
+        }
+    }
+
+    private final class CatalogBatch extends Batch<Product> {
+        CatalogBatch(String storeId, List<Product> products) {
+            super(storeId, products);
+        }
+
+        @Override
+        void send(Product product) {
+            sendIfMissing(storeId, product);
+        }
+
+        @Override
+        void logRejected(boolean shuttingDown) {
+            if (shuttingDown) {
+                log.warn("Application is shutting down, {} products of store {} left to the sweeper for a PIM entry request",
+                        items().size(), storeId);
+            } else {
+                log.warn("PIM entry request queue is full, dropping a batch of {} products for store {}; the sweeper will send them",
+                        items().size(), storeId);
+            }
+        }
+    }
+
+    private final class OrderBatch extends Batch<String> {
+        OrderBatch(String storeId, List<String> eans) {
+            super(storeId, eans);
+        }
+
+        @Override
+        void send(String ean) {
+            sendOrderEanIfMissing(storeId, ean);
+        }
+
+        @Override
+        void logRejected(boolean shuttingDown) {
+            if (shuttingDown) {
+                log.warn("Application is shutting down, order EANs {} of store {} not requested from PIM; nothing will resend them",
+                        items(), storeId);
+            } else {
+                log.warn("PIM entry request queue is full, dropping order EANs {} of store {}; nothing will resend them",
+                        items(), storeId);
+            }
+        }
+    }
+
+    private void sendOrderEanIfMissing(String storeId, String ean) {
+        try {
+            if (pimCatalog.withStoreData(storeId).findByGtin(ean).isPresent()) {
+                return;
+            }
+            pimCatalog.submit(new PimEntryRequest(ean, null, null, PimQueuePriorityCalculator.MAX_VALUE));
+        } catch (RuntimeException e) {
+            log.warn("Could not request PIM entry for store {}, order EAN {}: {}",
+                    storeId, ean, ExceptionUtils.getRootCauseMessage(e));
         }
     }
 

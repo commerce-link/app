@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
+import pl.commercelink.products.information.PimEntryRequester;
 
 import java.util.List;
 import java.util.Set;
@@ -29,6 +30,7 @@ class OrdersManagerBulkResultTest {
     @Mock private OrderItemsRepository orderItemsRepository;
     @Mock private OrderLifecycle orderLifecycle;
     @Mock private DropshipItemLookup dropshipItemLookup;
+    @Mock private PimEntryRequester pimEntryRequester;
 
     @InjectMocks
     private OrdersManager ordersManager;

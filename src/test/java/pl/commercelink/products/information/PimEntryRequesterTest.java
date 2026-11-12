@@ -19,6 +19,7 @@ import pl.commercelink.products.brand.BrandMapper;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -47,6 +48,8 @@ class PimEntryRequesterTest {
     private static final String EAN = "4719331361699";
     private static final String SECOND_EAN = "5901234567890";
     private static final String THIRD_EAN = "5901234567891";
+    private static final String ORDER_EAN = "5901234123457";
+    private static final String SECOND_ORDER_EAN = "4006381333931";
 
     @Mock
     private PimCatalog pimCatalog;
@@ -207,6 +210,20 @@ class PimEntryRequesterTest {
 
         // when
         requester.requestMissingEntries(STORE_ID, List.of(product(null, EAN, "MFN-1", "MSI")));
+
+        // then
+        assertThat(executor.tasks).isEmpty();
+        verifyNoInteractions(pimCatalog);
+    }
+
+    @Test
+    void nullOrderEansAreTreatedAsNone() {
+        // given
+        RecordingExecutor executor = new RecordingExecutor();
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "prod", executor);
+
+        // when
+        assertThatCode(() -> requester.requestMissingEntriesByEan(STORE_ID, null)).doesNotThrowAnyException();
 
         // then
         assertThat(executor.tasks).isEmpty();
@@ -388,5 +405,212 @@ class PimEntryRequesterTest {
             assertThat(logs.warnings()).singleElement().asString().contains("shutting down");
         }
         verify(pimCatalog, never()).submit(any());
+    }
+
+    private static PimEntryRequest orderRequest(String ean) {
+        return new PimEntryRequest(ean, null, null, 100);
+    }
+
+    @Test
+    void unknownOrderEanIsRequestedWithTheEanAlone() {
+        // when
+        requester("prod").requestMissingEntriesByEan(STORE_ID, List.of(ORDER_EAN));
+
+        // then
+        verify(pimCatalog).submit(orderRequest(ORDER_EAN));
+    }
+
+    @Test
+    void orderEanThePimKnowsIsNotRequested() {
+        // given
+        when(pimView.findByGtin(ORDER_EAN)).thenReturn(Optional.of(mock(PimEntry.class)));
+
+        // when
+        requester("prod").requestMissingEntriesByEan(STORE_ID, List.of(ORDER_EAN));
+
+        // then
+        verify(pimCatalog, never()).submit(any());
+    }
+
+    @Test
+    void orderEansAskNothingOfThePimOutsideProd() {
+        // given
+        RecordingExecutor executor = new RecordingExecutor();
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "localhost", executor);
+
+        // when
+        requester.requestMissingEntriesByEan(STORE_ID, List.of(ORDER_EAN));
+
+        // then
+        assertThat(executor.tasks).isEmpty();
+        verifyNoInteractions(pimCatalog);
+    }
+
+    @Test
+    void blankOrderEansAreDroppedAndAnEmptyBatchIsNotHandedToTheExecutor() {
+        // given
+        RecordingExecutor executor = new RecordingExecutor();
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "prod", executor);
+
+        // when
+        requester.requestMissingEntriesByEan(STORE_ID, Arrays.asList(null, "", "  "));
+
+        // then
+        assertThat(executor.tasks).isEmpty();
+    }
+
+    @Test
+    void orderEansAreHandedToTheExecutorAndNotSentOnTheCallersThread() {
+        // given
+        RecordingExecutor executor = new RecordingExecutor();
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "prod", executor);
+        List<String> eans = new ArrayList<>(List.of(ORDER_EAN, SECOND_ORDER_EAN));
+
+        // when
+        requester.requestMissingEntriesByEan(STORE_ID, eans);
+        eans.clear();
+
+        // then
+        verify(pimCatalog, never()).submit(any());
+        assertThat(executor.tasks).hasSize(1);
+
+        // when
+        executor.tasks.get(0).run();
+
+        // then
+        verify(pimCatalog).submit(orderRequest(ORDER_EAN));
+        verify(pimCatalog).submit(orderRequest(SECOND_ORDER_EAN));
+    }
+
+    @Test
+    void failureForOneOrderEanDoesNotStopTheRest() {
+        // given
+        doThrow(new IllegalStateException("boom")).when(pimCatalog).submit(orderRequest(ORDER_EAN));
+
+        // when / then
+        assertThatCode(() -> requester("prod").requestMissingEntriesByEan(STORE_ID, List.of(ORDER_EAN, SECOND_ORDER_EAN)))
+                .doesNotThrowAnyException();
+        verify(pimCatalog).submit(orderRequest(SECOND_ORDER_EAN));
+    }
+
+    @Test
+    void failedOrderRequestIsLoggedWithItsEanAndWithoutACategory() {
+        // given
+        doThrow(new IllegalStateException("boom")).when(pimCatalog).submit(orderRequest(ORDER_EAN));
+
+        // when
+        try (CapturedLogs logs = CapturedLogs.of(PimEntryRequester.class)) {
+            requester("prod").requestMissingEntriesByEan(STORE_ID, List.of(ORDER_EAN));
+
+            // then
+            assertThat(logs.warnings()).singleElement().asString()
+                    .contains("order EAN " + ORDER_EAN)
+                    .doesNotContain("category");
+        }
+    }
+
+    @Test
+    void orderBatchRejectedByAFullQueueIsLoggedWithItsEansAndPromisesNoSweeper() {
+        // given
+        Executor rejecting = task -> {
+            throw new RejectedExecutionException("queue full");
+        };
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "prod", rejecting);
+
+        // when / then
+        try (CapturedLogs logs = CapturedLogs.of(PimEntryRequester.class)) {
+            assertThatCode(() -> requester.requestMissingEntriesByEan(STORE_ID, List.of(ORDER_EAN, SECOND_ORDER_EAN)))
+                    .doesNotThrowAnyException();
+            assertThat(logs.warnings()).singleElement().asString()
+                    .contains(ORDER_EAN)
+                    .contains(SECOND_ORDER_EAN)
+                    .contains("nothing will resend them")
+                    .doesNotContain("sweeper");
+        }
+    }
+
+    @Test
+    void orderBatchAfterShutdownIsLoggedWithItsEansAndPromisesNoSweeper() {
+        // given
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "prod", PimEntryRequester.newWorker());
+        requester.shutdown();
+
+        // when / then
+        try (CapturedLogs logs = CapturedLogs.of(PimEntryRequester.class)) {
+            assertThatCode(() -> requester.requestMissingEntriesByEan(STORE_ID, List.of(ORDER_EAN)))
+                    .doesNotThrowAnyException();
+            assertThat(logs.warnings()).singleElement().asString()
+                    .contains("shutting down")
+                    .contains(ORDER_EAN)
+                    .doesNotContain("sweeper");
+        }
+        verify(pimCatalog, never()).submit(any());
+    }
+
+    @Test
+    void shutdownReportsUnsentOrderEansOnTheirOwnLine() throws InterruptedException {
+        // given
+        CompletableFuture<Void> sqs = new CompletableFuture<>();
+        CountDownLatch firstSendStarted = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            firstSendStarted.countDown();
+            sqs.join();
+            return null;
+        }).when(pimCatalog).submit(new PimEntryRequest(EAN, "MFN-1", "MSI", 100));
+        ThreadPoolExecutor worker = PimEntryRequester.newWorker();
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "prod", worker, Duration.ofMillis(50));
+        requester.requestMissingEntry(STORE_ID, product(null, EAN, "MFN-1", "MSI"));
+        requester.requestMissingEntriesByEan(STORE_ID, List.of(ORDER_EAN));
+        assertThat(firstSendStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+        try (CapturedLogs logs = CapturedLogs.of(PimEntryRequester.class)) {
+            // when
+            requester.shutdown();
+            sqs.complete(null);
+
+            // then
+            assertThat(worker.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(logs.warnings()).hasSize(2);
+            assertThat(logs.warnings().get(0)).asString().contains("1 products left to the sweeper");
+            assertThat(logs.warnings().get(1)).asString()
+                    .contains("order EANs")
+                    .contains(ORDER_EAN)
+                    .doesNotContain("sweeper");
+        }
+        verify(pimCatalog, never()).submit(orderRequest(ORDER_EAN));
+    }
+
+    @Test
+    void shutdownWithOnlyOrderEansLeftLogsNoCatalogLine() throws InterruptedException {
+        // given
+        CompletableFuture<Void> sqs = new CompletableFuture<>();
+        CountDownLatch firstSendStarted = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            firstSendStarted.countDown();
+            sqs.join();
+            return null;
+        }).when(pimCatalog).submit(orderRequest(SECOND_ORDER_EAN));
+        ThreadPoolExecutor worker = PimEntryRequester.newWorker();
+        PimEntryRequester requester = new PimEntryRequester(pimCatalog, brandMapper, "prod", worker, Duration.ofMillis(50));
+        requester.requestMissingEntriesByEan(STORE_ID, List.of(SECOND_ORDER_EAN));
+        requester.requestMissingEntriesByEan(STORE_ID, List.of(ORDER_EAN));
+        assertThat(firstSendStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+        try (CapturedLogs logs = CapturedLogs.of(PimEntryRequester.class)) {
+            // when
+            requester.shutdown();
+            sqs.complete(null);
+
+            // then
+            assertThat(worker.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(logs.warnings()).hasSize(1);
+            assertThat(logs.warnings().get(0)).asString()
+                    .contains("order EANs")
+                    .contains(SECOND_ORDER_EAN)
+                    .contains(ORDER_EAN)
+                    .doesNotContain("sweeper")
+                    .doesNotContain("products left");
+        }
+        verify(pimCatalog, never()).submit(orderRequest(ORDER_EAN));
     }
 }

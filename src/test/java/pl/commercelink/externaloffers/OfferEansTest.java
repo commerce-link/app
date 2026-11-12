@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Arrays;
@@ -120,5 +121,55 @@ class OfferEansTest {
 
         // then
         assertThat(unified).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"5901234123457", "4006381333931", "96385074", "730143315289", "15901234123454"})
+    void unifyCheckedKeepsAnEanWithAValidCheckDigit(String ean) {
+        // when
+        String checked = OfferEans.unifyChecked(ean);
+
+        // then
+        assertThat(checked).isEqualTo(ean);
+    }
+
+    @Test
+    void unifyCheckedReturnsTheUnifiedSpelling() {
+        // when
+        String checked = OfferEans.unifyChecked(" 05901234123457 ");
+
+        // then
+        assertThat(checked).isEqualTo(OfferEans.unifyValid(" 05901234123457 "));
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "  ", "5901234123458", "12345678", "2222222222222", "ABC-123", "#590123", "5901234123457:4006381333931"})
+    void unifyCheckedRejectsWhatIsNotAnEanOfAProduct(String code) {
+        // when
+        String checked = OfferEans.unifyChecked(code);
+
+        // then
+        assertThat(checked).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"100000597", "1234567895", "12345678905"})
+    void unifyCheckedRejectsANumberOfNoGtinLengthEvenWithAMatchingCheckDigit(String code) {
+        // when
+        String checked = OfferEans.unifyChecked(code);
+
+        // then
+        assertThat(checked).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"2000000000015", "0200000000004", "0412345678903", "20123451", "01234565"})
+    void unifyCheckedRejectsACodeAStoreAssignsItself(String code) {
+        // when
+        String checked = OfferEans.unifyChecked(code);
+
+        // then
+        assertThat(checked).isNull();
     }
 }

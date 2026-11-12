@@ -47,6 +47,55 @@ public final class OfferEans {
         return isValid(unified) ? unified : null;
     }
 
+    /**
+     * The GTIN check digit: a typo in one digit, or most swaps of two neighbours, gives another last digit.
+     * The argument must be a non-empty string of ASCII digits (an empty string throws, other characters give a
+     * meaningless result); callers check the {@linkplain #isValid format} first.
+     */
+    public static boolean hasValidCheckDigit(String digits) {
+        int sum = 0;
+        for (int i = digits.length() - 2, weight = 3; i >= 0; i--, weight = 4 - weight) {
+            sum += (digits.charAt(i) - '0') * weight;
+        }
+        return (10 - sum % 10) % 10 == digits.charAt(digits.length() - 1) - '0';
+    }
+
+    /**
+     * The EAN unified, or null unless it is also the code of a real product: it has the {@linkplain #isValid format}
+     * and a GTIN length, a matching check digit, more than one distinct digit (a repeated digit is a placeholder that
+     * happens to pass the check), and is not a code for restricted circulation. For codes that go out to other
+     * systems unreviewed: about one in ten numeric manufacturer codes passes the check digit by chance, and only the
+     * length tells it apart.
+     */
+    public static String unifyChecked(String ean) {
+        String unified = unifyValid(ean);
+        if (unified == null || !GTIN_LENGTHS.contains(unified.length()) || !hasValidCheckDigit(unified)
+                || unified.chars().distinct().count() < 2 || isRestrictedCirculation(unified)) {
+            return null;
+        }
+        return unified;
+    }
+
+    // unifyEan strips leading zeros down to 12 digits only, so 9 to 11 digits are never a GTIN
+    private static final Set<Integer> GTIN_LENGTHS = Set.of(8, 12, 13, 14);
+
+    /**
+     * GS1 leaves these prefixes to a store's own codes (weighed goods, in-store labels, coupons): no product catalogue
+     * knows them. EAN-8 starting with 0 or 2; as a GTIN-13 (a 12-digit code with its leading zero back, a GTIN-14
+     * without its packaging indicator) starting with 2, 02 or 04.
+     */
+    private static boolean isRestrictedCirculation(String unified) {
+        if (unified.length() == 8) {
+            return unified.charAt(0) == '0' || unified.charAt(0) == '2';
+        }
+        String gtin13 = switch (unified.length()) {
+            case 12 -> "0" + unified;
+            case 14 -> unified.substring(1);
+            default -> unified;
+        };
+        return gtin13.charAt(0) == '2' || gtin13.startsWith("02") || gtin13.startsWith("04");
+    }
+
     /** The EANs unified, without the ones that are not {@linkplain #isValid valid}, each once, in their order. */
     public static List<String> validUnified(Collection<String> eans) {
         if (eans == null) {

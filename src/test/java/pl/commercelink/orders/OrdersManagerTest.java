@@ -19,6 +19,7 @@ import pl.commercelink.orders.fulfilment.ManualWarehouseItemFulfilment;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
+import pl.commercelink.products.information.PimEntryRequester;
 import pl.commercelink.stores.Store;
 import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
@@ -35,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -45,6 +47,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -81,6 +84,8 @@ class OrdersManagerTest {
     private DropshipItemLookup dropshipItemLookup;
     @Mock
     private OrderNotificationsEventPublisher notificationEventPublisher;
+    @Mock
+    private PimEntryRequester pimEntryRequester;
 
     @InjectMocks
     private OrdersManager ordersManager;
@@ -111,6 +116,118 @@ class OrdersManagerTest {
         assertThat(saved).isFalse();
         verify(ordersRepository, never()).save(any(Order.class));
         verify(orderFulfilmentEventPublisher, never()).publish(any(), any());
+    }
+
+    @Test
+    void saveWithFulfilmentAsksThePimForTheEansOfTheSavedItems() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+
+        // when
+        ordersManager.saveWithFulfilment(order, List.of(productWithSku("5901234123457"), productWithSku("4006381333931")));
+
+        // then
+        verify(pimEntryRequester).requestMissingEntriesByEan(STORE_ID, List.of("5901234123457", "4006381333931"));
+    }
+
+    @Test
+    void saveWithFulfilmentAsksThePimAfterEverythingElse() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        List<OrderItem> items = List.of(productWithSku("5901234123457"));
+
+        // when
+        ordersManager.saveWithFulfilment(order, items);
+
+        // then
+        InOrder inOrder = inOrder(orderItemsRepository, orderLifecycle, orderFulfilmentEventPublisher, pimEntryRequester);
+        inOrder.verify(orderItemsRepository).batchSave(items);
+        inOrder.verify(orderLifecycle).update(order);
+        inOrder.verify(orderFulfilmentEventPublisher).publish(STORE_ID, ORDER_ID);
+        inOrder.verify(pimEntryRequester).requestMissingEntriesByEan(eq(STORE_ID), any());
+    }
+
+    @Test
+    void refusedDuplicateOrderAsksNothingOfThePim() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        order.setExternalOrderId("mp-1");
+        when(ordersRepository.findByStoreIdAndExternalOrderId(STORE_ID, "mp-1")).thenReturn(new Order(STORE_ID));
+
+        // when
+        boolean saved = ordersManager.saveWithFulfilment(order, List.of(productWithSku("5901234123457")));
+
+        // then
+        assertThat(saved).isFalse();
+        verifyNoInteractions(pimEntryRequester);
+    }
+
+    @Test
+    void saveWithFulfilmentSucceedsWhenThePimRequestFails() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        doThrow(new IllegalStateException("boom")).when(pimEntryRequester).requestMissingEntriesByEan(any(), any());
+
+        // when
+        boolean saved = ordersManager.saveWithFulfilment(order, List.of(productWithSku("5901234123457")));
+
+        // then
+        assertThat(saved).isTrue();
+        verify(orderFulfilmentEventPublisher).publish(STORE_ID, ORDER_ID);
+    }
+
+    @Test
+    void addOrderItemsAsksThePimOnlyForTheItemsItAdded() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        when(store.isPositionConsolidationEnabled()).thenReturn(false);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(productWithSku("4006381333931")));
+
+        // when
+        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(matchedInventory, "5901234123457", 1)));
+
+        // then
+        verify(pimEntryRequester).requestMissingEntriesByEan(STORE_ID, List.of("5901234123457"));
+    }
+
+    @Test
+    void addOrderItemsAsksThePimAfterTheFulfilmentRun() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        when(store.isPositionConsolidationEnabled()).thenReturn(false);
+
+        // when
+        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(matchedInventory, "5901234123457", 1)));
+
+        // then
+        InOrder inOrder = inOrder(automatedOrderFulfilment, pimEntryRequester);
+        inOrder.verify(automatedOrderFulfilment).run(eq(STORE_ID), any());
+        inOrder.verify(pimEntryRequester).requestMissingEntriesByEan(eq(STORE_ID), any());
+    }
+
+    @Test
+    void addOrderItemsSucceedsWhenThePimRequestFails() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        when(store.isPositionConsolidationEnabled()).thenReturn(false);
+        doThrow(new IllegalStateException("boom")).when(pimEntryRequester).requestMissingEntriesByEan(any(), any());
+
+        // when / then
+        assertThatCode(() -> ordersManager.addOrderItems(store, order,
+                List.of(OrderItemDraft.of(matchedInventory, "5901234123457", 1)))).doesNotThrowAnyException();
+        verify(automatedOrderFulfilment).run(eq(STORE_ID), any());
+    }
+
+    @Test
+    void addOrderItemsWithoutDraftsAsksNothingOfThePim() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+
+        // when
+        ordersManager.addOrderItems(store, order, List.of());
+
+        // then
+        verifyNoInteractions(pimEntryRequester);
     }
 
     @Test
@@ -1456,6 +1573,10 @@ class OrdersManagerTest {
 
     private OrderItem productAt(int position, String category) {
         return new OrderItem(ORDER_ID, category, "product", 1, 10.0, "SKU-" + position, false, position);
+    }
+
+    private OrderItem productWithSku(String sku) {
+        return new OrderItem(ORDER_ID, "Laptops", "product", 1, 10.0, sku, false);
     }
 
     private OrderItem serviceAt(int position) {
