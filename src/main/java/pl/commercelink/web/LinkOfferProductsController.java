@@ -12,6 +12,7 @@ import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistFinder;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
@@ -24,7 +25,7 @@ import java.util.Map;
 
 
 /**
- * The products "Link to product" offers for one catalog: every product of the catalog with an EAN, which is all a link
+ * The products "Link to product" offers for one catalog: every product of its manual categories with an EAN, which is all a link
  * needs to recognise an order line and fill its item (neither a manufacturer code nor a pimId is required). The pricelist only
  * carries available products, so a product without supplier stock or added after the last pricelist run would be
  * missing from it; it supplies the price where it has one, by pimId, or by EAN for a product without one.
@@ -46,19 +47,21 @@ public class LinkOfferProductsController extends BaseController {
         if (catalog == null) {
             return List.of();
         }
-        Map<String, String> categoryNames = new HashMap<>();
+        // Manual categories only: an automatic one keeps the products of its manual days just for a return to manual.
+        Map<String, String> manualCategoryNames = new HashMap<>();
         for (CategoryDefinition category : catalog.getCategories()) {
-            if (category.getCategoryId() != null) {
-                categoryNames.putIfAbsent(category.getCategoryId(), category.getName());
+            if (category.getCategoryId() != null && !category.hasType(CategoryDefinitionType.Dynamic)) {
+                manualCategoryNames.putIfAbsent(category.getCategoryId(), category.getName());
             }
         }
         Pricelist pricelist = pricelistFinder.newestPricelist(storeId, catalogId);
         return productRepository.findAll(catalog).stream()
+                .filter(product -> manualCategoryNames.containsKey(product.getCategoryId()))
                 // a product without a valid EAN would give a link the import skips
                 .filter(product -> OfferEans.unifyValid(product.getEan()) != null)
                 .map(product -> new LinkOfferProduct(product.getCategoryId(), product.getProductId(), product.getEan(),
                         product.getName(), product.getLabel(), product.getManufacturerCode(),
-                        categoryNames.get(product.getCategoryId()),
+                        manualCategoryNames.get(product.getCategoryId()),
                         (StringUtils.isNotBlank(product.getPimId()) ? pricelist.findByPimId(product.getPimId())
                                 : pricelist.findByEan(product.getEan()))
                                 .map(AvailabilityAndPrice::getPrice).orElse(null)))

@@ -157,4 +157,37 @@ class CategoryBasicsFormTest {
         assertThat(offered.getType()).isEqualTo("Managed");
         assertThat(offered.getMaxQty()).isEqualTo("1");
     }
+
+    @Test
+    void aRequiredChoiceOfTheAutomaticListIsMissing() {
+        // given
+        CategoryBasicsForm none = valid();
+        CategoryBasicsForm forged = valid();
+        forged.setDynamicProducts("all");
+        CategoryBasicsForm stored = valid();
+        stored.setDynamicProducts(CategoryBasicsForm.STORE_DYNAMIC_PRODUCTS);
+        CategoryBasicsForm skipped = valid();
+        skipped.setDynamicProducts(CategoryBasicsForm.SKIP_DYNAMIC_PRODUCTS);
+
+        // when / then
+        assertThat(none.validate(Set.of(), "GPU", true)).containsEntry("dynamicProducts", "catalog.category.type.managed.choice.required");
+        assertThat(forged.validate(Set.of(), "GPU", true)).containsEntry("dynamicProducts", "catalog.category.type.managed.choice.required");
+        assertThat(stored.validate(Set.of(), "GPU", true)).isEmpty();
+        assertThat(skipped.validate(Set.of(), "GPU", true)).isEmpty();
+        assertThat(none.validate(Set.of(), "GPU", false)).isEmpty();
+    }
+
+    @Test
+    void theFormOfAnExistingCategoryChoosesNothingForTheAutomaticList() {
+        // given
+        CategoryDefinition automatic = new CategoryDefinition().withName("GPU").withGeneratedId();
+        automatic.setType(CategoryDefinitionType.Dynamic);
+
+        // when
+        CategoryBasicsForm form = CategoryBasicsForm.from(automatic);
+
+        // then
+        assertThat(form.getDynamicProducts()).isNull();
+        assertThat(form.storesDynamicProducts()).isFalse();
+    }
 }

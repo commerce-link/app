@@ -59,6 +59,7 @@ public class ExternalOfferResolver {
 
         private final String storeId;
         private Map<String, String> categoryNamesById;
+        private Set<String> manualCategoryIds;
         private List<Product> catalogProducts;
         private Map<String, String> storeCategoryNamesByPimCategoryId;
         // one import can bring the same offer in many orders
@@ -85,11 +86,13 @@ public class ExternalOfferResolver {
          * each catalog's order, products of a category by id.
          */
         /**
-         * One product of the store's catalogs, read by its key; a category that is not the store's gives nothing, so
-         * another store's product cannot be picked. "Link to product" needs only the one the operator chose.
+         * One product of the store's manual categories, read by its key; a category that is not the store's gives
+         * nothing, so another store's product cannot be picked, and neither does an automatic one, which keeps the
+         * products of its manual days only for a return to manual. "Link to product" needs only the one the operator
+         * chose.
          */
         public Optional<Product> catalogProduct(String categoryId, String productId) {
-            if (StringUtils.isAnyBlank(categoryId, productId) || !categoryNamesById().containsKey(categoryId)) {
+            if (StringUtils.isAnyBlank(categoryId, productId) || !manualCategoryIds().contains(categoryId)) {
                 return Optional.empty();
             }
             return Optional.ofNullable(productRepository.findByProductId(categoryId, productId));
@@ -177,16 +180,32 @@ public class ExternalOfferResolver {
         }
 
         private Map<String, String> categoryNamesById() {
+            readCategories();
+            return categoryNamesById;
+        }
+
+        private Set<String> manualCategoryIds() {
+            readCategories();
+            return manualCategoryIds;
+        }
+
+        private void readCategories() {
             if (categoryNamesById == null) {
                 // insertion-ordered: it fixes which category of a product found twice counts as first
                 Map<String, String> names = new LinkedHashMap<>();
+                Set<String> manual = new HashSet<>();
                 productCatalogRepository.findAll(storeId).stream()
                         .sorted(Comparator.comparing(ProductCatalog::getCatalogId, Comparator.nullsLast(Comparator.naturalOrder())))
                         .flatMap(catalog -> catalog.getCategories().stream())
-                        .forEach(category -> names.putIfAbsent(category.getCategoryId(), category.getName()));
+                        .forEach(category -> {
+                            names.putIfAbsent(category.getCategoryId(), category.getName());
+                            if (!category.hasType(CategoryDefinitionType.Dynamic)) {
+                                manual.add(category.getCategoryId());
+                            }
+                        });
                 categoryNamesById = names;
+                manualCategoryIds = manual;
             }
-            return categoryNamesById;
         }
     }
 }

@@ -1,13 +1,6 @@
 package pl.commercelink.web;
 
-import com.amazonaws.auth.AWSStaticCredentialsProvider;
-import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
-import com.amazonaws.services.dynamodbv2.model.CreateTableRequest;
-import com.amazonaws.services.dynamodbv2.model.ProvisionedThroughput;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -29,6 +22,7 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimView;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CatalogPlacement;
+import pl.commercelink.products.ManagedCategoryProducts;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
@@ -41,6 +35,7 @@ import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.testsupport.DynamoDbLocal;
 import pl.commercelink.testsupport.DynamoDbLocalImage;
 import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.ProductsAddReview;
@@ -81,18 +76,8 @@ class ParallelReviewSaveDynamoDbIntegrationTest {
 
     @BeforeAll
     static void createTheProductsTable() {
-        client = AmazonDynamoDBClientBuilder.standard()
-                .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(
-                        "http://" + DYNAMODB.getHost() + ":" + DYNAMODB.getMappedPort(8000), "eu-central-1"))
-                .withCredentials(new AWSStaticCredentialsProvider(new BasicAWSCredentials("local", "local")))
-                .build();
-        ProvisionedThroughput throughput = new ProvisionedThroughput(1L, 1L);
-        CreateTableRequest request = new DynamoDBMapper(client).generateCreateTableRequest(Product.class)
-                .withProvisionedThroughput(throughput);
-        if (request.getGlobalSecondaryIndexes() != null) {
-            request.getGlobalSecondaryIndexes().forEach(index -> index.withProvisionedThroughput(throughput));
-        }
-        client.createTable(request);
+        client = DynamoDbLocal.clientOf(DYNAMODB);
+        DynamoDbLocal.createTables(client, Product.class);
     }
 
     @AfterEach
@@ -189,12 +174,14 @@ class ParallelReviewSaveDynamoDbIntegrationTest {
         BrandMapper brandMapper = mock(BrandMapper.class);
         MessageSource messageSource = mock(MessageSource.class);
         CatalogPlacement placement = mock(CatalogPlacement.class);
+        StorePimAliases aliases = new StorePimAliases(pimCatalog);
         PimEntryRequester pimEntryRequester = mock(PimEntryRequester.class);
         return new CatalogProductsController(access, products, mock(StoresRepository.class),
                 mock(ProductRecommendationEngine.class), inventory, mock(MarketplaceConnections.class),
                 mock(PimCategoryOptions.class), mock(SupplierLabels.class), pimCatalog, brandMapper,
                 messageSource, mock(OptimisticLockingExecutor.class), placement,
-                new ProductsAddReview(products, inventory, pimCatalog, brandMapper, messageSource, placement, new StorePimAliases(pimCatalog), pimEntryRequester),
+                new ProductsAddReview(products, inventory, pimCatalog, brandMapper, messageSource, aliases,
+                        new ManagedCategoryProducts(products, placement, aliases, pimEntryRequester)),
                 pimEntryRequester);
     }
 }

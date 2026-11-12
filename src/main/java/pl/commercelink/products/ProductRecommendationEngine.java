@@ -29,23 +29,37 @@ public class ProductRecommendationEngine {
     /**
      * That method should operate only on objects managed in memory without access to time-consuming PIM repository. We should consider including
      * recommendations for products that are not currently available via PimIndex.
+     *
+     * <p>The products the category holds in the products table hide nothing here: after a manual category turns
+     * automatic they stay in the table until the cleanup removes them, and the automatic list must go on pricing them.
      */
     public List<ProductRecommendation> getRecommendations(PimView pim, CategoryDefinition categoryDefinition, InventoryView inventory) {
         if (!categoryDefinition.hasCategoryMapping()) {
             return List.of();
         }
+        return recommend(pim, categoryDefinition, inventory, key -> true);
+    }
 
-        List<InventoryKey> alreadyMappedInventoryKeys = productRepository.findAll(categoryDefinition.getCategoryId())
+    /** What "Dodaj produkty" proposes: the list without the groups the category already holds (same pim id or a shared EAN). */
+    public List<ProductRecommendation> getRecommendationsNotInCategory(PimView pim, CategoryDefinition categoryDefinition, InventoryView inventory) {
+        if (!categoryDefinition.hasCategoryMapping()) {
+            return List.of();
+        }
+        List<InventoryKey> inCategory = productRepository.findAll(categoryDefinition.getCategoryId())
                 .stream()
                 .map(InventoryKey::fromProduct)
-                .collect(Collectors.toList());
+                .toList();
+        return recommend(pim, categoryDefinition, inventory, key -> isNotMapped(key, inCategory));
+    }
 
+    private List<ProductRecommendation> recommend(PimView pim, CategoryDefinition categoryDefinition, InventoryView inventory,
+                                                  Predicate<InventoryKey> offered) {
         return inventory.findAllByProductCategoryIds(categoryDefinition.getPimCategoryIds())
                 .values()
                 .stream()
                 .flatMap(Collection::stream)
                 .filter(MatchedInventory::hasAnyOffers)
-                .filter(i -> isNotMapped(i.getInventoryKey(), alreadyMappedInventoryKeys))
+                .filter(i -> offered.test(i.getInventoryKey()))
                 .filter(i -> matchesAllDefinitions(i, categoryDefinition.getInventoryDefinitions()))
                 .map(i -> createRecommendation(pim, categoryDefinition, i))
                 .filter(r -> StringUtils.isNotBlank(r.getBrand()))
@@ -66,13 +80,6 @@ public class ProductRecommendationEngine {
         return getRecommendations(pim, categoryDefinition, inventory).stream()
                 .filter(ProductRecommendation::hasPimId)
                 .filter(r -> matchesGroupingOrder(r, categoryDefinition))
-                .collect(Collectors.toList());
-    }
-
-    public List<ProductRecommendation> getRecommendationsForUnmappedProducts(PimView pim, CategoryDefinition categoryDefinition, InventoryView inventory) {
-        return getRecommendations(pim, categoryDefinition, inventory).stream()
-                .filter(ProductRecommendation::hasPimId)
-                .filter(r -> !matchesGroupingOrder(r, categoryDefinition))
                 .collect(Collectors.toList());
     }
 

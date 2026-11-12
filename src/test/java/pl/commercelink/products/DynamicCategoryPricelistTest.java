@@ -79,7 +79,6 @@ class DynamicCategoryPricelistTest {
 
         when(rollingPriceAggregateRepository.loadForStore(STORE_ID)).thenReturn(Map.of());
         when(sellingPriceHistoryRepository.load(STORE_ID, CATALOG_ID)).thenReturn(Map.of());
-        when(productRepository.findAll(CATEGORY_ID)).thenReturn(List.of());
         when(pimView.findByPimIdOrGtins(eq(PIM_ID), any())).thenReturn(Optional.of(pimEntry()));
 
         when(inventory.findAllByProductCategoryIds(List.of("170"))).thenReturn(Map.of("170", List.of(matchedInventory)));
@@ -95,6 +94,19 @@ class DynamicCategoryPricelistTest {
 
         // then
         assertThat(pricelist).hasSize(1);
+    }
+
+    @Test
+    void dynamicCategoryPricesProductsLeftInTheTableAfterTheTypeChange() {
+        // given: the category was manual a moment ago, its product stays in the table until the cleanup
+        when(productRepository.findAll(CATEGORY_ID)).thenReturn(List.of(
+                new Product(CATEGORY_ID, PIM_ID, "5900000000001", "MFN-1", "Gigabyte", "RTX 5070", "Gigabyte RTX 5070", "Default")));
+
+        // when
+        List<AvailabilityAndPrice> pricelist = generatePricelistFor("Karty graficzne");
+
+        // then
+        assertThat(pricelist).singleElement().extracting(AvailabilityAndPrice::getPimId).isEqualTo(PIM_ID);
     }
 
     @Test

@@ -46,10 +46,34 @@ class CategoryBasicsTemplateTest {
     private static String renderedFor(CategoryDefinition gpu, boolean existing) {
         CategoryBasicsForm form = CategoryBasicsForm.from(gpu);
         form.setLabels(List.of("RTX 5060"));
+        return render(context(gpu, existing, form, Map.of()));
+    }
+
+    /** The page of an automatic category whose list holds {@code listed} products, {@code kept} of them already rows. */
+    private static String renderedAutomatic(int listed, int kept, CategoryBasicsForm form, Map<String, String> errors) {
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId();
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        Context context = context(gpu, true, form, errors);
+        context.setVariable("dynamicListCount", listed);
+        context.setVariable("keptProductsCount", kept);
+        return render(context);
+    }
+
+    private static CategoryBasicsForm automaticForm() {
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId();
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        return CategoryBasicsForm.from(gpu);
+    }
+
+    private static String render(Context context) {
+        return EnglishFragmentTemplateEngine.create().process("catalog/category-basics", context);
+    }
+
+    private static Context context(CategoryDefinition gpu, boolean existing, CategoryBasicsForm form, Map<String, String> errors) {
         Context context = new Context();
         context.setVariables(Map.of(
                 "form", form,
-                "errors", Map.of(),
+                "errors", errors,
                 "existing", existing,
                 "category", gpu,
                 "categoryOptions", List.of(),
@@ -68,7 +92,72 @@ class CategoryBasicsTemplateTest {
         context.setVariable("labelsOutsideCount", 1L);
         context.setVariable("deleteHref", "/dashboard/catalogs/c1/category/k1/delete");
         context.setVariable("redirectTo", null);
-        return EnglishFragmentTemplateEngine.create().process("catalog/category-basics", context);
+        return context;
+    }
+
+    /** The radios of the automatic list's choice, as rendered. */
+    private static List<String> dynamicProductsRadios(String html) {
+        return Pattern.compile("<input[^>]*name=\"dynamicProducts\"[^>]*>").matcher(html).results()
+                .map(java.util.regex.MatchResult::group).toList();
+    }
+
+    @Test
+    void anAutomaticCategoryAsksWhatToDoWithItsListWhenTurnedManual() {
+        // when
+        String html = renderedAutomatic(12, 0, automaticForm(), Map.of());
+
+        // then
+        assertThat(html).contains("Products on the automatic list: 12. What should happen to them after the change to Manual?")
+                .contains("Save them in the category").contains("Do not save")
+                .doesNotContain("Products already in the category stay unchanged");
+        assertThat(dynamicProductsRadios(html)).hasSize(2).noneMatch(radio -> radio.contains("checked"));
+        assertThat(html).containsPattern("<fieldset[^>]*id=\"dynamicProducts\"[^>]*data-cl-variant-when=\"categoryType=Managed\"");
+    }
+
+    @Test
+    void theChoiceSaysHowManyProductsTheCategoryKeeps() {
+        // when
+        String html = renderedAutomatic(12, 3, automaticForm(), Map.of());
+
+        // then
+        assertThat(html).contains("Products already in the category stay unchanged: 3.");
+    }
+
+    @Test
+    void anEmptyAutomaticListOnlyInforms() {
+        // when
+        String html = renderedAutomatic(0, 0, automaticForm(), Map.of());
+
+        // then
+        assertThat(html).contains("The automatic list is empty");
+        assertThat(dynamicProductsRadios(html)).isEmpty();
+    }
+
+    @Test
+    void aRefusedSaveKeepsTheChoiceAndShowsTheErrorOfAMissingOne() {
+        // given
+        CategoryBasicsForm chosen = automaticForm();
+        chosen.setDynamicProducts(CategoryBasicsForm.STORE_DYNAMIC_PRODUCTS);
+
+        // when
+        String keptChoice = renderedAutomatic(12, 0, chosen, Map.of("name", "catalog.category.name.required"));
+        String missingChoice = renderedAutomatic(12, 0, automaticForm(),
+                Map.of("dynamicProducts", "catalog.category.type.managed.choice.required"));
+
+        // then
+        assertThat(dynamicProductsRadios(keptChoice)).filteredOn(radio -> radio.contains("checked"))
+                .singleElement().satisfies(radio -> assertThat(radio).contains("value=\"store\""));
+        assertThat(missingChoice).contains("Choose whether to save the products of the automatic list in the category.");
+    }
+
+    @Test
+    void aManualCategoryAsksNothingAboutAnAutomaticList() {
+        // when
+        String html = rendered();
+
+        // then
+        assertThat(dynamicProductsRadios(html)).isEmpty();
+        assertThat(html).doesNotContain("The automatic list is empty");
     }
 
     @Test

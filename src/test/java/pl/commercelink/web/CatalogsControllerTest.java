@@ -20,6 +20,7 @@ import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinitions;
+import pl.commercelink.products.ManagedCategoryProducts;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
@@ -91,7 +92,7 @@ class CatalogsControllerTest {
         mvc = MockMvcBuilders.standaloneSetup(new CatalogsController(catalogRepository, messageSource, detailsService,
                 access, productRepository, pimCategoryOptions, marketplaces,
                 new CategoryDefinitions(catalogRepository, productRepository, mock(OptimisticLockingExecutor.class),
-                        catalogPlacement))).build();
+                        catalogPlacement, mock(ManagedCategoryProducts.class)))).build();
     }
 
     @AfterEach
@@ -135,7 +136,7 @@ class CatalogsControllerTest {
         CatalogsController controller = new CatalogsController(catalogRepository, messageSource, detailsService,
                 access, productRepository, pimCategoryOptions, marketplaces,
                 new CategoryDefinitions(catalogRepository, productRepository, mock(OptimisticLockingExecutor.class),
-                        catalogPlacement));
+                        catalogPlacement, mock(ManagedCategoryProducts.class)));
         Locale polish = Locale.forLanguageTag("pl");
         when(messageSource.getMessage(eq("store.supplier.schedule.summary.every.minutes"), any(), eq(polish)))
                 .thenReturn("Co 30 min");
@@ -507,7 +508,7 @@ class CatalogsControllerTest {
         MockMvc withRealDetails = MockMvcBuilders.standaloneSetup(new CatalogsController(catalogRepository, messageSource,
                 realDetails, access, productRepository, pimCategoryOptions, marketplaces,
                 new CategoryDefinitions(catalogRepository, productRepository, mock(OptimisticLockingExecutor.class),
-                        catalogPlacement))).build();
+                        catalogPlacement, mock(ManagedCategoryProducts.class)))).build();
         when(messageSource.getMessage(eq("catalog.created"), any(), any(Locale.class))).thenReturn("Created");
         var create = post("/dashboard/catalogs/new").param("name", "Parts").param("newCatalogId", "k3y0000001");
 

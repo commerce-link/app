@@ -4,7 +4,6 @@ import org.junit.jupiter.api.BeforeEach;
 import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -24,6 +23,7 @@ import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import java.util.Collection;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.ManagedCategoryProducts;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductRepository;
@@ -63,7 +63,7 @@ class ProductsAddReviewTest {
     @Mock private CatalogPlacement catalogPlacement;
     @Mock private StorePimAliases pimAliases;
     @Mock private PimEntryRequester pimEntryRequester;
-    @InjectMocks private ProductsAddReview review;
+    private ProductsAddReview review;
 
     @org.junit.jupiter.api.BeforeEach
     void pimStoreViewIsTheCatalog() {
@@ -76,6 +76,8 @@ class ProductsAddReviewTest {
 
     @BeforeEach
     void setUp() {
+        review = new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, pimAliases,
+                new ManagedCategoryProducts(productRepository, catalogPlacement, pimAliases, pimEntryRequester));
         gpu = new CategoryDefinition().withName("GPU").withGeneratedId();
         gpu.setPriceDefinitions(new ArrayList<>(List.of(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"),
                 new PriceDefinition(1.0, 0, 0, 0, 0, "Premium"))));

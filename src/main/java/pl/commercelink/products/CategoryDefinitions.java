@@ -1,6 +1,7 @@
 package pl.commercelink.products;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ import java.util.stream.Collectors;
  * message at the form. A later save of the same section still wins over an earlier one (no version travels with the
  * forms, ruling D-M15/OD-7): this removes the error, it does not detect a lost update of one section.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CategoryDefinitions {
@@ -60,6 +62,16 @@ public class CategoryDefinitions {
     public record RemoveResult(boolean productsKept, int productsDeleted) {
     }
 
+    /**
+     * What a save of the basics did to the category's products: whether it turned the automatic category manual, how
+     * many products it stored then, how many the category held already, and whether storing them broke off midway.
+     */
+    public record BasicsSaved(boolean becameManaged, int productsCreated, int productsAlreadyInCategory,
+                              boolean productsIncomplete) {
+
+        public static final BasicsSaved UNCHANGED = new BasicsSaved(false, 0, 0, false);
+    }
+
     /** What remove() will do, for the confirmation page: the same decision, made in the same place, without deleting. */
     public record DeletionPreview(boolean productsKept, int productsToDelete) {
     }
@@ -78,6 +90,7 @@ public class CategoryDefinitions {
     private final ProductRepository products;
     private final OptimisticLockingExecutor optimisticLockingExecutor;
     private final CatalogPlacement placement;
+    private final ManagedCategoryProducts managedCategoryProducts;
 
     public CategoryDefinition create(ProductCatalog catalog, Basics basics) {
         // Built once, outside the retried closure: a retry adds the same category, under the same id, to the fresh read.
@@ -96,8 +109,16 @@ public class CategoryDefinitions {
         return category;
     }
 
-    public void saveBasics(ProductCatalog catalog, CategoryDefinition category, Basics basics) {
+    /**
+     * @param dynamicProducts the products to store when this save turns the automatic category manual, as the operator
+     *                        agreed to; empty to store none. Decided on the fresh read: a save that finds the category
+     *                        manual already (another tab, a retry after a conflict) stores nothing.
+     */
+    public BasicsSaved saveBasics(ProductCatalog catalog, CategoryDefinition category, Basics basics,
+                                  List<ManagedCategoryProducts.Candidate> dynamicProducts) {
+        AtomicBoolean becameManaged = new AtomicBoolean();
         modifyCategory(catalog, category, fresh -> {
+            becameManaged.set(fresh.hasType(CategoryDefinitionType.Dynamic) && basics.type() == CategoryDefinitionType.Managed);
             if (fresh.getType() != basics.type()) {
                 fresh.setTypeChangedAt(LocalDateTime.now());
             }
@@ -106,6 +127,24 @@ public class CategoryDefinitions {
                 fresh.setSequenceNumber(basics.sequenceNumber());
             }
         });
+        if (!becameManaged.get()) {
+            return BasicsSaved.UNCHANGED;
+        }
+        if (dynamicProducts.isEmpty()) {
+            return new BasicsSaved(true, 0, 0, false);
+        }
+        // The products only once the manual type is saved: the cleanup of automatic categories reads a category's
+        // products before it reads the catalog again, so any product stored here is seen there with the manual type.
+        try {
+            ManagedCategoryProducts.Added added = managedCategoryProducts.addMissing(catalog.getStoreId(),
+                    category.getCategoryId(), dynamicProducts);
+            return new BasicsSaved(true, added.added(), added.alreadyInCategory(), false);
+        } catch (RuntimeException e) {
+            log.error("Category {} of catalog {} (store {}) turned manual, but storing the products of its automatic list "
+                    + "broke off; the missing ones can be added by hand", category.getCategoryId(), catalog.getCatalogId(),
+                    catalog.getStoreId(), e);
+            return new BasicsSaved(true, 0, 0, true);
+        }
     }
 
     private void applyBasics(CategoryDefinition category, Basics basics) {

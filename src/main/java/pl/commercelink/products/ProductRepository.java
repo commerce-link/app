@@ -63,24 +63,7 @@ public class ProductRepository extends DynamoDbRepository<Product> {
 
     /** As {@link #findAll(String)}, at most pageSize items a query page (null: DynamoDB's 1 MB page). */
     List<Product> findAll(String categoryId, Integer pageSize) {
-        Map<String, AttributeValue> eav = new HashMap<>();
-        eav.put(":categoryId", new AttributeValue().withS(categoryId));
-        List<Product> products = new ArrayList<>();
-        Map<String, AttributeValue> lastEvaluatedKey = null;
-        do {
-            QueryRequest queryRequest = new QueryRequest()
-                    .withTableName(TABLE)
-                    .withKeyConditionExpression("categoryId = :categoryId")
-                    .withExpressionAttributeValues(eav)
-                    .withLimit(pageSize)
-                    .withExclusiveStartKey(lastEvaluatedKey);
-            QueryResult queryResult = amazonDynamoDB.query(queryRequest);
-            for (Map<String, AttributeValue> item : queryResult.getItems()) {
-                products.add(dynamoDBMapper.marshallIntoObject(Product.class, item));
-            }
-            lastEvaluatedKey = queryResult.getLastEvaluatedKey();
-        } while (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty());
-        return products;
+        return queryAllPages(byCategory(categoryId).withLimit(pageSize), this::toProduct);
     }
 
     /**
@@ -94,26 +77,8 @@ public class ProductRepository extends DynamoDbRepository<Product> {
 
     /** As {@link #labelsOf(String)}, at most pageSize items a query page (null: DynamoDB's 1 MB page). */
     List<String> labelsOf(String categoryId, Integer pageSize) {
-        Map<String, AttributeValue> eav = new HashMap<>();
-        eav.put(":categoryId", new AttributeValue().withS(categoryId));
-        List<String> labels = new ArrayList<>();
-        Map<String, AttributeValue> lastEvaluatedKey = null;
-        do {
-            QueryRequest queryRequest = new QueryRequest()
-                    .withTableName(TABLE)
-                    .withKeyConditionExpression("categoryId = :categoryId")
-                    .withExpressionAttributeValues(eav)
-                    .withProjectionExpression("label")
-                    .withLimit(pageSize)
-                    .withExclusiveStartKey(lastEvaluatedKey);
-            QueryResult queryResult = amazonDynamoDB.query(queryRequest);
-            for (Map<String, AttributeValue> item : queryResult.getItems()) {
-                AttributeValue label = item.get("label");
-                labels.add(label == null ? null : label.getS());
-            }
-            lastEvaluatedKey = queryResult.getLastEvaluatedKey();
-        } while (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty());
-        return labels;
+        return queryAllPages(byCategory(categoryId).withProjectionExpression("label").withLimit(pageSize),
+                item -> stringOf(item, "label"));
     }
 
     /**
@@ -128,26 +93,39 @@ public class ProductRepository extends DynamoDbRepository<Product> {
 
     /** As {@link #eansOf(String)}, at most pageSize items a query page (null: DynamoDB's 1 MB page). */
     List<String> eansOf(String categoryId, Integer pageSize) {
+        return queryAllPages(byCategory(categoryId).withProjectionExpression("ean").withConsistentRead(true)
+                .withLimit(pageSize), item -> stringOf(item, "ean"));
+    }
+
+    private static QueryRequest byCategory(String categoryId) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":categoryId", new AttributeValue().withS(categoryId));
-        List<String> eans = new ArrayList<>();
+        return new QueryRequest()
+                .withTableName(TABLE)
+                .withKeyConditionExpression("categoryId = :categoryId")
+                .withExpressionAttributeValues(eav);
+    }
+
+    /**
+     * Every item the query matches. One page holds at most 1 MB (or the request's limit) and a filter is applied after
+     * a page is read, so a page can come back empty while the next ones still hold matches: the pages are followed until
+     * DynamoDB has none left, never until the first empty one.
+     */
+    private <T> List<T> queryAllPages(QueryRequest request, Function<Map<String, AttributeValue>, T> mapper) {
+        List<T> result = new ArrayList<>();
         Map<String, AttributeValue> lastEvaluatedKey = null;
         do {
-            QueryRequest queryRequest = new QueryRequest()
-                    .withTableName(TABLE)
-                    .withKeyConditionExpression("categoryId = :categoryId")
-                    .withExpressionAttributeValues(eav)
-                    .withProjectionExpression("ean")
-                    .withConsistentRead(true)
-                    .withLimit(pageSize)
-                    .withExclusiveStartKey(lastEvaluatedKey);
-            QueryResult queryResult = amazonDynamoDB.query(queryRequest);
-            for (Map<String, AttributeValue> item : queryResult.getItems()) {
-                eans.add(stringOf(item, "ean"));
+            QueryResult page = amazonDynamoDB.query(request.clone().withExclusiveStartKey(lastEvaluatedKey));
+            for (Map<String, AttributeValue> item : page.getItems()) {
+                result.add(mapper.apply(item));
             }
-            lastEvaluatedKey = queryResult.getLastEvaluatedKey();
+            lastEvaluatedKey = page.getLastEvaluatedKey();
         } while (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty());
-        return eans;
+        return result;
+    }
+
+    private Product toProduct(Map<String, AttributeValue> item) {
+        return dynamoDBMapper.marshallIntoObject(Product.class, item);
     }
 
     private static String stringOf(Map<String, AttributeValue> item, String attribute) {
@@ -165,6 +143,11 @@ public class ProductRepository extends DynamoDbRepository<Product> {
     }
 
     public List<Product> findAllByPimId(String pimId) {
+        return findAllByPimId(pimId, null);
+    }
+
+    /** As {@link #findAllByPimId(String)}, at most pageSize items a query page (null: DynamoDB's 1 MB page). */
+    List<Product> findAllByPimId(String pimId, Integer pageSize) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":pimId", new AttributeValue().withS(pimId));
 
@@ -172,9 +155,10 @@ public class ProductRepository extends DynamoDbRepository<Product> {
                 .withTableName(TABLE)
                 .withIndexName("PimIdIndex")
                 .withKeyConditionExpression("pimId = :pimId")
-                .withExpressionAttributeValues(eav);
+                .withExpressionAttributeValues(eav)
+                .withLimit(pageSize);
 
-        return query(queryRequest, Product.class);
+        return queryAllPages(queryRequest, this::toProduct);
     }
 
     /** Clears {@code pimId} on every product pinned to it and returns those products, fully loaded. */
@@ -198,17 +182,21 @@ public class ProductRepository extends DynamoDbRepository<Product> {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * The products of the category with a PIM entry, enabled or disabled as asked: what the price list, the marketplace
+     * export and the shop's product list of a manual category read, so every page of the category is followed.
+     */
     public List<Product> findAllProductsWithPimId(String categoryId, boolean enabled) {
-        Map<String, AttributeValue> eav = new HashMap<>();
-        eav.put(":categoryId", new AttributeValue().withS(categoryId));
-        eav.put(":enabled", new AttributeValue().withN(enabled ? "1" : "0"));
+        return findAllProductsWithPimId(categoryId, enabled, null);
+    }
 
-        QueryRequest queryRequest = new QueryRequest()
-                .withTableName(TABLE)
-                .withKeyConditionExpression("categoryId = :categoryId")
+    /** As {@link #findAllProductsWithPimId(String, boolean)}, at most pageSize items a query page (null: 1 MB). */
+    List<Product> findAllProductsWithPimId(String categoryId, boolean enabled, Integer pageSize) {
+        QueryRequest queryRequest = byCategory(categoryId)
                 .withFilterExpression("enabled = :enabled AND attribute_exists(pimId)")
-                .withExpressionAttributeValues(eav);
-        return query(queryRequest, Product.class);
+                .withLimit(pageSize);
+        queryRequest.getExpressionAttributeValues().put(":enabled", new AttributeValue().withN(enabled ? "1" : "0"));
+        return queryAllPages(queryRequest, this::toProduct);
     }
 
     public List<Product> scanAllKeys() {

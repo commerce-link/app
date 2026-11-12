@@ -30,6 +30,7 @@ import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.ManagedCategoryProducts;
 import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
@@ -173,8 +174,7 @@ class CatalogProductsControllerTest {
         mvc = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
                 brandMapper, messageSource, optimisticLockingExecutor, catalogPlacement,
-                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement, new StorePimAliases(pimCatalog), pimEntryRequester),
-                pimEntryRequester))
+                addReview(), pimEntryRequester))
                 .build();
     }
 
@@ -527,7 +527,7 @@ class CatalogProductsControllerTest {
         when(recommendation.getAlternativeEans()).thenReturn(List.of("1", "2"));
         when(recommendation.getAlternativeProductCodes()).thenReturn(List.of("MFN-1"));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        when(recommendationEngine.getRecommendations(any(), eq(gpu), eq(inventoryView))).thenReturn(List.of(recommendation));
+        when(recommendationEngine.getRecommendationsNotInCategory(any(), eq(gpu), eq(inventoryView))).thenReturn(List.of(recommendation));
         when(supplierLabels.forStoreId(STORE_ID)).thenReturn(supplierLabelMap);
         when(supplierLabelMap.of("Acme")).thenReturn("Acme Parts");
 
@@ -558,7 +558,7 @@ class CatalogProductsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("hasMapping", false))
                 .andExpect(model().attribute("rows", List.of()));
-        verify(recommendationEngine, never()).getRecommendations(any(), any(), any());
+        verify(recommendationEngine, never()).getRecommendationsNotInCategory(any(), any(), any());
         verify(inventory, never()).withEnabledSuppliersOnly(anyString());
         verify(supplierLabels, never()).forStoreId(anyString());
     }
@@ -1965,8 +1965,7 @@ class CatalogProductsControllerTest {
         MockMvc real = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
                 brandMapper, messageSource, RetryingOptimisticLockingExecutor.create(), catalogPlacement,
-                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement, new StorePimAliases(pimCatalog), pimEntryRequester),
-                pimEntryRequester))
+                addReview(), pimEntryRequester))
                 .build();
 
         // when / then
@@ -1988,5 +1987,12 @@ class CatalogProductsControllerTest {
                 .andExpect(flash().attribute("settingsSavedMessage", "catalog.products.bulk.deleted"));
         verify(productRepository).deleteWhateverItsVersion(a);
         verify(productRepository, never()).delete(any(Product.class));
+    }
+
+    /** The review as the application wires it, over this test's mocks. */
+    private ProductsAddReview addReview() {
+        StorePimAliases aliases = new StorePimAliases(pimCatalog);
+        return new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, aliases,
+                new ManagedCategoryProducts(productRepository, catalogPlacement, aliases, pimEntryRequester));
     }
 }
