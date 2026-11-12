@@ -120,19 +120,10 @@ public class ExternalOfferLinking {
     public LinkResult linkEan(String storeId, Order order, String itemId, String ean, String userId) {
         OrderItem chosen = linkableItem(storeId, order, itemId);
         String typed = SPACES.matcher(StringUtils.defaultString(ean)).replaceAll("");
-        if (!EAN.matcher(typed).matches() || !hasValidCheckDigit(typed)) {
+        if (!EAN.matcher(typed).matches() || !OfferEans.hasValidCheckDigit(typed)) {
             throw new IllegalArgumentException(INVALID_EAN);
         }
         return save(storeId, order, chosen, OfferEans.unify(typed), userId);
-    }
-
-    /** The GTIN check digit: a typo in one digit, or most swaps of two neighbours, gives another last digit. */
-    static boolean hasValidCheckDigit(String digits) {
-        int sum = 0;
-        for (int i = digits.length() - 2, weight = 3; i >= 0; i--, weight = 4 - weight) {
-            sum += (digits.charAt(i) - '0') * weight;
-        }
-        return (10 - sum % 10) % 10 == digits.charAt(digits.length() - 1) - '0';
     }
 
     private OrderItem linkableItem(String storeId, Order order, String itemId) {

@@ -47,6 +47,28 @@ public final class OfferEans {
         return isValid(unified) ? unified : null;
     }
 
+    /** The GTIN check digit: a typo in one digit, or most swaps of two neighbours, gives another last digit. */
+    public static boolean hasValidCheckDigit(String digits) {
+        int sum = 0;
+        for (int i = digits.length() - 2, weight = 3; i >= 0; i--, weight = 4 - weight) {
+            sum += (digits.charAt(i) - '0') * weight;
+        }
+        return (10 - sum % 10) % 10 == digits.charAt(digits.length() - 1) - '0';
+    }
+
+    /**
+     * The EAN unified, or null unless it is also the code of a real product: it has the {@linkplain #isValid format},
+     * a matching check digit, and more than one distinct digit (a repeated digit is a placeholder that happens to pass
+     * the check). For codes that go out to other systems unreviewed.
+     */
+    public static String unifyChecked(String ean) {
+        String unified = unifyValid(ean);
+        if (unified == null || !hasValidCheckDigit(unified) || unified.chars().distinct().count() < 2) {
+            return null;
+        }
+        return unified;
+    }
+
     /** The EANs unified, without the ones that are not {@linkplain #isValid valid}, each once, in their order. */
     public static List<String> validUnified(Collection<String> eans) {
         if (eans == null) {

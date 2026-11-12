@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Arrays;
@@ -120,5 +121,35 @@ class OfferEansTest {
 
         // then
         assertThat(unified).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"5901234123457", "4006381333931", "96385074"})
+    void unifyCheckedKeepsAnEanWithAValidCheckDigit(String ean) {
+        // when
+        String checked = OfferEans.unifyChecked(ean);
+
+        // then
+        assertThat(checked).isEqualTo(ean);
+    }
+
+    @Test
+    void unifyCheckedReturnsTheUnifiedSpelling() {
+        // when
+        String checked = OfferEans.unifyChecked(" 05901234123457 ");
+
+        // then
+        assertThat(checked).isEqualTo(OfferEans.unifyValid(" 05901234123457 "));
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "  ", "5901234123458", "12345678", "2222222222222", "ABC-123", "#590123", "5901234123457:4006381333931"})
+    void unifyCheckedRejectsWhatIsNotAnEanOfAProduct(String code) {
+        // when
+        String checked = OfferEans.unifyChecked(code);
+
+        // then
+        assertThat(checked).isNull();
     }
 }
