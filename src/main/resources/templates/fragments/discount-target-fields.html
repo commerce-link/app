@@ -1,0 +1,113 @@
+<th:block th:fragment="fields (prefix, target, categories, products, brands)"
+          th:with="targetName=${#strings.unCapitalize(prefix + 'Target')},
+                   valuesName=${targetName + 'Values'},
+                   categoriesName=${#strings.unCapitalize(prefix + 'Categories')},
+                   productsName=${#strings.unCapitalize(prefix + 'Products')},
+                   brandsName=${#strings.unCapitalize(prefix + 'Brands')},
+                   described=${errors.get(valuesName) != null ? ' ' + valuesName + '-error' : ''}">
+    <div class="cl-span-6">
+        <fieldset class="cl-choice-group is-row" th:id="${targetName}">
+            <legend class="cl-label" th:text="#{store.discounts.target}"></legend>
+            <label class="cl-choice">
+                <input type="radio" th:name="${targetName}" value="" th:checked="${#strings.isEmpty(target)}"
+                       th:attr="data-cl-variant-select=${targetName}"/>
+                <span class="cl-choice-text">
+                    <span class="cl-choice-title" th:text="#{store.discounts.target.basket}"></span>
+                    <span class="cl-choice-description" th:text="#{store.discounts.target.basket.description}"></span>
+                </span>
+            </label>
+            <label class="cl-choice" th:each="kind : ${ {'Category', 'Product', 'Brand'} }">
+                <input type="radio" th:name="${targetName}" th:value="${kind}" th:checked="${target == kind}"
+                       th:attr="data-cl-variant-select=${targetName}"/>
+                <span class="cl-choice-text">
+                    <span class="cl-choice-title" th:text="#{${'store.discounts.target.' + kind}}"></span>
+                    <span class="cl-choice-description" th:text="#{${'store.discounts.target.' + kind + '.description'}}"></span>
+                </span>
+            </label>
+        </fieldset>
+        <p th:if="${errors.get(targetName) != null}" class="cl-field-error">
+            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+            <span th:text="#{${errors.get(targetName)}}"></span>
+        </p>
+        <p class="cl-help" th:text="#{store.discounts.target.help}"></p>
+    </div>
+    <div class="cl-span-6" th:id="${valuesName}" th:attr="data-cl-variant-when=${targetName + '=Category|Product|Brand'}">
+        <fieldset class="cl-choice-group" data-cl-variant="Category" data-discount-picked-dialog="categories"
+                  th:attr="data-cl-variant-group=${targetName}, data-discount-picked=${categoriesName},
+                           aria-describedby=${categoriesName + '-help' + described},
+                           data-remove-label=#{store.discounts.picked.remove}">
+            <legend class="cl-label" th:text="#{store.discounts.categories}"></legend>
+            <ul class="cl-chip-list" data-discount-picked-list>
+                <li th:each="category : ${categories}" th:unless="${#strings.isEmpty(category)}"
+                    class="cl-chip-tag" th:attr="data-id=${category}, data-name=${category}">
+                    <span th:text="${category}"></span>
+                    <input type="hidden" th:name="${categoriesName}" th:value="${category}"/>
+                    <button type="button" class="cl-chip-tag-remove" data-discount-picked-remove
+                            th:attr="aria-label=#{store.discounts.picked.remove(${category})}">&times;</button>
+                </li>
+            </ul>
+            <p class="cl-help" data-discount-picked-empty th:hidden="${!#lists.isEmpty(categories)}"
+               th:text="#{store.discounts.categories.none}"></p>
+            <p>
+                <button type="button" class="cl-button" data-discount-pick hidden>
+                    <i class="fas fa-plus" aria-hidden="true"></i>
+                    <span th:text="#{store.discounts.categories.pick}"></span>
+                </button>
+            </p>
+            <p class="cl-help" th:id="${categoriesName + '-help'}" th:text="#{store.discounts.categories.help}"></p>
+        </fieldset>
+        <fieldset class="cl-choice-group" data-cl-variant="Product" data-discount-picked-dialog="products"
+                  th:attr="data-cl-variant-group=${targetName}, data-discount-picked=${productsName},
+                           aria-describedby=${productsName + '-help' + described},
+                           data-remove-label=#{store.discounts.picked.remove}">
+            <legend class="cl-label" th:text="#{store.discounts.products}"></legend>
+            <ul class="cl-chip-list" data-discount-picked-list>
+                <li th:each="product, row : ${products}" th:if="${product != null and !#strings.isEmpty(product.id)}"
+                    class="cl-chip-tag" th:attr="data-id=${product.id}, data-name=${product.name}">
+                    <span th:text="${product.name}"></span>
+                    <input type="hidden" th:name="|${productsName}[${row.index}].id|" th:value="${product.id}"/>
+                    <input type="hidden" th:name="|${productsName}[${row.index}].name|" th:value="${product.name}"/>
+                    <button type="button" class="cl-chip-tag-remove" data-discount-picked-remove
+                            th:attr="aria-label=#{store.discounts.picked.remove(${product.name})}">&times;</button>
+                </li>
+            </ul>
+            <p class="cl-help" data-discount-picked-empty th:hidden="${!#lists.isEmpty(products)}"
+               th:text="#{store.discounts.products.none}"></p>
+            <p>
+                <button type="button" class="cl-button" data-discount-pick hidden>
+                    <i class="fas fa-plus" aria-hidden="true"></i>
+                    <span th:text="#{store.discounts.products.pick}"></span>
+                </button>
+            </p>
+            <p class="cl-help" th:id="${productsName + '-help'}" th:text="#{store.discounts.products.help}"></p>
+        </fieldset>
+        <fieldset class="cl-choice-group" data-cl-variant="Brand" data-discount-picked-dialog="brands"
+                  th:attr="data-cl-variant-group=${targetName}, data-discount-picked=${brandsName},
+                           aria-describedby=${brandsName + '-help' + described},
+                           data-remove-label=#{store.discounts.picked.remove}">
+            <legend class="cl-label" th:text="#{store.discounts.brands}"></legend>
+            <ul class="cl-chip-list" data-discount-picked-list>
+                <li th:each="brand : ${brands}" th:unless="${#strings.isEmpty(brand)}"
+                    class="cl-chip-tag" th:attr="data-id=${brand}, data-name=${brand}">
+                    <span th:text="${brand}"></span>
+                    <input type="hidden" th:name="${brandsName}" th:value="${brand}"/>
+                    <button type="button" class="cl-chip-tag-remove" data-discount-picked-remove
+                            th:attr="aria-label=#{store.discounts.picked.remove(${brand})}">&times;</button>
+                </li>
+            </ul>
+            <p class="cl-help" data-discount-picked-empty th:hidden="${!#lists.isEmpty(brands)}"
+               th:text="#{store.discounts.brands.none}"></p>
+            <p>
+                <button type="button" class="cl-button" data-discount-pick hidden>
+                    <i class="fas fa-plus" aria-hidden="true"></i>
+                    <span th:text="#{store.discounts.brands.pick}"></span>
+                </button>
+            </p>
+            <p class="cl-help" th:id="${brandsName + '-help'}" th:text="#{store.discounts.brands.help}"></p>
+        </fieldset>
+        <p th:if="${errors.get(valuesName) != null}" class="cl-field-error" th:id="${valuesName + '-error'}">
+            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+            <span th:text="#{${errors.get(valuesName)}}"></span>
+        </p>
+    </div>
+</th:block>

@@ -65,9 +65,9 @@ class StoreNewDiscountCodeTemplateTest {
         // then
         assertThat(html).contains("name=\"target\" value=\"Category\"").contains("name=\"target\" value=\"Product\"")
                 .contains("name=\"target\" value=\"Brand\"")
-                .contains("data-cl-variant-group=\"discount-target\" data-cl-variant=\"Category\"")
-                .contains("data-cl-variant-group=\"discount-target\" data-cl-variant=\"Product\"")
-                .contains("data-cl-variant-group=\"discount-target\" data-cl-variant=\"Brand\"")
+                .contains("data-cl-variant=\"Category\" data-discount-picked-dialog=\"categories\" data-cl-variant-group=\"target\" data-discount-picked=\"categories\"")
+                .contains("data-cl-variant=\"Product\" data-discount-picked-dialog=\"products\" data-cl-variant-group=\"target\" data-discount-picked=\"products\"")
+                .contains("data-cl-variant=\"Brand\" data-discount-picked-dialog=\"brands\" data-cl-variant-group=\"target\" data-discount-picked=\"brands\"")
                 .contains(">Wybierz kategorie<").contains(">Wybierz produkty<").contains(">Wybierz marki<")
                 .doesNotContain("type=\"checkbox\" name=\"categories\"");
     }
@@ -97,7 +97,7 @@ class StoreNewDiscountCodeTemplateTest {
                 Map.of("name", "store.discounts.name.required"), form));
 
         // then
-        assertThat(html).contains("value=\"Category\" data-cl-variant-select=\"discount-target\" checked=\"checked\"")
+        assertThat(html).contains("value=\"Category\" data-cl-variant-select=\"target\" checked=\"checked\"")
                 .contains("<input type=\"hidden\" name=\"categories\" value=\"Karty graficzne\"/>")
                 .contains("<input type=\"hidden\" name=\"categories\" value=\"Procesory\"/>");
     }
@@ -115,7 +115,7 @@ class StoreNewDiscountCodeTemplateTest {
                 Map.of("name", "store.discounts.name.required"), form));
 
         // then
-        assertThat(html).contains("value=\"Product\" data-cl-variant-select=\"discount-target\" checked=\"checked\"")
+        assertThat(html).contains("value=\"Product\" data-cl-variant-select=\"target\" checked=\"checked\"")
                 .contains("name=\"products[0].id\" value=\"PIM-1\"")
                 .contains("name=\"products[0].name\" value=\"Zestaw Gamer RTX 5070\"")
                 .contains("name=\"products[1].id\" value=\"PIM-2\"")
@@ -134,7 +134,7 @@ class StoreNewDiscountCodeTemplateTest {
                 Map.of("name", "store.discounts.name.required"), form));
 
         // then
-        assertThat(html).contains("value=\"Brand\" data-cl-variant-select=\"discount-target\" checked=\"checked\"")
+        assertThat(html).contains("value=\"Brand\" data-cl-variant-select=\"target\" checked=\"checked\"")
                 .contains("name=\"brands\" value=\"ASUS\"").contains("name=\"brands\" value=\"MSI\"");
     }
 
@@ -167,7 +167,8 @@ class StoreNewDiscountCodeTemplateTest {
         // then
         assertThat(html).contains("id=\"discount-code-errors\"").contains("Sklep ma już kod o tej nazwie")
                 .contains("href=\"#targetValues\"").contains("id=\"targetValues\"").contains("aria-invalid=\"true\"")
-                .contains("Wybierz co najmniej jedną markę.");
+                .contains("Wybierz co najmniej jedną markę.").contains("id=\"targetValues-error\"")
+                .contains("aria-describedby=\"brands-help targetValues-error\"");
     }
 
     @Test
@@ -192,7 +193,31 @@ class StoreNewDiscountCodeTemplateTest {
 
         // then
         assertThat(html).contains("/js/async-form.js").contains("/js/variant-fields.js")
-                .contains("/js/money.js").contains("/js/discount-code-form.js");
+                .contains("/js/money.js").contains("/js/discount-target-picker.js").contains("/js/discount-code-form.js");
+    }
+
+    @Test
+    void aPrefixGivesTheTargetFieldsTheirOwnNamesAndKeepsTheDialogs() {
+        // given
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("errors", Map.of("conditionTargetValues", "store.discounts.targetValues.required.Product"));
+        variables.put("products", List.of(new TargetValue("PIM-1", "Zestaw Gamer RTX 5070")));
+
+        // when
+        String html = SettingsTemplateRenderer.render("<div th:replace=\"~{fragments/discount-target-fields :: "
+                + "fields('condition', 'Product', ${null}, ${products}, ${null})}\"></div>", variables);
+
+        // then
+        assertThat(html).contains("id=\"conditionTarget\"")
+                .contains("name=\"conditionTarget\" value=\"Product\" data-cl-variant-select=\"conditionTarget\" checked=\"checked\"")
+                .contains("id=\"conditionTargetValues\" data-cl-variant-when=\"conditionTarget=Category|Product|Brand\"")
+                .contains("data-discount-picked-dialog=\"categories\" data-cl-variant-group=\"conditionTarget\" data-discount-picked=\"conditionCategories\"")
+                .contains("data-discount-picked-dialog=\"products\" data-cl-variant-group=\"conditionTarget\" data-discount-picked=\"conditionProducts\"")
+                .contains("data-discount-picked-dialog=\"brands\" data-cl-variant-group=\"conditionTarget\" data-discount-picked=\"conditionBrands\"")
+                .contains("name=\"conditionProducts[0].id\" value=\"PIM-1\"")
+                .contains("aria-describedby=\"conditionProducts-help conditionTargetValues-error\"")
+                .contains("id=\"conditionTargetValues-error\"").contains("Wybierz co najmniej jeden produkt.")
+                .doesNotContain("name=\"target\"").doesNotContain("??");
     }
 
     private static ProductCatalog catalog(String name, String... categories) {
