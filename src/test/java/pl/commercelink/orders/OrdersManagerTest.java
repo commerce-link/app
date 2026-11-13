@@ -513,8 +513,7 @@ class OrdersManagerTest {
     }
 
     @Test
-    @DisplayName("cancelOrder throws when payments are not settled")
-    void cancelOrderThrowsWhenPaymentsNotSettled() {
+    void aReturnedOrderIsCancelledWithTheCustomersPaymentStillOnIt() {
         // given
         Order order = deliveredOrder(150.0);
         Payment incoming = new Payment(PaymentSource.BankTransfer);
@@ -524,9 +523,132 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(product));
 
+        // when
+        ordersManager.cancelOrder(STORE_ID, ORDER_ID);
+
+        // then
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Cancelled);
+        assertThat(order.getPayments()).contains(incoming);
+        assertThat(product.isReturned()).isTrue();
+    }
+
+    @Test
+    void cancellingAnOpenOrderReturnsItsGoodsToTheWarehouseAndCancelsEveryItem() {
+        // given
+        Order order = orderWithTotalPrice(250.0);
+        order.setStatus(OrderStatus.Assembled);
+        OrderItem reserved = allocatedProduct("item-1");
+        OrderItem fresh = orderItem("item-2", 100.0);
+        OrderItem service = serviceItem("item-3", 50.0);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(reserved, fresh, service));
+        when(warehouse.reservationService(STORE_ID)).thenReturn(reservationService);
+
+        // when
+        ordersManager.cancelOrder(STORE_ID, ORDER_ID);
+
+        // then
+        verify(reservationService, times(1)).remove(any(Reservation.class));
+        assertThat(List.of(reserved, fresh, service)).allMatch(OrderItem::isCancelled);
+        assertThat(reserved.getDeliveryId()).isNull();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Cancelled);
+        assertThat(order.getTotalPrice()).isZero();
+        verify(orderItemsRepository).batchSave(List.of(reserved, fresh, service));
+        verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCancelled);
+    }
+
+    @Test
+    void anOpenOrderWithGoodsOnADropshipDeliveryIsNotCancelled() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.Assembly);
+        OrderItem dropshipped = allocatedProduct("item-1");
+        dropshipped.setStatus(FulfilmentStatus.Ordered);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(dropshipped));
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq(STORE_ID), any())).thenReturn(Set.of("item-1"));
+
         // when / then
         assertThatThrownBy(() -> ordersManager.cancelOrder(STORE_ID, ORDER_ID))
                 .isInstanceOf(IllegalStateException.class);
+        assertThat(dropshipped.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Assembly);
+        verify(reservationService, never()).remove(any(Reservation.class));
+        verify(orderLifecycleEventPublisher, never()).publish(any(), any());
+    }
+
+    @Test
+    void goodsThatCouldNotBeReleasedLeaveTheOrderOpen() {
+        // given: the warehouse refuses the release, so the item stays allocated
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.Assembled);
+        OrderItem reserved = allocatedProduct("item-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(reserved));
+        when(warehouse.reservationService(STORE_ID)).thenReturn(reservationService);
+        doThrow(new IllegalStateException("warehouse down")).when(reservationService).remove(any(Reservation.class));
+
+        // when / then
+        assertThatThrownBy(() -> ordersManager.cancelOrder(STORE_ID, ORDER_ID))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Assembled);
+        assertThat(reserved.isCancelled()).isFalse();
+        verify(orderItemsRepository, never()).batchSave(any());
+        verify(orderLifecycleEventPublisher, never()).publish(any(), any());
+    }
+
+    @Test
+    void aCancelLostToAConcurrentChangeOfTheOrderWritesNothing() {
+        // given: the order is the versioned record and is saved first
+        Order order = orderWithTotalPrice(100.0);
+        OrderItem fresh = orderItem("item-1", 100.0);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(fresh));
+        doThrow(new IllegalArgumentException("version conflict")).when(ordersRepository).save(order);
+
+        // when / then
+        assertThatThrownBy(() -> ordersManager.cancelOrder(STORE_ID, ORDER_ID))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(orderItemsRepository, never()).batchSave(any());
+        verify(orderLifecycleEventPublisher, never()).publish(any(), any());
+    }
+
+    @Test
+    void aCourierBookedWhileTheGoodsWereReleasedStopsTheCancel() {
+        // given: the second read of the order, after the release, finds a courier order on it
+        Order before = orderWithTotalPrice(100.0);
+        before.setStatus(OrderStatus.Assembled);
+        Order after = orderWithTotalPrice(100.0);
+        after.setStatus(OrderStatus.Assembled);
+        Shipment courier = new Shipment(ShipmentType.Courier);
+        courier.setExternalId("courier-order-1");
+        after.setShipments(new ArrayList<>(List.of(courier)));
+        OrderItem reserved = allocatedProduct("item-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(before, before, before, after);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(reserved));
+        when(warehouse.reservationService(STORE_ID)).thenReturn(reservationService);
+
+        // when / then: the goods are back in the warehouse and the order stays open
+        assertThatThrownBy(() -> ordersManager.cancelOrder(STORE_ID, ORDER_ID))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(reserved.isNew()).isTrue();
+        assertThat(after.getStatus()).isEqualTo(OrderStatus.Assembled);
+        verify(orderItemsRepository, never()).batchSave(any());
+        verify(orderLifecycleEventPublisher, never()).publish(any(), any());
+    }
+
+    @Test
+    void aCancelledOrderIsNotCancelledASecondTime() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        order.setStatus(OrderStatus.Cancelled);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+
+        // when / then
+        assertThatThrownBy(() -> ordersManager.cancelOrder(STORE_ID, ORDER_ID))
+                .isInstanceOf(IllegalStateException.class);
+        verify(orderLifecycleEventPublisher, never()).publish(any(), any());
     }
 
     @Test

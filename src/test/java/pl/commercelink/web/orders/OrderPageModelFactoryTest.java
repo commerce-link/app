@@ -143,6 +143,15 @@ class OrderPageModelFactoryTest {
         return order;
     }
 
+    /** Reserved from the store's own warehouse, with what the release back to stock goes by. */
+    private static OrderItem reservedItem() {
+        OrderItem item = item(FulfilmentStatus.Delivered);
+        item.setEan("5901234123457");
+        item.setManufacturerCode("MFN");
+        item.setDeliveryId("Warehouse");
+        return item;
+    }
+
     private static OrderItem item(FulfilmentStatus status) {
         OrderItem item = new OrderItem("o", "CPU", "Ryzen", 1, 100, "MFN", false);
         item.setStatus(status);
@@ -1836,18 +1845,21 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
-    void cancelReasonOfAnOpenOrderPointsToRemoval() {
-        // given: a new order without items can be deleted
-        Order fresh = order(OrderStatus.New);
+    void anOpenOrderIsCancelledWhetherItIsEmptyPaidOrHoldsGoods() {
+        // given
+        Order paid = order(OrderStatus.Assembled);
+        paid.addPayment(new Payment("REF-1", "Jan", PaymentSource.BankTransfer, 100, 0));
 
         // when
-        OrderPageModel.Header header = factory.build(fresh, List.of(), ADMIN, PL).header();
+        OrderPageModel.Header empty = factory.build(order(OrderStatus.New), List.of(), ADMIN, PL).header();
+        OrderPageModel.Header withGoods = factory.build(paid, List.of(reservedItem()), ADMIN, PL).header();
 
-        // then: the reason names the menu entry that is actually offered, by its label
-        ResourceBundle bundle = ResourceBundle.getBundle("messages", PL);
-        assertThat(header.canDelete()).isTrue();
-        assertThat(header.cancelUnavailableKey()).isEqualTo("order.page.cancel.unavailable.delete");
-        assertThat(bundle.getString(header.cancelUnavailableKey())).contains("„" + bundle.getString("order.page.delete") + "”");
+        // then: an empty order offers both, as before; cancelling keeps it, deleting removes it
+        assertThat(empty.canCancel()).isTrue();
+        assertThat(empty.canDelete()).isTrue();
+        assertThat(withGoods.canCancel()).isTrue();
+        assertThat(withGoods.cancelUnavailableKey()).isNull();
+        assertThat(withGoods.cancelMessage()).contains("wróci na magazyn").contains("zwrot");
     }
 
     @Test
@@ -1883,39 +1895,61 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
-    void cancelReasonOfAnOpenOrderThatCannotBeDeletedStaysNeutral() {
-        // when: an order in assembly has items, so "Usuń zamówienie" is greyed too
-        OrderPageModel.Header header = factory.build(order(OrderStatus.Assembly), List.of(item(FulfilmentStatus.New)),
+    void cancelReasonOfAnOpenOrderNamesWhatToReleaseFirst() {
+        // given
+        Order booked = order(OrderStatus.Realization);
+        Shipment courier = new Shipment(ShipmentType.Courier);
+        courier.setExternalId("courier-order-1");
+        booked.setShipments(new java.util.ArrayList<>(List.of(courier)));
+
+        // when
+        OrderPageModel.Header header = factory.build(booked, List.of(reservedItem()), ADMIN, PL).header();
+        OrderPageModel.Header inClaim = factory.build(order(OrderStatus.Assembly), List.of(item(FulfilmentStatus.InRMA)),
                 ADMIN, PL).header();
 
-        // then: no advice to delete what cannot be deleted
-        assertThat(header.canDelete()).isFalse();
-        assertThat(header.cancelUnavailableKey()).isEqualTo("order.page.cancel.unavailable.open");
-        assertThat(ResourceBundle.getBundle("messages", PL).getString(header.cancelUnavailableKey()))
-                .isEqualTo("Anulować można dostarczone zamówienie, po zwrocie wszystkich produktów i wpłat.");
+        // then
+        assertThat(header.canCancel()).isFalse();
+        assertThat(header.cancelUnavailableKey()).isEqualTo("order.page.cancel.unavailable.courier");
+        assertThat(inClaim.cancelUnavailableKey()).isEqualTo("order.page.cancel.unavailable.delivery");
+        ResourceBundle bundle = ResourceBundle.getBundle("messages", PL);
+        assertThat(bundle.getString(header.cancelUnavailableKey())).contains("przesyłkę");
     }
 
     @Test
-    void cancelReasonOfADeliveredOrderNamesTheMissingCondition() {
-        // given
+    void aDeliveredOrderIsCancelledOnlyAfterItsProductsCameBack() {
+        // given: the money still on the order does not stand in the way, the refund is recorded afterwards
         Order paid = order(OrderStatus.Delivered);
         paid.addPayment(new Payment("REF-1", "Jan", PaymentSource.BankTransfer, 100, 0));
-        Order unpaid = order(OrderStatus.Delivered);
 
         // when
-        String itemsAndPayments = factory.build(paid, List.of(item(FulfilmentStatus.Delivered)), ADMIN, PL).header().cancelUnavailableKey();
-        String payments = factory.build(paid, returnedItems(), ADMIN, PL).header().cancelUnavailableKey();
-        String items = factory.build(unpaid, List.of(item(FulfilmentStatus.Delivered)), ADMIN, PL).header().cancelUnavailableKey();
-        OrderPageModel.Header cancellable = factory.build(order(OrderStatus.Delivered), returnedItems(), ADMIN, PL).header();
+        OrderPageModel.Header notReturned = factory.build(paid, List.of(item(FulfilmentStatus.Delivered)), ADMIN, PL).header();
+        OrderPageModel.Header returned = factory.build(paid, returnedItems(), ADMIN, PL).header();
 
         // then
-        assertThat(itemsAndPayments).isEqualTo("order.page.cancel.unavailable.itemsAndPayments");
-        assertThat(payments).isEqualTo("order.page.cancel.unavailable.payments");
-        assertThat(items).isEqualTo("order.page.cancel.unavailable.items");
-        assertThat(cancellable.canCancel()).isTrue();
-        ResourceBundle bundle = ResourceBundle.getBundle("messages", PL);
-        assertThat(bundle.getString(payments)).contains("wpłat").doesNotContain("produktów");
-        assertThat(bundle.getString(items)).contains("produktów").doesNotContain("wpłat");
+        assertThat(notReturned.canCancel()).isFalse();
+        assertThat(notReturned.cancelUnavailableKey()).isEqualTo("order.page.cancel.unavailable.items");
+        assertThat(ResourceBundle.getBundle("messages", PL).getString(notReturned.cancelUnavailableKey())).contains("produktów");
+        assertThat(returned.canCancel()).isTrue();
+        assertThat(returned.cancelUnavailableKey()).isNull();
+    }
+
+    @Test
+    void aCancelledOrderOffersNoCancelButStillTakesPayments() {
+        // given
+        Order cancelled = order(OrderStatus.Cancelled);
+        cancelled.addPayment(new Payment("REF-1", "Jan", PaymentSource.BankTransfer, 100, 0));
+
+        // when
+        OrderPageModel page = factory.build(cancelled, List.of(item(FulfilmentStatus.Cancelled)), ADMIN, PL);
+        OrderPageModel completed = factory.build(order(OrderStatus.Completed), returnedItems(), ADMIN, PL);
+
+        // then: the refund of what the customer paid is recorded on the cancelled order
+        assertThat(page.header().canCancel()).isFalse();
+        assertThat(page.header().cancelUnavailableKey()).isNull();
+        assertThat(page.readOnly()).isTrue();
+        assertThat(page.payments().editable()).isTrue();
+        assertThat(page.payments().forms()).isNotEmpty();
+        assertThat(completed.payments().editable()).isFalse();
     }
 
     @Test

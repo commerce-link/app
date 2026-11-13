@@ -99,7 +99,7 @@ public final class OrderLabels {
         }
         return switch (status) {
             // waiting states neutral/info, trouble warn/bad
-            case New -> NEUTRAL;
+            case New, Cancelled -> NEUTRAL;
             case Allocation, Ordered, Reserved -> INFO;
             case Delivered -> OK;
             case InRMA, Returned, Replaced, InExternalService -> WARN;

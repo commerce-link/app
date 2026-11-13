@@ -122,6 +122,9 @@ public class PaymentsRowMapper {
     }
 
     private String shipText(ReceivableEntry entry, LocalDate today) {
+        if (entry.order().hasStatus(OrderStatus.Cancelled)) {
+            return text("payments.ship.cancelled");
+        }
         if (entry.shipped()) {
             if (entry.shipDate() == null) {
                 return text(entry.delivered() ? "payments.ship.deliveredUndated" : "payments.ship.gone");

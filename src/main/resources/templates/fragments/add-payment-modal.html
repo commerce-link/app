@@ -104,8 +104,9 @@
             </div>
         </form>
     </dialog>
-    <!--/* loadMoneyJs is false only on the order details page, where fragments/item-add-modal.html is included
-           on the same page and already loads money.js -- loading it twice would run its IIFE twice. Every other
+    <!--/* loadMoneyJs is false only on the order details page while fragments/item-add-modal.html is included on
+           the same page and already loads money.js -- loading it twice would run its IIFE twice. A read-only order
+           page that still takes payments (a cancelled order) has no such dialog and passes true. Every other
            caller passes true explicitly (Thymeleaf requires it); the "== null" half of the guard only matters
            for a test that calls this fragment directly with ${null}. */-->
     <script th:if="${loadMoneyJs == null or loadMoneyJs}" th:src="@{/js/money.js}" defer></script>

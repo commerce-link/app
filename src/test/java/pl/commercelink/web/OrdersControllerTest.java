@@ -1495,19 +1495,20 @@ class OrdersControllerTest {
         }
 
         @Test
-        void addingAPaymentToACancelledOrderIsRefused() {
-            // given: the closed page offers no "Dodaj wpłatę", and the lifecycle would drop the payment anyway
-            Order order = orderWith(new Payment(PaymentSource.BankTransfer));
+        void aRefundIsRecordedOnACancelledOrder() {
+            // given: cancelled with the customer's money still on it; OrderLifecycle.update would not save it
+            Order order = orderWith(Payment.bankTransfer("REF-1", "Jan", 100));
             order.setStatus(OrderStatus.Cancelled);
 
             // when
-            String view = ordersController.addPayment(ORDER_ID, addForm("100", "", PaymentDirection.Incoming), redirect,
+            String view = ordersController.addPayment(ORDER_ID, addForm("100", "", PaymentDirection.Outgoing), redirect,
                     Locale.ENGLISH);
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-            assertThat(errorMessage()).isEqualTo("order.payments.error.cancelled");
-            assertThat(order.getPayments().get(0).isUnsettled()).isTrue();
+            assertThat(errorMessage()).isNull();
+            assertThat(order.getPaidAmount()).isZero();
+            verify(ordersRepository).save(order);
             verifyNoInteractions(orderLifecycle);
         }
 
@@ -1756,26 +1757,22 @@ class OrdersControllerTest {
         }
 
         @Test
-        void removingAPaymentOfACancelledOrderIsRefused() {
+        void aPaymentOfACancelledOrderIsRemoved() {
             // given
             Payment paid = Payment.bankTransfer("REF-1", "Jan", 100);
             Payment second = Payment.bankTransfer("REF-2", "Jan", 50);
             Order order = orderWith(paid, second);
             order.setStatus(OrderStatus.Cancelled);
-            RedirectAttributesModelMap confirmation = new RedirectAttributesModelMap();
 
             // when
             String view = ordersController.removePayment(ORDER_ID, 1, OrderPaymentForm.version(second), redirect,
                     Locale.ENGLISH);
-            String confirmView = ordersController.confirmRemovePayment(ORDER_ID, 1, OrderPaymentForm.version(second),
-                    new ExtendedModelMap(), confirmation, Locale.ENGLISH);
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-            assertThat(confirmView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-            assertThat(errorMessage()).isEqualTo("order.payments.error.cancelled");
-            assertThat(confirmation.getFlashAttributes().get("errorMessage")).isEqualTo("order.payments.error.cancelled");
-            assertThat(order.getPayments()).containsExactly(paid, second);
+            assertThat(errorMessage()).isNull();
+            assertThat(order.getPayments()).containsExactly(paid);
+            verify(ordersRepository).save(order);
             verifyNoInteractions(orderLifecycle);
         }
 
@@ -1801,47 +1798,23 @@ class OrdersControllerTest {
         }
 
         @Test
-        void aPaymentOfACancelledOrderIsRefusedBecauseTheSaveWouldBeDropped() {
-            // given: OrderLifecycle.update returns before saving a cancelled order, so a "saved" notice would be a lie
+        void aPaymentOfACancelledOrderIsEditedAndSavedPastTheLifecycle() {
+            // given: OrderLifecycle.update returns before saving a cancelled order, so the save goes to the repository
             Payment paid = Payment.bankTransfer("REF-1", "Jan", 100);
-            Payment second = Payment.bankTransfer("REF-2", "Jan", 50);
-            Order order = orderWith(paid, second);
+            Order order = orderWith(paid);
             order.setStatus(OrderStatus.Cancelled);
-            RedirectAttributesModelMap removal = new RedirectAttributesModelMap();
-            RedirectAttributesModelMap confirmation = new RedirectAttributesModelMap();
-            RedirectAttributesModelMap page = new RedirectAttributesModelMap();
-            MockHttpServletResponse response = new MockHttpServletResponse();
-            ExtendedModelMap model = new ExtendedModelMap();
 
             // when
             String view = save(0, OrderPaymentForm.version(paid), "150");
-            String asyncView = save(0, OrderPaymentForm.version(paid), PaymentSource.BankTransfer, "150", "", null,
-                    "fetch", response, model);
-            String removeView = ordersController.removePayment(ORDER_ID, 1, OrderPaymentForm.version(second), removal,
-                    Locale.ENGLISH);
-            String confirmView = ordersController.confirmRemovePayment(ORDER_ID, 1, OrderPaymentForm.version(second),
-                    new ExtendedModelMap(), confirmation, Locale.ENGLISH);
-            String pageView = ordersController.showPayment(ORDER_ID, "0", new ExtendedModelMap(), page, Locale.ENGLISH);
+            String pageView = ordersController.showPayment(ORDER_ID, "0", new ExtendedModelMap(), redirect, Locale.ENGLISH);
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-            assertThat(errorMessage()).isEqualTo("order.payments.error.cancelled");
-            assertThat(asyncView).isEqualTo("orders/details/payments :: dialogForm");
-            assertThat(response.getStatus()).isEqualTo(422);
-            assertThat(((OrderPaymentForm) model.getAttribute("payment")).refusal()).isEqualTo("order.payments.error.cancelled");
-            for (RedirectAttributesModelMap flash : List.of(removal, confirmation, page)) {
-                assertThat(flash.getFlashAttributes().get("errorMessage")).isEqualTo("order.payments.error.cancelled");
-            }
-            assertThat(removeView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-            assertThat(confirmView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-            assertThat(pageView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-            for (RedirectAttributesModelMap flash : List.of(redirect, removal, confirmation, page)) {
-                assertThat(flash.getFlashAttributes()).doesNotContainKey(OrderFlash.ATTRIBUTE);
-            }
-            assertThat(order.getPayments()).containsExactly(paid, second);
-            assertThat(paid.getAmount()).isEqualTo(100);
+            assertThat(errorMessage()).isNull();
+            assertThat(order.getPayments().get(0).getAmount()).isEqualTo(150);
+            assertThat(pageView).doesNotStartWith("redirect:");
+            verify(ordersRepository).save(order);
             verifyNoInteractions(orderLifecycle);
-            verify(ordersRepository, never()).save(any());
         }
 
         @Test
@@ -5805,6 +5778,30 @@ class OrdersControllerTest {
             assertThat(issueView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
             assertThat(flash(confirm)).containsEntry("errorMessage", "receipts.invoicing.blocked");
             assertThat(flash(issue)).containsEntry("errorMessage", "receipts.invoicing.blocked");
+            verifyNoInteractions(invoiceCreationEventPublisher);
+        }
+
+        @Test
+        void noInvoiceIsIssuedOnACancelledOrder() {
+            // given: a business order cancelled before any invoice, asked for from a stale page
+            Order order = order(OrderStatus.Cancelled);
+            BillingDetails billing = new BillingDetails();
+            billing.setTaxId("5250000000");
+            order.setBillingDetails(billing);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            RedirectAttributesModelMap confirm = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap issue = new RedirectAttributesModelMap();
+
+            // when
+            String confirmView = ordersController.confirmInvoice(ORDER_ID, DocumentType.InvoiceVat, new ExtendedModelMap(),
+                    polish, confirm);
+            String issueView = ordersController.createInvoice(ORDER_ID, DocumentType.InvoiceVat, false, polish, issue);
+
+            // then
+            assertThat(confirmView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(issueView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(confirm)).containsEntry("errorMessage", "order.documents.issue.error.cancelled");
+            assertThat(flash(issue)).containsEntry("errorMessage", "order.documents.issue.error.cancelled");
             verifyNoInteractions(invoiceCreationEventPublisher);
         }
 

@@ -10,6 +10,8 @@ import pl.commercelink.documents.DocumentType;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -546,30 +548,147 @@ class OrderTest {
     }
 
     @Test
-    void cancelBlockersNameExactlyWhatCanBeCancelledMisses() {
+    void anOrderBeforeShippingIsCancelledWhateverItsItemsAndPayments() {
         // given
-        OrderItem delivered = new OrderItem("o1", "CPU", "Ryzen", 1, 100, "SKU", false, 0);
-        delivered.setStatus(FulfilmentStatus.Delivered);
-        OrderItem returned = new OrderItem("o1", "CPU", "Ryzen", 1, 100, "SKU", false, 0);
-        returned.setStatus(FulfilmentStatus.Returned);
+        OrderItem fresh = product(FulfilmentStatus.New);
+        OrderItem reserved = reservedProduct();
+        Order paid = new Order("store-1");
+        paid.setStatus(OrderStatus.Assembled);
+        paid.addPayment(new Payment("REF", "Jan", PaymentSource.BankTransfer, 100, 0));
+
+        // when
+        Set<Order.CancelBlocker> blockers = paid.cancelBlockers(List.of(fresh, reserved), Set.of());
+
+        // then
+        assertThat(blockers).isEmpty();
+        assertThat(paid.canBeCancelled(List.of(fresh, reserved), Set.of())).isTrue();
+    }
+
+    @Test
+    void anOrderBeforeShippingNamesWhatHasToBeReleasedByHandFirst() {
+        // given
+        OrderItem dropshipped = reservedProduct();
+        dropshipped.setStatus(FulfilmentStatus.Ordered);
+        OrderItem claimed = product(FulfilmentStatus.Allocation);
+        claimed.setClaimedDeliveryId("delivery-being-created");
+        OrderItem inClaim = product(FulfilmentStatus.InRMA);
+        Order booked = new Order("store-1");
+        booked.setStatus(OrderStatus.Realization);
+        Shipment courier = new Shipment(ShipmentType.Courier);
+        courier.setExternalId("courier-order-1");
+        booked.setShipments(new ArrayList<>(List.of(courier)));
         Order open = new Order("store-1");
         open.setStatus(OrderStatus.Assembly);
+
+        // when / then
+        assertThat(open.cancelBlockers(List.of(dropshipped), Set.of(dropshipped.getItemId())))
+                .containsExactly(Order.CancelBlocker.DROPSHIP_ITEMS);
+        assertThat(open.cancelBlockers(List.of(claimed), Set.of())).containsExactly(Order.CancelBlocker.ITEMS_NOT_RELEASABLE);
+        assertThat(open.cancelBlockers(List.of(inClaim), Set.of())).containsExactly(Order.CancelBlocker.ITEMS_NOT_RELEASABLE);
+        assertThat(booked.cancelBlockers(List.of(), Set.of())).containsExactly(Order.CancelBlocker.COURIER_ORDERED);
+    }
+
+    @Test
+    void onceTheGoodsWentOutCancellingWaitsForEveryProductToComeBack() {
+        // given
+        OrderItem delivered = product(FulfilmentStatus.Delivered);
+        OrderItem returned = product(FulfilmentStatus.Returned);
         Order paid = new Order("store-1");
         paid.setStatus(OrderStatus.Delivered);
         paid.addPayment(new Payment("REF", "Jan", PaymentSource.BankTransfer, 100, 0));
-        Order settled = new Order("store-1");
-        settled.setStatus(OrderStatus.Delivered);
+        Order shippedParcel = new Order("store-1");
+        shippedParcel.setStatus(OrderStatus.Realization);
+        Shipment gone = new Shipment(ShipmentType.Courier);
+        gone.setShippedAt(LocalDateTime.now());
+        shippedParcel.setShipments(new ArrayList<>(List.of(gone)));
 
-        // when / then: the reason on the page is built from these, canBeCancelled is "none of them"
-        assertThat(open.cancelBlockers(List.of(returned))).containsExactly(Order.CancelBlocker.NOT_DELIVERED);
-        assertThat(paid.cancelBlockers(List.of(delivered))).containsExactlyInAnyOrder(
-                Order.CancelBlocker.PRODUCTS_NOT_RETURNED, Order.CancelBlocker.PAYMENTS_NOT_REFUNDED);
-        assertThat(paid.cancelBlockers(List.of(returned))).containsExactly(Order.CancelBlocker.PAYMENTS_NOT_REFUNDED);
-        assertThat(settled.cancelBlockers(List.of(returned))).isEmpty();
-        for (Order order : List.of(open, paid, settled)) {
-            for (List<OrderItem> items : List.of(List.of(delivered), List.of(returned), List.<OrderItem>of())) {
-                assertThat(order.canBeCancelled(items)).isEqualTo(order.cancelBlockers(items).isEmpty());
-            }
-        }
+        // when / then: the money still on the order no longer stands in the way, the refund is recorded afterwards
+        assertThat(paid.cancelBlockers(List.of(delivered), Set.of())).containsExactly(Order.CancelBlocker.PRODUCTS_NOT_RETURNED);
+        assertThat(paid.cancelBlockers(List.of(returned), Set.of())).isEmpty();
+        assertThat(shippedParcel.cancelBlockers(List.of(delivered), Set.of()))
+                .containsExactly(Order.CancelBlocker.PRODUCTS_NOT_RETURNED);
+    }
+
+    @Test
+    void aCancelledOrderIsNotCancelledAgain() {
+        // given
+        Order cancelled = new Order("store-1");
+        cancelled.setStatus(OrderStatus.Cancelled);
+
+        // when
+        Set<Order.CancelBlocker> blockers = cancelled.cancelBlockers(List.of(product(FulfilmentStatus.Cancelled)), Set.of());
+
+        // then
+        assertThat(blockers).containsExactly(Order.CancelBlocker.ALREADY_CANCELLED);
+    }
+
+    @Test
+    void cancellingBeforeShippingMarksEveryItemCancelledAndLeavesNothingToPay() {
+        // given
+        OrderItem fresh = product(FulfilmentStatus.New);
+        fresh.setEan("5901234123457");
+        OrderItem waitingForSupplier = product(FulfilmentStatus.Allocation);
+        waitingForSupplier.setDeliveryId("Acme");
+        OrderItem service = new OrderItem("o1", "Dostawa", "Kurier", 1, 20, null, false, 0);
+        service.setService(true);
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Assembly);
+        order.setTotalPrice(220);
+        order.addPayment(new Payment("REF", "Jan", PaymentSource.BankTransfer, 220, 0));
+
+        // when
+        order.cancel(List.of(fresh, waitingForSupplier, service));
+
+        // then: the payment stays, so the whole amount shows as owed back to the customer
+        assertThat(List.of(fresh, waitingForSupplier, service)).allMatch(OrderItem::isCancelled)
+                .allMatch(item -> item.getPrice() == 0 && item.getCost() == 0);
+        assertThat(fresh.getEan()).isEqualTo("5901234123457");
+        assertThat(waitingForSupplier.getDeliveryId()).isNull();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Cancelled);
+        assertThat(order.getTotalPrice()).isZero();
+        assertThat(order.getUnpaidAmount()).isEqualTo(-220);
+    }
+
+    @Test
+    void goodsTheWarehouseCouldNotTakeBackRefuseTheCancel() {
+        // given: reserved, but without the manufacturer code the release goes by (older data)
+        OrderItem reserved = reservedProduct();
+        reserved.setManufacturerCode(null);
+        Order open = new Order("store-1");
+        open.setStatus(OrderStatus.Assembled);
+
+        // when
+        Set<Order.CancelBlocker> blockers = open.cancelBlockers(List.of(reserved), Set.of());
+
+        // then
+        assertThat(blockers).containsExactly(Order.CancelBlocker.ITEMS_NOT_RELEASABLE);
+    }
+
+    @Test
+    void aCancelThatStoppedHalfWayIsFinishedByCancellingAgain() {
+        // given: the order was saved as Cancelled and its items were not, or the other way round
+        Order cancelled = new Order("store-1");
+        cancelled.setStatus(OrderStatus.Cancelled);
+        Order open = new Order("store-1");
+        open.setStatus(OrderStatus.New);
+
+        // when / then
+        assertThat(cancelled.cancelBlockers(List.of(product(FulfilmentStatus.New)), Set.of())).isEmpty();
+        assertThat(open.cancelBlockers(List.of(product(FulfilmentStatus.Cancelled)), Set.of())).isEmpty();
+    }
+
+    private static OrderItem reservedProduct() {
+        OrderItem item = product(FulfilmentStatus.Delivered);
+        item.setEan("5901234123457");
+        item.setManufacturerCode("MFN-1");
+        item.setDeliveryId("delivery-1");
+        return item;
+    }
+
+    private static OrderItem product(FulfilmentStatus status) {
+        OrderItem item = new OrderItem("o1", "CPU", "Ryzen", 1, 100, "SKU", false, 0);
+        item.setItemId(UUID.randomUUID().toString());
+        item.setStatus(status);
+        return item;
     }
 }

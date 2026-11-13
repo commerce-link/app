@@ -468,14 +468,40 @@ public class OrdersManager {
         Order order = ordersRepository.findById(storeId, orderId);
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(orderId);
 
-        if (!order.canBeCancelled(orderItems)) {
+        if (!order.canBeCancelled(orderItems, dropshipItemLookup.itemIdsInDropshipDeliveries(storeId, orderItems))) {
             throw new IllegalStateException("Order cannot be cancelled");
+        }
+
+        if (!order.hasGoodsOut()) {
+            // Release before cancelling, never together: a release that fails half-way leaves an open order with
+            // some items back to New, which the operator can cancel again; items already Cancelled in an open order
+            // would be goods nobody holds and nobody can allocate.
+            List<String> allocated = orderItems.stream()
+                    .filter(item -> item.isProduct() && item.isAllocated())
+                    .map(OrderItem::getItemId)
+                    .toList();
+            if (!allocated.isEmpty()) {
+                moveOrderItemsToTheWarehouse(storeId, orderId, allocated);
+                order = ordersRepository.findById(storeId, orderId);
+                orderItems = orderItemsRepository.findByOrderId(orderId);
+                if (orderItems.stream().anyMatch(item -> item.isProduct() && item.isAllocated())) {
+                    throw new IllegalStateException("Order cannot be cancelled: its goods were not released");
+                }
+                // the release took time and saved the order: a courier booked or a parcel sent meanwhile changes the answer
+                if (!order.canBeCancelled(orderItems, dropshipItemLookup.itemIdsInDropshipDeliveries(storeId, orderItems))
+                        || order.hasGoodsOut()) {
+                    throw new IllegalStateException("Order cannot be cancelled: it changed while its goods were released");
+                }
+            }
         }
 
         order.cancel(orderItems);
 
-        orderItemsRepository.batchSave(orderItems);
+        // The order first: it is the versioned record, so a save lost to a concurrent change fails here with nothing
+        // written. Should the items fail after it, the order is Cancelled with open items and cancelling again
+        // finishes them (Order#cancelBlockers).
         ordersRepository.save(order);
+        orderItemsRepository.batchSave(orderItems);
         orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.OrderCancelled);
     }
 

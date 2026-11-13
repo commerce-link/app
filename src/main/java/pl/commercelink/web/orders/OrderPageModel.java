@@ -210,11 +210,13 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     /**
      * unpaid never goes below zero: an order paid above its total shows overpaidAmount instead. forms: one edit form per
      * payment, in the order of rows, empty on a read-only page. expected, pending and sources feed the shared
-     * "Dodaj wpłatę" dialog.
+     * "Dodaj wpłatę" dialog. editable: payments can be added, edited and removed, which a cancelled order still allows
+     * (the refund) although the rest of its page is read-only.
      */
     public record PaymentsCard(List<PaymentRow> rows, String paid, String unpaid, boolean unpaidDue, boolean overpaid,
                                String overpaidAmount, double expected, Payment pending,
-                               List<OrderLabels.Option<PaymentSource>> sources, List<OrderPaymentForm> forms) {
+                               List<OrderLabels.Option<PaymentSource>> sources, List<OrderPaymentForm> forms,
+                               boolean editable) {
     }
 
     /**

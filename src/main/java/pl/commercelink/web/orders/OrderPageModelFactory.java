@@ -119,13 +119,14 @@ public class OrderPageModelFactory {
         return new OrderPageModel(order.getOrderId(), order.getShortenedOrderId(),
                 viewer.superAdmin() ? null : OrderBackLink.sanitize(viewer.back()),
                 closed, readOnly, viewer.superAdmin(), viewer.admin(), store == null ? null : store.getName(),
-                header(order, items, store, viewer, readOnly, links, locale, dropship, receipts, receiptLock),
+                header(order, items, dropshipItemIds, store, viewer, readOnly, links, locale, dropship, receipts, receiptLock),
                 items(order, items, store, viewer, readOnly, links, hasDropshipItems, hasWarehouseDocument, dropship,
                         receiptLock, locale),
                 shipments(order, store, readOnly, locale),
                 documents(order, store, viewer, closed, readOnly,
                         documentsEnabled && hasWarehouseItems && !hasWarehouseDocument, receipts, receiptLock),
-                payments(order, readOnly, receiptLock),
+                // a cancelled order still takes payments: the refund of what the customer paid is recorded after the cancel
+                payments(order, viewer.superAdmin() || order.hasStatus(OrderStatus.Completed), receiptLock),
                 CustomerView.of(order, readOnly, receiptLock, locale),
                 settings(order, items, readOnly),
                 FinancesView.of(order, items),
@@ -137,7 +138,8 @@ public class OrderPageModelFactory {
         return OrderSettingsView.of(order, items, readOnly);
     }
 
-    private OrderPageModel.Header header(Order order, List<OrderItem> items, Store store, Viewer viewer, boolean readOnly,
+    private OrderPageModel.Header header(Order order, List<OrderItem> items, Set<String> dropshipItemIds, Store store,
+                                         Viewer viewer, boolean readOnly,
                                          OrderLinks links, Locale locale, DropshipAssessment dropship,
                                          ReceiptOrderState receipts, ReceiptLock receiptLock) {
         boolean receiptLocked = receiptLock.locks();
@@ -168,6 +170,7 @@ public class OrderPageModelFactory {
         // as OrdersController#deleteOrder refuses: an order whose e-receipt is being issued stays
         boolean canDelete = !viewer.superAdmin() && items.isEmpty() && !order.isInvoiced()
                 && !order.hasRecordedPayments() && !receiptLocked;
+        boolean canCancel = order.canBeCancelled(items, dropshipItemIds);
         // not tied to readOnly: a completed order is closed, yet a return is exactly when an RMA is reported
         String rmaHref = !viewer.superAdmin() && order.isEligibleForRMACreation()
                 ? "/dashboard/rma/new?q=" + order.getOrderId() + "&from=order" : null;
@@ -190,11 +193,11 @@ public class OrderPageModelFactory {
                 // a completed order can still be cancelled after a full return, so this follows the viewer, not readOnly;
                 // while an e-receipt is being issued OrdersController#cancelOrder refuses it, so it is greyed with that
                 // reason (only when the order could otherwise be cancelled: the general reason says more otherwise)
-                !viewer.superAdmin() && order.canBeCancelled(items) && !receiptLocked,
-                !viewer.superAdmin() && order.canBeCancelled(items) && receiptLocked
+                !viewer.superAdmin() && canCancel && !receiptLocked,
+                !viewer.superAdmin() && canCancel && receiptLocked
                         ? receiptLock.key(CANCEL_LOCKED_RECEIPT) : null,
-                cancelUnavailableKey(order, items, canDelete),
-                cancelMessage(receipts.hasFiscalisedReceipt(order), messageSource, locale),
+                cancelUnavailableKey(order, items, dropshipItemIds),
+                cancelMessage(order, receipts.hasFiscalisedReceipt(order), messageSource, locale),
                 canDelete,
                 deleteMessage(order, messageSource, locale),
                 rmaHref);
@@ -203,35 +206,37 @@ public class OrderPageModelFactory {
     private static final String CANCEL_LOCKED_RECEIPT = "order.page.cancel.locked.receipt";
 
     /**
-     * Why "Anuluj zamówienie" is greyed when Order#canBeCancelled says no (the rule stays as on main), built from
-     * Order#cancelBlockers so the reason cannot drift from the rule. Before delivery the reason suggests "Usuń
-     * zamówienie" only when the menu offers it; otherwise, and after delivery, it names what is still missing.
+     * Why "Anuluj zamówienie" is greyed when Order#canBeCancelled says no, built from Order#cancelBlockers so the
+     * reason cannot drift from the rule; one reason at a time, the one to deal with first. A cancelled order has none:
+     * its menu shows no greyed placeholders.
      */
-    static String cancelUnavailableKey(Order order, List<OrderItem> items, boolean canDelete) {
-        Set<Order.CancelBlocker> blockers = order.cancelBlockers(items);
-        if (blockers.contains(Order.CancelBlocker.NOT_DELIVERED)) {
-            return canDelete ? "order.page.cancel.unavailable.delete" : "order.page.cancel.unavailable.open";
-        }
-        boolean products = blockers.contains(Order.CancelBlocker.PRODUCTS_NOT_RETURNED);
-        boolean payments = blockers.contains(Order.CancelBlocker.PAYMENTS_NOT_REFUNDED);
-        if (products && payments) {
-            return "order.page.cancel.unavailable.itemsAndPayments";
-        }
-        if (products) {
+    static String cancelUnavailableKey(Order order, List<OrderItem> items, Set<String> dropshipItemIds) {
+        Set<Order.CancelBlocker> blockers = order.cancelBlockers(items, dropshipItemIds);
+        if (blockers.contains(Order.CancelBlocker.PRODUCTS_NOT_RETURNED)) {
             return "order.page.cancel.unavailable.items";
         }
-        return payments ? "order.page.cancel.unavailable.payments" : null;
+        if (blockers.contains(Order.CancelBlocker.DROPSHIP_ITEMS)) {
+            return "order.page.cancel.unavailable.dropship";
+        }
+        if (blockers.contains(Order.CancelBlocker.ITEMS_NOT_RELEASABLE)) {
+            return "order.page.cancel.unavailable.delivery";
+        }
+        return blockers.contains(Order.CancelBlocker.COURIER_ORDERED) ? "order.page.cancel.unavailable.courier" : null;
     }
 
     /**
-     * The cancel confirmation, in the dialog and on the no-JS page: once the e-receipt is fiscalised (or closed by
-     * hand) it says that cancelling the order does not undo the receipt and the refund is settled separately.
+     * The cancel confirmation, in the dialog and on the no-JS page. Before the goods went out it says what cancelling
+     * does to them and to the money; after a full return only the services are left to zero. No document is undone by
+     * a cancel: a fiscalised e-receipt (or one closed by hand) and an invoice each add their own warning.
      */
-    public static String cancelMessage(boolean fiscalisedReceipt, MessageSource messages, Locale locale) {
-        String message = messages.getMessage("order.page.cancel.confirm.message", null, locale);
-        return fiscalisedReceipt
-                ? message + " " + messages.getMessage("order.page.cancel.confirm.receipt", null, locale)
-                : message;
+    public static String cancelMessage(Order order, boolean fiscalisedReceipt, MessageSource messages, Locale locale) {
+        String message = messages.getMessage(order.hasGoodsOut() ? "order.page.cancel.confirm.message"
+                : "order.page.cancel.confirm.message.open", null, locale);
+        if (fiscalisedReceipt) {
+            return message + " " + messages.getMessage("order.page.cancel.confirm.receipt", null, locale);
+        }
+        boolean invoiced = order.hasClosingDocument() || order.getDocumentByType(DocumentType.InvoiceAdvance).isPresent();
+        return invoiced ? message + " " + messages.getMessage("order.page.cancel.confirm.invoice", null, locale) : message;
     }
 
     /** The client as the orders list names it (shipping first, company before person), then the billing e-mail. */
@@ -753,7 +758,7 @@ public class OrderPageModelFactory {
                 unpaid > 0.005, overpaid, overpaid ? Money.format(-unpaid) : null,
                 Math.max(0, unpaid),
                 order.getPendingPayment(), OrderLabels.Option.of(PaymentSource.values(), OrderLabels::paymentSource),
-                forms);
+                forms, !readOnly);
     }
 
     /**
