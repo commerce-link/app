@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.discounts.DiscountCode;
+import pl.commercelink.discounts.Promotion;
 import pl.commercelink.externaloffers.ExternalOfferLink;
 import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.deliveries.Delivery;
@@ -425,6 +426,40 @@ class StoreDeletionServiceTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         stubEmptyCascade();
         when(wipeRepository.findDiscountCodes(STORE_ID)).thenThrow(new RuntimeException("throttled"));
+
+        // when
+        boolean deleted = service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+
+        // then
+        assertFalse(deleted);
+        verify(storesRepository, never()).delete(any(Store.class));
+    }
+
+    @Test
+    void deletesStorePromotions() {
+        // given
+        Store store = regularStore();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        stubEmptyCascade();
+        Promotion promotion = new Promotion();
+        when(wipeRepository.findPromotions(STORE_ID)).thenReturn(List.of(promotion));
+
+        // when
+        boolean deleted = service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+
+        // then
+        assertTrue(deleted);
+        verify(wipeRepository).deleteAll(List.of(promotion));
+        verify(storesRepository).delete(store);
+    }
+
+    @Test
+    void keepsStoreRecordWhenPromotionsCannotBeDeleted() {
+        // given
+        Store store = regularStore();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        stubEmptyCascade();
+        when(wipeRepository.findPromotions(STORE_ID)).thenThrow(new RuntimeException("throttled"));
 
         // when
         boolean deleted = service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);

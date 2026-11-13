@@ -8,7 +8,7 @@
         <div class="cl-page-body">
             <div th:replace="~{fragments/settings-header :: header(false, ~{::discountActions})}">
                 <th:block th:fragment="discountActions">
-                    <a th:if="${newCodeHref != null}" class="cl-button is-primary" th:href="@{${newCodeHref}}">
+                    <a class="cl-button is-primary" th:href="@{${newCodeHref}}">
                         <i class="fas fa-plus" aria-hidden="true"></i>
                         <span th:text="#{store.discounts.add}"></span>
                     </a>
@@ -16,21 +16,12 @@
             </div>
             <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
 
-            <div th:if="${newCodeHref == null}" class="cl-alert is-warn">
-                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
-                <div>
-                    <p class="cl-alert-title" th:text="#{store.discounts.noGateway.title}"></p>
-                    <p class="cl-alert-text" th:text="#{store.discounts.noGateway.text}"></p>
-                    <p><a class="cl-button" th:href="@{${paymentsHref}}" th:text="#{store.discounts.noGateway.action}"></a></p>
-                </div>
-            </div>
-
             <section class="cl-card" aria-labelledby="discount-codes-title">
                 <h2 class="cl-visually-hidden" id="discount-codes-title" th:text="#{store.discounts.list.title}"></h2>
 
                 <p th:if="${codes.total() == 0}" class="cl-list-empty">
                     <span th:text="#{store.discounts.list.empty}"></span>
-                    <a th:if="${newCodeHref != null}" class="cl-link-button" th:href="@{${newCodeHref}}"
+                    <a class="cl-link-button" th:href="@{${newCodeHref}}"
                        th:text="#{store.discounts.list.addFirst}"></a>
                 </p>
 

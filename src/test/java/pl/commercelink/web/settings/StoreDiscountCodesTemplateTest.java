@@ -39,19 +39,18 @@ class StoreDiscountCodesTemplateTest {
         return code;
     }
 
-    private Map<String, Object> page(List<DiscountCode> codes, String q, String status, String target, String newCodeHref) {
+    private Map<String, Object> page(List<DiscountCode> codes, String q, String status, String target) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("settingsPage", SettingsPage.forRequest(UserRole.ADMIN, PATH));
         variables.put("navigation", null);
         variables.put("codes", DiscountCodeListView.of(codes, q, status, target, NOW, Map.of("paynow", "PayNow"), PATH));
         variables.put("listPath", PATH);
-        variables.put("newCodeHref", newCodeHref);
-        variables.put("paymentsHref", "/dashboard/store/payments");
+        variables.put("newCodeHref", PATH + "/new");
         return variables;
     }
 
     private String rendered(List<DiscountCode> codes) {
-        return SettingsTemplateRenderer.render("store-discount-codes", page(codes, null, null, null, PATH + "/new"));
+        return SettingsTemplateRenderer.render("store-discount-codes", page(codes, null, null, null));
     }
 
     @Test
@@ -81,20 +80,10 @@ class StoreDiscountCodesTemplateTest {
     }
 
     @Test
-    void aStoreWithoutGatewaysIsSentToPaymentsInsteadOfANewCode() {
-        // when
-        String html = SettingsTemplateRenderer.render("store-discount-codes", page(List.of(), null, null, null, null));
-
-        // then
-        assertThat(html).doesNotContain("href=\"/dashboard/store/discounts/new\"")
-                .contains("Najpierw podłącz bramkę płatności").contains("href=\"/dashboard/store/payments\"");
-    }
-
-    @Test
     void segmentsLinkToTheListInOneStatusWithTheirCounts() {
         // when
         String html = SettingsTemplateRenderer.render("store-discount-codes",
-                page(List.of(wholeBasket(), categories()), null, "active", null, PATH + "/new"));
+                page(List.of(wholeBasket(), categories()), null, "active", null));
 
         // then
         assertThat(html).contains("href=\"/dashboard/store/discounts?status=expired\"")
@@ -107,7 +96,7 @@ class StoreDiscountCodesTemplateTest {
     void searchingKeepsTheTargetFilterAndFilteringKeepsTheSearch() {
         // when
         String html = SettingsTemplateRenderer.render("store-discount-codes",
-                page(List.of(wholeBasket(), categories()), "gpu", "active", "category", PATH + "/new"));
+                page(List.of(wholeBasket(), categories()), "gpu", "active", "category"));
 
         // then
         String search = html.substring(html.indexOf("role=\"search\""), html.indexOf("name=\"q\""));
@@ -122,25 +111,16 @@ class StoreDiscountCodesTemplateTest {
         String html = rendered(List.of());
 
         // then
-        assertThat(html).contains("Nie masz jeszcze kodów rabatowych.").contains(">Dodaj pierwszy kod<")
-                .doesNotContain("formularzu poniżej").doesNotContain("aria-label=\"Status kodu\"")
+        assertThat(html).contains("Nie masz jeszcze kodów rabatowych. Działają tylko z podłączoną bramką płatności.")
+                .contains(">Dodaj pierwszy kod<").doesNotContain("formularzu poniżej").doesNotContain("aria-label=\"Status kodu\"")
                 .doesNotContain("name=\"q\"").doesNotContain("<table");
-    }
-
-    @Test
-    void aStoreWithoutCodesAndGatewaysIsNotOfferedAFirstCode() {
-        // when
-        String html = SettingsTemplateRenderer.render("store-discount-codes", page(List.of(), null, null, null, null));
-
-        // then
-        assertThat(html).contains("Nie masz jeszcze kodów rabatowych.").doesNotContain(">Dodaj pierwszy kod<");
     }
 
     @Test
     void aFilterWithoutMatchesOffersToClearIt() {
         // when
         String html = SettingsTemplateRenderer.render("store-discount-codes",
-                page(List.of(wholeBasket()), "zima", null, null, PATH + "/new"));
+                page(List.of(wholeBasket()), "zima", null, null));
 
         // then
         assertThat(html).contains("Żaden kod nie pasuje do filtrów").contains("href=\"/dashboard/store/discounts\"")

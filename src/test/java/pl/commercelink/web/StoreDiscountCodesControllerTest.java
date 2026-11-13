@@ -100,7 +100,7 @@ class StoreDiscountCodesControllerTest {
     }
 
     @Test
-    void aStoreWithoutGatewaysIsOfferedNoNewCode() {
+    void aStoreWithoutGatewaysCanStillAddACode() {
         // given
         store("store-1");
         when(paymentGateways.paymentOptions(any())).thenReturn(List.of());
@@ -110,8 +110,7 @@ class StoreDiscountCodesControllerTest {
         controller.codes(null, null, null, model);
 
         // then
-        assertThat(model.getAttribute("newCodeHref")).isNull();
-        assertThat(model.getAttribute("paymentsHref")).isEqualTo("/dashboard/store/payments");
+        assertThat(model.getAttribute("newCodeHref")).isEqualTo("/dashboard/store/discounts/new");
     }
 
     @Test

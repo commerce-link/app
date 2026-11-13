@@ -1,0 +1,109 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: header(false, ~{::promotionActions})}">
+                <th:block th:fragment="promotionActions">
+                    <a class="cl-button is-primary" th:href="@{${newPromotionHref}}">
+                        <i class="fas fa-plus" aria-hidden="true"></i>
+                        <span th:text="#{store.promotions.add}"></span>
+                    </a>
+                </th:block>
+            </div>
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
+
+            <section class="cl-card" aria-labelledby="promotions-title">
+                <h2 class="cl-visually-hidden" id="promotions-title" th:text="#{store.promotions.list.title}"></h2>
+
+                <p th:if="${promotions.total() == 0}" class="cl-list-empty">
+                    <span th:text="#{store.promotions.list.empty}"></span>
+                    <a class="cl-link-button" th:href="@{${newPromotionHref}}" th:text="#{store.promotions.list.addFirst}"></a>
+                </p>
+
+                <div th:if="${promotions.total() > 0}" class="cl-table-toolbar is-stacked">
+                    <div class="cl-toolbar-row">
+                        <nav class="cl-segmented" th:attr="aria-label=#{store.promotions.filter.label}">
+                            <a class="cl-segment" th:each="s : ${promotions.segments()}" th:href="@{${s.href()}}"
+                               th:attr="aria-current=${s.active()} ? 'page' : null, data-count=${s.count()}"><span
+                                    th:text="#{${s.labelKey()}}"></span><span class="cl-segment-sep">: </span><span
+                                    class="cl-segment-count" th:text="${s.count()}"></span></a>
+                        </nav>
+                        <form method="get" th:action="@{${listPath}}" class="cl-search-form" role="search">
+                            <input type="hidden" name="status" th:if="${!promotions.status().isEmpty()}" th:value="${promotions.status()}"/>
+                            <label class="cl-visually-hidden" for="promotion-search" th:text="#{store.promotions.search.label}"></label>
+                            <div class="cl-search-field">
+                                <span class="cl-search-icon icon is-small" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                <input class="cl-input cl-table-search" type="search" id="promotion-search" name="q" autocomplete="off"
+                                       th:value="${promotions.query()}" th:attr="placeholder=#{store.promotions.search.placeholder}"/>
+                            </div>
+                            <button type="submit" class="cl-button is-primary cl-search-submit" th:attr="aria-label=#{general.search}">
+                                <span class="icon is-small cl-search-submit-icon" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                <span class="cl-search-submit-text" th:text="#{general.search}"></span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <p th:if="${promotions.total() > 0 and promotions.rows().isEmpty()}" class="cl-list-empty">
+                    <span th:text="#{store.promotions.list.noMatch}"></span>
+                    <a class="cl-link-button" th:href="@{${listPath}}" th:text="#{general.clear.filters}"></a>
+                </p>
+
+                <table th:unless="${promotions.rows().isEmpty()}" class="cl-table" aria-labelledby="promotions-title">
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{store.promotions.column.name}"></th>
+                        <th scope="col" th:text="#{store.promotions.column.condition}"></th>
+                        <th scope="col" th:text="#{store.promotions.column.discount}"></th>
+                        <th scope="col" th:text="#{store.promotions.column.validity}"></th>
+                        <th scope="col" th:text="#{store.promotions.column.status}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="row : ${promotions.rows()}">
+                        <th scope="row" class="cl-table-key" th:attr="data-label=#{store.promotions.column.name}">
+                            <a th:href="@{${row.href()}}" th:text="${row.name()}"></a>
+                        </th>
+                        <td th:attr="data-label=#{store.promotions.column.condition}"
+                            th:with="minimum=${row.minOrderValue() != null ? #messages.msg('store.promotions.list.minimum', row.minOrderValue()) : null}">
+                            <th:block th:if="${row.conditionTarget() == null}">
+                                <span th:text="#{store.promotions.list.noCondition}"></span>
+                                <span th:if="${minimum != null}" class="cl-table-sub" th:text="${minimum}"></span>
+                            </th:block>
+                            <th:block th:if="${row.conditionTarget() != null}">
+                                <span th:text="${#strings.listJoin(row.conditionNames(), ', ')}"></span>
+                                <span class="cl-table-sub"
+                                      th:text="${#messages.msg('store.promotions.list.kind.' + row.conditionTarget().name())
+                                              + (row.moreConditions() > 0 ? ' · ' + #messages.msg('store.promotions.list.more', row.moreConditions()) : '')
+                                              + ' · ' + #messages.msg('store.promotions.list.quantity', row.conditionQuantity())
+                                              + (minimum != null ? ' · ' + minimum : '')}"></span>
+                            </th:block>
+                        </td>
+                        <td th:attr="data-label=#{store.promotions.column.discount}">
+                            <span class="cl-tabular" th:text="${row.percentage()} ? #{store.discounts.list.percent(${row.value()})} : #{store.discounts.list.amount(${row.value()})}"></span>
+                            <span class="cl-table-sub"
+                                  th:text="${row.target() == null} ? #{store.promotions.list.basket}
+                                          : ${#messages.msg('store.promotions.list.target', #strings.listJoin(row.targetNames(), ', '))
+                                          + (row.moreTargets() > 0 ? ' · ' + #messages.msg('store.promotions.list.more', row.moreTargets()) : '')}"></span>
+                        </td>
+                        <td class="cl-tabular" th:attr="data-label=#{store.promotions.column.validity}"
+                            th:text="${row.validFrom() != null and row.validTo() != null} ? #{store.discounts.validity.range(${row.validFrom()}, ${row.validTo()})}
+                                    : (${row.validFrom() != null} ? #{store.discounts.validity.from(${row.validFrom()})}
+                                    : (${row.validTo() != null} ? #{store.discounts.validity.to(${row.validTo()})} : #{store.discounts.validity.none}))"></td>
+                        <td th:attr="data-label=#{store.promotions.column.status}">
+                            <span class="cl-status" th:classappend="${row.statusTone()}"
+                                  th:text="#{${'store.promotions.status.' + row.status().name()}}"></span>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </section>
+        </div>
+    </section>
+</div>
+</body>
+</html>

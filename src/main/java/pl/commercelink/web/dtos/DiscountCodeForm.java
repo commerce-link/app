@@ -52,9 +52,7 @@ public class DiscountCodeForm {
         if (StringUtils.isNotBlank(paymentProvider) && store.getPaymentIntegration(paymentProvider.trim()) == null) {
             errors.put("paymentProvider", "store.discounts.paymentProvider.invalid");
         }
-        if (StringUtils.isNotBlank(minOrderValue) && FormNumbers.decimal(minOrderValue).filter(v -> v >= 0).isEmpty()) {
-            errors.put("minOrderValue", "store.discounts.minOrderValue.invalid");
-        }
+        DiscountFormFields.validateMinOrderValue(errors, minOrderValue);
         if (StringUtils.isNotBlank(maxUses) && FormNumbers.integer(maxUses).filter(v -> v >= 0).isEmpty()) {
             errors.put("maxUses", "store.discounts.maxUses.invalid");
         }
@@ -72,7 +70,7 @@ public class DiscountCodeForm {
         discountCode.setTarget(DiscountFormFields.target(target));
         discountCode.setTargetValues(targetValues());
         discountCode.setPaymentProvider(StringUtils.trimToNull(paymentProvider));
-        discountCode.setMinOrderValue(FormNumbers.decimal(minOrderValue).map(DiscountFormFields::toGrosz).orElse(0.0));
+        discountCode.setMinOrderValue(DiscountFormFields.minOrderValue(minOrderValue));
         discountCode.setMaxUses(FormNumbers.integer(maxUses).orElse(0));
         discountCode.setValidFrom(DiscountFormFields.validFrom(validFrom));
         discountCode.setValidTo(DiscountFormFields.validTo(validTo));

@@ -37,7 +37,6 @@ class StoreNewDiscountCodeTemplateTest {
         variables.put("paymentOptions", gateways);
         variables.put("catalogs", List.of(PARTS, OUTLET));
         variables.put("pricelistUrl", LIST + "/pricelist");
-        variables.put("paymentsHref", "/dashboard/store/payments");
         return variables;
     }
 
@@ -149,13 +148,13 @@ class StoreNewDiscountCodeTemplateTest {
     }
 
     @Test
-    void aStoreWithoutGatewaysIsSentToPaymentsInsteadOfTheForm() {
+    void aStoreWithoutGatewaysGetsTheForm() {
         // when
         String html = SettingsTemplateRenderer.render("store-discount-code-new", page(List.of(), Map.of()));
 
         // then
-        assertThat(html).doesNotContain("id=\"discount-code-form\"").contains("Najpierw podłącz bramkę płatności")
-                .contains("href=\"/dashboard/store/payments\"");
+        assertThat(html).contains("id=\"discount-code-form\"").contains("id=\"discount-categories-dialog\"")
+                .doesNotContain("href=\"/dashboard/store/payments\"");
     }
 
     @Test
@@ -205,7 +204,8 @@ class StoreNewDiscountCodeTemplateTest {
 
         // when
         String html = SettingsTemplateRenderer.render("<div th:replace=\"~{fragments/discount-target-fields :: "
-                + "fields('condition', 'Product', ${null}, ${products}, ${null})}\"></div>", variables);
+                + "fields('condition', 'store.promotions.condition', 'Product', ${null}, ${products}, ${null})}\"></div>",
+                variables);
 
         // then
         assertThat(html).contains("id=\"conditionTarget\"")

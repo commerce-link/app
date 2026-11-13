@@ -8,16 +8,7 @@
         <div class="cl-page-body is-form">
             <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${backLabel}, #{store.discounts.form.title}, #{store.discounts.form.description}, null)}"></div>
 
-            <div th:if="${paymentOptions.isEmpty()}" class="cl-alert is-warn">
-                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
-                <div>
-                    <p class="cl-alert-title" th:text="#{store.discounts.noGateway.title}"></p>
-                    <p class="cl-alert-text" th:text="#{store.discounts.noGateway.text}"></p>
-                    <p><a class="cl-button" th:href="@{${paymentsHref}}" th:text="#{store.discounts.noGateway.action}"></a></p>
-                </div>
-            </div>
-
-            <form th:fragment="codeForm" th:unless="${paymentOptions.isEmpty()}" id="discount-code-form" class="cl-form"
+            <form th:fragment="codeForm" id="discount-code-form" class="cl-form"
                   th:action="@{${formAction}}" th:object="${form}" method="post" novalidate data-cl-async
                   th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
                 <div th:replace="~{fragments/settings-form :: errorSummary('discount-code-errors', ${errors}, null)}"></div>
@@ -85,7 +76,7 @@
                                     <span th:text="#{${errors['value']}}"></span>
                                 </p>
                             </div>
-                            <th:block th:replace="~{fragments/discount-target-fields :: fields('', ${form.target}, ${form.categories}, ${form.products}, ${form.brands})}"></th:block>
+                            <th:block th:replace="~{fragments/discount-target-fields :: fields('', 'store.discounts', ${form.target}, ${form.categories}, ${form.products}, ${form.brands})}"></th:block>
                         </div>
                     </fieldset>
 
@@ -174,11 +165,10 @@
                 </div>
             </form>
 
-            <th:block th:unless="${paymentOptions.isEmpty()}"
-                      th:insert="~{fragments/discount-target-dialog :: dialogs(${catalogs}, ${pricelistUrl})}"></th:block>
+            <th:block th:insert="~{fragments/discount-target-dialog :: dialogs(${catalogs}, ${pricelistUrl})}"></th:block>
         </div>
     </section>
-    <script th:if="${!errors.isEmpty() and !paymentOptions.isEmpty()}">
+    <script th:if="${!errors.isEmpty()}">
         document.getElementById('discount-code-errors').focus();
     </script>
     <script th:src="@{/js/async-form.js}" defer></script>

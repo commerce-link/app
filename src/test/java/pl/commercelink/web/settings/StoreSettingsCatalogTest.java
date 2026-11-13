@@ -30,7 +30,7 @@ class StoreSettingsCatalogTest {
         List<SettingsTile> tiles = allTiles();
 
         // then
-        assertThat(tiles).hasSize(17);
+        assertThat(tiles).hasSize(18);
         assertThat(tiles).extracting(SettingsTile::key).doesNotHaveDuplicates();
         assertThat(tiles).extracting(SettingsTile::icon).doesNotHaveDuplicates();
         assertThat(tiles).extracting(SettingsTile::relativePath).doesNotHaveDuplicates();
@@ -50,7 +50,7 @@ class StoreSettingsCatalogTest {
     }
 
     @Test
-    void listsDiscountCodesLastInTheSalesSectionForBothAdmins() {
+    void listsDiscountCodesAndPromotionsLastInTheSalesSectionForBothAdmins() {
         // when
         SettingsSection sales = StoreSettingsCatalog.sections().stream()
                 .filter(section -> section.messageKey().equals("store.settings.group.sales"))
@@ -58,10 +58,12 @@ class StoreSettingsCatalogTest {
 
         // then
         assertThat(sales.tiles()).extracting(SettingsTile::key)
-                .containsExactly("marketplaces", "categories", "reporting", "discounts");
-        SettingsTile discounts = StoreSettingsCatalog.tileAt("/discounts").orElseThrow();
-        assertThat(discounts.visibleFor(UserRole.ADMIN)).isTrue();
-        assertThat(discounts.visibleFor(UserRole.SUPER_ADMIN)).isTrue();
+                .containsExactly("marketplaces", "categories", "reporting", "discounts", "promotions");
+        for (String path : List.of("/discounts", "/promotions")) {
+            SettingsTile tile = StoreSettingsCatalog.tileAt(path).orElseThrow();
+            assertThat(tile.visibleFor(UserRole.ADMIN)).as(path).isTrue();
+            assertThat(tile.visibleFor(UserRole.SUPER_ADMIN)).as(path).isTrue();
+        }
     }
 
     @Test
@@ -99,13 +101,13 @@ class StoreSettingsCatalogTest {
         // then
         List<SettingsTileView> adminTiles = adminSections.stream().flatMap(section -> section.tiles().stream()).toList();
         assertThat(adminSections).hasSize(6);
-        assertThat(adminTiles).hasSize(17);
+        assertThat(adminTiles).hasSize(18);
         assertThat(adminTiles).filteredOn(tile -> tile.tile().key().equals("warehouse"))
                 .extracting(SettingsTileView::href).containsExactly("/dashboard/store/warehouse");
 
         List<SettingsTileView> superAdminTiles =
                 superAdminSections.stream().flatMap(section -> section.tiles().stream()).toList();
-        assertThat(superAdminTiles).hasSize(16);
+        assertThat(superAdminTiles).hasSize(17);
         assertThat(superAdminTiles).noneMatch(tile -> tile.tile().key().equals("rmaCenters"));
         assertThat(superAdminTiles).filteredOn(tile -> tile.tile().key().equals("warehouse"))
                 .extracting(SettingsTileView::href).containsExactly("/dashboard/store/store-1/warehouse");

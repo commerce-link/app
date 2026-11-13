@@ -149,7 +149,6 @@ public class StoreNewDiscountCodeController {
         model.addAttribute("paymentOptions", paymentGateways.paymentOptions(store));
         model.addAttribute("catalogs", productCatalogRepository.findAll(storeId));
         model.addAttribute("pricelistUrl", listPath(storeId) + "/pricelist");
-        model.addAttribute("paymentsHref", SettingsPaths.store(storeId, "/payments"));
     }
 
     private static String listPath(String storeId) {

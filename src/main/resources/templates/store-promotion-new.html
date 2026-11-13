@@ -1,0 +1,128 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body is-form">
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${backLabel}, #{store.promotions.form.title}, #{store.promotions.form.description}, null)}"></div>
+
+            <form th:fragment="promotionForm" id="promotion-form" class="cl-form"
+                  th:action="@{${formAction}}" th:object="${form}" method="post" novalidate data-cl-async
+                  th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
+                <div th:replace="~{fragments/settings-form :: errorSummary('promotion-errors', ${errors}, null)}"></div>
+
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.promotions.form.promotion.section}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-6" th:insert="~{fragments/settings-form :: textFieldLimited('name', 'store.promotions.name', *{name}, 'text', 'off', true, ${errors['name']}, #{store.promotions.name.help}, null, null, false, 100)}"></div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.promotions.form.condition.section}"></legend>
+                        <div class="cl-form-grid">
+                            <th:block th:replace="~{fragments/discount-target-fields :: fields('condition', 'store.promotions.condition', ${form.conditionTarget}, ${form.conditionCategories}, ${form.conditionProducts}, ${form.conditionBrands})}"></th:block>
+                            <div class="cl-span-3" data-cl-variant-when="conditionTarget=Category|Product|Brand"
+                                 th:insert="~{fragments/settings-form :: textFieldWith('conditionQuantity', 'store.promotions.conditionQuantity', *{conditionQuantity}, 'text', 'off', true, ${errors['conditionQuantity']}, #{store.promotions.conditionQuantity.help}, 'numeric', null, false)}"></div>
+                            <div class="cl-span-3" th:insert="~{fragments/settings-form :: textFieldWith('minOrderValue', 'store.promotions.minOrderValue', *{minOrderValue}, 'text', 'off', false, ${errors['minOrderValue']}, #{store.discounts.minOrderValue.help}, 'decimal', #{store.discounts.minOrderValue.placeholder}, false)}"></div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.promotions.form.discount.section}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-6">
+                                <fieldset class="cl-choice-group is-row" id="type">
+                                    <legend class="cl-label" th:text="#{store.discounts.type}"></legend>
+                                    <label class="cl-choice" th:each="kind : ${ {'Percentage', 'Amount'} }">
+                                        <input type="radio" name="type" th:value="${kind}" th:checked="${form.type == kind}"
+                                               data-cl-variant-select="discount-type"/>
+                                        <span class="cl-choice-text">
+                                            <span class="cl-choice-title" th:text="#{${'store.discounts.type.' + kind}}"></span>
+                                            <span class="cl-choice-description" th:text="#{${'store.discounts.type.' + kind + '.description'}}"></span>
+                                        </span>
+                                    </label>
+                                </fieldset>
+                                <p th:if="${errors['type'] != null}" class="cl-field-error">
+                                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                    <span th:text="#{${errors['type']}}"></span>
+                                </p>
+                            </div>
+                            <div class="cl-field cl-span-2">
+                                <label class="cl-label" for="value" th:text="#{store.discounts.value}"></label>
+                                <input class="cl-input cl-tabular" th:classappend="${errors['value'] != null} ? 'is-invalid'"
+                                       id="value" name="value" type="text" inputmode="decimal" required autocomplete="off"
+                                       th:value="*{value}"
+                                       th:attr="aria-invalid=${errors['value'] != null ? 'true' : null},
+                                                aria-describedby=${errors['value'] != null ? 'value-help-percentage value-help-amount value-error' : 'value-help-percentage value-help-amount'}"/>
+                                <p class="cl-help" id="value-help-percentage" data-cl-variant-when="discount-type=Percentage"
+                                   th:text="#{store.discounts.value.help.percentage}"></p>
+                                <p class="cl-help" id="value-help-amount" data-cl-variant-when="discount-type=Amount"
+                                   th:text="#{store.discounts.value.help.amount}"></p>
+                                <p th:if="${errors['value'] != null}" class="cl-field-error" id="value-error">
+                                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                    <span th:text="#{${errors['value']}}"></span>
+                                </p>
+                            </div>
+                            <th:block th:replace="~{fragments/discount-target-fields :: fields('', 'store.promotions', ${form.target}, ${form.categories}, ${form.products}, ${form.brands})}"></th:block>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.promotions.form.validity.section}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('validFrom', 'store.promotions.validFrom', *{validFrom}, 'datetime-local', 'off', false, ${errors['validFrom']}, null)}"></div>
+                            <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('validTo', 'store.promotions.validTo', *{validTo}, 'datetime-local', 'off', false, ${errors['validTo']}, null)}"></div>
+                            <p class="cl-help cl-span-6" th:text="#{store.promotions.dates.help}"></p>
+                            <div class="cl-span-6" th:insert="~{fragments/settings-form :: check('active', 'store.promotions.active', *{active}, 'store.promotions.active.description', null, null)}"></div>
+                        </div>
+                    </fieldset>
+
+                    <div class="cl-card-body" data-promotion-summary hidden
+                         th:attr="data-always=#{store.promotions.summary.always}, data-minimum-only=#{store.promotions.summary.minimum},
+                                  data-categories=#{store.promotions.summary.categories}, data-no-categories=#{store.promotions.summary.categories.none},
+                                  data-products=#{store.promotions.summary.products}, data-no-products=#{store.promotions.summary.products.none},
+                                  data-brands=#{store.promotions.summary.brands}, data-no-brands=#{store.promotions.summary.brands.none},
+                                  data-and-minimum=#{store.promotions.summary.andMinimum},
+                                  data-percentage=#{store.promotions.summary.percentage}, data-amount=#{store.promotions.summary.amount},
+                                  data-basket=#{store.discounts.summary.basket},
+                                  data-target-categories=#{store.discounts.summary.categories}, data-target-no-categories=#{store.discounts.summary.categories.none},
+                                  data-target-products=#{store.discounts.summary.products}, data-target-no-products=#{store.discounts.summary.products.none},
+                                  data-target-brands=#{store.discounts.summary.brands}, data-target-no-brands=#{store.discounts.summary.brands.none},
+                                  data-no-dates=#{store.promotions.summary.noDates}, data-from=#{store.promotions.summary.from},
+                                  data-to=#{store.promotions.summary.to}, data-range=#{store.promotions.summary.range},
+                                  data-inactive=#{store.promotions.summary.inactive}">
+                        <div class="cl-alert is-info" role="status">
+                            <i class="fas fa-info-circle cl-alert-icon" aria-hidden="true"></i>
+                            <div>
+                                <p class="cl-alert-title" th:text="#{store.promotions.summary.title}"></p>
+                                <p class="cl-alert-text" data-promotion-summary-text></p>
+                                <p class="cl-alert-text" th:text="#{store.promotions.summary.rule}"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{store.promotions.form.submit}"></button>
+                        <a class="cl-button" th:href="@{${backHref}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+
+            <th:block th:insert="~{fragments/discount-target-dialog :: dialogs(${catalogs}, ${pricelistUrl})}"></th:block>
+        </div>
+    </section>
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('promotion-errors').focus();
+    </script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+    <script th:src="@{/js/variant-fields.js}" defer></script>
+    <script th:src="@{/js/money.js}" defer></script>
+    <script th:src="@{/js/discount-target-picker.js}" defer></script>
+    <script th:src="@{/js/promotion-form.js}" defer></script>
+</div>
+</body>
+</html>

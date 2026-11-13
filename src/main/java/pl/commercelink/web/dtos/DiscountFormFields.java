@@ -55,6 +55,12 @@ final class DiscountFormFields {
         }
     }
 
+    static void validateMinOrderValue(Map<String, String> errors, String minOrderValue) {
+        if (StringUtils.isNotBlank(minOrderValue) && FormNumbers.decimal(minOrderValue).filter(v -> v >= 0).isEmpty()) {
+            errors.put("minOrderValue", "store.discounts.minOrderValue.invalid");
+        }
+    }
+
     static void validateDates(Map<String, String> errors, String validFrom, String validTo) {
         if (!isBlankOrReadable(validFrom)) {
             errors.put("validFrom", "store.discounts.validFrom.invalid");
@@ -105,6 +111,10 @@ final class DiscountFormFields {
         };
     }
 
+    static double minOrderValue(String value) {
+        return FormNumbers.decimal(value).map(DiscountFormFields::toGrosz).orElse(0.0);
+    }
+
     static LocalDateTime validFrom(String value) {
         return dateTime(value).orElse(null);
     }
@@ -113,7 +123,7 @@ final class DiscountFormFields {
         return dateTime(value).map(end -> end.withSecond(59)).orElse(null);
     }
 
-    static double toGrosz(double value) {
+    private static double toGrosz(double value) {
         return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).doubleValue();
     }
 

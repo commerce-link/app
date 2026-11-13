@@ -1,0 +1,99 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page" th:with="promotion=${details.summary()}">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: record(${backHref}, ${backLabel}, ${promotion.name()}, null, ~{::promotionStatus}, null, ~{::promotionActions})}">
+                <th:block th:fragment="promotionStatus">
+                    <span class="cl-status" th:classappend="${promotion.statusTone()}"
+                          th:text="#{${'store.promotions.status.' + promotion.status().name()}}"></span>
+                </th:block>
+                <th:block th:fragment="promotionActions">
+                    <form method="post" th:action="@{${details.toggleHref()}}">
+                        <input type="hidden" name="active" th:value="${!details.active()}"/>
+                        <button type="submit" class="cl-button"
+                                th:text="${details.active()} ? #{store.promotions.toggle.off} : #{store.promotions.toggle.on}"></button>
+                    </form>
+                    <a class="cl-button is-danger-outline" th:href="@{${details.deleteHref()}}" data-cl-confirm
+                       th:attr="data-cl-confirm-title=#{store.promotions.delete.title(${promotion.name()})},
+                                data-cl-confirm-message=#{store.promotions.delete.message},
+                                data-cl-confirm-action=#{store.promotions.delete}"><i class="fas fa-trash-alt" aria-hidden="true"></i><span
+                            th:text="#{store.promotions.delete}"></span></a>
+                </th:block>
+            </div>
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
+
+            <div class="cl-stack is-wide">
+                <section class="cl-card" aria-labelledby="promotion-params-title">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="promotion-params-title" th:text="#{store.promotions.details.params}"></h2>
+                    </div>
+                    <dl class="cl-kv is-rows cl-card-inset">
+                        <div>
+                            <dt th:text="#{store.promotions.details.condition}"></dt>
+                            <dd th:if="${promotion.conditionTarget() == null}" th:text="#{store.promotions.condition.target.basket}"></dd>
+                            <dd th:if="${promotion.conditionTarget() != null}">
+                                <ul>
+                                    <li th:each="value : ${details.conditionValues()}">
+                                        <span th:text="${value.name}"></span>
+                                        <span th:if="${promotion.conditionTarget().name() == 'Product'}" class="cl-kv-sub"
+                                              th:text="#{store.discounts.details.productId(${value.id})}"></span>
+                                    </li>
+                                </ul>
+                                <span class="cl-kv-sub"
+                                      th:text="#{store.promotions.details.condition.quantity(${#messages.msg('store.discounts.target.' + promotion.conditionTarget().name())}, ${promotion.conditionQuantity()})}"></span>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt th:text="#{store.promotions.details.minimum}"></dt>
+                            <dd class="cl-tabular" th:text="${promotion.minOrderValue() != null} ? #{store.discounts.details.minimum.value(${promotion.minOrderValue()})} : #{store.discounts.details.none}"></dd>
+                        </div>
+                        <div>
+                            <dt th:text="#{store.promotions.details.discount}"></dt>
+                            <dd>
+                                <span class="cl-tabular" th:text="${promotion.percentage()} ? #{store.discounts.list.percent(${promotion.value()})} : #{store.discounts.list.amount(${promotion.value()})}"></span>
+                                <span class="cl-kv-sub" th:text="${promotion.percentage()} ? #{store.discounts.details.discount.percentage} : #{store.discounts.details.discount.amount}"></span>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt th:text="#{store.promotions.target}"></dt>
+                            <dd th:if="${promotion.target() == null}" th:text="#{store.promotions.target.basket}"></dd>
+                            <dd th:if="${promotion.target() != null}">
+                                <ul>
+                                    <li th:each="value : ${details.targetValues()}">
+                                        <span th:text="${value.name}"></span>
+                                        <span th:if="${promotion.target().name() == 'Product'}" class="cl-kv-sub"
+                                              th:text="#{store.discounts.details.productId(${value.id})}"></span>
+                                    </li>
+                                </ul>
+                                <span class="cl-kv-sub" th:text="#{${'store.discounts.target.' + promotion.target().name()}}"></span>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt th:text="#{store.promotions.details.validity}"></dt>
+                            <dd class="cl-tabular"
+                                th:text="${details.validFrom() != null and details.validTo() != null} ? #{store.discounts.validity.range(${details.validFrom()}, ${details.validTo()})}
+                                        : (${details.validFrom() != null} ? #{store.discounts.validity.from(${details.validFrom()})}
+                                        : (${details.validTo() != null} ? #{store.discounts.validity.to(${details.validTo()})} : #{store.discounts.validity.none}))"></dd>
+                        </div>
+                        <div>
+                            <dt th:text="#{store.promotions.details.createdAt}"></dt>
+                            <dd>
+                                <span class="cl-tabular" th:text="${details.createdAt()}"></span>
+                                <span class="cl-kv-sub" th:text="#{store.promotions.details.createdAt.help}"></span>
+                            </dd>
+                        </div>
+                    </dl>
+                </section>
+            </div>
+
+            <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
+        </div>
+    </section>
+    <script th:src="@{/js/confirm-dialog.js}" defer></script>
+</div>
+</body>
+</html>
