@@ -410,34 +410,91 @@ public class Order {
     }
 
     /** What stands between the order and cancelling it; empty when it can be cancelled. */
-    public enum CancelBlocker { NOT_DELIVERED, PRODUCTS_NOT_RETURNED, PAYMENTS_NOT_REFUNDED }
+    public enum CancelBlocker { ALREADY_CANCELLED, PRODUCTS_NOT_RETURNED, DROPSHIP_ITEMS, ITEMS_NOT_RELEASABLE, COURIER_ORDERED }
 
+    // Cancelled is here for a cancel that stopped half-way (see cancelBlockers): its items are finished, not in the way
+    private static final Set<FulfilmentStatus> RELEASABLE_ON_CANCEL = EnumSet.of(
+            FulfilmentStatus.New, FulfilmentStatus.Allocation, FulfilmentStatus.Ordered, FulfilmentStatus.Delivered,
+            FulfilmentStatus.Cancelled);
+
+    /**
+     * The goods (may) have left: the order reached Shipping, a parcel went out or a goods issue was written. From here
+     * on cancelling waits for the products to come back through an RMA; before it, the goods are simply released.
+     */
     @DynamoDBIgnore
-    public boolean canBeCancelled(List<OrderItem> orderItems) {
-        return cancelBlockers(orderItems).isEmpty();
+    public boolean hasGoodsOut() {
+        return hasOneOfStatuses(OrderStatus.Shipping, OrderStatus.Delivered, OrderStatus.Completed)
+                || hasShippedShipment()
+                || getDocumentByType(DocumentType.GoodsIssue).isPresent();
     }
 
-    /** The conditions of {@link #canBeCancelled} this order does not meet yet, so a reason can name exactly those. */
     @DynamoDBIgnore
-    public Set<CancelBlocker> cancelBlockers(List<OrderItem> orderItems) {
+    public boolean canBeCancelled(List<OrderItem> orderItems, Set<String> dropshipItemIds) {
+        return cancelBlockers(orderItems, dropshipItemIds).isEmpty();
+    }
+
+    /**
+     * The conditions of {@link #canBeCancelled} this order does not meet yet, so a reason can name exactly those.
+     * dropshipItemIds: the items sitting in a dropship delivery (DropshipItemLookup), whose goods travel from the
+     * supplier to the customer and cannot be taken back into the warehouse.
+     */
+    @DynamoDBIgnore
+    public Set<CancelBlocker> cancelBlockers(List<OrderItem> orderItems, Set<String> dropshipItemIds) {
         Set<CancelBlocker> blockers = EnumSet.noneOf(CancelBlocker.class);
-        if (!hasOneOfStatuses(OrderStatus.Delivered, OrderStatus.Completed)) {
-            blockers.add(CancelBlocker.NOT_DELIVERED);
+        // A cancelled order whose items did not all follow it is one whose cancel stopped between the two saves
+        // (OrdersManager#cancelOrder): cancelling again finishes it, so only a fully cancelled order refuses.
+        if (hasStatus(OrderStatus.Cancelled)
+                && orderItems.stream().allMatch(item -> item.isCancelled() || item.isReturned())) {
+            blockers.add(CancelBlocker.ALREADY_CANCELLED);
+            return blockers;
         }
-        if (getPaidAmount() != 0) {
-            blockers.add(CancelBlocker.PAYMENTS_NOT_REFUNDED);
+        List<OrderItem> products = orderItems.stream().filter(OrderItem::isProduct).toList();
+        if (hasGoodsOut()) {
+            if (!products.stream().allMatch(OrderItem::isReturned)) {
+                blockers.add(CancelBlocker.PRODUCTS_NOT_RETURNED);
+            }
+            return blockers;
         }
-        if (!orderItems.stream().filter(OrderItem::isProduct).allMatch(OrderItem::isReturned)) {
-            blockers.add(CancelBlocker.PRODUCTS_NOT_RETURNED);
+        if (products.stream().anyMatch(item -> dropshipItemIds.contains(item.getItemId()))) {
+            blockers.add(CancelBlocker.DROPSHIP_ITEMS);
+        }
+        if (products.stream().anyMatch(item -> item.isClaimed() || !RELEASABLE_ON_CANCEL.contains(item.getStatus())
+                || holdsGoodsThatCannotBeReleased(item))) {
+            blockers.add(CancelBlocker.ITEMS_NOT_RELEASABLE);
+        }
+        if (courierShipmentToCancel().isPresent() || hasShipmentBeingCreated()) {
+            blockers.add(CancelBlocker.COURIER_ORDERED);
         }
         return blockers;
     }
 
+    /**
+     * Ordered or Delivered without the delivery, EAN and manufacturer code the release goes by (Item#isAllocated):
+     * the warehouse could not be given the goods back, so cancelling would lose them from stock.
+     */
+    private static boolean holdsGoodsThatCannotBeReleased(OrderItem item) {
+        return item.hasOneOfTheStatuses(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered) && !item.isAllocated();
+    }
+
+    /**
+     * After the goods went out, the products are already Returned (RMA) and the services follow them. Before that
+     * nothing left: every item becomes Cancelled, and the caller has released the allocated goods first
+     * (OrdersManager#cancelOrder), so what is still in Allocation only loses its supplier.
+     */
     @DynamoDBIgnore
     public void cancel(List<OrderItem> orderItems) {
-        orderItems.stream()
-                .filter(i -> i.isService())
-                .forEach(OrderItem::markAsReturned);
+        if (hasGoodsOut()) {
+            orderItems.stream()
+                    .filter(i -> i.isService())
+                    .forEach(OrderItem::markAsReturned);
+        } else {
+            orderItems.forEach(item -> {
+                if (item.isProduct() && !item.isNew()) {
+                    item.removeFulfilment();
+                }
+                item.markAsCancelled();
+            });
+        }
 
         this.totalPrice = orderItems.stream()
                 .mapToDouble(OrderItem::getTotalPrice)

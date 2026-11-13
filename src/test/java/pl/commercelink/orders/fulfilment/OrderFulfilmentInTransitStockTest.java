@@ -12,6 +12,7 @@ import pl.commercelink.inventory.deliveries.DeliveryType;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.invoicing.api.Price;
+import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
@@ -86,6 +87,25 @@ class OrderFulfilmentInTransitStockTest {
         // inStock=false: the reservation was confirmed against a delivery still travelling to us.
         item.copyFulfilmentFrom(new ReservationConfirmation("delivery-1", EAN, MFN, Price.fromNet(20.0), 1, false, null, ItemCondition.Sealed));
         return item;
+    }
+
+    @Test
+    void aFulfilmentRequestLeftFromBeforeTheCancelFulfilsNothing() {
+        // given: the cancelled items look unallocated, which is all the candidate filter asks
+        Order order = new Order(STORE_ID);
+        order.setOrderId(ORDER_ID);
+        order.setStatus(OrderStatus.Cancelled);
+        OrderItem item = new OrderItem(ORDER_ID, Categories.UNCATEGORIZED, "Widget", 1, 199.0, MFN, false);
+        item.markAsCancelled();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        List<OrderItem> fulfilled = fulfilment().commit(STORE_ID, List.of(item));
+
+        // then
+        assertEquals(List.of(), fulfilled);
+        assertEquals(FulfilmentStatus.Cancelled, item.getStatus());
+        org.mockito.Mockito.verifyNoInteractions(warehouseFulfilmentService);
     }
 
     @Test

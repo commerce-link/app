@@ -47,12 +47,15 @@
                     <dialog th:replace="~{orders/details/history :: reviewDialog}"></dialog>
                     <th:block th:if="${page.customer().billingForm() != null}"><dialog th:replace="~{orders/details/address :: dialog(${page.customer().billingForm()})}"></dialog></th:block>
                     <th:block th:if="${page.customer().shippingForm() != null}"><dialog th:replace="~{orders/details/address :: dialog(${page.customer().shippingForm()})}"></dialog></th:block>
+                </th:block>
+                <!--/* outside readOnly: a cancelled order still records the refund of what the customer paid */-->
+                <th:block th:if="${page.payments().editable()}">
                     <div th:replace="~{fragments/add-payment-modal :: addPaymentModal(
                             formAction=@{/dashboard/orders/{o}/addPayment(o=${page.orderId()})},
                             expectedAmount=${page.payments().expected()},
                             pendingPayment=${page.payments().pending()},
                             paymentSources=${page.payments().sources()},
-                            loadMoneyJs=false)}"></div>
+                            loadMoneyJs=${page.readOnly()})}"></div>
                     <th:block th:replace="~{orders/details/payments :: dialogs}"></th:block>
                 </th:block>
             </th:block>

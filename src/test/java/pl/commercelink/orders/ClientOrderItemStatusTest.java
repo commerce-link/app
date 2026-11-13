@@ -19,7 +19,8 @@ class ClientOrderItemStatusTest {
             "InExternalService, InClaim",
             "Returned, Returned",
             "Replaced, Returned",
-            "Destroyed, Returned"
+            "Destroyed, Returned",
+            "Cancelled, Cancelled"
     })
     @DisplayName("from hides the New/Allocation distinction and maps the remaining statuses onto customer labels")
     void fromMapsFulfilmentStatusesOntoCustomerLabels(FulfilmentStatus status, ClientOrderItemStatus expected) {
