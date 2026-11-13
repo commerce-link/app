@@ -10,25 +10,20 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.apache.commons.lang3.StringUtils;
-import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
-import java.util.function.Function;
 import java.util.regex.Pattern;
 
 @DynamoDBTable(tableName = DiscountCode.TABLE_NAME)
 @Getter
 @Setter
 @NoArgsConstructor
-public class DiscountCode {
+public class DiscountCode implements Discount {
 
     public static final String TABLE_NAME = "DiscountCodes";
     public static final ZoneId ZONE = ZoneId.of("Europe/Warsaw");
@@ -86,39 +81,11 @@ public class DiscountCode {
         return maxUses > 0 && usedCount > maxUses;
     }
 
-    /**
-     * @param productAliases the ids a product is known by in the store (itself, its source, its clone); a product
-     *                       target covers the item when any of them is a target
-     */
-    public boolean covers(BasketItem item, Function<String, Set<String>> productAliases) {
-        if (!item.isProduct()) {
-            return false;
-        }
-        if (target == null) {
-            return true;
-        }
-        Set<String> values = new HashSet<>();
-        values.add(StringUtils.trim(target.valueIn(item)));
-        if (target == DiscountTarget.Product && item.getId() != null) {
-            productAliases.apply(item.getId()).forEach(alias -> values.add(StringUtils.trim(alias)));
-        }
-        values.remove(null);
-        return targetValues.stream().anyMatch(v -> values.contains(StringUtils.trim(v.getId())));
-    }
-
+    @Override
     public DiscountCodeStatus statusAt(LocalDateTime now) {
-        if (!active) {
-            return DiscountCodeStatus.Disabled;
-        }
-        if (isExhausted()) {
+        if (active && isExhausted()) {
             return DiscountCodeStatus.Exhausted;
         }
-        if (validTo != null && now.isAfter(validTo)) {
-            return DiscountCodeStatus.Expired;
-        }
-        if (validFrom != null && now.isBefore(validFrom)) {
-            return DiscountCodeStatus.Scheduled;
-        }
-        return DiscountCodeStatus.Active;
+        return Discount.super.statusAt(now);
     }
 }

@@ -2,6 +2,7 @@ package pl.commercelink.discounts;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.checkout.CheckoutError;
@@ -11,7 +12,6 @@ import pl.commercelink.products.information.StorePimAliases;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -23,6 +23,12 @@ public class DiscountService {
     private final StorePimAliases aliases;
 
     public void apply(Basket basket, String code, String paymentProvider) {
+        if (StringUtils.isNotBlank(code)) {
+            applyCode(basket, code, paymentProvider);
+        }
+    }
+
+    private void applyCode(Basket basket, String code, String paymentProvider) {
         String normalized = DiscountCode.normalize(code);
         DiscountCode discountCode = discountCodesRepository.find(basket.getStoreId(), normalized)
                 .orElseThrow(() -> refusal(CheckoutError.DiscountCodeNotFound, basket, normalized, "does not exist"));
@@ -49,19 +55,15 @@ public class DiscountService {
                     detail(basket, normalized, "needs a basket of " + minimum), minimum);
         }
 
-        List<DiscountedLine> lines = DiscountCalculator.calculate(discountCode, basket.getEffectiveBasketItems(),
+        DiscountCalculation calculation = DiscountCalculator.calculate(discountCode, basket.getEffectiveBasketItems(),
                 id -> aliases.aliasesOf(basket.getStoreId(), id));
-        if (lines.isEmpty()) {
+        if (calculation.lines().isEmpty()) {
             throw refusal(CheckoutError.DiscountCodeNotApplicable, basket, normalized, "covers nothing in the basket");
         }
 
-        BigDecimal amount = lines.stream()
-                .map(l -> BigDecimal.valueOf(l.item().getUnitPrice()).subtract(BigDecimal.valueOf(l.unitPrice()))
-                        .multiply(BigDecimal.valueOf(l.item().getQty())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        lines.forEach(l -> l.item().setUnitPrice(l.unitPrice()));
+        calculation.applyPrices();
         basket.setDiscountCode(discountCode.getCode());
-        basket.setDiscountAmount(money(amount.doubleValue()).doubleValue());
+        basket.setDiscountAmount(calculation.amount().doubleValue());
     }
 
     public void redeem(String storeId, String code) {

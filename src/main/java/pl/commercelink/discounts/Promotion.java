@@ -19,7 +19,7 @@ import java.util.List;
 @Getter
 @Setter
 @NoArgsConstructor
-public class Promotion {
+public class Promotion implements Discount {
 
     public static final String TABLE_NAME = "Promotions";
 
@@ -59,17 +59,4 @@ public class Promotion {
     @DynamoDBAttribute(attributeName = "createdAt")
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime createdAt;
-
-    public DiscountCodeStatus statusAt(LocalDateTime now) {
-        if (!active) {
-            return DiscountCodeStatus.Disabled;
-        }
-        if (validTo != null && now.isAfter(validTo)) {
-            return DiscountCodeStatus.Expired;
-        }
-        if (validFrom != null && now.isBefore(validFrom)) {
-            return DiscountCodeStatus.Scheduled;
-        }
-        return DiscountCodeStatus.Active;
-    }
 }

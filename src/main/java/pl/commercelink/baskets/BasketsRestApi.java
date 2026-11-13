@@ -62,9 +62,7 @@ public class BasketsRestApi {
 
         fillBasket(basket, req);
         Map<BasketItem, Double> listPrices = CreatedBasketResponse.listPrices(basket);
-        if (StringUtils.isNotBlank(req.getDiscountCode())) {
-            discountService.apply(basket, req.getDiscountCode(), paymentProvider(store, req.getPaymentOptionId()));
-        }
+        discountService.apply(basket, req.getDiscountCode(), paymentProvider(store, req.getPaymentOptionId()));
         if (validate) {
             return ResponseEntity.ok(CreatedBasketResponse.preview(basket, listPrices));
         }

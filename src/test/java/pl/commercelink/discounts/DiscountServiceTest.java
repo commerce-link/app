@@ -12,6 +12,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -36,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -111,6 +114,23 @@ class DiscountServiceTest {
         // when / then
         assertThatThrownBy(() -> discountService.apply(basket, CODE, PROVIDER))
                 .isInstanceOfSatisfying(CheckoutException.class, e -> assertThat(e.getError()).isEqualTo(expected));
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getUnitPrice).containsExactly(129.90, 50.00, 100.00);
+        assertThat(basket.getDiscountCode()).isNull();
+        assertThat(basket.getDiscountAmount()).isZero();
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = " ")
+    void blankCodeLeavesTheBasketUntouched(String code) {
+        // given
+        Basket basket = basket();
+
+        // when
+        discountService.apply(basket, code, PROVIDER);
+
+        // then
+        verifyNoInteractions(discountCodesRepository);
         assertThat(basket.getBasketItems()).extracting(BasketItem::getUnitPrice).containsExactly(129.90, 50.00, 100.00);
         assertThat(basket.getDiscountCode()).isNull();
         assertThat(basket.getDiscountAmount()).isZero();

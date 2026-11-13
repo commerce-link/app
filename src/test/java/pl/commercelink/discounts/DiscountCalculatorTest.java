@@ -21,11 +21,11 @@ class DiscountCalculatorTest {
         BasketItem clone = product("C", 100, 1);
 
         // when
-        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(clone), aliasesOfS());
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(clone), aliasesOfS()).lines();
 
         // then
         assertThat(lines).hasSize(1);
-        assertThat(DiscountCalculator.calculate(code, List.of(clone), Set::of)).isEmpty();
+        assertThat(DiscountCalculator.calculate(code, List.of(clone), Set::of).lines()).isEmpty();
     }
 
     @Test
@@ -35,13 +35,13 @@ class DiscountCalculatorTest {
         BasketItem source = product("S", 100, 1);
 
         // when / then
-        assertThat(DiscountCalculator.calculate(code, List.of(source), aliasesOfS())).hasSize(1);
+        assertThat(DiscountCalculator.calculate(code, List.of(source), aliasesOfS()).lines()).hasSize(1);
     }
 
     @Test
     void discountForAnUnrelatedProductCoversNeither() {
         // when / then
-        assertThat(DiscountCalculator.calculate(percentage(10, DiscountTarget.Product, "pim-G"), List.of(product("C", 100, 1)), aliasesOfS())).isEmpty();
+        assertThat(DiscountCalculator.calculate(percentage(10, DiscountTarget.Product, "pim-G"), List.of(product("C", 100, 1)), aliasesOfS()).lines()).isEmpty();
     }
 
     private static Function<String, Set<String>> aliasesOfS() {
@@ -56,7 +56,7 @@ class DiscountCalculatorTest {
         BasketItem cable = product("Kabel", 0.10, 1);
 
         // when
-        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(gpu, cable), Set::of);
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(gpu, cable), Set::of).lines();
 
         // then
         assertThat(lines).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
@@ -71,7 +71,7 @@ class DiscountCalculatorTest {
         BasketItem pad = product("Podkładka", 1.00, 1);
 
         // when
-        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(sticker, pad), Set::of);
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(sticker, pad), Set::of).lines();
 
         // then
         assertThat(lines).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
@@ -86,7 +86,7 @@ class DiscountCalculatorTest {
         BasketItem ram = product("RAM", 50.00, 1);
 
         // when
-        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(ram, gpu), Set::of);
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(ram, gpu), Set::of).lines();
 
         // then
         assertThat(lines).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
@@ -100,7 +100,7 @@ class DiscountCalculatorTest {
         BasketItem fans = product("Wentylator", 100.00, 3);
 
         // when
-        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(fans), Set::of);
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(fans), Set::of).lines();
 
         // then
         assertThat(lines).extracting(DiscountedLine::unitPrice).containsExactly(96.67);
@@ -114,7 +114,7 @@ class DiscountCalculatorTest {
         BasketItem ram = product("RAM", 50.00, 1);
 
         // when
-        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(gpu, ram), Set::of);
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(gpu, ram), Set::of).lines();
 
         // then
         assertThat(lines).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
@@ -134,7 +134,7 @@ class DiscountCalculatorTest {
         service.setService(true);
 
         // when
-        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(acme, globex, service), Set::of);
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(acme, globex, service), Set::of).lines();
 
         // then
         assertThat(lines).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
@@ -148,7 +148,7 @@ class DiscountCalculatorTest {
         BasketItem gpu = product("GPU", 100.00, 1);
 
         // when
-        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(gpu), Set::of);
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(gpu), Set::of).lines();
 
         // then
         assertThat(lines).isEmpty();
@@ -161,10 +161,61 @@ class DiscountCalculatorTest {
         BasketItem gift = product("Gratis", 0.00, 1);
 
         // when
-        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(gift), Set::of);
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(gift), Set::of).lines();
 
         // then
         assertThat(lines).isEmpty();
+    }
+
+    @Test
+    void amountSumsTheDiscountOfEveryUnitWithoutChangingPrices() {
+        // given
+        DiscountCode code = percentage(10);
+        BasketItem gpu = product("GPU", 129.90, 3);
+        BasketItem ram = product("RAM", 50.00, 1);
+
+        // when
+        DiscountCalculation calculation = DiscountCalculator.calculate(code, List.of(gpu, ram), Set::of);
+
+        // then
+        assertThat(calculation.amount()).isEqualByComparingTo("43.97");
+        assertThat(gpu.getUnitPrice()).isEqualTo(129.90);
+        assertThat(ram.getUnitPrice()).isEqualTo(50.00);
+    }
+
+    @Test
+    void applyPricesWritesTheDiscountedPricesToTheItems() {
+        // given
+        DiscountCalculation calculation = DiscountCalculator.calculate(amount(10), List.of(product("GPU", 100.00, 1)), Set::of);
+
+        // when
+        calculation.applyPrices();
+
+        // then
+        assertThat(calculation.lines()).extracting(l -> l.item().getUnitPrice()).containsExactly(90.00);
+        assertThat(calculation.amount()).isEqualByComparingTo("10.00");
+    }
+
+    @Test
+    void promotionIsCalculatedLikeACode() {
+        // given
+        Promotion promotion = new Promotion();
+        promotion.setType(DiscountType.Percentage);
+        promotion.setValue(20);
+        promotion.setTarget(DiscountTarget.Brand);
+        promotion.setTargetValues(List.of(new TargetValue("Acme", "Acme")));
+        BasketItem acme = product("GPU", 100.00, 2);
+        acme.setBrand("Acme");
+        BasketItem globex = product("RAM", 50.00, 1);
+        globex.setBrand("Globex");
+
+        // when
+        DiscountCalculation calculation = DiscountCalculator.calculate(promotion, List.of(acme, globex), Set::of);
+
+        // then
+        assertThat(calculation.lines()).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
+                .containsExactly(tuple("GPU", 80.00));
+        assertThat(calculation.amount()).isEqualByComparingTo("40.00");
     }
 
     private static DiscountCode percentage(double value, DiscountTarget target, String... values) {

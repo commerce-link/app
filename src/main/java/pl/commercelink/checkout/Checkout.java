@@ -205,9 +205,7 @@ public class Checkout {
                 .withDeliveryOptionId(req.getDeliveryOptionId())
                 .build();
 
-        if (!isBlank(req.getDiscountCode())) {
-            discountService.apply(basket, req.getDiscountCode(), providerName);
-        }
+        discountService.apply(basket, req.getDiscountCode(), providerName);
 
         basketsRepository.save(basket);
 
