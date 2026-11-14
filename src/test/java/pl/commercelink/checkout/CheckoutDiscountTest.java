@@ -274,6 +274,102 @@ class CheckoutDiscountTest {
                 assertThat(r.lineItems()).extracting(PaymentLineItem::amount).containsExactly(90000));
     }
 
+    @Test
+    void amountCodeIsChargedOverEveryUnitAndTheChargeIsTheListTotalLessTheDiscountWithDelivery() {
+        // given: 100 zł over 2 × 1000 and 3 × 200; the grosz left after the split falls on the line of two units
+        givenCode(code(DiscountType.Amount, 100));
+        Map<String, Object> body = withCode(validRequest(line("pim-gpu", 2, true), line("pim-ram", 3, true), line("pim-srv", 1, true)));
+        body.put("deliveryOptionId", "inpost");
+
+        // when
+        checkout.create(STORE_ID, request(body));
+
+        // then
+        verify(paymentProvider).createPaymentLink(paymentRequest.capture());
+        assertThat(paymentRequest.getValue().lineItems()).extracting(PaymentLineItem::amount, PaymentLineItem::quantity)
+                .containsExactly(tuple(96154, 2), tuple(19231, 3), tuple(10000, 1));
+        assertThat(paymentRequest.getValue().shippingItem().amount()).isEqualTo(1500);
+        verify(basketsRepository).save(savedBasket.capture());
+        assertThat(savedBasket.getValue().getDiscountAmount()).isEqualTo(99.99);
+        assertThat(charged(paymentRequest.getValue()))
+                .isEqualTo(270_000 - 9_999 + 1_500)
+                .isEqualTo(grosze(savedBasket.getValue().getTotalPrice() + 15.00));
+    }
+
+    @Test
+    void promotionsAreChargedWithTheLargerDiscountOnEveryItemAndTheChargeAddsUp() {
+        // given: 10% on graphics cards beats the card's share of 50 zł off everything, the RAM keeps its share
+        Promotion cards = promotion(DiscountType.Percentage, 10);
+        cards.setTarget(DiscountTarget.Category);
+        cards.setTargetValues(List.of(new TargetValue("Karty graficzne", "Karty graficzne")));
+        when(promotionsRepository.findAll(STORE_ID)).thenReturn(List.of(cards, promotion(DiscountType.Amount, 50)));
+        Map<String, Object> body = validRequest(line("pim-gpu", 2, true), line("pim-ram", 3, true), line("pim-srv", 1, true));
+        body.put("deliveryOptionId", "inpost");
+
+        // when
+        checkout.create(STORE_ID, request(body));
+
+        // then
+        verify(paymentProvider).createPaymentLink(paymentRequest.capture());
+        assertThat(paymentRequest.getValue().lineItems()).extracting(PaymentLineItem::amount, PaymentLineItem::quantity)
+                .containsExactly(tuple(90000, 2), tuple(19616, 3), tuple(10000, 1));
+        verify(basketsRepository).save(savedBasket.capture());
+        assertThat(savedBasket.getValue().getDiscountCode()).isNull();
+        assertThat(savedBasket.getValue().getDiscountAmount()).isEqualTo(211.52);
+        assertThat(charged(paymentRequest.getValue()))
+                .isEqualTo(270_000 - 21_152 + 1_500)
+                .isEqualTo(grosze(savedBasket.getValue().getTotalPrice() + 15.00));
+    }
+
+    @Test
+    void consolidatedLineIsChargedAtTheDiscountedPricesOfItsItems() {
+        // given
+        givenCode(percentage(10));
+        Map<String, Object> body = withCode(validRequest(line("pim-gpu", 2, false), line("pim-ram", 1, false), line("pim-srv", 1, true)));
+
+        // when
+        checkout.create(STORE_ID, request(body));
+
+        // then
+        verify(paymentProvider).createPaymentLink(paymentRequest.capture());
+        assertThat(paymentRequest.getValue().lineItems()).extracting(PaymentLineItem::amount, PaymentLineItem::quantity)
+                .containsExactly(tuple(198000, 1), tuple(10000, 1));
+        verify(basketsRepository).save(savedBasket.capture());
+        assertThat(savedBasket.getValue().getDiscountAmount()).isEqualTo(220.00);
+        assertThat(charged(paymentRequest.getValue())).isEqualTo(230_000 - 22_000);
+    }
+
+    @Test
+    void linesWithoutAPositiveQuantityAreNeitherSavedNorCharged() {
+        // when
+        checkout.create(STORE_ID, request(validRequest(line("pim-gpu", 1, true), line("pim-ram", 0, true), line("pim-srv", -1, true))));
+
+        // then
+        verify(basketsRepository).save(savedBasket.capture());
+        assertThat(savedBasket.getValue().getBasketItems()).extracting(BasketItem::getId).containsExactly("pim-gpu");
+        verify(paymentProvider).createPaymentLink(paymentRequest.capture());
+        assertThat(paymentRequest.getValue().lineItems()).extracting(PaymentLineItem::amount, PaymentLineItem::quantity)
+                .containsExactly(tuple(100000, 1));
+    }
+
+    private static int charged(PaymentRequest request) {
+        int lines = request.lineItems().stream().mapToInt(l -> l.amount() * l.quantity()).sum();
+        return lines + (request.shippingItem() == null ? 0 : request.shippingItem().amount());
+    }
+
+    private static long grosze(double amount) {
+        return Math.round(amount * 100);
+    }
+
+    private static Promotion promotion(DiscountType type, double value) {
+        Promotion promotion = new Promotion();
+        promotion.setStoreId(STORE_ID);
+        promotion.setActive(true);
+        promotion.setType(type);
+        promotion.setValue(value);
+        return promotion;
+    }
+
     private void assertRejectedWithNothingCreated(Map<String, Object> body, CheckoutError expected) {
         CheckoutRequest request = request(body);
         assertThatThrownBy(() -> checkout.create(STORE_ID, request))
@@ -287,12 +383,16 @@ class CheckoutDiscountTest {
     }
 
     private static DiscountCode percentage(double value) {
+        return code(DiscountType.Percentage, value);
+    }
+
+    private static DiscountCode code(DiscountType type, double value) {
         DiscountCode code = new DiscountCode();
         code.setStoreId(STORE_ID);
         code.setCode(CODE);
         code.setName("Kampania letnia");
         code.setActive(true);
-        code.setType(DiscountType.Percentage);
+        code.setType(type);
         code.setValue(value);
         return code;
     }
@@ -307,10 +407,21 @@ class CheckoutDiscountTest {
     }
 
     private static Map<String, Object> validRequest(String... pimIds) {
+        return validRequest(List.of(pimIds).stream().map(id -> line(id, 1, true)).toList());
+    }
+
+    @SafeVarargs
+    private static Map<String, Object> validRequest(Map<String, Object>... lines) {
+        return validRequest(List.of(lines));
+    }
+
+    private static Map<String, Object> line(String pimId, int qty, boolean listed) {
+        return Map.of("itemId", pimId, "qty", qty, "listed", listed, "catalogId", CATALOG_ID, "pricelistId", PRICELIST_ID);
+    }
+
+    private static Map<String, Object> validRequest(List<Map<String, Object>> lines) {
         Map<String, Object> body = new HashMap<>();
-        body.put("items", List.of(pimIds).stream()
-                .map(id -> Map.of("itemId", id, "qty", 1, "catalogId", CATALOG_ID, "pricelistId", PRICELIST_ID))
-                .toList());
+        body.put("items", lines);
         body.put("billingDetails", Map.of("name", "Jan Kowalski", "streetAndNumber", "Zakopiańska 58", "postalCode", "30-418",
                 "city", "Kraków", "country", "PL", "email", "jan@example.com"));
         body.put("shippingDetails", Map.of("name", "Jan", "surname", "Kowalski", "streetAndNumber", "Zakopiańska 58",

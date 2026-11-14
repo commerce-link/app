@@ -15,6 +15,94 @@ import static org.assertj.core.api.Assertions.tuple;
 class DiscountCalculatorTest {
 
     @Test
+    void percentageRoundsEveryUnitAndCountsTheDiscountOfEveryUnit() {
+        // given
+        BasketItem gpu = product("GPU", 129.90, 3);
+        BasketItem ram = product("RAM", 49.99, 2);
+
+        // when
+        DiscountCalculation calculation = DiscountCalculator.calculate(percentage(15), List.of(gpu, ram), Set::of);
+
+        // then: 129.90 × 0.85 = 110.415 → 110.42, 49.99 × 0.85 = 42.4915 → 42.49; (19.48 × 3) + (7.50 × 2) = 73.44
+        assertThat(calculation.lines()).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
+                .containsExactly(tuple("GPU", 110.42), tuple("RAM", 42.49));
+        assertThat(calculation.amount()).isEqualByComparingTo("73.44");
+    }
+
+    @Test
+    void amountSplitOverQuantitiesMayGiveAGroszLessThanItsValue() {
+        // given
+        BasketItem gpu = product("GPU", 1000.00, 2);
+        BasketItem ram = product("RAM", 200.00, 3);
+
+        // when
+        DiscountCalculation calculation = DiscountCalculator.calculate(amount(100), List.of(gpu, ram), Set::of);
+
+        // then: 100 × 1000 / 2600 = 38.46 a unit, 100 × 200 / 2600 = 7.69 a unit, 99.99 given; the grosz left
+        // cannot be split over the two units of the largest line
+        assertThat(calculation.lines()).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
+                .containsExactly(tuple("GPU", 961.54), tuple("RAM", 192.31));
+        assertThat(calculation.amount()).isEqualByComparingTo("99.99");
+    }
+
+    @Test
+    void amountRemainderGoesToTheLargestLineWhenItHasOneUnit() {
+        // given
+        BasketItem gpu = product("GPU", 1000.00, 1);
+        BasketItem ram = product("RAM", 100.00, 2);
+
+        // when
+        DiscountCalculation calculation = DiscountCalculator.calculate(amount(100), List.of(ram, gpu), Set::of);
+
+        // then: 83.33 + 2 × 8.33 = 99.99, the grosz left goes to the GPU
+        assertThat(calculation.lines()).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
+                .containsExactly(tuple("RAM", 91.67), tuple("GPU", 916.66));
+        assertThat(calculation.amount()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void percentageWithAFractionalValueRoundsHalfUp() {
+        // given
+        BasketItem monitor = product("Monitor", 199.00, 1);
+
+        // when
+        List<DiscountedLine> lines = DiscountCalculator.calculate(percentage(12.5), List.of(monitor), Set::of).lines();
+
+        // then: 199.00 × 0.875 = 174.125
+        assertThat(lines).extracting(DiscountedLine::unitPrice).containsExactly(174.13);
+    }
+
+    @Test
+    void amountAboveTheCoveredValueLeavesOneGroszOnEveryUnit() {
+        // given
+        BasketItem fans = product("Wentylator", 40.00, 3);
+        BasketItem ram = product("RAM", 50.00, 1);
+
+        // when
+        DiscountCalculation calculation = DiscountCalculator.calculate(amount(500), List.of(fans, ram), Set::of);
+
+        // then
+        assertThat(calculation.lines()).extracting(DiscountedLine::unitPrice).containsExactly(0.01, 0.01);
+        assertThat(calculation.amount()).isEqualByComparingTo("169.96");
+    }
+
+    @Test
+    void amountSkipsLinesWithoutAQuantity() {
+        // given
+        BasketItem gpu = product("GPU", 100.00, 1);
+        BasketItem none = product("RAM", 100.00, 0);
+
+        // when
+        DiscountCalculation calculation = DiscountCalculator.calculate(amount(10), List.of(gpu, none), Set::of);
+
+        // then
+        assertThat(calculation.lines()).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
+                .containsExactly(tuple("GPU", 90.00));
+        assertThat(calculation.amount()).isEqualByComparingTo("10.00");
+    }
+
+
+    @Test
     void discountForTheSourceCoversTheClone() {
         // given: the code names the global entry, the basket holds the store's clone
         DiscountCode code = percentage(10, DiscountTarget.Product, "pim-S");

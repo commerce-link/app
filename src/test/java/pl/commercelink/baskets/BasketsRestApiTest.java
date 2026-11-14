@@ -184,6 +184,32 @@ class BasketsRestApiTest {
     }
 
     @Test
+    void amountCodeIsSplitOverEveryUnitAndTheResponseTotalsAddUp() {
+        // given
+        givenItems();
+        DiscountCode code = percentageOnAcme();
+        code.setType(DiscountType.Amount);
+        code.setValue(100);
+        code.setTarget(null);
+        code.setTargetValues(List.of());
+        givenCode(code);
+        when(req.getDiscountCode()).thenReturn(CODE);
+
+        // when
+        CreatedBasketResponse response = basketsRestApi.createBasket(req, STORE_ID, false).getBody();
+
+        // then
+        assertThat(response.items()).extracting(CreatedBasketResponse.Item::unitPrice, CreatedBasketResponse.Item::discountedUnitPrice)
+                .containsExactly(tuple(1000.00, 916.66), tuple(100.00, 91.67));
+        assertThat(response.discountAmount()).isEqualTo(100.00);
+        assertThat(response.totalPrice()).isEqualTo(1200.00);
+        assertThat(response.discountedTotalPrice()).isEqualTo(1100.00);
+        verify(basketsRepository).save(savedBasket.capture());
+        assertThat(savedBasket.getValue().getBasketItems()).extracting(BasketItem::getUnitPrice).containsExactly(916.66, 91.67);
+        assertThat(savedBasket.getValue().getDiscountAmount()).isEqualTo(100.00);
+    }
+
+    @Test
     void basketWithCodeDoesNotLookAtPromotions() {
         // given
         givenItems();

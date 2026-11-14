@@ -25,6 +25,49 @@ class PromotionPickerTest {
 
     private static final String STORE_ID = "store-1";
 
+    @Test
+    void amountPromotionWinsAnItemWhereItGivesMoreThanAPercentage() {
+        // given
+        Promotion fivePercentOnEverything = tenPercentOn("Acme");
+        fivePercentOnEverything.setValue(5);
+        fivePercentOnEverything.setTarget(null);
+        fivePercentOnEverything.setTargetValues(List.of());
+        Promotion twentyOffGlobex = tenPercentOn("Globex");
+        twentyOffGlobex.setType(DiscountType.Amount);
+        twentyOffGlobex.setValue(20);
+        when(promotionsRepository.findAll(STORE_ID)).thenReturn(List.of(fivePercentOnEverything, twentyOffGlobex));
+
+        // when
+        Optional<AppliedDiscount> picked = picker.pick(basket());
+
+        // then: GPU 129.90 × 0.95 = 123.41 (6.49 × 3), RAM 30.00 from 20 zł beats 47.50 from 5%
+        assertThat(picked).hasValueSatisfying(applied -> {
+            assertThat(applied.calculation().lines()).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
+                    .containsExactly(tuple("GPU", 123.41), tuple("RAM", 30.00));
+            assertThat(applied.calculation().amount()).isEqualByComparingTo("39.47");
+        });
+    }
+
+    @Test
+    void twoPromotionsGivingTheSamePriceDiscountTheItemOnce() {
+        // given
+        Promotion acme = tenPercentOn("Acme");
+        Promotion everything = tenPercentOn("Acme");
+        everything.setTarget(null);
+        everything.setTargetValues(List.of());
+        when(promotionsRepository.findAll(STORE_ID)).thenReturn(List.of(acme, everything));
+
+        // when
+        Optional<AppliedDiscount> picked = picker.pick(basket());
+
+        // then
+        assertThat(picked).hasValueSatisfying(applied -> {
+            assertThat(applied.calculation().lines()).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
+                    .containsExactly(tuple("GPU", 116.91), tuple("RAM", 45.00));
+            assertThat(applied.calculation().amount()).isEqualByComparingTo("43.97");
+        });
+    }
+
     @Mock
     private PromotionsRepository promotionsRepository;
 
