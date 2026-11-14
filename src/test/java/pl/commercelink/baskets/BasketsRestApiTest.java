@@ -18,10 +18,14 @@ import pl.commercelink.checkout.CheckoutError;
 import pl.commercelink.checkout.CheckoutException;
 import pl.commercelink.checkout.CheckoutRequest;
 import pl.commercelink.discounts.DiscountCode;
+import pl.commercelink.discounts.DiscountCodeResolver;
 import pl.commercelink.discounts.DiscountCodesRepository;
 import pl.commercelink.discounts.DiscountService;
 import pl.commercelink.discounts.DiscountTarget;
 import pl.commercelink.discounts.DiscountType;
+import pl.commercelink.discounts.Promotion;
+import pl.commercelink.discounts.PromotionPicker;
+import pl.commercelink.discounts.PromotionsRepository;
 import pl.commercelink.discounts.TargetValue;
 import pl.commercelink.invoicing.InvoicingService;
 import pl.commercelink.pim.ScopedPimCatalog;
@@ -67,6 +71,8 @@ class BasketsRestApiTest {
     @Mock
     private DiscountCodesRepository discountCodesRepository;
     @Mock
+    private PromotionsRepository promotionsRepository;
+    @Mock
     private CheckoutRequest req;
     @Mock
     private Store store;
@@ -78,7 +84,10 @@ class BasketsRestApiTest {
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(basketsRestApi, "discountService", new DiscountService(discountCodesRepository, new StorePimAliases(ScopedPimCatalog.of())));
+        StorePimAliases aliases = new StorePimAliases(ScopedPimCatalog.of());
+        ReflectionTestUtils.setField(basketsRestApi, "discountService", new DiscountService(
+                new DiscountCodeResolver(discountCodesRepository, aliases), new PromotionPicker(promotionsRepository, aliases),
+                discountCodesRepository));
         when(store.getStoreId()).thenReturn(STORE_ID);
         when(store.getDefaultPaymentIntegration()).thenReturn(Optional.of(new PaymentIntegration(DEFAULT_PROVIDER, true)));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
@@ -149,6 +158,44 @@ class BasketsRestApiTest {
         assertThat(response.discountAmount()).isZero();
         assertThat(response.totalPrice()).isEqualTo(1200.00);
         assertThat(response.discountedTotalPrice()).isEqualTo(1200.00);
+    }
+
+    @Test
+    void aValidatedBasketWithoutCodeGetsThePromotions() {
+        // given
+        givenItems();
+        Promotion promotion = new Promotion();
+        promotion.setActive(true);
+        promotion.setType(DiscountType.Percentage);
+        promotion.setValue(10);
+        promotion.setTarget(DiscountTarget.Brand);
+        promotion.setTargetValues(List.of(new TargetValue("Acme", "Acme")));
+        when(promotionsRepository.findAll(STORE_ID)).thenReturn(List.of(promotion));
+
+        // when
+        CreatedBasketResponse response = basketsRestApi.createBasket(req, STORE_ID, true).getBody();
+
+        // then
+        assertThat(response.discountCode()).isNull();
+        assertThat(response.discountAmount()).isEqualTo(100.00);
+        assertThat(response.items()).extracting(CreatedBasketResponse.Item::unitPrice, CreatedBasketResponse.Item::discountedUnitPrice)
+                .containsExactly(tuple(1000.00, 900.00), tuple(100.00, 100.00));
+        assertThat(response.discountedTotalPrice()).isEqualTo(1100.00);
+    }
+
+    @Test
+    void basketWithCodeDoesNotLookAtPromotions() {
+        // given
+        givenItems();
+        givenCode(percentageOnAcme());
+        when(req.getDiscountCode()).thenReturn(CODE);
+
+        // when
+        CreatedBasketResponse response = basketsRestApi.createBasket(req, STORE_ID, true).getBody();
+
+        // then
+        verify(promotionsRepository, never()).findAll(any());
+        assertThat(response.discountCode()).isEqualTo(CODE);
     }
 
     @Test

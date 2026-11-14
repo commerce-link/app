@@ -127,7 +127,7 @@ class StoreNewPromotionTemplateTest {
         String html = rendered();
 
         // then
-        assertThat(html).contains("data-promotion-summary").contains("klient dostaje tę z największym rabatem")
+        assertThat(html).contains("data-promotion-summary").contains("produkt objęty kilkoma dostaje największy z ich rabatów")
                 .contains("data-minimum-only=\"Gdy koszyk jest wart co najmniej {0} zł\"");
     }
 

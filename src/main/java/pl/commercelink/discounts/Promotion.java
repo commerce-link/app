@@ -9,11 +9,15 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import pl.commercelink.baskets.Basket;
+import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.function.Function;
 
 @DynamoDBTable(tableName = Promotion.TABLE_NAME)
 @Getter
@@ -59,4 +63,19 @@ public class Promotion implements Discount {
     @DynamoDBAttribute(attributeName = "createdAt")
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime createdAt;
+
+    boolean isMetBy(Basket basket, Function<String, Set<String>> productAliases) {
+        return isMinimumReachedBy(basket) && isConditionMetBy(basket, productAliases);
+    }
+
+    private boolean isConditionMetBy(Basket basket, Function<String, Set<String>> productAliases) {
+        if (conditionTarget == null) {
+            return true;
+        }
+        long quantity = basket.getEffectiveBasketItems().stream()
+                .filter(item -> conditionTarget.matches(item, conditionValues, productAliases))
+                .mapToLong(BasketItem::getQty)
+                .sum();
+        return quantity >= conditionQuantity;
+    }
 }

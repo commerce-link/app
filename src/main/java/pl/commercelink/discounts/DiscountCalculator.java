@@ -26,14 +26,7 @@ public final class DiscountCalculator {
                 .filter(i -> prices.get(i).compareTo(price(covered.get(i))) < 0)
                 .mapToObj(i -> new DiscountedLine(covered.get(i), prices.get(i).doubleValue()))
                 .toList();
-        return new DiscountCalculation(lines, amountOf(lines));
-    }
-
-    private static BigDecimal amountOf(List<DiscountedLine> lines) {
-        return lines.stream()
-                .map(l -> price(l.item()).subtract(BigDecimal.valueOf(l.unitPrice())).multiply(BigDecimal.valueOf(l.item().getQty())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .setScale(2, RoundingMode.HALF_UP);
+        return DiscountCalculation.of(lines);
     }
 
     private static List<BigDecimal> percentage(Discount discount, List<BasketItem> covered) {

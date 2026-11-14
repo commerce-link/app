@@ -14,9 +14,15 @@ import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.baskets.BasketsRepository;
 import pl.commercelink.discounts.DiscountCode;
+import pl.commercelink.discounts.DiscountCodeResolver;
 import pl.commercelink.discounts.DiscountCodesRepository;
 import pl.commercelink.discounts.DiscountService;
+import pl.commercelink.discounts.DiscountTarget;
 import pl.commercelink.discounts.DiscountType;
+import pl.commercelink.discounts.Promotion;
+import pl.commercelink.discounts.PromotionPicker;
+import pl.commercelink.discounts.PromotionsRepository;
+import pl.commercelink.discounts.TargetValue;
 import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.payments.api.PaymentLineItem;
 import pl.commercelink.payments.api.PaymentLink;
@@ -77,6 +83,8 @@ class CheckoutDiscountTest {
     private PaymentProvider paymentProvider;
     @Mock
     private DiscountCodesRepository discountCodesRepository;
+    @Mock
+    private PromotionsRepository promotionsRepository;
     @Captor
     private ArgumentCaptor<PaymentRequest> paymentRequest;
     @Captor
@@ -89,7 +97,9 @@ class CheckoutDiscountTest {
     @BeforeEach
     void setUp() {
         checkout = new Checkout(storesRepository, basketsRepository, pricelistRepository, productCatalogRepository,
-                paymentProviderFactory, new DiscountService(discountCodesRepository, aliases), aliases, "https://app.example");
+                paymentProviderFactory, new DiscountService(new DiscountCodeResolver(discountCodesRepository, aliases),
+                        new PromotionPicker(promotionsRepository, aliases), discountCodesRepository),
+                aliases, "https://app.example");
 
         store = new Store();
         store.setStoreId(STORE_ID);
@@ -146,6 +156,30 @@ class CheckoutDiscountTest {
         verify(basketsRepository).save(savedBasket.capture());
         assertThat(savedBasket.getValue().getDiscountCode()).isNull();
         assertThat(savedBasket.getValue().getBasketItems()).extracting(BasketItem::getUnitPrice).containsExactly(1000.0);
+    }
+
+    @Test
+    void checkoutWithoutCodeCreatesPaymentLinkDiscountedByThePromotions() {
+        // given
+        Promotion promotion = new Promotion();
+        promotion.setActive(true);
+        promotion.setConditionTarget(DiscountTarget.Category);
+        promotion.setConditionValues(List.of(new TargetValue("Karty graficzne", "Karty graficzne")));
+        promotion.setConditionQuantity(1);
+        promotion.setType(DiscountType.Percentage);
+        promotion.setValue(10);
+        when(promotionsRepository.findAll(STORE_ID)).thenReturn(List.of(promotion));
+
+        // when
+        checkout.create(STORE_ID, request(validRequest("pim-gpu", "pim-ram")));
+
+        // then
+        verify(paymentProvider).createPaymentLink(paymentRequest.capture());
+        assertThat(paymentRequest.getValue().lineItems()).extracting(PaymentLineItem::amount, PaymentLineItem::quantity)
+                .containsExactly(tuple(90000, 1), tuple(18000, 1));
+        verify(basketsRepository).save(savedBasket.capture());
+        assertThat(savedBasket.getValue().getDiscountCode()).isNull();
+        assertThat(savedBasket.getValue().getDiscountAmount()).isEqualTo(120.00);
     }
 
     @Test

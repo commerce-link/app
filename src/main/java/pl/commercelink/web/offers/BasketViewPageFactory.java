@@ -128,10 +128,12 @@ public class BasketViewPageFactory {
             }
         }
         double total = itemsTotal + delivery;
-        double discount = basket.hasDiscountCode() ? basket.getDiscountAmount() : 0;
+        boolean discounted = basket.hasDiscountCode() || basket.hasPromotions();
+        double discount = discounted ? basket.getDiscountAmount() : 0;
         return new Summary(Money.format(itemsTotal + discount), basket.getDiscountCode(),
-                basket.hasDiscountCode() ? Money.format(discount) : null, state, deliveryName, Money.format(delivery),
-                Money.format(total), Money.format(total / DEFAULT_VAT_RATE), Money.format(total - total / DEFAULT_VAT_RATE));
+                discounted ? Money.format(discount) : null,
+                state, deliveryName, Money.format(delivery), Money.format(total), Money.format(total / DEFAULT_VAT_RATE),
+                Money.format(total - total / DEFAULT_VAT_RATE));
     }
 
     static Customer customer(Basket basket, Locale locale) {
