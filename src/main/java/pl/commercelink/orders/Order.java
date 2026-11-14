@@ -154,7 +154,11 @@ public class Order {
 
     @DynamoDBIgnore
     public boolean isFullyPaid() {
-        return Math.abs(getUnpaidAmount()) < HALF_CENT;
+        return isZero(getUnpaidAmount());
+    }
+
+    private static boolean isZero(double amount) {
+        return Math.abs(amount) < HALF_CENT;
     }
 
     /** A sale at the shop's counter, created from the dashboard's point of sale. */
@@ -430,7 +434,7 @@ public class Order {
         if (!hasOneOfStatuses(OrderStatus.Delivered, OrderStatus.Completed)) {
             blockers.add(CancelBlocker.NOT_DELIVERED);
         }
-        if (getPaidAmount() != 0) {
+        if (!isZero(getPaidAmount())) {
             blockers.add(CancelBlocker.PAYMENTS_NOT_REFUNDED);
         }
         if (!orderItems.stream().filter(OrderItem::isProduct).allMatch(OrderItem::isReturned)) {
@@ -459,7 +463,7 @@ public class Order {
     @DynamoDBIgnore
     public boolean canBeSplit() {
         return hasOneOfStatuses(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly, OrderStatus.Assembled)
-                && getPaidAmount() == 0
+                && isZero(getPaidAmount())
                 && !getDocumentByType(DocumentType.GoodsIssue).isPresent()
                 && !isInvoiced();
     }

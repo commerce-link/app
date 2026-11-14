@@ -605,4 +605,44 @@ class OrderTest {
             }
         }
     }
+
+    @Test
+    void paymentsRefundedInFullDoNotBlockTheCancellationWhenTheirDoubleSumIsJustOffZero() {
+        // given
+        OrderItem returned = new OrderItem("o1", "CPU", "Ryzen", 1, 4345.69, "SKU", false, 0);
+        returned.setStatus(FulfilmentStatus.Returned);
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Delivered);
+        paidAndRefundedInFull(order);
+
+        // when / then
+        assertThat(order.cancelBlockers(List.of(returned))).isEmpty();
+    }
+
+    @Test
+    void paymentsRefundedInFullDoNotBlockTheSplitWhenTheirDoubleSumIsJustOffZero() {
+        // given
+        Order order = splittableOrder();
+        paidAndRefundedInFull(order);
+
+        // when / then
+        assertThat(order.canBeSplit()).isTrue();
+    }
+
+    @Test
+    void aCentLeftAfterTheRefundsBlocksTheSplit() {
+        // given
+        Order order = splittableOrder();
+        order.addPayment(Payment.bankTransfer("REF-1", "Jan", 181.58));
+        order.addPayment(new Payment("REF-2", "Jan", PaymentSource.BankTransfer, PaymentDirection.Outgoing, -181.57, 0, null, null));
+
+        // when / then
+        assertThat(order.canBeSplit()).isFalse();
+    }
+
+    private static void paidAndRefundedInFull(Order order) {
+        order.addPayment(Payment.bankTransfer("REF-1", "Jan", 1703.14));
+        order.addPayment(Payment.bankTransfer("REF-2", "Jan", 2642.55));
+        order.addPayment(new Payment("REF-3", "Jan", PaymentSource.BankTransfer, PaymentDirection.Outgoing, -4345.69, 0, null, null));
+    }
 }
