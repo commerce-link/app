@@ -9,7 +9,7 @@
 // - Totals: each row and the summary are recounted as the fields change, with the server's formulas
 //   (OfferDetailsPageFactory.summary, ItemMargin): total = chosen items (qty × price) + delivery, cost = chosen items
 //   (qty × cost, the estimate for an item without one: costOf), gross profit = total − cost, net = gross / VAT rate;
-//   amounts rounded half up to grosze as Money.format.
+//   amounts rounded half up to cents as Money.format.
 //   An item the save drops (incomplete) is left out, so the summary shows what the save will store.
 // - "Edytuj pozycję" fills its dialog from the row's hidden fields; "Zastosuj" writes them back and refreshes the row.
 // - Before the form is sent the rows are renumbered basketItems[0..n] in their order on screen, and an emptied
@@ -188,7 +188,7 @@
         return tenths < 0 ? '−' + text : text;
     }
 
-    // ItemMargin.of: price and cost rounded to grosze, the margin to a tenth of a percent, the net profit to grosze
+    // ItemMargin.of: price and cost rounded to cents, the margin to a tenth of a percent, the net profit to cents
     function marginOf(price, cost) {
         if (cost <= 0) {
             return { tone: 'unknown', percent: null };

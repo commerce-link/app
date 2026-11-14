@@ -13,7 +13,7 @@ class EstimatedCostTest {
     }
 
     @Test
-    void theEstimateIsRoundedHalfUpToGrosze() {
+    void theEstimateIsRoundedHalfUpToCents() {
         // when / then
         assertThat(EstimatedCost.between(10.01, 10.02)).isEqualTo(10.02);
     }

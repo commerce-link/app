@@ -36,7 +36,7 @@ import java.util.regex.Pattern;
 public class ReceiptRequestConverter {
 
     private static final Pattern LEADING_SHIPPING_WORD = Pattern.compile("^(?i)dostawa\\s*[-–—:]*\\s*");
-    private static final long ONE_GROSZ = 1;
+    private static final long ONE_CENT = 1;
 
     /** {@code storeEmail} is the store's own e-mail, never a point-of-sale buyer's (see {@link BuyerEmail}). */
     public ReceiptConversion convert(Order order, List<OrderItem> items, String receiptKey, ReceiptProvider provider,
@@ -77,7 +77,7 @@ public class ReceiptRequestConverter {
             return new ReceiptConversion.Blocked(ReceiptBlockReason.NO_LINES, null);
         }
         long orderTotal = Money.of(BigDecimal.valueOf(order.getTotalPrice())).grosze();
-        if (Math.abs(orderTotal - linesTotal) > ONE_GROSZ) {
+        if (Math.abs(orderTotal - linesTotal) > ONE_CENT) {
             return new ReceiptConversion.Blocked(ReceiptBlockReason.TOTAL_MISMATCH,
                     Money.ofGrosze(linesTotal).toBigDecimal() + " ≠ " + Money.ofGrosze(orderTotal).toBigDecimal());
         }
@@ -154,7 +154,7 @@ public class ReceiptRequestConverter {
             return List.of();
         }
         long paidTotal = paid.stream().mapToLong(p -> Money.of(BigDecimal.valueOf(p.getAppliedAmount())).grosze()).sum();
-        if (paidTotal >= total - ONE_GROSZ) {
+        if (paidTotal >= total - ONE_CENT) {
             return settledPayments(paid, total);
         }
         Map<PaymentForm, Long> byForm = new EnumMap<>(PaymentForm.class);

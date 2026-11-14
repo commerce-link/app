@@ -276,7 +276,7 @@ class CheckoutDiscountTest {
 
     @Test
     void amountCodeIsChargedOverEveryUnitAndTheChargeIsTheListTotalLessTheDiscountWithDelivery() {
-        // given: 100 zł over 2 × 1000 and 3 × 200; the grosz left after the split falls on the line of two units
+        // given: 100 zł over 2 × 1000 and 3 × 200; the cent left after the split falls on the line of two units
         givenCode(code(DiscountType.Amount, 100));
         Map<String, Object> body = withCode(validRequest(line("pim-gpu", 2, true), line("pim-ram", 3, true), line("pim-srv", 1, true)));
         body.put("deliveryOptionId", "inpost");
@@ -293,7 +293,7 @@ class CheckoutDiscountTest {
         assertThat(savedBasket.getValue().getDiscountAmount()).isEqualTo(99.99);
         assertThat(charged(paymentRequest.getValue()))
                 .isEqualTo(270_000 - 9_999 + 1_500)
-                .isEqualTo(grosze(savedBasket.getValue().getTotalPrice() + 15.00));
+                .isEqualTo(cents(savedBasket.getValue().getTotalPrice() + 15.00));
     }
 
     @Test
@@ -318,7 +318,7 @@ class CheckoutDiscountTest {
         assertThat(savedBasket.getValue().getDiscountAmount()).isEqualTo(211.52);
         assertThat(charged(paymentRequest.getValue()))
                 .isEqualTo(270_000 - 21_152 + 1_500)
-                .isEqualTo(grosze(savedBasket.getValue().getTotalPrice() + 15.00));
+                .isEqualTo(cents(savedBasket.getValue().getTotalPrice() + 15.00));
     }
 
     @Test
@@ -357,7 +357,7 @@ class CheckoutDiscountTest {
         return lines + (request.shippingItem() == null ? 0 : request.shippingItem().amount());
     }
 
-    private static long grosze(double amount) {
+    private static long cents(double amount) {
         return Math.round(amount * 100);
     }
 

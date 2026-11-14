@@ -79,7 +79,7 @@ class StockLevelsTest {
     }
 
     @Test
-    void offerAGroszAboveTheCurrentLowestNetPriceMissesTheLowestPriceThreshold() {
+    void offerACentAboveTheCurrentLowestNetPriceMissesTheLowestPriceThreshold() {
         // when
         StockProductLevel level = calculateTheOnlyLevel();
 
@@ -97,7 +97,7 @@ class StockLevelsTest {
     }
 
     @Test
-    void offerAGroszAboveTheCurrentLowestNetPriceMissesTheHotDealThreshold() {
+    void offerACentAboveTheCurrentLowestNetPriceMissesTheHotDealThreshold() {
         // when
         StockProductLevel level = calculateTheOnlyLevel();
 

@@ -34,16 +34,16 @@ public record DevReceiptPreview(String storeName, String orderId, String saleDat
     }
 
     static DevReceiptPreview of(ReceiptAttempt attempt, ReceiptRequestSnapshot snapshot, String storeName) {
-        long totalGrosze = 0;
+        long totalCents = 0;
         Map<VatRate, Long> grossByRate = new EnumMap<>(VatRate.class);
         List<Line> lines = new ArrayList<>();
         for (ReceiptRequestSnapshot.Line line : snapshot.lines()) {
-            long lineGrosze = BigDecimal.valueOf(line.unitGrosze()).multiply(line.quantity())
+            long lineCents = BigDecimal.valueOf(line.unitGrosze()).multiply(line.quantity())
                     .setScale(0, RoundingMode.HALF_UP).longValueExact();
-            totalGrosze += lineGrosze;
-            grossByRate.merge(line.vatRate(), lineGrosze, Long::sum);
+            totalCents += lineCents;
+            grossByRate.merge(line.vatRate(), lineCents, Long::sum);
             lines.add(new Line(line.name(), quantity(line.quantity()), pln(line.unitGrosze()), line.vatRate().name(),
-                    pln(lineGrosze)));
+                    pln(lineCents)));
         }
         List<VatSummary> vatSummary = grossByRate.entrySet().stream()
                 .map(e -> new VatSummary(e.getKey().name(), pln(e.getValue())))
@@ -55,15 +55,15 @@ public record DevReceiptPreview(String storeName, String orderId, String saleDat
                 snapshot.saleDate() == null ? null : snapshot.saleDate().format(SALE_DATE),
                 attempt.getReceiptKey(), attempt.getProviderReceiptId(),
                 attempt.getState() == null ? null : attempt.getState().name(), attempt.getReceiptNumber(),
-                snapshot.buyerEmail(), List.copyOf(lines), pln(totalGrosze), vatSummary, payments);
+                snapshot.buyerEmail(), List.copyOf(lines), pln(totalCents), vatSummary, payments);
     }
 
     /** "1 234,56 zł": Polish grouping with a no-break space, always two decimals. */
-    static String pln(long grosze) {
+    static String pln(long cents) {
         DecimalFormatSymbols symbols = new DecimalFormatSymbols();
         symbols.setDecimalSeparator(',');
         symbols.setGroupingSeparator(' ');
-        return new DecimalFormat("#,##0.00", symbols).format(BigDecimal.valueOf(grosze, 2)) + " zł";
+        return new DecimalFormat("#,##0.00", symbols).format(BigDecimal.valueOf(cents, 2)) + " zł";
     }
 
     private static String quantity(BigDecimal quantity) {

@@ -208,6 +208,39 @@ class OrderTest {
         assertThat(order.getDocuments()).hasSize(1);
     }
 
+    @Test
+    void orderWhosePricesSumToADoubleJustOffThePaidAmountIsFullyPaid() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(449.55 + 19.99 + 4.35);
+        order.addPayment(Payment.bankTransfer("ref-1", "Jan", 473.89));
+
+        // when / then
+        assertThat(order.isFullyPaid()).isTrue();
+    }
+
+    @Test
+    void orderPaidACentShortIsNotFullyPaid() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(449.55 + 19.99 + 4.35);
+        order.addPayment(Payment.bankTransfer("ref-1", "Jan", 473.88));
+
+        // when / then
+        assertThat(order.isFullyPaid()).isFalse();
+    }
+
+    @Test
+    void orderOverpaidByACentIsNotFullyPaid() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(449.55 + 19.99 + 4.35);
+        order.addPayment(Payment.bankTransfer("ref-1", "Jan", 473.90));
+
+        // when / then
+        assertThat(order.isFullyPaid()).isFalse();
+    }
+
     private Order b2bOrder() {
         Order order = new Order("store-1");
         order.setOrderId("order-1");

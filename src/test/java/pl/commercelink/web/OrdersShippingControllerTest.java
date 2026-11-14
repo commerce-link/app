@@ -505,7 +505,7 @@ class OrdersShippingControllerTest {
     }
 
     @Test
-    void theCashOnDeliveryAmountIsPrefilledRoundedToGrosze() {
+    void theCashOnDeliveryAmountIsPrefilledRoundedToCents() {
         // given: 79.98 - 20.0 is 59.980000000000004 in a double
         Order order = allegroOrder();
         order.setTotalPrice(79.98);

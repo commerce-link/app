@@ -30,7 +30,7 @@ class MoneyTest {
     }
 
     @Test
-    void roundedInputKeepsWholeGroszeOnly() {
+    void roundedInputKeepsWholeCentsOnly() {
         // when / then
         assertThat(Money.inputRounded(10.00111)).isEqualTo("10.00");
         assertThat(Money.inputRounded(2.675)).isEqualTo("2.68");

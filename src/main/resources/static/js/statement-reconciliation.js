@@ -1,6 +1,6 @@
 // The reconciliation of an uploaded bank statement (payments-statement.html). The page holds everything: the proposals
 // per operation in the hidden field "allocations" (JSON: operation number -> [{orderId, amount, fee}], amounts in
-// grosze), the orders that still owe money (#statement-receivables) and the payout channels (#statement-channels).
+// cents), the orders that still owe money (#statement-receivables) and the payout channels (#statement-channels).
 // Ticking a row books its proposal; the assignment dialog and the payout dialog change a proposal and tick the row.
 // Without JavaScript the ticked rows are booked with the proposals the page came with.
 (function () {
@@ -40,20 +40,20 @@
         });
     }
 
-    function plain(grosze) {
-        var negative = grosze < 0;
-        var value = Math.abs(Math.round(grosze));
+    function plain(amount) {
+        var negative = amount < 0;
+        var value = Math.abs(Math.round(amount));
         var whole = String(Math.floor(value / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
         var cents = String(value % 100);
         return (negative ? '\u2212' : '') + whole + ',' + (cents.length < 2 ? '0' + cents : cents);
     }
 
-    function money(grosze) {
-        return format(currency, [plain(grosze)]).replace(/ /g, '\u00a0');
+    function money(amount) {
+        return format(currency, [plain(amount)]).replace(/ /g, '\u00a0');
     }
 
     // "159,00", "159.00", "1 249,00": one decimal mark, at most two decimals; null for anything else
-    function grosze(text) {
+    function toCents(text) {
         var typed = String(text || '').replace(/[\s\u00a0\u202f]/g, '').replace(',', '.');
         if (!/^\d+(\.\d{1,2})?$/.test(typed)) {
             return null;
@@ -402,7 +402,7 @@
                 input.id = 'statement-assign-' + id;
                 input.value = fieldValue(assignState.amounts[id] || 0);
                 input.addEventListener('input', function () {
-                    var value = grosze(input.value);
+                    var value = toCents(input.value);
                     input.classList.toggle('is-invalid', value === null || value <= 0);
                     assignState.amounts[id] = value === null ? 0 : value;
                     showState(state, order, assignState.amounts[id]);
@@ -490,7 +490,7 @@
             amount: Number(row.getAttribute('data-amount')),
             rows: parse(row.getAttribute('data-channels'), []),
             picked: current.map(function (allocation) { return allocation.orderId; }),
-            // grosze the payer kept from each order: as proposed, typed, or worked out from the difference
+            // cents the payer kept from each order: as proposed, typed, or worked out from the difference
             fees: {},
             inputs: {},
             netCells: {}
@@ -545,12 +545,12 @@
     }
 
     // An amount for a text field: "1249,00", no grouping spaces.
-    function fieldValue(grosze) {
-        return plain(grosze).split(String.fromCharCode(160)).join('');
+    function fieldValue(amount) {
+        return plain(amount).split(String.fromCharCode(160)).join('');
     }
 
     // "Auto-uzupełnij prowizję jako różnicę", as when a payment is added by hand: what the ticked orders owe less the
-    // transfer is the fee, shared out in proportion to what each order owes; the grosze left by the rounding go to the
+    // transfer is the fee, shared out in proportion to what each order owes; the cents left by the rounding go to the
     // largest order, so the fees add up to the difference exactly.
     function spreadFee() {
         var picked = pickedIds();
@@ -638,7 +638,7 @@
             input.inputMode = 'decimal';
             input.setAttribute('aria-label', format(payout.getAttribute('data-text-fee'), [order.shortId]));
             input.addEventListener('input', function () {
-                var value = grosze(input.value);
+                var value = toCents(input.value);
                 var valid = value !== null && value <= order.unpaid;
                 input.classList.toggle('is-invalid', !valid);
                 payoutState.fees[id] = valid ? value : NaN;

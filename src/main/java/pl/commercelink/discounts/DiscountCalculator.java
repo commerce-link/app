@@ -12,7 +12,7 @@ import java.util.stream.IntStream;
 
 public final class DiscountCalculator {
 
-    private static final BigDecimal ONE_GROSZ = new BigDecimal("0.01");
+    private static final BigDecimal ONE_CENT = new BigDecimal("0.01");
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
     private DiscountCalculator() {
@@ -32,7 +32,7 @@ public final class DiscountCalculator {
     private static List<BigDecimal> percentage(Discount discount, List<BasketItem> covered) {
         BigDecimal factor = BigDecimal.ONE.subtract(BigDecimal.valueOf(discount.getValue()).divide(HUNDRED));
         return covered.stream()
-                .map(i -> price(i).multiply(factor).setScale(2, RoundingMode.HALF_UP).max(ONE_GROSZ))
+                .map(i -> price(i).multiply(factor).setScale(2, RoundingMode.HALF_UP).max(ONE_CENT))
                 .toList();
     }
 
@@ -76,7 +76,7 @@ public final class DiscountCalculator {
     }
 
     private static BigDecimal room(BasketItem item) {
-        return price(item).subtract(ONE_GROSZ).max(BigDecimal.ZERO);
+        return price(item).subtract(ONE_CENT).max(BigDecimal.ZERO);
     }
 
     private static BigDecimal lineValue(BasketItem item) {

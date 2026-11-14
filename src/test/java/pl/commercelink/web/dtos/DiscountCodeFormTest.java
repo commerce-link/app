@@ -107,7 +107,7 @@ class DiscountCodeFormTest {
     }
 
     @Test
-    void amountMustBeAboveZeroAfterRoundingToGrosz() {
+    void amountMustBeAboveZeroAfterRoundingToCent() {
         // when / then
         assertThat(amount("0,004").validate(store())).containsEntry("value", "store.discounts.value.amount");
         assertThat(amount("-5").validate(store())).containsEntry("value", "store.discounts.value.amount");

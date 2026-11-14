@@ -234,7 +234,7 @@ class StatementMatcherTest {
         // then
         assertThat(match.kind()).isEqualTo(MatchKind.PAYOUT);
         assertThat(match.warnings()).isEmpty();
-        // 2% of 1234,25 is 24,685: rounded half up to the grosz
+        // 2% of 1234,25 is 24,685: rounded half up to the cent
         assertThat(match.allocations()).containsExactly(
                 new Allocation(JAN, new BigDecimal("1234.25"), new BigDecimal("24.69")),
                 new Allocation(ANNA, new BigDecimal("2500.00"), new BigDecimal("100.00")));

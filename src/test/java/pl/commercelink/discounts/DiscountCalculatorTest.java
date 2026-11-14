@@ -30,7 +30,7 @@ class DiscountCalculatorTest {
     }
 
     @Test
-    void amountSplitOverQuantitiesMayGiveAGroszLessThanItsValue() {
+    void amountSplitOverQuantitiesMayGiveACentLessThanItsValue() {
         // given
         BasketItem gpu = product("GPU", 1000.00, 2);
         BasketItem ram = product("RAM", 200.00, 3);
@@ -38,7 +38,7 @@ class DiscountCalculatorTest {
         // when
         DiscountCalculation calculation = DiscountCalculator.calculate(amount(100), List.of(gpu, ram), Set::of);
 
-        // then: 100 × 1000 / 2600 = 38.46 a unit, 100 × 200 / 2600 = 7.69 a unit, 99.99 given; the grosz left
+        // then: 100 × 1000 / 2600 = 38.46 a unit, 100 × 200 / 2600 = 7.69 a unit, 99.99 given; the cent left
         // cannot be split over the two units of the largest line
         assertThat(calculation.lines()).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
                 .containsExactly(tuple("GPU", 961.54), tuple("RAM", 192.31));
@@ -54,7 +54,7 @@ class DiscountCalculatorTest {
         // when
         DiscountCalculation calculation = DiscountCalculator.calculate(amount(100), List.of(ram, gpu), Set::of);
 
-        // then: 83.33 + 2 × 8.33 = 99.99, the grosz left goes to the GPU
+        // then: 83.33 + 2 × 8.33 = 99.99, the cent left goes to the GPU
         assertThat(calculation.lines()).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
                 .containsExactly(tuple("RAM", 91.67), tuple("GPU", 916.66));
         assertThat(calculation.amount()).isEqualByComparingTo("100.00");
@@ -73,7 +73,7 @@ class DiscountCalculatorTest {
     }
 
     @Test
-    void amountAboveTheCoveredValueLeavesOneGroszOnEveryUnit() {
+    void amountAboveTheCoveredValueLeavesOneCentOnEveryUnit() {
         // given
         BasketItem fans = product("Wentylator", 40.00, 3);
         BasketItem ram = product("RAM", 50.00, 1);
@@ -152,7 +152,7 @@ class DiscountCalculatorTest {
     }
 
     @Test
-    void percentageNeverGoesBelowOneGrosz() {
+    void percentageNeverGoesBelowOneCent() {
         // given
         DiscountCode code = percentage(99);
         BasketItem sticker = product("Naklejka", 0.01, 1);

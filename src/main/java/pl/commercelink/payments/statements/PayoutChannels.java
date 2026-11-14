@@ -60,7 +60,7 @@ public final class PayoutChannels {
 
     /**
      * The fees the payer may have kept from an order that owes remaining: one per rate of a row with rates, each
-     * rounded half up to the grosz as the bank rounds each loan's fee, else the one {@link #fee} gives.
+     * rounded half up to the cent as the bank rounds each loan's fee, else the one {@link #fee} gives.
      */
     public static List<BigDecimal> fees(PayoutChannel row, BigDecimal remaining, Payment pending) {
         if (row == null || !row.isNetOfFees() || row.getFeeRates() == null || row.getFeeRates().isEmpty()) {

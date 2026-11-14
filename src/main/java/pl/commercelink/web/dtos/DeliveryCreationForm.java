@@ -205,7 +205,7 @@ public class DeliveryCreationForm {
         }
     }
 
-    /** Unit costs in whole grosze: the cost fields have no browser validation, so a longer fraction is rounded here. */
+    /** Unit costs in whole cents: the cost fields have no browser validation, so a longer fraction is rounded here. */
     public void roundUnitCosts() {
         if (items != null) {
             items.forEach(item -> item.setUnitCost(Money.round(item.getUnitCost())));

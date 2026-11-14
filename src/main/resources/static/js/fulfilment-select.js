@@ -142,7 +142,7 @@
         return winner;
     }
 
-    // net per piece above the winner, in whole grosze; zero or less when the gross decided (same net, other VAT rate)
+    // net per piece above the winner, in whole cents; zero or less when the gross decided (same net, other VAT rate)
     function dearerCents(offer, winner) {
         return Math.round((offer.net - winner.net) * 100);
     }

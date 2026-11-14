@@ -98,7 +98,7 @@ class OrdersExportTest {
     }
 
     @Test
-    void amountIsRoundedToTheGrosz() {
+    void amountIsRoundedToTheCent() {
         // given
         Order order = order("order-4");
         order.setTotalPrice(389.7000000000003);

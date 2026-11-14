@@ -41,7 +41,7 @@ final class DiscountFormFields {
         if (chosen == DiscountType.Percentage && (number < MIN_PERCENTAGE || number > MAX_PERCENTAGE)) {
             errors.put("value", "store.discounts.value.percentage");
         }
-        if (chosen == DiscountType.Amount && toGrosz(number) <= 0) {
+        if (chosen == DiscountType.Amount && roundToCent(number) <= 0) {
             errors.put("value", "store.discounts.value.amount");
         }
     }
@@ -86,7 +86,7 @@ final class DiscountFormFields {
 
     static double value(String type, String value) {
         double parsed = FormNumbers.decimal(value).orElseThrow();
-        return type(type) == DiscountType.Amount ? toGrosz(parsed) : parsed;
+        return type(type) == DiscountType.Amount ? roundToCent(parsed) : parsed;
     }
 
     static DiscountTarget target(String target) {
@@ -112,7 +112,7 @@ final class DiscountFormFields {
     }
 
     static double minOrderValue(String value) {
-        return FormNumbers.decimal(value).map(DiscountFormFields::toGrosz).orElse(0.0);
+        return FormNumbers.decimal(value).map(DiscountFormFields::roundToCent).orElse(0.0);
     }
 
     static LocalDateTime validFrom(String value) {
@@ -123,7 +123,7 @@ final class DiscountFormFields {
         return dateTime(value).map(end -> end.withSecond(59)).orElse(null);
     }
 
-    private static double toGrosz(double value) {
+    private static double roundToCent(double value) {
         return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).doubleValue();
     }
 

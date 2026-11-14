@@ -43,7 +43,7 @@ class AmountParserTest {
     }
 
     @Test
-    void roundsAnExponentHalfUpToTheGrosz() {
+    void roundsAnExponentHalfUpToTheCent() {
         // then
         assertThat(AmountParser.parse("5e-3")).isEqualByComparingTo("0.01");
         assertThat(AmountParser.parse("-5e-3")).isEqualByComparingTo("-0.01");

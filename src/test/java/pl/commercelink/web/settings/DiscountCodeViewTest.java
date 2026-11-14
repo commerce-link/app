@@ -44,7 +44,7 @@ class DiscountCodeViewTest {
     }
 
     @Test
-    void amountWithoutThresholdShowsGroszeAndNoThreshold() {
+    void amountWithoutThresholdShowsCentsAndNoThreshold() {
         // when
         DiscountCodeView view = DiscountCodeView.of(code("GPU-50", DiscountType.Amount, 1250), NOW, GATEWAYS, BASE);
 

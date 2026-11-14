@@ -54,12 +54,12 @@ public class AddPaymentForm {
         return null;
     }
 
-    /** The amount as typed, to the grosz. */
+    /** The amount as typed, to the cent. */
     public double amount() {
         return AmountParser.parse(bankAmount).doubleValue();
     }
 
-    /** The fee as typed, to the grosz; 0 when blank. */
+    /** The fee as typed, to the cent; 0 when blank. */
     public double fee() {
         return AmountParser.parse(processingFee).doubleValue();
     }

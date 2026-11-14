@@ -23,6 +23,7 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 public class Order {
 
     public static final int PREFERRED_SHIPPING_WINDOW_DAYS = 14;
+    private static final double HALF_CENT = 0.005;
 
     @DynamoDBHashKey(attributeName = "storeId")
     @DynamoDBIndexHashKey(globalSecondaryIndexNames = {"StoreIdOrderedAtIndex", "ExternalOrderIdIndex"}, attributeName = "storeId")
@@ -153,7 +154,7 @@ public class Order {
 
     @DynamoDBIgnore
     public boolean isFullyPaid() {
-        return getUnpaidAmount() == 0;
+        return Math.abs(getUnpaidAmount()) < HALF_CENT;
     }
 
     /** A sale at the shop's counter, created from the dashboard's point of sale. */

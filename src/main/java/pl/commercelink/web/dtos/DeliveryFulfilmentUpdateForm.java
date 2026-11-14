@@ -17,7 +17,7 @@ public class DeliveryFulfilmentUpdateForm {
     private List<AllocationRef> allocations = new ArrayList<>();
     private List<String> warehouseItemIds = new ArrayList<>();
 
-    // the field has no browser validation, so a cost typed with more decimals is rounded to whole grosze here
+    // the field has no browser validation, so a cost typed with more decimals is rounded to whole cents here
     public void setUnitCost(double unitCost) {
         this.unitCost = Money.round(unitCost);
     }

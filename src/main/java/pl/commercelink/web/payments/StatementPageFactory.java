@@ -110,14 +110,14 @@ public class StatementPageFactory {
                 .toList();
 
         List<Row> selectedRows = rows.stream().filter(Row::selected).toList();
-        long selectedGrosze = selectedRows.stream().mapToLong(Row::amountGrosze).sum();
+        long selectedCents = selectedRows.stream().mapToLong(Row::amountCents).sum();
         int selectedOrders = selectedRows.stream().mapToInt(row -> proposals.getOrDefault(row.number(), List.of()).size()).sum();
         BankAccount account = statement.account();
         return new StatementPage(account.getId(), statement.fileName(), tiles(rows, locale), groups, notices(outcomes, locale), statement.problems(),
                 json.write(statement.problems()), statement.outgoing(),
                 statement.skipped(), json.operations(statement.incoming()), json.allocations(proposals),
                 receivables(openOrders, channels, locale), channels(channels, locale), selectedRows.size(),
-                money(locale, selectedGrosze), selectedOrders);
+                money(locale, selectedCents), selectedOrders);
     }
 
     private static OperationMatch booked(OperationMatch match, List<String> orderIds) {
@@ -176,7 +176,7 @@ public class StatementPageFactory {
                 : text(locale, "payments.statement.action.change");
         return new Row(operation.number(), operation.date().format(DAY), operation.sender(),
                 titleParts(operation.title(), match.matchedTexts()), money(locale, operation.amount()),
-                StatementJson.grosze(operation.amount()), group, rulePill(match, locale),
+                StatementJson.cents(operation.amount()), group, rulePill(match, locale),
                 warningPills(match, locale), refs, note, payment[0], payment[1],
                 !booked && !allocations.isEmpty(), selected && !allocations.isEmpty(), payout, json.write(payerRows),
                 json.write(match.candidates()), action);
@@ -351,7 +351,7 @@ public class StatementPageFactory {
                 .map(kind -> {
                     List<Row> of = rows.stream().filter(row -> row.group().equals(kind.name())).toList();
                     return new Tile(kind.name().toLowerCase(Locale.ROOT), text(locale, "payments.statement.tile." + kind.name()),
-                            of.size(), money(locale, of.stream().mapToLong(Row::amountGrosze).sum()),
+                            of.size(), money(locale, of.stream().mapToLong(Row::amountCents).sum()),
                             text(locale, "payments.statement.tile." + kind.name() + ".hint"));
                 })
                 .toList();
@@ -399,8 +399,8 @@ public class StatementPageFactory {
                     item.put("client", StringUtils.defaultString(OrderPageModelFactory.clientName(order)));
                     item.put("email", StringUtils.defaultString(order.getEmail()));
                     item.put("ordered", order.getOrderedAt() == null ? "" : order.getOrderedAt().format(FULL_DAY));
-                    item.put("unpaid", StatementJson.grosze(StatementAmounts.of(order.getUnpaidAmount())));
-                    item.put("fee", pending == null ? 0 : StatementJson.grosze(StatementAmounts.of(pending.getFee())));
+                    item.put("unpaid", StatementJson.cents(StatementAmounts.of(order.getUnpaidAmount())));
+                    item.put("fee", pending == null ? 0 : StatementJson.cents(StatementAmounts.of(pending.getFee())));
                     item.put("type", pending == null ? text(locale, "payments.statement.payment.new") : type(pending, locale));
                     item.put("reference", pending == null ? text(locale, "payments.statement.payment.noReference") : reference(pending, locale));
                     item.put("channels", channels.stream()
@@ -429,8 +429,8 @@ public class StatementPageFactory {
         return text(locale, "general.currency.amount", Money.format(amount.doubleValue())).replace(' ', '\u00a0');
     }
 
-    private String money(Locale locale, long grosze) {
-        return money(locale, StatementJson.money(grosze));
+    private String money(Locale locale, long cents) {
+        return money(locale, StatementJson.money(cents));
     }
 
     private String text(Locale locale, String key, Object... args) {

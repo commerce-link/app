@@ -47,7 +47,7 @@ public abstract class AbstractShippingController {
     @Autowired
     protected ShipmentCreationService shipmentCreationService;
 
-    /** The unpaid amount in whole grosze: the form must show 59.98, not the double's 59.980000000000004. */
+    /** The unpaid amount in whole cents: the form must show 59.98, not the double's 59.980000000000004. */
     protected static double roundedUnpaidAmount(Order order) {
         return java.math.BigDecimal.valueOf(order.getUnpaidAmount()).setScale(2, java.math.RoundingMode.HALF_UP).doubleValue();
     }
