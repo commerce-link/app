@@ -147,6 +147,11 @@ public class Order {
     }
 
     @DynamoDBIgnore
+    public boolean hasPromotions() {
+        return discountCode == null && discountAmount > 0;
+    }
+
+    @DynamoDBIgnore
     public boolean isFullyPaid() {
         return getUnpaidAmount() == 0;
     }

@@ -2527,12 +2527,28 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void theFinancesCardShowsPromotionsBelowTheTotalForADiscountWithoutACode() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        order.setDiscountAmount(38.97);
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then
+        String totals = html.substring(html.indexOf("id=\"finances-title\""), html.indexOf("id=\"finances-costs\""));
+        assertThat(Pattern.compile("<dt>([^<]+)</dt>").matcher(totals).results().map(m -> m.group(1)).toList())
+                .containsExactly("Razem", "Promocje", "Wpłacono", "Do zapłaty");
+        assertThat(totals).contains("−38,97 PLN");
+    }
+
+    @Test
     void theFinancesCardHasNoDiscountRowWithoutACode() {
         // when
         String html = page(render(order(OrderStatus.Realization), ADMIN));
 
         // then
-        assertThat(card(html, "finances-title")).doesNotContain("Kod rabatowy");
+        assertThat(card(html, "finances-title")).doesNotContain("Kod rabatowy").doesNotContain("Promocje");
     }
 
     @Test

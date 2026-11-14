@@ -49,6 +49,22 @@ class FinancesViewTest {
         assertThat(view.hasDiscount()).isTrue();
         assertThat(view.discountCode()).isEqualTo("LATO-10");
         assertThat(view.discountAmount()).isEqualTo("38,97");
+        assertThat(view.promotions()).isFalse();
+    }
+
+    @Test
+    void anOrderWithADiscountWithoutACodeShowsPromotions() {
+        // given
+        Order order = order(350.73, 0);
+        order.setDiscountAmount(38.97);
+
+        // when
+        FinancesView view = FinancesView.of(order, List.of());
+
+        // then
+        assertThat(view.promotions()).isTrue();
+        assertThat(view.hasDiscount()).isFalse();
+        assertThat(view.discountAmount()).isEqualTo("38,97");
     }
 
     @Test
@@ -59,5 +75,6 @@ class FinancesViewTest {
         // then
         assertThat(view.hasDiscount()).isFalse();
         assertThat(view.discountCode()).isNull();
+        assertThat(view.promotions()).isFalse();
     }
 }

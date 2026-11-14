@@ -12,7 +12,7 @@ import java.util.List;
  * with a minus.
  */
 public record FinancesView(String total, String paid, String unpaid, boolean unpaidDue, boolean overpaid,
-                           String discountCode, String discountAmount, Costs costs) {
+                           String discountCode, boolean promotions, String discountAmount, Costs costs) {
 
     public record Costs(String itemsCost, String servicesCost, String feesCost, String profit, String profitNet) {
     }
@@ -26,7 +26,7 @@ public record FinancesView(String total, String paid, String unpaid, boolean unp
         boolean overpaid = unpaid < -0.005;
         return new FinancesView(Money.format(order.getTotalPrice()), Money.format(order.getPaidAmount()),
                 Money.format(overpaid ? -unpaid : Math.max(0, unpaid)), unpaid > 0.005, overpaid,
-                order.getDiscountCode(), Money.format(order.getDiscountAmount()), costs);
+                order.getDiscountCode(), order.hasPromotions(), Money.format(order.getDiscountAmount()), costs);
     }
 
     public boolean hasDiscount() {
