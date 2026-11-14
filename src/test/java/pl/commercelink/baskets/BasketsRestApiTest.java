@@ -333,6 +333,24 @@ class BasketsRestApiTest {
     }
 
     @Test
+    void itemsWithZeroOrNegativeQuantityAreLeftOutOfTheBasket() {
+        // given
+        BasketItem gpu = new BasketItem("pim-gpu", "Karta graficzna", "MFN-GPU", "Karty graficzne", 1000, 0, 1, "catalog-1", 2, false);
+        BasketItem ram = new BasketItem("pim-ram", "Pamięć RAM", "MFN-RAM", "Pamięci", 100, 0, -1, "catalog-1", 2, false);
+        BasketItem ssd = new BasketItem("pim-ssd", "Dysk SSD", "MFN-SSD", "Dyski", 300, 0, 0, "catalog-1", 2, false);
+        when(req.toBasketItems(eq(STORE_ID), eq(pricelistRepository), any())).thenReturn(List.of(gpu, ram, ssd));
+
+        // when
+        CreatedBasketResponse response = basketsRestApi.createBasket(req, STORE_ID, false).getBody();
+
+        // then
+        verify(basketsRepository).save(savedBasket.capture());
+        assertThat(savedBasket.getValue().getBasketItems()).extracting(BasketItem::getId).containsExactly("pim-gpu");
+        assertThat(response.items()).extracting(CreatedBasketResponse.Item::itemId).containsExactly("pim-gpu");
+        assertThat(response.totalPrice()).isEqualTo(1000.00);
+    }
+
+    @Test
     void responseJsonKeepsIdAndInvoiceNoAndListsPrices() throws Exception {
         // given
         givenItems();

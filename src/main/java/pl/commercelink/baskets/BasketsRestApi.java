@@ -16,7 +16,6 @@ import pl.commercelink.stores.PaymentIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -58,6 +57,7 @@ public class BasketsRestApi {
 
         Basket basket = Basket.builder(store)
                 .withSource(new OrderSource("", OrderSourceType.WebStore))
+                .withBasketItems(req.toBasketItems(store.getStoreId(), pricelistRepository, aliases))
                 .build();
 
         fillBasket(basket, req);
@@ -77,9 +77,6 @@ public class BasketsRestApi {
     }
 
     private void fillBasket(Basket basket, CheckoutRequest req) {
-        List<BasketItem> items = req.toBasketItems(basket.getStoreId(), pricelistRepository, aliases);
-
-        basket.setBasketItems(items);
         basket.setDeliveryOptionId(req.getDeliveryOptionId());
         basket.setAffiliateId(req.getAffiliateId());
 
