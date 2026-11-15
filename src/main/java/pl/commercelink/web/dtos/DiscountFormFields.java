@@ -1,7 +1,7 @@
 package pl.commercelink.web.dtos;
 
 import org.apache.commons.lang3.StringUtils;
-import pl.commercelink.discounts.DiscountTarget;
+import pl.commercelink.discounts.DiscountScope;
 import pl.commercelink.discounts.DiscountType;
 import pl.commercelink.discounts.TargetValue;
 
@@ -46,15 +46,6 @@ final class DiscountFormFields {
         }
     }
 
-    static void validateTarget(Map<String, String> errors, String field, String target, List<TargetValue> values) {
-        DiscountTarget chosen = target(target);
-        if (StringUtils.isNotBlank(target) && chosen == null) {
-            errors.put(field, "store.discounts.target.invalid");
-        } else if (chosen != null && values.isEmpty()) {
-            errors.put(field + "Values", "store.discounts.targetValues.required." + chosen.name());
-        }
-    }
-
     static void validateMinOrderValue(Map<String, String> errors, String minOrderValue) {
         if (StringUtils.isNotBlank(minOrderValue) && FormNumbers.decimal(minOrderValue).filter(v -> v >= 0).isEmpty()) {
             errors.put("minOrderValue", "store.discounts.minOrderValue.invalid");
@@ -89,26 +80,8 @@ final class DiscountFormFields {
         return type(type) == DiscountType.Amount ? roundToCent(parsed) : parsed;
     }
 
-    static DiscountTarget target(String target) {
-        for (DiscountTarget candidate : DiscountTarget.values()) {
-            if (candidate.name().equals(target)) {
-                return candidate;
-            }
-        }
-        return null;
-    }
-
-    static List<TargetValue> targetValues(String target, List<String> categories, List<TargetValue> products,
-                                          List<String> brands) {
-        DiscountTarget chosen = target(target);
-        if (chosen == null) {
-            return new ArrayList<>();
-        }
-        return switch (chosen) {
-            case Category -> byName(categories);
-            case Brand -> byName(brands);
-            case Product -> byId(products);
-        };
+    static DiscountScope scope(List<String> categories, List<String> brands, List<TargetValue> products) {
+        return new DiscountScope(names(categories), names(brands), byId(products));
     }
 
     static double minOrderValue(String value) {
@@ -127,7 +100,7 @@ final class DiscountFormFields {
         return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).doubleValue();
     }
 
-    private static List<TargetValue> byName(List<String> names) {
+    private static List<String> names(List<String> names) {
         if (names == null) {
             return new ArrayList<>();
         }
@@ -135,7 +108,6 @@ final class DiscountFormFields {
                 .map(StringUtils::trimToNull)
                 .filter(Objects::nonNull)
                 .distinct()
-                .map(name -> new TargetValue(name, name))
                 .toList());
     }
 

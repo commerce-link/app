@@ -53,24 +53,26 @@ class StoreNewPromotionTemplateTest {
         String html = rendered();
 
         // then
-        assertThat(html).contains(">W koszyku klienta musi być<").contains(">Bez warunku<")
-                .contains("name=\"conditionTarget\" value=\"\" data-cl-variant-select=\"conditionTarget\" checked=\"checked\"")
+        assertThat(html).contains(">W koszyku klienta musi być<").contains("id=\"conditionScope\"")
+                .contains("Bez wyboru promocja działa dla każdego koszyka.")
                 .contains("data-discount-picked=\"conditionCategories\"").contains(">Kategorie w warunku<")
-                .contains("data-discount-picked=\"conditionProducts\"").contains(">Produkty w warunku<")
-                .contains("data-discount-picked=\"conditionBrands\"").contains(">Marki w warunku<");
-        assertThat(html).contains(">Obowiązuje na<").contains(">Cały koszyk<")
-                .contains("name=\"target\" value=\"\" data-cl-variant-select=\"target\" checked=\"checked\"")
-                .contains("data-discount-picked=\"categories\"").contains("rabat obejmie ją w każdym z nich");
-        assertThat(html).doesNotContain("kod obejmie");
+                .contains("data-discount-picked=\"conditionBrands\"").contains(">Marki w warunku<")
+                .contains("data-discount-picked=\"conditionProducts\"").contains(">Produkty w warunku<");
+        assertThat(html).contains(">Obowiązuje na<").contains("id=\"scope\"")
+                .contains("Bez wyboru rabat obejmuje cały koszyk.")
+                .contains("data-discount-picked=\"categories\"").contains("data-discount-picked=\"brands\"")
+                .contains("data-discount-picked=\"products\"").contains("rabat obejmie ją w każdym z nich");
+        assertThat(html).doesNotContain("kod obejmie").doesNotContain("name=\"conditionTarget\"")
+                .doesNotContain("name=\"target\"");
     }
 
     @Test
-    void theQuantityShowsOnlyWithACondition() {
+    void theQuantityFieldIsMarkedForTheScriptThatHidesItWithoutACondition() {
         // when
         String html = rendered();
 
         // then
-        assertThat(html).contains("data-cl-variant-when=\"conditionTarget=Category|Product|Brand\"")
+        assertThat(html).contains("<div class=\"cl-span-3\" data-promotion-condition-quantity>")
                 .contains("name=\"conditionQuantity\"").contains("value=\"1\"").contains(">Co najmniej (szt.)<");
     }
 
@@ -90,34 +92,30 @@ class StoreNewPromotionTemplateTest {
     void pickedValuesComeBackAfterARejectedSave() {
         // given
         PromotionForm form = PromotionForm.empty();
-        form.setConditionTarget("Product");
         form.setConditionProducts(List.of(new TargetValue("PIM-1", "Karta graficzna ASUS Dual RTX 5070 OC")));
         form.setConditionQuantity("2");
-        form.setTarget("Category");
-        form.setCategories(List.of("Zasilacze"));
+        form.setCategories(List.of("Monitory"));
+        form.setBrands(List.of("ASUS"));
 
         // when
         String html = SettingsTemplateRenderer.render("store-promotion-new", page(form,
                 Map.of("name", "store.promotions.name.required")));
 
         // then
-        assertThat(html).contains("name=\"conditionTarget\" value=\"Product\" data-cl-variant-select=\"conditionTarget\" checked=\"checked\"")
-                .contains("name=\"conditionProducts[0].id\" value=\"PIM-1\"")
+        assertThat(html).contains("name=\"conditionProducts[0].id\" value=\"PIM-1\"")
                 .contains("value=\"2\"")
-                .contains("name=\"target\" value=\"Category\" data-cl-variant-select=\"target\" checked=\"checked\"")
-                .contains("<input type=\"hidden\" name=\"categories\" value=\"Zasilacze\"/>");
+                .contains("<input type=\"hidden\" name=\"categories\" value=\"Monitory\"/>")
+                .contains("<input type=\"hidden\" name=\"brands\" value=\"ASUS\"/>");
     }
 
     @Test
     void rejectedFieldsAreListedAndMarked() {
         // when
         String html = SettingsTemplateRenderer.render("store-promotion-new", page(PromotionForm.empty(),
-                Map.of("conditionTargetValues", "store.discounts.targetValues.required.Brand",
-                        "conditionQuantity", "store.promotions.conditionQuantity.invalid")));
+                Map.of("conditionQuantity", "store.promotions.conditionQuantity.invalid")));
 
         // then
-        assertThat(html).contains("id=\"promotion-errors\"").contains("href=\"#conditionTargetValues\"")
-                .contains("id=\"conditionTargetValues-error\"").contains("Wybierz co najmniej jedną markę.")
+        assertThat(html).contains("id=\"promotion-errors\"")
                 .contains("href=\"#conditionQuantity\"").contains("Liczba sztuk to liczba całkowita, co najmniej 1.");
     }
 
@@ -128,7 +126,11 @@ class StoreNewPromotionTemplateTest {
 
         // then
         assertThat(html).contains("data-promotion-summary").contains("produkt objęty kilkoma dostaje największy z ich rabatów")
-                .contains("data-minimum-only=\"Gdy koszyk jest wart co najmniej {0} zł\"");
+                .contains("data-minimum-only=\"Gdy koszyk jest wart co najmniej {0} zł\"")
+                .contains("data-condition=\"Gdy w koszyku jest co najmniej {0} szt. {1}\"")
+                .contains("data-condition-any-products=\"produktów\"")
+                .contains("data-categories=\"z kategorii {0}\"").contains("data-brands=\"marek {0}\"")
+                .contains("data-and=\"oraz\"").contains("data-any-products=\"na produkty\"");
     }
 
     @Test

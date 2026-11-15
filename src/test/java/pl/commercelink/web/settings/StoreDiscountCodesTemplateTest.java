@@ -2,9 +2,8 @@ package pl.commercelink.web.settings;
 
 import org.junit.jupiter.api.Test;
 import pl.commercelink.discounts.DiscountCode;
-import pl.commercelink.discounts.DiscountTarget;
+import pl.commercelink.discounts.DiscountScope;
 import pl.commercelink.discounts.DiscountType;
-import pl.commercelink.discounts.TargetValue;
 import pl.commercelink.starter.security.UserRole;
 
 import java.time.LocalDateTime;
@@ -28,9 +27,8 @@ class StoreDiscountCodesTemplateTest {
 
     private static DiscountCode categories() {
         DiscountCode code = code("GPU-50", "Rabat na podzespoły", DiscountType.Amount, 50);
-        code.setTarget(DiscountTarget.Category);
-        code.setTargetValues(List.of(category("Karty graficzne"), category("Procesory"), category("Płyty główne"),
-                category("Zasilacze")));
+        code.setScope(new DiscountScope(List.of("Karty graficzne", "Procesory", "Płyty główne", "Zasilacze"),
+                List.of("ASUS"), List.of()));
         code.setPaymentProvider("paynow");
         code.setMaxUses(100);
         code.setUsedCount(6);
@@ -63,7 +61,8 @@ class StoreDiscountCodesTemplateTest {
         assertThat(html).contains(">10%<").contains(">od 500,00 zł<").contains(">Cały koszyk<").contains(">Każda<")
                 .contains(">bez limitu<");
         assertThat(html).contains(">50,00 zł<").contains("Karty graficzne, Procesory, Płyty główne")
-                .contains("Kategorie · +1 więcej").contains(">PayNow<").contains("6 / 100")
+                .contains(">Kategorie · +1 więcej<").contains(">ASUS<").contains(">Marki<")
+                .contains(">PayNow<").contains("6 / 100")
                 .contains("01.10.2026 – 31.12.2026");
         assertThat(html).contains(">Aktywny<");
         assertThat(html).doesNotContain("??").doesNotContain("name=\"storeId\"");
@@ -89,6 +88,7 @@ class StoreDiscountCodesTemplateTest {
         assertThat(html).contains("href=\"/dashboard/store/discounts?status=expired\"")
                 .contains("href=\"/dashboard/store/discounts?status=active\" aria-current=\"page\"");
         assertThat(html).contains("<option value=\"category\">Kategorie</option>")
+                .contains("<option value=\"brand\">Marki</option>").contains("<option value=\"product\">Produkty</option>")
                 .contains("name=\"q\"").contains("data-cl-submit-on-change");
     }
 
@@ -145,9 +145,5 @@ class StoreDiscountCodesTemplateTest {
         discountCode.setValue(value);
         discountCode.setActive(true);
         return discountCode;
-    }
-
-    private static TargetValue category(String name) {
-        return new TargetValue(name, name);
     }
 }

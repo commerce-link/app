@@ -1,12 +1,10 @@
 package pl.commercelink.discounts;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import pl.commercelink.baskets.BasketItem;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -89,24 +87,73 @@ class DiscountCodeTest {
     }
 
     @Test
-    void coversEveryProductWhenNoTargetValues() {
+    void coversEveryProductWhenScopeIsEmpty() {
         // given
-        DiscountCode code = covering(null);
+        DiscountCode code = covering(new DiscountScope());
 
         // when / then
         assertThat(code.covers(product("pim-1", "Karty graficzne", "Acme"), Set::of)).isTrue();
         assertThat(code.covers(product("pim-2", "Procesory", "Globex"), Set::of)).isTrue();
     }
 
-    @ParameterizedTest
-    @CsvSource({"Product, pim-1, pim-2", "Category, Karty graficzne, Procesory", "Brand, Acme, Globex"})
-    void coversItemMatchingTargetValue(DiscountTarget target, String matching, String other) {
+    @Test
+    void coversItemOnTheOnlyFilledList() {
         // given
         BasketItem item = product("pim-1", "Karty graficzne", "Acme");
 
         // when / then
-        assertThat(covering(target, matching).covers(item, Set::of)).isTrue();
-        assertThat(covering(target, other).covers(item, Set::of)).isFalse();
+        assertThat(covering(Scopes.products("pim-1")).covers(item, Set::of)).isTrue();
+        assertThat(covering(Scopes.products("pim-2")).covers(item, Set::of)).isFalse();
+        assertThat(covering(Scopes.categories("Karty graficzne")).covers(item, Set::of)).isTrue();
+        assertThat(covering(Scopes.categories("Procesory")).covers(item, Set::of)).isFalse();
+        assertThat(covering(Scopes.brands("Acme")).covers(item, Set::of)).isTrue();
+        assertThat(covering(Scopes.brands("Globex")).covers(item, Set::of)).isFalse();
+    }
+
+    @Test
+    void coversOnlyItemsMatchingEveryFilledList() {
+        // given
+        DiscountCode acmeMonitors = covering(new DiscountScope(List.of("Monitory"), List.of("Acme"), List.of()));
+
+        // when / then
+        assertThat(acmeMonitors.covers(product("pim-1", "Monitory", "Acme"), Set::of)).isTrue();
+        assertThat(acmeMonitors.covers(product("pim-2", "Monitory", "Globex"), Set::of)).isFalse();
+        assertThat(acmeMonitors.covers(product("pim-3", "Laptopy", "Acme"), Set::of)).isFalse();
+    }
+
+    @Test
+    void severalValuesOfOneListAreAlternatives() {
+        // given
+        DiscountCode code = covering(new DiscountScope(List.of("Monitory", "Laptopy"), List.of("Acme", "Globex"), List.of()));
+
+        // when / then
+        assertThat(code.covers(product("pim-1", "Monitory", "Globex"), Set::of)).isTrue();
+        assertThat(code.covers(product("pim-2", "Laptopy", "Acme"), Set::of)).isTrue();
+        assertThat(code.covers(product("pim-3", "Laptopy", "Initech"), Set::of)).isFalse();
+        assertThat(code.covers(product("pim-4", "Procesory", "Acme"), Set::of)).isFalse();
+    }
+
+    @Test
+    void listedProductOutsideTheListedCategoryIsNotCovered() {
+        // given
+        TargetValue monitor = new TargetValue("pim-1", "Monitor 27");
+        TargetValue laptop = new TargetValue("pim-2", "Laptop 15");
+        DiscountCode code = covering(new DiscountScope(List.of("Monitory"), List.of(), List.of(monitor, laptop)));
+
+        // when / then
+        assertThat(code.covers(product("pim-1", "Monitory", "Acme"), Set::of)).isTrue();
+        assertThat(code.covers(product("pim-2", "Laptopy", "Acme"), Set::of)).isFalse();
+        assertThat(code.covers(product("pim-3", "Monitory", "Acme"), Set::of)).isFalse();
+    }
+
+    @Test
+    void itemWithoutBrandIsNotCoveredByABrandList() {
+        // given
+        BasketItem item = product("pim-1", "Monitory", null);
+
+        // when / then
+        assertThat(covering(Scopes.brands("Acme")).covers(item, Set::of)).isFalse();
+        assertThat(covering(Scopes.categories("Monitory")).covers(item, Set::of)).isTrue();
     }
 
     @Test
@@ -116,7 +163,7 @@ class DiscountCodeTest {
         fromFirstCatalog.setCatalogId("catalog-1");
         BasketItem fromSecondCatalog = product("pim-2", "Karty graficzne", "Globex");
         fromSecondCatalog.setCatalogId("catalog-2");
-        DiscountCode code = covering(DiscountTarget.Category, "Karty graficzne");
+        DiscountCode code = covering(Scopes.categories("Karty graficzne"));
 
         // when / then
         assertThat(code.covers(fromFirstCatalog, Set::of)).isTrue();
@@ -129,8 +176,8 @@ class DiscountCodeTest {
         BasketItem item = product("pim-1", "Karty graficzne ", " Acme");
 
         // when / then
-        assertThat(covering(DiscountTarget.Category, "Karty graficzne").covers(item, Set::of)).isTrue();
-        assertThat(covering(DiscountTarget.Brand, "Acme ").covers(item, Set::of)).isTrue();
+        assertThat(covering(Scopes.categories("Karty graficzne")).covers(item, Set::of)).isTrue();
+        assertThat(covering(Scopes.brands("Acme ")).covers(item, Set::of)).isTrue();
     }
 
     @Test
@@ -139,8 +186,8 @@ class DiscountCodeTest {
         BasketItem service = product("srv-1", "Usługi", "Acme");
         service.setService(true);
         BasketItem shipping = BasketItem.shipping(15.00);
-        DiscountCode wholeBasket = covering(null);
-        DiscountCode serviceCategory = covering(DiscountTarget.Category, "Usługi");
+        DiscountCode wholeBasket = covering(new DiscountScope());
+        DiscountCode serviceCategory = covering(Scopes.categories("Usługi"));
 
         // when / then
         assertThat(wholeBasket.covers(service, Set::of)).isFalse();
@@ -148,10 +195,9 @@ class DiscountCodeTest {
         assertThat(serviceCategory.covers(service, Set::of)).isFalse();
     }
 
-    private static DiscountCode covering(DiscountTarget target, String... values) {
+    private static DiscountCode covering(DiscountScope scope) {
         DiscountCode code = new DiscountCode();
-        code.setTarget(target);
-        code.setTargetValues(Arrays.stream(values).map(v -> new TargetValue(v, v)).toList());
+        code.setScope(scope);
         return code;
     }
 

@@ -21,10 +21,9 @@ public class DiscountCodeForm {
     private String name;
     private String type;
     private String value;
-    private String target;
     private List<String> categories = new ArrayList<>();
-    private List<TargetValue> products = new ArrayList<>();
     private List<String> brands = new ArrayList<>();
+    private List<TargetValue> products = new ArrayList<>();
     private String paymentProvider;
     private String minOrderValue;
     private String maxUses;
@@ -35,7 +34,6 @@ public class DiscountCodeForm {
     public static DiscountCodeForm empty() {
         DiscountCodeForm form = new DiscountCodeForm();
         form.type = DiscountType.Percentage.name();
-        form.target = "";
         form.active = true;
         return form;
     }
@@ -48,7 +46,6 @@ public class DiscountCodeForm {
         }
         FormRules.requireText(errors, "name", name, "store.discounts.name.required");
         DiscountFormFields.validateDiscount(errors, type, value);
-        DiscountFormFields.validateTarget(errors, "target", target, targetValues());
         if (StringUtils.isNotBlank(paymentProvider) && store.getPaymentIntegration(paymentProvider.trim()) == null) {
             errors.put("paymentProvider", "store.discounts.paymentProvider.invalid");
         }
@@ -67,8 +64,7 @@ public class DiscountCodeForm {
         discountCode.setName(name.trim());
         discountCode.setType(DiscountFormFields.type(type));
         discountCode.setValue(DiscountFormFields.value(type, value));
-        discountCode.setTarget(DiscountFormFields.target(target));
-        discountCode.setTargetValues(targetValues());
+        discountCode.setScope(DiscountFormFields.scope(categories, brands, products));
         discountCode.setPaymentProvider(StringUtils.trimToNull(paymentProvider));
         discountCode.setMinOrderValue(DiscountFormFields.minOrderValue(minOrderValue));
         discountCode.setMaxUses(FormNumbers.integer(maxUses).orElse(0));
@@ -76,9 +72,5 @@ public class DiscountCodeForm {
         discountCode.setValidTo(DiscountFormFields.validTo(validTo));
         discountCode.setActive(active);
         return discountCode;
-    }
-
-    private List<TargetValue> targetValues() {
-        return DiscountFormFields.targetValues(target, categories, products, brands);
     }
 }

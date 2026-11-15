@@ -64,8 +64,7 @@ class DiscountCodeResolverTest {
                 arguments("below minimum", (Consumer<DiscountCode>) c -> c.setMinOrderValue(10_000),
                         CheckoutError.DiscountCodeMinimumNotReached),
                 arguments("nothing covered", (Consumer<DiscountCode>) c -> {
-                    c.setTarget(DiscountTarget.Brand);
-                    c.setTargetValues(List.of(new TargetValue("Initech", "Initech")));
+                    c.setScope(Scopes.brands("Initech"));
                 }, CheckoutError.DiscountCodeNotApplicable));
     }
 
@@ -246,8 +245,7 @@ class DiscountCodeResolverTest {
         code.setActive(true);
         code.setType(DiscountType.Percentage);
         code.setValue(10);
-        code.setTarget(DiscountTarget.Brand);
-        code.setTargetValues(List.of(new TargetValue("Acme", "Acme")));
+        code.setScope(Scopes.brands("Acme"));
         return code;
     }
 
@@ -257,8 +255,7 @@ class DiscountCodeResolverTest {
         code.setCode(CODE);
         code.setType(DiscountType.Percentage);
         code.setValue(10);
-        code.setTarget(DiscountTarget.Product);
-        code.setTargetValues(List.of(new TargetValue("pim-GPU-source", "GPU")));
+        code.setScope(Scopes.products("pim-GPU-source"));
         return code;
     }
 

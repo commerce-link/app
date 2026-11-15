@@ -62,13 +62,23 @@ class StoreNewDiscountCodeTemplateTest {
         String html = rendered();
 
         // then
-        assertThat(html).contains("name=\"target\" value=\"Category\"").contains("name=\"target\" value=\"Product\"")
-                .contains("name=\"target\" value=\"Brand\"")
-                .contains("data-cl-variant=\"Category\" data-discount-picked-dialog=\"categories\" data-cl-variant-group=\"target\" data-discount-picked=\"categories\"")
-                .contains("data-cl-variant=\"Product\" data-discount-picked-dialog=\"products\" data-cl-variant-group=\"target\" data-discount-picked=\"products\"")
-                .contains("data-cl-variant=\"Brand\" data-discount-picked-dialog=\"brands\" data-cl-variant-group=\"target\" data-discount-picked=\"brands\"")
+        assertThat(html).contains("data-discount-picked-dialog=\"categories\" data-discount-picked=\"categories\"")
+                .contains("data-discount-picked-dialog=\"brands\" data-discount-picked=\"brands\"")
+                .contains("data-discount-picked-dialog=\"products\" data-discount-picked=\"products\"")
                 .contains(">Wybierz kategorie<").contains(">Wybierz produkty<").contains(">Wybierz marki<")
-                .doesNotContain("type=\"checkbox\" name=\"categories\"");
+                .doesNotContain("type=\"checkbox\" name=\"categories\"").doesNotContain("name=\"target\"");
+    }
+
+    @Test
+    void everyListIsOpenAtOnceAndAnEmptyOneNarrowsNothing() {
+        // when
+        String html = rendered();
+
+        // then
+        assertThat(html).contains("Bez wyboru rabat obejmuje cały koszyk.")
+                .contains("np. kategoria Monitory i marka Asus to tylko monitory Asus")
+                .contains(">Wszystkie kategorie.<").contains(">Wszystkie marki.<").contains(">Wszystkie produkty.<")
+                .doesNotContain("data-cl-variant-group=\"target\"");
     }
 
     @Test
@@ -88,7 +98,6 @@ class StoreNewDiscountCodeTemplateTest {
     void pickedCategoriesComeBackAfterARejectedSave() {
         // given
         DiscountCodeForm form = DiscountCodeForm.empty();
-        form.setTarget("Category");
         form.setCategories(List.of("Karty graficzne", "Procesory"));
 
         // when
@@ -96,8 +105,7 @@ class StoreNewDiscountCodeTemplateTest {
                 Map.of("name", "store.discounts.name.required"), form));
 
         // then
-        assertThat(html).contains("value=\"Category\" data-cl-variant-select=\"target\" checked=\"checked\"")
-                .contains("<input type=\"hidden\" name=\"categories\" value=\"Karty graficzne\"/>")
+        assertThat(html).contains("<input type=\"hidden\" name=\"categories\" value=\"Karty graficzne\"/>")
                 .contains("<input type=\"hidden\" name=\"categories\" value=\"Procesory\"/>");
     }
 
@@ -105,7 +113,6 @@ class StoreNewDiscountCodeTemplateTest {
     void pickedProductsComeBackAfterARejectedSave() {
         // given
         DiscountCodeForm form = DiscountCodeForm.empty();
-        form.setTarget("Product");
         form.setProducts(List.of(new TargetValue("PIM-1", "Zestaw Gamer RTX 5070"),
                 new TargetValue("PIM-2", "Karta graficzna ASUS Dual RTX 5070 OC")));
 
@@ -114,18 +121,17 @@ class StoreNewDiscountCodeTemplateTest {
                 Map.of("name", "store.discounts.name.required"), form));
 
         // then
-        assertThat(html).contains("value=\"Product\" data-cl-variant-select=\"target\" checked=\"checked\"")
-                .contains("name=\"products[0].id\" value=\"PIM-1\"")
+        assertThat(html).contains("name=\"products[0].id\" value=\"PIM-1\"")
                 .contains("name=\"products[0].name\" value=\"Zestaw Gamer RTX 5070\"")
                 .contains("name=\"products[1].id\" value=\"PIM-2\"")
                 .contains(">Karta graficzna ASUS Dual RTX 5070 OC<");
     }
 
     @Test
-    void pickedBrandsComeBackAfterARejectedSave() {
+    void pickedBrandsComeBackWithTheCategoriesTheyNarrowAfterARejectedSave() {
         // given
         DiscountCodeForm form = DiscountCodeForm.empty();
-        form.setTarget("Brand");
+        form.setCategories(List.of("Monitory"));
         form.setBrands(List.of("ASUS", "MSI"));
 
         // when
@@ -133,8 +139,8 @@ class StoreNewDiscountCodeTemplateTest {
                 Map.of("name", "store.discounts.name.required"), form));
 
         // then
-        assertThat(html).contains("value=\"Brand\" data-cl-variant-select=\"target\" checked=\"checked\"")
-                .contains("name=\"brands\" value=\"ASUS\"").contains("name=\"brands\" value=\"MSI\"");
+        assertThat(html).contains("name=\"brands\" value=\"ASUS\"").contains("name=\"brands\" value=\"MSI\"")
+                .contains("name=\"categories\" value=\"Monitory\"");
     }
 
     @Test
@@ -161,13 +167,11 @@ class StoreNewDiscountCodeTemplateTest {
     void rejectedFieldsAreListedAndMarked() {
         // when
         String html = SettingsTemplateRenderer.render("store-discount-code-new", page(PAYNOW,
-                Map.of("code", "store.discounts.code.taken", "targetValues", "store.discounts.targetValues.required.Brand")));
+                Map.of("code", "store.discounts.code.taken")));
 
         // then
         assertThat(html).contains("id=\"discount-code-errors\"").contains("Sklep ma już kod o tej nazwie")
-                .contains("href=\"#targetValues\"").contains("id=\"targetValues\"").contains("aria-invalid=\"true\"")
-                .contains("Wybierz co najmniej jedną markę.").contains("id=\"targetValues-error\"")
-                .contains("aria-describedby=\"brands-help targetValues-error\"");
+                .contains("href=\"#code\"").contains("aria-invalid=\"true\"").contains("id=\"code-error\"");
     }
 
     @Test
@@ -196,28 +200,24 @@ class StoreNewDiscountCodeTemplateTest {
     }
 
     @Test
-    void aPrefixGivesTheTargetFieldsTheirOwnNamesAndKeepsTheDialogs() {
+    void aPrefixGivesTheScopeFieldsTheirOwnNamesAndKeepsTheDialogs() {
         // given
         Map<String, Object> variables = new HashMap<>();
-        variables.put("errors", Map.of("conditionTargetValues", "store.discounts.targetValues.required.Product"));
         variables.put("products", List.of(new TargetValue("PIM-1", "Zestaw Gamer RTX 5070")));
 
         // when
         String html = SettingsTemplateRenderer.render("<div th:replace=\"~{fragments/discount-target-fields :: "
-                + "fields('condition', 'store.promotions.condition', 'Product', ${null}, ${products}, ${null})}\"></div>",
+                + "fields('condition', 'store.promotions.condition', ${null}, ${null}, ${products})}\"></div>",
                 variables);
 
         // then
-        assertThat(html).contains("id=\"conditionTarget\"")
-                .contains("name=\"conditionTarget\" value=\"Product\" data-cl-variant-select=\"conditionTarget\" checked=\"checked\"")
-                .contains("id=\"conditionTargetValues\" data-cl-variant-when=\"conditionTarget=Category|Product|Brand\"")
-                .contains("data-discount-picked-dialog=\"categories\" data-cl-variant-group=\"conditionTarget\" data-discount-picked=\"conditionCategories\"")
-                .contains("data-discount-picked-dialog=\"products\" data-cl-variant-group=\"conditionTarget\" data-discount-picked=\"conditionProducts\"")
-                .contains("data-discount-picked-dialog=\"brands\" data-cl-variant-group=\"conditionTarget\" data-discount-picked=\"conditionBrands\"")
+        assertThat(html).contains("id=\"conditionScope\"")
+                .contains("data-discount-picked-dialog=\"categories\" data-discount-picked=\"conditionCategories\"")
+                .contains("data-discount-picked-dialog=\"brands\" data-discount-picked=\"conditionBrands\"")
+                .contains("data-discount-picked-dialog=\"products\" data-discount-picked=\"conditionProducts\"")
                 .contains("name=\"conditionProducts[0].id\" value=\"PIM-1\"")
-                .contains("aria-describedby=\"conditionProducts-help conditionTargetValues-error\"")
-                .contains("id=\"conditionTargetValues-error\"").contains("Wybierz co najmniej jeden produkt.")
-                .doesNotContain("name=\"target\"").doesNotContain("??");
+                .contains("aria-describedby=\"conditionProducts-help\"")
+                .doesNotContain("name=\"conditionTarget\"").doesNotContain("??");
     }
 
     private static ProductCatalog catalog(String name, String... categories) {

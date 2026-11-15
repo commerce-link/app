@@ -80,11 +80,31 @@ class PromotionTest {
     }
 
     @Test
+    void conditionOnACategoryOfABrandCountsOnlyItemsOfBoth() {
+        // given
+        Promotion promotion = new Promotion();
+        promotion.setConditionScope(new DiscountScope(List.of("Karty graficzne"), List.of("Acme"), List.of()));
+        promotion.setConditionQuantity(2);
+        BasketItem acmeGpu = gpu("pim-1", 1, 100.00);
+        acmeGpu.setBrand("Acme");
+        BasketItem globexGpu = gpu("pim-2", 5, 100.00);
+        globexGpu.setBrand("Globex");
+        BasketItem acmeRam = ram(50.00);
+        acmeRam.setBrand("Acme");
+        acmeRam.setQty(5);
+        BasketItem secondAcmeGpu = gpu("pim-3", 1, 100.00);
+        secondAcmeGpu.setBrand("Acme");
+
+        // when / then
+        assertThat(promotion.isMetBy(basket(acmeGpu, globexGpu, acmeRam), Set::of)).isFalse();
+        assertThat(promotion.isMetBy(basket(acmeGpu, globexGpu, acmeRam, secondAcmeGpu), Set::of)).isTrue();
+    }
+
+    @Test
     void productConditionCountsTheCloneOfTheSource() {
         // given
         Promotion promotion = new Promotion();
-        promotion.setConditionTarget(DiscountTarget.Product);
-        promotion.setConditionValues(List.of(new TargetValue("pim-source", "GPU")));
+        promotion.setConditionScope(Scopes.products("pim-source"));
         promotion.setConditionQuantity(1);
         Basket basket = basket(gpu("pim-clone", 1, 100.00));
 
@@ -106,8 +126,7 @@ class PromotionTest {
 
     private static Promotion condition(int quantity) {
         Promotion promotion = new Promotion();
-        promotion.setConditionTarget(DiscountTarget.Category);
-        promotion.setConditionValues(List.of(new TargetValue("Karty graficzne", "Karty graficzne")));
+        promotion.setConditionScope(Scopes.categories("Karty graficzne"));
         promotion.setConditionQuantity(quantity);
         return promotion;
     }

@@ -1,10 +1,10 @@
 package pl.commercelink.web.settings;
 
 import org.junit.jupiter.api.Test;
-import pl.commercelink.discounts.DiscountTarget;
+import pl.commercelink.discounts.DiscountScope;
 import pl.commercelink.discounts.DiscountType;
 import pl.commercelink.discounts.Promotion;
-import pl.commercelink.discounts.TargetValue;
+import pl.commercelink.discounts.Scopes;
 import pl.commercelink.starter.security.UserRole;
 
 import java.time.LocalDateTime;
@@ -21,11 +21,9 @@ class StorePromotionsTemplateTest {
 
     private static Promotion monitorAndCable() {
         Promotion promotion = promotion("p-1", "Monitor + kabel taniej", DiscountType.Percentage, 20);
-        promotion.setConditionTarget(DiscountTarget.Category);
-        promotion.setConditionValues(List.of(value("Monitory")));
+        promotion.setConditionScope(new DiscountScope(List.of("Monitory"), List.of("ASUS"), List.of()));
         promotion.setConditionQuantity(1);
-        promotion.setTarget(DiscountTarget.Category);
-        promotion.setTargetValues(List.of(value("Kable i adaptery")));
+        promotion.setScope(Scopes.categories("Kable i adaptery"));
         promotion.setValidFrom(LocalDateTime.of(2026, 11, 1, 0, 0));
         promotion.setValidTo(LocalDateTime.of(2026, 12, 31, 23, 59, 59));
         return promotion;
@@ -39,12 +37,10 @@ class StorePromotionsTemplateTest {
 
     private static Promotion brands() {
         Promotion promotion = promotion("p-3", "Dwie myszy gamingowe", DiscountType.Percentage, 15);
-        promotion.setConditionTarget(DiscountTarget.Brand);
-        promotion.setConditionValues(List.of(value("Logitech"), value("SteelSeries"), value("Razer"), value("HyperX")));
+        promotion.setConditionScope(Scopes.brands("Logitech", "SteelSeries", "Razer", "HyperX"));
         promotion.setConditionQuantity(2);
         promotion.setMinOrderValue(300);
-        promotion.setTarget(DiscountTarget.Brand);
-        promotion.setTargetValues(List.of(value("Logitech"), value("SteelSeries"), value("Razer"), value("HyperX")));
+        promotion.setScope(Scopes.brands("Logitech", "SteelSeries", "Razer", "HyperX"));
         promotion.setActive(false);
         return promotion;
     }
@@ -71,14 +67,15 @@ class StorePromotionsTemplateTest {
         // then
         assertThat(html).contains(">Promocje<").contains("Rabaty, które koszyk nalicza sam, gdy klient spełni warunek");
         assertThat(html).contains("href=\"/dashboard/store/promotions/p-1\"").contains(">Monitor + kabel taniej<")
-                .contains(">Monitory<").contains(">kategorie · od 1 szt.<")
-                .contains(">20%<").contains(">na: Kable i adaptery<")
+                .contains(">Monitory<").contains(">Kategorie<").contains(">ASUS<").contains(">Marki<")
+                .contains(">od 1 szt.<")
+                .contains(">20%<").contains(">Kategorie: Kable i adaptery<")
                 .contains("01.11.2026 – 31.12.2026").contains(">Aktywna<");
         assertThat(html).contains(">Bez warunku<").contains(">koszyk od 5 000,00 zł<")
                 .contains(">150,00 zł<").contains(">na: cały koszyk<").contains(">bez terminu<");
         assertThat(html).contains(">Logitech, SteelSeries, Razer<")
-                .contains(">marki · +1 więcej · od 2 szt. · koszyk od 300,00 zł<")
-                .contains(">na: Logitech, SteelSeries, Razer · +1 więcej<").contains(">Wyłączona<");
+                .contains(">Marki · +1 więcej<").contains(">od 2 szt. · koszyk od 300,00 zł<")
+                .contains(">Marki: Logitech, SteelSeries, Razer · +1 więcej<").contains(">Wyłączona<");
         assertThat(html).doesNotContain("??").doesNotContain("name=\"storeId\"").doesNotContain("name=\"target\"");
     }
 
@@ -157,9 +154,5 @@ class StorePromotionsTemplateTest {
         promotion.setValue(value);
         promotion.setActive(true);
         return promotion;
-    }
-
-    private static TargetValue value(String name) {
-        return new TargetValue(name, name);
     }
 }

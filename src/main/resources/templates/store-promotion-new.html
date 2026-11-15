@@ -24,8 +24,8 @@
                     <fieldset class="cl-fieldset">
                         <legend class="cl-fieldset-title" th:text="#{store.promotions.form.condition.section}"></legend>
                         <div class="cl-form-grid">
-                            <th:block th:replace="~{fragments/discount-target-fields :: fields('condition', 'store.promotions.condition', ${form.conditionTarget}, ${form.conditionCategories}, ${form.conditionProducts}, ${form.conditionBrands})}"></th:block>
-                            <div class="cl-span-3" data-cl-variant-when="conditionTarget=Category|Product|Brand"
+                            <th:block th:replace="~{fragments/discount-target-fields :: fields('condition', 'store.promotions.condition', ${form.conditionCategories}, ${form.conditionBrands}, ${form.conditionProducts})}"></th:block>
+                            <div class="cl-span-3" data-promotion-condition-quantity
                                  th:insert="~{fragments/settings-form :: textFieldWith('conditionQuantity', 'store.promotions.conditionQuantity', *{conditionQuantity}, 'text', 'off', true, ${errors['conditionQuantity']}, #{store.promotions.conditionQuantity.help}, 'numeric', null, false)}"></div>
                             <div class="cl-span-3" th:insert="~{fragments/settings-form :: textFieldWith('minOrderValue', 'store.promotions.minOrderValue', *{minOrderValue}, 'text', 'off', false, ${errors['minOrderValue']}, #{store.discounts.minOrderValue.help}, 'decimal', #{store.discounts.minOrderValue.placeholder}, false)}"></div>
                         </div>
@@ -67,7 +67,7 @@
                                     <span th:text="#{${errors['value']}}"></span>
                                 </p>
                             </div>
-                            <th:block th:replace="~{fragments/discount-target-fields :: fields('', 'store.promotions', ${form.target}, ${form.categories}, ${form.products}, ${form.brands})}"></th:block>
+                            <th:block th:replace="~{fragments/discount-target-fields :: fields('', 'store.promotions', ${form.categories}, ${form.brands}, ${form.products})}"></th:block>
                         </div>
                     </fieldset>
 
@@ -83,15 +83,14 @@
 
                     <div class="cl-card-body" data-promotion-summary hidden
                          th:attr="data-always=#{store.promotions.summary.always}, data-minimum-only=#{store.promotions.summary.minimum},
-                                  data-categories=#{store.promotions.summary.categories}, data-no-categories=#{store.promotions.summary.categories.none},
-                                  data-products=#{store.promotions.summary.products}, data-no-products=#{store.promotions.summary.products.none},
-                                  data-brands=#{store.promotions.summary.brands}, data-no-brands=#{store.promotions.summary.brands.none},
+                                  data-condition=#{store.promotions.summary.condition},
+                                  data-condition-any-products=#{store.promotions.summary.condition.products.any},
+                                  data-condition-products=#{store.promotions.summary.condition.products},
                                   data-and-minimum=#{store.promotions.summary.andMinimum},
                                   data-percentage=#{store.promotions.summary.percentage}, data-amount=#{store.promotions.summary.amount},
-                                  data-basket=#{store.discounts.summary.basket},
-                                  data-target-categories=#{store.discounts.summary.categories}, data-target-no-categories=#{store.discounts.summary.categories.none},
-                                  data-target-products=#{store.discounts.summary.products}, data-target-no-products=#{store.discounts.summary.products.none},
-                                  data-target-brands=#{store.discounts.summary.brands}, data-target-no-brands=#{store.discounts.summary.brands.none},
+                                  data-basket=#{store.discounts.summary.basket}, data-any-products=#{store.discounts.summary.products.any},
+                                  data-products=#{store.discounts.summary.products}, data-categories=#{store.discounts.summary.categories},
+                                  data-brands=#{store.discounts.summary.brands}, data-and=#{store.discounts.summary.and},
                                   data-no-dates=#{store.promotions.summary.noDates}, data-from=#{store.promotions.summary.from},
                                   data-to=#{store.promotions.summary.to}, data-range=#{store.promotions.summary.range},
                                   data-inactive=#{store.promotions.summary.inactive}">

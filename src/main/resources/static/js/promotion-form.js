@@ -26,39 +26,26 @@
         return match ? match[3] + '.' + match[2] + '.' + match[1] + ', ' + match[4] + ':' + match[5] : value;
     }
 
-    function pickedNames(root, name) {
-        var items = root.querySelectorAll('[data-discount-picked="' + name + '"] [data-discount-picked-list] > li');
-        return Array.prototype.map.call(items, function (item) {
-            return item.getAttribute('data-name');
-        });
-    }
-
     function minimum(root) {
         var value = root.querySelector('#minOrderValue').value.trim();
         return value && Number(value.replace(/\s/g, '').replace(',', '.')) > 0 ? money(value) : null;
     }
 
-    function picked(root, name, quantity, some, none) {
-        var names = pickedNames(root, name);
-        return names.length ? format(some, [quantity, names.join(', ')]) : format(none, [quantity]);
+    function conditionScope(root, texts) {
+        return window.CL_discountScopePhrase(root, 'condition', {
+            everything: null, anyProducts: texts.conditionAnyProducts, products: texts.conditionProducts,
+            categories: texts.categories, brands: texts.brands, and: texts.and
+        });
     }
 
     function conditionPart(root, texts) {
-        var condition = checkedValue(root, 'conditionTarget');
+        var scope = conditionScope(root, texts);
         var threshold = minimum(root);
-        if (!condition) {
+        if (scope === null) {
             return threshold ? format(texts.minimumOnly, [threshold]) : texts.always;
         }
         var quantity = root.querySelector('#conditionQuantity').value.trim() || '…';
-        var part;
-        if (condition === 'Product') {
-            var products = pickedNames(root, 'conditionProducts').length;
-            part = products ? format(texts.products, [quantity, products]) : format(texts.noProducts, [quantity]);
-        } else if (condition === 'Brand') {
-            part = picked(root, 'conditionBrands', quantity, texts.brands, texts.noBrands);
-        } else {
-            part = picked(root, 'conditionCategories', quantity, texts.categories, texts.noCategories);
-        }
+        var part = format(texts.condition, [quantity, scope]);
         return threshold ? part + ' ' + format(texts.andMinimum, [threshold]) : part;
     }
 
@@ -70,20 +57,10 @@
     }
 
     function targetPart(root, texts) {
-        var target = checkedValue(root, 'target');
-        if (target === 'Product') {
-            var products = pickedNames(root, 'products').length;
-            return products ? format(texts.targetProducts, [products]) : texts.targetNoProducts;
-        }
-        if (target === 'Brand') {
-            var brands = pickedNames(root, 'brands');
-            return brands.length ? format(texts.targetBrands, [brands.join(', ')]) : texts.targetNoBrands;
-        }
-        if (target !== 'Category') {
-            return texts.basket;
-        }
-        var categories = pickedNames(root, 'categories');
-        return categories.length ? format(texts.targetCategories, [categories.join(', ')]) : texts.targetNoCategories;
+        return window.CL_discountScopePhrase(root, '', {
+            everything: texts.basket, anyProducts: texts.anyProducts, products: texts.products,
+            categories: texts.categories, brands: texts.brands, and: texts.and
+        });
     }
 
     function validityPart(root, texts) {
@@ -105,6 +82,7 @@
             return;
         }
         var texts = summary.dataset;
+        root.querySelector('[data-promotion-condition-quantity]').hidden = conditionScope(root, texts) === null;
         var sentence = conditionPart(root, texts) + ': ' + discountPart(root, texts) + ' ' + targetPart(root, texts)
             + '. ' + validityPart(root, texts);
         if (!root.querySelector('#active').checked) {

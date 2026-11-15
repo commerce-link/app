@@ -76,7 +76,7 @@
                                     <span th:text="#{${errors['value']}}"></span>
                                 </p>
                             </div>
-                            <th:block th:replace="~{fragments/discount-target-fields :: fields('', 'store.discounts', ${form.target}, ${form.categories}, ${form.products}, ${form.brands})}"></th:block>
+                            <th:block th:replace="~{fragments/discount-target-fields :: fields('', 'store.discounts', ${form.categories}, ${form.brands}, ${form.products})}"></th:block>
                         </div>
                     </fieldset>
 
@@ -139,10 +139,9 @@
 
                     <div class="cl-card-body" data-discount-summary hidden
                          th:attr="data-percentage=#{store.discounts.summary.percentage}, data-amount=#{store.discounts.summary.amount},
-                                  data-basket=#{store.discounts.summary.basket}, data-categories=#{store.discounts.summary.categories},
-                                  data-no-categories=#{store.discounts.summary.categories.none},
-                                  data-products=#{store.discounts.summary.products}, data-no-products=#{store.discounts.summary.products.none},
-                                  data-brands=#{store.discounts.summary.brands}, data-no-brands=#{store.discounts.summary.brands.none},
+                                  data-basket=#{store.discounts.summary.basket}, data-any-products=#{store.discounts.summary.products.any},
+                                  data-products=#{store.discounts.summary.products}, data-categories=#{store.discounts.summary.categories},
+                                  data-brands=#{store.discounts.summary.brands}, data-and=#{store.discounts.summary.and},
                                   data-minimum=#{store.discounts.summary.minimum},
                                   data-any-gateway=#{store.discounts.summary.anyGateway}, data-gateway=#{store.discounts.summary.gateway},
                                   data-unlimited=#{store.discounts.summary.unlimited}, data-once=#{store.discounts.summary.once},

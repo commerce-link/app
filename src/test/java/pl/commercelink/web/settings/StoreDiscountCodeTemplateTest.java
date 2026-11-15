@@ -2,7 +2,7 @@ package pl.commercelink.web.settings;
 
 import org.junit.jupiter.api.Test;
 import pl.commercelink.discounts.DiscountCode;
-import pl.commercelink.discounts.DiscountTarget;
+import pl.commercelink.discounts.DiscountScope;
 import pl.commercelink.discounts.DiscountType;
 import pl.commercelink.discounts.TargetValue;
 import pl.commercelink.orders.DiscountedOrderEntry;
@@ -33,9 +33,7 @@ class StoreDiscountCodeTemplateTest {
         code.setName("Rabat na podzespoły");
         code.setType(DiscountType.Amount);
         code.setValue(50);
-        code.setTarget(DiscountTarget.Category);
-        code.setTargetValues(List.of(new TargetValue("Karty graficzne", "Karty graficzne"),
-                new TargetValue("Procesory", "Procesory")));
+        code.setScope(new DiscountScope(List.of("Karty graficzne", "Procesory"), List.of("ASUS"), List.of()));
         code.setPaymentProvider("paynow");
         code.setMinOrderValue(1500);
         code.setMaxUses(100);
@@ -70,6 +68,7 @@ class StoreDiscountCodeTemplateTest {
                 .contains("href=\"/dashboard/store/discounts\"").contains(">Kody rabatowe<");
         assertThat(html).contains(">50,00 zł<").contains("kwotowy, dzielony na objęte produkty")
                 .contains(">Karty graficzne<").contains(">Procesory<").contains(">Kategorie<")
+                .contains(">ASUS<").contains(">Marki<")
                 .contains(">PayNow<").contains(">1 500,00 zł<").contains(">6 z 100<")
                 .contains("01.10.2026, 08:30 – 31.12.2026, 23:59");
         String terms = html.substring(html.indexOf("id=\"discount-params-title\""), html.indexOf("id=\"discount-orders-title\""));
@@ -123,8 +122,7 @@ class StoreDiscountCodeTemplateTest {
         DiscountCode code = categories(3);
         code.setType(DiscountType.Percentage);
         code.setValue(10);
-        code.setTarget(null);
-        code.setTargetValues(List.of());
+        code.setScope(new DiscountScope());
         code.setPaymentProvider(null);
         code.setMinOrderValue(0);
         code.setMaxUses(0);
@@ -219,8 +217,7 @@ class StoreDiscountCodeTemplateTest {
     void productTargetsShowTheirIdUnderTheName() {
         // given
         DiscountCode code = categories(0);
-        code.setTarget(DiscountTarget.Product);
-        code.setTargetValues(List.of(new TargetValue("0101", "Zestaw Gamer RTX 5070")));
+        code.setScope(new DiscountScope(List.of(), List.of(), List.of(new TargetValue("0101", "Zestaw Gamer RTX 5070"))));
 
         // when
         String html = rendered(code);

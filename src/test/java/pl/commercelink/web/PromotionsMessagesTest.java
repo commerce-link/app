@@ -36,14 +36,15 @@ class PromotionsMessagesTest {
                     messages.getMessage("store.promotions.toggled.off", new Object[]{"Duży koszyk"}, locale),
                     messages.getMessage("store.promotions.list.quantity", new Object[]{2}, locale),
                     messages.getMessage("store.promotions.list.minimum", new Object[]{"5 000,00"}, locale),
-                    messages.getMessage("store.promotions.list.more", new Object[]{2}, locale),
-                    messages.getMessage("store.promotions.list.target", new Object[]{"ASUS"}, locale),
-                    messages.getMessage("store.promotions.details.condition.quantity", new Object[]{"Marki", 2}, locale));
+                    messages.getMessage("store.promotions.details.condition.quantity", new Object[]{2}, locale),
+                    messages.getMessage("store.promotions.summary.condition", new Object[]{2, "ASUS"}, locale),
+                    messages.getMessage("store.promotions.summary.condition.products", new Object[]{3}, locale));
 
             // then
             assertThat(texts).as(locale.toString()).noneMatch(text -> text.contains("{") || text.contains("}"));
             assertThat(texts.get(0)).as(locale.toString()).contains("Duży koszyk");
-            assertThat(texts.get(9)).as(locale.toString()).contains("Marki").contains("2");
+            assertThat(texts.get(7)).as(locale.toString()).contains("2");
+            assertThat(texts.get(8)).as(locale.toString()).contains("2").contains("ASUS");
         }
     }
 

@@ -55,9 +55,9 @@
                         <select class="cl-select is-compact" id="discount-target-filter" name="target" data-cl-submit-on-change>
                             <option value="" th:selected="${codes.target().isEmpty()}" th:text="#{store.discounts.filter.target.all}"></option>
                             <option value="basket" th:selected="${codes.target() == 'basket'}" th:text="#{store.discounts.target.basket}"></option>
-                            <option value="category" th:selected="${codes.target() == 'category'}" th:text="#{store.discounts.target.Category}"></option>
-                            <option value="product" th:selected="${codes.target() == 'product'}" th:text="#{store.discounts.target.Product}"></option>
-                            <option value="brand" th:selected="${codes.target() == 'brand'}" th:text="#{store.discounts.target.Brand}"></option>
+                            <option value="category" th:selected="${codes.target() == 'category'}" th:text="#{store.discounts.categories}"></option>
+                            <option value="brand" th:selected="${codes.target() == 'brand'}" th:text="#{store.discounts.brands}"></option>
+                            <option value="product" th:selected="${codes.target() == 'product'}" th:text="#{store.discounts.products}"></option>
                         </select>
                         <noscript><button type="submit" class="cl-button" th:text="#{general.filter}"></button></noscript>
                     </form>
@@ -92,14 +92,8 @@
                                   th:text="#{store.discounts.list.minimum(${row.minOrderValue()})}"></span>
                         </td>
                         <td th:attr="data-label=#{store.discounts.column.target}">
-                            <span th:if="${row.target() == null}" th:text="#{store.discounts.target.basket}"></span>
-                            <th:block th:if="${row.target() != null}"
-                                      th:with="targetLabel=${#messages.msg('store.discounts.target.' + row.target().name())}">
-                                <span th:text="${#strings.listJoin(row.targetNames(), ', ')}"></span>
-                                <span class="cl-table-sub" th:text="${row.moreTargets() > 0}
-                                        ? ${#messages.msg('store.discounts.list.targetMore', targetLabel, row.moreTargets())}
-                                        : ${targetLabel}"></span>
-                            </th:block>
+                            <span th:if="${row.scope().everything()}" th:text="#{store.discounts.target.basket}"></span>
+                            <th:block th:replace="~{fragments/discount-scope :: lines(${row.scope()})}"></th:block>
                         </td>
                         <td th:attr="data-label=#{store.discounts.column.gateway}"
                             th:text="${row.paymentProvider() != null} ? ${row.paymentProvider()} : #{store.discounts.gateway.any}"></td>

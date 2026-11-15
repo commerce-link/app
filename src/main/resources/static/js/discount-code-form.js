@@ -45,20 +45,10 @@
     }
 
     function targetPart(root, texts) {
-        var target = checkedValue(root, 'target');
-        if (target === 'Product') {
-            var products = pickedNames('products').length;
-            return products ? format(texts.products, [products]) : texts.noProducts;
-        }
-        if (target === 'Brand') {
-            var brands = pickedNames('brands');
-            return brands.length ? format(texts.brands, [brands.join(', ')]) : texts.noBrands;
-        }
-        if (target !== 'Category') {
-            return texts.basket;
-        }
-        var names = pickedNames('categories');
-        return names.length ? format(texts.categories, [names.join(', ')]) : texts.noCategories;
+        return window.CL_discountScopePhrase(root, '', {
+            everything: texts.basket, anyProducts: texts.anyProducts, products: texts.products,
+            categories: texts.categories, brands: texts.brands, and: texts.and
+        });
     }
 
     function gatewayPart(root, texts) {
@@ -122,13 +112,6 @@
 
     function closest(target, selector) {
         return target.closest ? target.closest(selector) : null;
-    }
-
-    function pickedNames(name) {
-        var items = form().querySelectorAll('[data-discount-picked="' + name + '"] [data-discount-picked-list] > li');
-        return Array.prototype.map.call(items, function (item) {
-            return item.getAttribute('data-name');
-        });
     }
 
     function prepare() {

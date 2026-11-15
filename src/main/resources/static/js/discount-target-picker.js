@@ -75,6 +75,36 @@
         field.dispatchEvent(new CustomEvent('cl:discount-picked', {bubbles: true}));
     }
 
+    function pickedNames(form, prefix, list) {
+        var name = prefix ? prefix + list : list.toLowerCase();
+        var items = form.querySelectorAll('[data-discount-picked="' + name + '"] [data-discount-picked-list] > li');
+        return Array.prototype.map.call(items, function (item) {
+            return item.getAttribute('data-name');
+        });
+    }
+
+    // What the three lists of a form cover together, in words: texts.everything while nothing is picked, otherwise
+    // e.g. "na produkty z kategorii Monitory oraz marek Asus". prefix: '' for the discount, 'condition' for a condition.
+    function scopePhrase(form, prefix, texts) {
+        var categories = pickedNames(form, prefix, 'Categories');
+        var brands = pickedNames(form, prefix, 'Brands');
+        var products = pickedNames(form, prefix, 'Products');
+        if (!categories.length && !brands.length && !products.length) {
+            return texts.everything;
+        }
+        var narrowing = [];
+        if (categories.length) {
+            narrowing.push(format(texts.categories, [categories.join(', ')]));
+        }
+        if (brands.length) {
+            narrowing.push(format(texts.brands, [brands.join(', ')]));
+        }
+        var head = products.length ? format(texts.products, [products.length]) : texts.anyProducts;
+        return narrowing.length ? head + ' ' + narrowing.join(' ' + texts.and + ' ') : head;
+    }
+
+    window.CL_discountScopePhrase = scopePhrase;
+
     var pricelists = {};
     var picking = null;
 

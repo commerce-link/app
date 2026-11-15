@@ -17,12 +17,11 @@ import pl.commercelink.discounts.DiscountCode;
 import pl.commercelink.discounts.DiscountCodeResolver;
 import pl.commercelink.discounts.DiscountCodesRepository;
 import pl.commercelink.discounts.DiscountService;
-import pl.commercelink.discounts.DiscountTarget;
 import pl.commercelink.discounts.DiscountType;
 import pl.commercelink.discounts.Promotion;
 import pl.commercelink.discounts.PromotionPicker;
 import pl.commercelink.discounts.PromotionsRepository;
-import pl.commercelink.discounts.TargetValue;
+import pl.commercelink.discounts.Scopes;
 import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.payments.api.PaymentLineItem;
 import pl.commercelink.payments.api.PaymentLink;
@@ -163,8 +162,7 @@ class CheckoutDiscountTest {
         // given
         Promotion promotion = new Promotion();
         promotion.setActive(true);
-        promotion.setConditionTarget(DiscountTarget.Category);
-        promotion.setConditionValues(List.of(new TargetValue("Karty graficzne", "Karty graficzne")));
+        promotion.setConditionScope(Scopes.categories("Karty graficzne"));
         promotion.setConditionQuantity(1);
         promotion.setType(DiscountType.Percentage);
         promotion.setValue(10);
@@ -300,8 +298,7 @@ class CheckoutDiscountTest {
     void promotionsAreChargedWithTheLargerDiscountOnEveryItemAndTheChargeAddsUp() {
         // given: 10% on graphics cards beats the card's share of 50 zł off everything, the RAM keeps its share
         Promotion cards = promotion(DiscountType.Percentage, 10);
-        cards.setTarget(DiscountTarget.Category);
-        cards.setTargetValues(List.of(new TargetValue("Karty graficzne", "Karty graficzne")));
+        cards.setScope(Scopes.categories("Karty graficzne"));
         when(promotionsRepository.findAll(STORE_ID)).thenReturn(List.of(cards, promotion(DiscountType.Amount, 50)));
         Map<String, Object> body = validRequest(line("pim-gpu", 2, true), line("pim-ram", 3, true), line("pim-srv", 1, true));
         body.put("deliveryOptionId", "inpost");

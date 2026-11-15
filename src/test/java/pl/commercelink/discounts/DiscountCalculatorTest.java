@@ -3,7 +3,6 @@ package pl.commercelink.discounts;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.baskets.BasketItem;
 
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -105,7 +104,7 @@ class DiscountCalculatorTest {
     @Test
     void discountForTheSourceCoversTheClone() {
         // given: the code names the global entry, the basket holds the store's clone
-        DiscountCode code = percentage(10, DiscountTarget.Product, "pim-S");
+        DiscountCode code = percentage(10, Scopes.products("pim-S"));
         BasketItem clone = product("C", 100, 1);
 
         // when
@@ -119,7 +118,7 @@ class DiscountCalculatorTest {
     @Test
     void discountForTheCloneCoversTheSource() {
         // given
-        DiscountCode code = percentage(10, DiscountTarget.Product, "pim-C");
+        DiscountCode code = percentage(10, Scopes.products("pim-C"));
         BasketItem source = product("S", 100, 1);
 
         // when / then
@@ -129,7 +128,7 @@ class DiscountCalculatorTest {
     @Test
     void discountForAnUnrelatedProductCoversNeither() {
         // when / then
-        assertThat(DiscountCalculator.calculate(percentage(10, DiscountTarget.Product, "pim-G"), List.of(product("C", 100, 1)), aliasesOfS()).lines()).isEmpty();
+        assertThat(DiscountCalculator.calculate(percentage(10, Scopes.products("pim-G")), List.of(product("C", 100, 1)), aliasesOfS()).lines()).isEmpty();
     }
 
     private static Function<String, Set<String>> aliasesOfS() {
@@ -212,7 +211,7 @@ class DiscountCalculatorTest {
     @Test
     void onlyCoveredItemsAreDiscounted() {
         // given
-        DiscountCode code = amount(10, DiscountTarget.Brand, "Acme");
+        DiscountCode code = amount(10, Scopes.brands("Acme"));
         BasketItem acme = product("GPU", 100.00, 1);
         acme.setBrand("Acme");
         BasketItem globex = product("RAM", 100.00, 1);
@@ -232,7 +231,7 @@ class DiscountCalculatorTest {
     @Test
     void emptyWhenNothingCovered() {
         // given
-        DiscountCode code = percentage(10, DiscountTarget.Category, "Procesory");
+        DiscountCode code = percentage(10, Scopes.categories("Procesory"));
         BasketItem gpu = product("GPU", 100.00, 1);
 
         // when
@@ -290,8 +289,7 @@ class DiscountCalculatorTest {
         Promotion promotion = new Promotion();
         promotion.setType(DiscountType.Percentage);
         promotion.setValue(20);
-        promotion.setTarget(DiscountTarget.Brand);
-        promotion.setTargetValues(List.of(new TargetValue("Acme", "Acme")));
+        promotion.setScope(Scopes.brands("Acme"));
         BasketItem acme = product("GPU", 100.00, 2);
         acme.setBrand("Acme");
         BasketItem globex = product("RAM", 50.00, 1);
@@ -306,28 +304,27 @@ class DiscountCalculatorTest {
         assertThat(calculation.amount()).isEqualByComparingTo("40.00");
     }
 
-    private static DiscountCode percentage(double value, DiscountTarget target, String... values) {
-        return code(DiscountType.Percentage, value, target, values);
+    private static DiscountCode percentage(double value, DiscountScope scope) {
+        return code(DiscountType.Percentage, value, scope);
     }
 
     private static DiscountCode percentage(double value) {
-        return code(DiscountType.Percentage, value, null);
+        return code(DiscountType.Percentage, value, new DiscountScope());
     }
 
-    private static DiscountCode amount(double value, DiscountTarget target, String... values) {
-        return code(DiscountType.Amount, value, target, values);
+    private static DiscountCode amount(double value, DiscountScope scope) {
+        return code(DiscountType.Amount, value, scope);
     }
 
     private static DiscountCode amount(double value) {
-        return code(DiscountType.Amount, value, null);
+        return code(DiscountType.Amount, value, new DiscountScope());
     }
 
-    private static DiscountCode code(DiscountType type, double value, DiscountTarget target, String... values) {
+    private static DiscountCode code(DiscountType type, double value, DiscountScope scope) {
         DiscountCode code = new DiscountCode();
         code.setType(type);
         code.setValue(value);
-        code.setTarget(target);
-        code.setTargetValues(Arrays.stream(values).map(v -> new TargetValue(v, v)).toList());
+        code.setScope(scope);
         return code;
     }
 

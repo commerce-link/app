@@ -16,9 +16,9 @@ import org.springframework.ui.ExtendedModelMap;
 import org.springframework.web.server.ResponseStatusException;
 import pl.commercelink.discounts.DiscountCode;
 import pl.commercelink.discounts.DiscountCodesRepository;
-import pl.commercelink.discounts.DiscountTarget;
+import pl.commercelink.discounts.DiscountScope;
 import pl.commercelink.discounts.DiscountType;
-import pl.commercelink.discounts.TargetValue;
+import pl.commercelink.discounts.Scopes;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -176,8 +176,7 @@ class StoreDiscountCodesControllerTest {
         // given
         store("store-1");
         DiscountCode categories = code("GPU-50", "Rabat na podzespoły");
-        categories.setTarget(DiscountTarget.Category);
-        categories.setTargetValues(List.of(new TargetValue("Karty graficzne", "Karty graficzne")));
+        categories.setScope(Scopes.categories("Karty graficzne"));
         when(discountCodesRepository.findAll("store-1")).thenReturn(List.of(categories, code("LATO-10", "Kampania letnia")));
 
         // when
@@ -192,6 +191,33 @@ class StoreDiscountCodesControllerTest {
         assertThat(rows(basket)).extracting(DiscountCodeView::code).containsExactly("LATO-10");
         assertThat(rows(category)).extracting(DiscountCodeView::code).containsExactly("GPU-50");
         assertThat(rows(unknown)).hasSize(2);
+    }
+
+    @Test
+    void targetFilterListsACodeUnderEveryListItFills() {
+        // given
+        store("store-1");
+        DiscountCode asusMonitors = code("ASUS-10", "Monitory ASUS");
+        asusMonitors.setScope(new DiscountScope(List.of("Monitory"), List.of("ASUS"), List.of()));
+        DiscountCode products = code("KABEL-5", "Kable");
+        products.setScope(Scopes.products("PIM-1"));
+        when(discountCodesRepository.findAll("store-1")).thenReturn(List.of(asusMonitors, products));
+
+        // when
+        ExtendedModelMap category = new ExtendedModelMap();
+        controller.codes(null, null, "category", category);
+        ExtendedModelMap brand = new ExtendedModelMap();
+        controller.codes(null, null, "brand", brand);
+        ExtendedModelMap product = new ExtendedModelMap();
+        controller.codes(null, null, "product", product);
+        ExtendedModelMap basket = new ExtendedModelMap();
+        controller.codes(null, null, "basket", basket);
+
+        // then
+        assertThat(rows(category)).extracting(DiscountCodeView::code).containsExactly("ASUS-10");
+        assertThat(rows(brand)).extracting(DiscountCodeView::code).containsExactly("ASUS-10");
+        assertThat(rows(product)).extracting(DiscountCodeView::code).containsExactly("KABEL-5");
+        assertThat(rows(basket)).isEmpty();
     }
 
     @Test

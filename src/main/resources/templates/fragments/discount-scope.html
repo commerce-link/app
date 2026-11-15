@@ -1,0 +1,27 @@
+<th:block th:fragment="lines (scope)">
+    <th:block th:each="part : ${scope.parts()}">
+        <span th:text="${#strings.listJoin(part.shownNames(), ', ')}"></span>
+        <span class="cl-table-sub"
+              th:text="${#messages.msg('store.discounts.' + part.kind())
+                      + (part.more() > 0 ? ' · ' + #messages.msg('store.discounts.list.more', part.more()) : '')}"></span>
+    </th:block>
+</th:block>
+
+<th:block th:fragment="subLines (scope)">
+    <span th:each="part : ${scope.parts()}" class="cl-table-sub"
+          th:text="${#messages.msg('store.discounts.' + part.kind()) + ': ' + #strings.listJoin(part.shownNames(), ', ')
+                  + (part.more() > 0 ? ' · ' + #messages.msg('store.discounts.list.more', part.more()) : '')}"></span>
+</th:block>
+
+<th:block th:fragment="values (scope)">
+    <th:block th:each="part : ${scope.parts()}">
+        <ul>
+            <li th:each="value : ${part.values()}">
+                <span th:text="${value.name}"></span>
+                <span th:if="${part.kind() == 'products'}" class="cl-kv-sub"
+                      th:text="#{store.discounts.details.productId(${value.id})}"></span>
+            </li>
+        </ul>
+        <span class="cl-kv-sub" th:text="#{${'store.discounts.' + part.kind()}}"></span>
+    </th:block>
+</th:block>

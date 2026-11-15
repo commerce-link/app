@@ -2,7 +2,6 @@ package pl.commercelink.web.dtos;
 
 import org.junit.jupiter.api.Test;
 import pl.commercelink.discounts.DiscountCode;
-import pl.commercelink.discounts.DiscountTarget;
 import pl.commercelink.discounts.DiscountType;
 import pl.commercelink.discounts.TargetValue;
 import pl.commercelink.stores.Store;
@@ -115,72 +114,43 @@ class DiscountCodeFormTest {
     }
 
     @Test
-    void targetMustBeKnown() {
+    void everyFilledListIsKept() {
         // given
         DiscountCodeForm form = valid();
-        form.setTarget("Catalog");
-
-        // when / then
-        assertThat(form.validate(store())).containsEntry("target", "store.discounts.target.invalid");
-    }
-
-    @Test
-    void categoryCodeNeedsAtLeastOneCategory() {
-        // given
-        DiscountCodeForm form = valid();
-        form.setTarget("Category");
-        form.setCategories(List.of(" "));
-
-        // when / then
-        assertThat(form.validate(store())).containsEntry("targetValues", "store.discounts.targetValues.required.Category");
-    }
-
-    @Test
-    void productCodeNeedsAtLeastOneProduct() {
-        // given
-        DiscountCodeForm form = valid();
-        form.setTarget("Product");
-        form.setProducts(List.of(new TargetValue(" ", "Zestaw Gamer RTX 5070")));
-        form.setCategories(List.of("Karty graficzne"));
-
-        // when / then
-        assertThat(form.validate(store())).containsEntry("targetValues", "store.discounts.targetValues.required.Product");
-    }
-
-    @Test
-    void brandCodeNeedsAtLeastOneBrand() {
-        // given
-        DiscountCodeForm form = valid();
-        form.setTarget("Brand");
-        form.setBrands(List.of(""));
-        form.setProducts(List.of(new TargetValue("PIM-1", "Zestaw Gamer RTX 5070")));
-
-        // when / then
-        assertThat(form.validate(store())).containsEntry("targetValues", "store.discounts.targetValues.required.Brand");
-    }
-
-    @Test
-    void onlyTheValuesOfTheChosenTargetAreKept() {
-        // given
-        DiscountCodeForm form = valid();
-        form.setTarget("Brand");
-        form.setCategories(List.of("Karty graficzne"));
-        form.setProducts(List.of(new TargetValue("PIM-1", "Zestaw Gamer RTX 5070")));
+        form.setCategories(List.of("Monitory"));
         form.setBrands(List.of("ASUS"));
+        form.setProducts(List.of(new TargetValue("PIM-1", "Monitor ASUS 27")));
 
         // when
         DiscountCode code = form.toDiscountCode("store-1");
 
         // then
-        assertThat(code.getTarget()).isEqualTo(DiscountTarget.Brand);
-        assertThat(code.getTargetValues()).extracting(TargetValue::getId).containsExactly("ASUS");
+        assertThat(form.validate(store())).isEmpty();
+        assertThat(code.getScope().getCategories()).containsExactly("Monitory");
+        assertThat(code.getScope().getBrands()).containsExactly("ASUS");
+        assertThat(code.getScope().getProducts()).extracting(TargetValue::getId).containsExactly("PIM-1");
+    }
+
+    @Test
+    void blankValuesNarrowNothing() {
+        // given
+        DiscountCodeForm form = valid();
+        form.setCategories(List.of(" "));
+        form.setBrands(List.of(""));
+        form.setProducts(List.of(new TargetValue(" ", "Zestaw Gamer RTX 5070")));
+
+        // when
+        DiscountCode code = form.toDiscountCode("store-1");
+
+        // then
+        assertThat(form.validate(store())).isEmpty();
+        assertThat(code.getScope().isEmpty()).isTrue();
     }
 
     @Test
     void productsAreKeptOncePerIdWithTheirNames() {
         // given
         DiscountCodeForm form = valid();
-        form.setTarget("Product");
         form.setProducts(List.of(
                 new TargetValue("PIM-1", "Zestaw Gamer RTX 5070"),
                 new TargetValue(" PIM-2 ", " Karta graficzna ASUS Dual RTX 5070 OC "),
@@ -192,9 +162,8 @@ class DiscountCodeFormTest {
         DiscountCode code = form.toDiscountCode("store-1");
 
         // then
-        assertThat(code.getTarget()).isEqualTo(DiscountTarget.Product);
-        assertThat(code.getTargetValues()).extracting(TargetValue::getId).containsExactly("PIM-1", "PIM-2", "PIM-3");
-        assertThat(code.getTargetValues()).extracting(TargetValue::getName)
+        assertThat(code.getScope().getProducts()).extracting(TargetValue::getId).containsExactly("PIM-1", "PIM-2", "PIM-3");
+        assertThat(code.getScope().getProducts()).extracting(TargetValue::getName)
                 .containsExactly("Zestaw Gamer RTX 5070", "Karta graficzna ASUS Dual RTX 5070 OC", "PIM-3");
     }
 
@@ -202,15 +171,13 @@ class DiscountCodeFormTest {
     void brandsAreKeptOnceByName() {
         // given
         DiscountCodeForm form = valid();
-        form.setTarget("Brand");
         form.setBrands(List.of("ASUS", " MSI ", "ASUS", ""));
 
         // when
         DiscountCode code = form.toDiscountCode("store-1");
 
         // then
-        assertThat(code.getTargetValues()).extracting(TargetValue::getId).containsExactly("ASUS", "MSI");
-        assertThat(code.getTargetValues()).extracting(TargetValue::getName).containsExactly("ASUS", "MSI");
+        assertThat(code.getScope().getBrands()).containsExactly("ASUS", "MSI");
     }
 
     @Test
@@ -297,8 +264,7 @@ class DiscountCodeFormTest {
         assertThat(code.getPaymentProvider()).isNull();
         assertThat(code.getValidFrom()).isNull();
         assertThat(code.getValidTo()).isNull();
-        assertThat(code.getTarget()).isNull();
-        assertThat(code.getTargetValues()).isEmpty();
+        assertThat(code.getScope().isEmpty()).isTrue();
     }
 
     @Test
@@ -306,7 +272,6 @@ class DiscountCodeFormTest {
         // given
         DiscountCodeForm form = amount("49,999");
         form.setName("  Rabat na podzespoły ");
-        form.setTarget("Category");
         form.setCategories(List.of("Karty graficzne", " Procesory ", "Karty graficzne", ""));
         form.setPaymentProvider("paynow");
         form.setMinOrderValue("499,995");
@@ -324,9 +289,9 @@ class DiscountCodeFormTest {
         assertThat(code.getName()).isEqualTo("Rabat na podzespoły");
         assertThat(code.getType()).isEqualTo(DiscountType.Amount);
         assertThat(code.getValue()).isEqualTo(50.00);
-        assertThat(code.getTarget()).isEqualTo(DiscountTarget.Category);
-        assertThat(code.getTargetValues()).extracting(TargetValue::getId).containsExactly("Karty graficzne", "Procesory");
-        assertThat(code.getTargetValues()).extracting(TargetValue::getName).containsExactly("Karty graficzne", "Procesory");
+        assertThat(code.getScope().getCategories()).containsExactly("Karty graficzne", "Procesory");
+        assertThat(code.getScope().getBrands()).isEmpty();
+        assertThat(code.getScope().getProducts()).isEmpty();
         assertThat(code.getPaymentProvider()).isEqualTo("paynow");
         assertThat(code.getMinOrderValue()).isEqualTo(500.00);
         assertThat(code.getMaxUses()).isEqualTo(100);
@@ -355,7 +320,9 @@ class DiscountCodeFormTest {
 
         // then
         assertThat(form.getType()).isEqualTo("Percentage");
-        assertThat(form.getTarget()).isEmpty();
+        assertThat(form.getCategories()).isEmpty();
+        assertThat(form.getBrands()).isEmpty();
+        assertThat(form.getProducts()).isEmpty();
         assertThat(form.isActive()).isTrue();
     }
 

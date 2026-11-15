@@ -1,7 +1,7 @@
 package pl.commercelink.web.settings;
 
 import org.junit.jupiter.api.Test;
-import pl.commercelink.discounts.DiscountTarget;
+import pl.commercelink.discounts.DiscountScope;
 import pl.commercelink.discounts.DiscountType;
 import pl.commercelink.discounts.Promotion;
 import pl.commercelink.discounts.TargetValue;
@@ -23,13 +23,11 @@ class StorePromotionTemplateTest {
         promotion.setStoreId("store-1");
         promotion.setPromotionId("p-1");
         promotion.setName("Monitor + kabel taniej");
-        promotion.setConditionTarget(DiscountTarget.Category);
-        promotion.setConditionValues(List.of(new TargetValue("Monitory", "Monitory")));
+        promotion.setConditionScope(new DiscountScope(List.of("Monitory"), List.of("ASUS"), List.of()));
         promotion.setConditionQuantity(1);
         promotion.setType(DiscountType.Percentage);
         promotion.setValue(20);
-        promotion.setTarget(DiscountTarget.Product);
-        promotion.setTargetValues(List.of(new TargetValue("0101", "Kabel HDMI 2 m")));
+        promotion.setScope(new DiscountScope(List.of(), List.of(), List.of(new TargetValue("0101", "Kabel HDMI 2 m"))));
         promotion.setMinOrderValue(1500);
         promotion.setValidFrom(LocalDateTime.of(2026, 11, 1, 0, 0));
         promotion.setValidTo(LocalDateTime.of(2026, 12, 31, 23, 59, 59));
@@ -56,7 +54,8 @@ class StorePromotionTemplateTest {
         // then
         assertThat(html).contains(">Monitor + kabel taniej<").contains(">Aktywna<")
                 .contains("href=\"/dashboard/store/promotions\"").contains(">Promocje<");
-        assertThat(html).contains(">Monitory<").contains(">Kategorie · co najmniej 1 szt.<")
+        assertThat(html).contains(">Monitory<").contains(">Kategorie<").contains(">ASUS<").contains(">Marki<")
+                .contains(">co najmniej 1 szt.<")
                 .contains(">1 500,00 zł<")
                 .contains(">20%<").contains("procentowy, od ceny każdej objętej sztuki")
                 .contains(">Kabel HDMI 2 m<").contains(">ID: 0101<").contains(">Produkty<")
@@ -69,13 +68,11 @@ class StorePromotionTemplateTest {
     void aPromotionWithoutConditionOnTheWholeBasketSaysSo() {
         // given
         Promotion promotion = monitorAndCable();
-        promotion.setConditionTarget(null);
-        promotion.setConditionValues(List.of());
+        promotion.setConditionScope(new DiscountScope());
         promotion.setConditionQuantity(0);
         promotion.setType(DiscountType.Amount);
         promotion.setValue(150);
-        promotion.setTarget(null);
-        promotion.setTargetValues(List.of());
+        promotion.setScope(new DiscountScope());
         promotion.setMinOrderValue(0);
         promotion.setValidFrom(null);
         promotion.setValidTo(null);
@@ -85,7 +82,8 @@ class StorePromotionTemplateTest {
 
         // then
         assertThat(html).contains(">Bez warunku<").contains(">Brak<").contains(">150,00 zł<")
-                .contains("kwotowy, dzielony na objęte produkty").contains(">Cały koszyk<").contains(">bez terminu<");
+                .contains("kwotowy, dzielony na objęte produkty").contains(">Cały koszyk<").contains(">bez terminu<")
+                .doesNotContain("co najmniej").doesNotContain(">Kategorie<").doesNotContain(">Produkty<");
     }
 
     @Test

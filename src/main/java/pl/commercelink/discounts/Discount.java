@@ -6,7 +6,6 @@ import pl.commercelink.baskets.BasketItem;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -16,9 +15,7 @@ interface Discount {
 
     double getValue();
 
-    DiscountTarget getTarget();
-
-    List<TargetValue> getTargetValues();
+    DiscountScope getScope();
 
     double getMinOrderValue();
 
@@ -29,8 +26,7 @@ interface Discount {
     LocalDateTime getValidTo();
 
     default boolean covers(BasketItem item, Function<String, Set<String>> productAliases) {
-        DiscountTarget target = getTarget();
-        return target == null ? item.isProduct() : target.matches(item, getTargetValues(), productAliases);
+        return getScope().matches(item, productAliases);
     }
 
     default BigDecimal minimum() {

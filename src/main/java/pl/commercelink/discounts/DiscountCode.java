@@ -14,8 +14,6 @@ import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
@@ -41,11 +39,8 @@ public class DiscountCode implements Discount {
     private DiscountType type;
     @DynamoDBAttribute(attributeName = "value")
     private double value;
-    @DynamoDBAttribute(attributeName = "target")
-    @DynamoDBTypeConvertedEnum
-    private DiscountTarget target;
-    @DynamoDBAttribute(attributeName = "targetValues")
-    private List<TargetValue> targetValues = new ArrayList<>();
+    @DynamoDBAttribute(attributeName = "scope")
+    private DiscountScope scope = new DiscountScope();
     @DynamoDBAttribute(attributeName = "paymentProvider")
     private String paymentProvider;
     @DynamoDBAttribute(attributeName = "minOrderValue")

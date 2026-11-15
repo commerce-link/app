@@ -70,25 +70,21 @@
                         </th>
                         <td th:attr="data-label=#{store.promotions.column.condition}"
                             th:with="minimum=${row.minOrderValue() != null ? #messages.msg('store.promotions.list.minimum', row.minOrderValue()) : null}">
-                            <th:block th:if="${row.conditionTarget() == null}">
+                            <th:block th:if="${row.condition().everything()}">
                                 <span th:text="#{store.promotions.list.noCondition}"></span>
                                 <span th:if="${minimum != null}" class="cl-table-sub" th:text="${minimum}"></span>
                             </th:block>
-                            <th:block th:if="${row.conditionTarget() != null}">
-                                <span th:text="${#strings.listJoin(row.conditionNames(), ', ')}"></span>
+                            <th:block th:unless="${row.condition().everything()}">
+                                <th:block th:replace="~{fragments/discount-scope :: lines(${row.condition()})}"></th:block>
                                 <span class="cl-table-sub"
-                                      th:text="${#messages.msg('store.promotions.list.kind.' + row.conditionTarget().name())
-                                              + (row.moreConditions() > 0 ? ' · ' + #messages.msg('store.promotions.list.more', row.moreConditions()) : '')
-                                              + ' · ' + #messages.msg('store.promotions.list.quantity', row.conditionQuantity())
+                                      th:text="${#messages.msg('store.promotions.list.quantity', row.conditionQuantity())
                                               + (minimum != null ? ' · ' + minimum : '')}"></span>
                             </th:block>
                         </td>
                         <td th:attr="data-label=#{store.promotions.column.discount}">
                             <span class="cl-tabular" th:text="${row.percentage()} ? #{store.discounts.list.percent(${row.value()})} : #{store.discounts.list.amount(${row.value()})}"></span>
-                            <span class="cl-table-sub"
-                                  th:text="${row.target() == null} ? #{store.promotions.list.basket}
-                                          : ${#messages.msg('store.promotions.list.target', #strings.listJoin(row.targetNames(), ', '))
-                                          + (row.moreTargets() > 0 ? ' · ' + #messages.msg('store.promotions.list.more', row.moreTargets()) : '')}"></span>
+                            <span th:if="${row.scope().everything()}" class="cl-table-sub" th:text="#{store.promotions.list.basket}"></span>
+                            <th:block th:replace="~{fragments/discount-scope :: subLines(${row.scope()})}"></th:block>
                         </td>
                         <td class="cl-tabular" th:attr="data-label=#{store.promotions.column.validity}"
                             th:text="${row.validFrom() != null and row.validTo() != null} ? #{store.discounts.validity.range(${row.validFrom()}, ${row.validTo()})}

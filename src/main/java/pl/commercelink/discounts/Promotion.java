@@ -14,8 +14,6 @@ import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -33,11 +31,8 @@ public class Promotion implements Discount {
     private String promotionId;
     @DynamoDBAttribute(attributeName = "name")
     private String name;
-    @DynamoDBAttribute(attributeName = "conditionTarget")
-    @DynamoDBTypeConvertedEnum
-    private DiscountTarget conditionTarget;
-    @DynamoDBAttribute(attributeName = "conditionValues")
-    private List<TargetValue> conditionValues = new ArrayList<>();
+    @DynamoDBAttribute(attributeName = "conditionScope")
+    private DiscountScope conditionScope = new DiscountScope();
     @DynamoDBAttribute(attributeName = "conditionQuantity")
     private int conditionQuantity;
     @DynamoDBAttribute(attributeName = "minOrderValue")
@@ -47,11 +42,8 @@ public class Promotion implements Discount {
     private DiscountType type;
     @DynamoDBAttribute(attributeName = "value")
     private double value;
-    @DynamoDBAttribute(attributeName = "target")
-    @DynamoDBTypeConvertedEnum
-    private DiscountTarget target;
-    @DynamoDBAttribute(attributeName = "targetValues")
-    private List<TargetValue> targetValues = new ArrayList<>();
+    @DynamoDBAttribute(attributeName = "scope")
+    private DiscountScope scope = new DiscountScope();
     @DynamoDBAttribute(attributeName = "validFrom")
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime validFrom;
@@ -69,11 +61,11 @@ public class Promotion implements Discount {
     }
 
     private boolean isConditionMetBy(Basket basket, Function<String, Set<String>> productAliases) {
-        if (conditionTarget == null) {
+        if (conditionScope.isEmpty()) {
             return true;
         }
         long quantity = basket.getEffectiveBasketItems().stream()
-                .filter(item -> conditionTarget.matches(item, conditionValues, productAliases))
+                .filter(item -> conditionScope.matches(item, productAliases))
                 .mapToLong(BasketItem::getQty)
                 .sum();
         return quantity >= conditionQuantity;

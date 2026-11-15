@@ -21,12 +21,12 @@ import pl.commercelink.discounts.DiscountCode;
 import pl.commercelink.discounts.DiscountCodeResolver;
 import pl.commercelink.discounts.DiscountCodesRepository;
 import pl.commercelink.discounts.DiscountService;
-import pl.commercelink.discounts.DiscountTarget;
+import pl.commercelink.discounts.DiscountScope;
 import pl.commercelink.discounts.DiscountType;
 import pl.commercelink.discounts.Promotion;
 import pl.commercelink.discounts.PromotionPicker;
 import pl.commercelink.discounts.PromotionsRepository;
-import pl.commercelink.discounts.TargetValue;
+import pl.commercelink.discounts.Scopes;
 import pl.commercelink.invoicing.InvoicingService;
 import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pricelist.PricelistRepository;
@@ -168,8 +168,7 @@ class BasketsRestApiTest {
         promotion.setActive(true);
         promotion.setType(DiscountType.Percentage);
         promotion.setValue(10);
-        promotion.setTarget(DiscountTarget.Brand);
-        promotion.setTargetValues(List.of(new TargetValue("Acme", "Acme")));
+        promotion.setScope(Scopes.brands("Acme"));
         when(promotionsRepository.findAll(STORE_ID)).thenReturn(List.of(promotion));
 
         // when
@@ -190,8 +189,7 @@ class BasketsRestApiTest {
         DiscountCode code = percentageOnAcme();
         code.setType(DiscountType.Amount);
         code.setValue(100);
-        code.setTarget(null);
-        code.setTargetValues(List.of());
+        code.setScope(new DiscountScope());
         givenCode(code);
         when(req.getDiscountCode()).thenReturn(CODE);
 
@@ -389,8 +387,7 @@ class BasketsRestApiTest {
         code.setActive(true);
         code.setType(DiscountType.Percentage);
         code.setValue(10);
-        code.setTarget(DiscountTarget.Brand);
-        code.setTargetValues(List.of(new TargetValue("Acme", "Acme")));
+        code.setScope(Scopes.brands("Acme"));
         return code;
     }
 }

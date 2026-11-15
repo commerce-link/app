@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 @Testcontainers(disabledWithoutDocker = true)
 class PromotionsRepositoryDynamoDbIntegrationTest {
@@ -48,12 +49,10 @@ class PromotionsRepositoryDynamoDbIntegrationTest {
     void savedPromotionIsFoundWithAllItsTerms() {
         // given
         Promotion original = promotion("store-1", "Monitor + kabel taniej");
-        original.setConditionTarget(DiscountTarget.Category);
-        original.setConditionValues(List.of(new TargetValue("Monitory", "Monitory")));
+        original.setConditionScope(new DiscountScope(List.of("Monitory"), List.of("Asus"), List.of()));
         original.setConditionQuantity(2);
         original.setMinOrderValue(500);
-        original.setTarget(DiscountTarget.Product);
-        original.setTargetValues(List.of(new TargetValue("PIM-1", "Kabel HDMI 2 m")));
+        original.setScope(new DiscountScope(List.of(), List.of(), List.of(new TargetValue("PIM-1", "Kabel HDMI 2 m"))));
         original.setValidTo(LocalDateTime.of(2026, 12, 31, 23, 59, 59));
         repository.save(original);
 
@@ -62,13 +61,15 @@ class PromotionsRepositoryDynamoDbIntegrationTest {
 
         // then
         assertThat(stored.getName()).isEqualTo("Monitor + kabel taniej");
-        assertThat(stored.getConditionTarget()).isEqualTo(DiscountTarget.Category);
-        assertThat(stored.getConditionValues()).extracting(TargetValue::getId).containsExactly("Monitory");
+        assertThat(stored.getConditionScope().getCategories()).containsExactly("Monitory");
+        assertThat(stored.getConditionScope().getBrands()).containsExactly("Asus");
+        assertThat(stored.getConditionScope().getProducts()).isEmpty();
         assertThat(stored.getConditionQuantity()).isEqualTo(2);
         assertThat(stored.getMinOrderValue()).isEqualTo(500);
         assertThat(stored.getType()).isEqualTo(DiscountType.Percentage);
-        assertThat(stored.getTarget()).isEqualTo(DiscountTarget.Product);
-        assertThat(stored.getTargetValues()).extracting(TargetValue::getName).containsExactly("Kabel HDMI 2 m");
+        assertThat(stored.getScope().getCategories()).isEmpty();
+        assertThat(stored.getScope().getProducts()).extracting(TargetValue::getId, TargetValue::getName)
+                .containsExactly(tuple("PIM-1", "Kabel HDMI 2 m"));
         assertThat(stored.getValidTo()).isEqualTo(LocalDateTime.of(2026, 12, 31, 23, 59, 59));
         assertThat(stored.getCreatedAt()).isEqualTo(LocalDateTime.of(2026, 11, 12, 10, 14));
     }

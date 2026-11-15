@@ -30,8 +30,7 @@ class PromotionPickerTest {
         // given
         Promotion fivePercentOnEverything = tenPercentOn("Acme");
         fivePercentOnEverything.setValue(5);
-        fivePercentOnEverything.setTarget(null);
-        fivePercentOnEverything.setTargetValues(List.of());
+        fivePercentOnEverything.setScope(new DiscountScope());
         Promotion twentyOffGlobex = tenPercentOn("Globex");
         twentyOffGlobex.setType(DiscountType.Amount);
         twentyOffGlobex.setValue(20);
@@ -53,8 +52,7 @@ class PromotionPickerTest {
         // given
         Promotion acme = tenPercentOn("Acme");
         Promotion everything = tenPercentOn("Acme");
-        everything.setTarget(null);
-        everything.setTargetValues(List.of());
+        everything.setScope(new DiscountScope());
         when(promotionsRepository.findAll(STORE_ID)).thenReturn(List.of(acme, everything));
 
         // when
@@ -81,8 +79,7 @@ class PromotionPickerTest {
     void picksThePromotionWhoseConditionIsMet() {
         // given
         Promotion promotion = tenPercentOn("Acme");
-        promotion.setConditionTarget(DiscountTarget.Brand);
-        promotion.setConditionValues(List.of(new TargetValue("Acme", "Acme")));
+        promotion.setConditionScope(Scopes.brands("Acme"));
         promotion.setConditionQuantity(3);
         when(promotionsRepository.findAll(STORE_ID)).thenReturn(List.of(promotion));
 
@@ -121,8 +118,7 @@ class PromotionPickerTest {
         // given
         Promotion fivePercentOnEverything = tenPercentOn("Acme");
         fivePercentOnEverything.setValue(5);
-        fivePercentOnEverything.setTarget(null);
-        fivePercentOnEverything.setTargetValues(List.of());
+        fivePercentOnEverything.setScope(new DiscountScope());
         when(promotionsRepository.findAll(STORE_ID)).thenReturn(List.of(fivePercentOnEverything, tenPercentOn("Acme")));
 
         // when
@@ -142,8 +138,7 @@ class PromotionPickerTest {
         Promotion twentyOff = tenPercentOn("Acme");
         twentyOff.setType(DiscountType.Amount);
         twentyOff.setValue(20);
-        twentyOff.setTarget(null);
-        twentyOff.setTargetValues(List.of());
+        twentyOff.setScope(new DiscountScope());
         when(promotionsRepository.findAll(STORE_ID)).thenReturn(List.of(twentyOff, tenPercentOn("Acme")));
 
         // when
@@ -179,8 +174,7 @@ class PromotionPickerTest {
         // given
         Promotion unmet = tenPercentOn("Acme");
         unmet.setValue(50);
-        unmet.setConditionTarget(DiscountTarget.Brand);
-        unmet.setConditionValues(List.of(new TargetValue("Acme", "Acme")));
+        unmet.setConditionScope(Scopes.brands("Acme"));
         unmet.setConditionQuantity(4);
         Promotion belowMinimum = tenPercentOn("Acme");
         belowMinimum.setValue(40);
@@ -212,6 +206,28 @@ class PromotionPickerTest {
     }
 
     @Test
+    void promotionOnACategoryOfABrandDiscountsOnlyItemsOfBoth() {
+        // given
+        Promotion acmeComponents = tenPercentOn("Acme");
+        acmeComponents.setScope(new DiscountScope(List.of("Podzespoły"), List.of("Acme"), List.of()));
+        BasketItem acmeMonitor = product("Monitor", 1000.00, 1, "Acme");
+        acmeMonitor.setCategory("Monitory");
+        Basket basket = basket();
+        basket.getBasketItems().add(acmeMonitor);
+        when(promotionsRepository.findAll(STORE_ID)).thenReturn(List.of(acmeComponents));
+
+        // when
+        Optional<AppliedDiscount> picked = picker.pick(basket);
+
+        // then: only the Acme GPU is both in "Podzespoły" and of Acme; 12.99 × 3 = 38.97
+        assertThat(picked).hasValueSatisfying(applied -> {
+            assertThat(applied.calculation().lines()).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
+                    .containsExactly(tuple("GPU", 116.91));
+            assertThat(applied.calculation().amount()).isEqualByComparingTo("38.97");
+        });
+    }
+
+    @Test
     void promotionThatCoversNothingIsNotPicked() {
         // given
         when(promotionsRepository.findAll(STORE_ID)).thenReturn(List.of(tenPercentOn("Initech")));
@@ -233,8 +249,7 @@ class PromotionPickerTest {
         promotion.setActive(true);
         promotion.setType(DiscountType.Percentage);
         promotion.setValue(10);
-        promotion.setTarget(DiscountTarget.Brand);
-        promotion.setTargetValues(List.of(new TargetValue(brand, brand)));
+        promotion.setScope(Scopes.brands(brand));
         return promotion;
     }
 
