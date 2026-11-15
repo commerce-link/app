@@ -22,15 +22,6 @@ class BuiltInStockQueryService implements StockQueryService {
     }
 
     @Override
-    public List<WarehouseItemView> searchAvailableByEans(String storeId, Collection<String> eans) {
-        return warehouseRepository.findAllAvailableByEans(storeId, eans)
-                .stream()
-                .filter(WarehouseItem::isSealed)
-                .map(this::fromInternal)
-                .collect(Collectors.toList());
-    }
-
-    @Override
     public List<WarehouseItemView> searchByEans(String storeId, Collection<String> eans) {
         return warehouseRepository.findAllByEans(storeId, eans)
                 .stream()
