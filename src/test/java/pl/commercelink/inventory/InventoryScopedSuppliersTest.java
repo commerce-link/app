@@ -17,6 +17,9 @@ import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.SupplierScope;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.invoicing.api.Price;
+import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.warehouse.api.StockQueryService;
 import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.warehouse.api.WarehouseItemView;
@@ -24,8 +27,6 @@ import pl.commercelink.warehouse.api.WarehouseItemView;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -147,9 +148,9 @@ class InventoryScopedSuppliersTest {
         when(globalInventory.index()).thenReturn(InventoryIndex.of(List.of(globalGroup)));
         StockQueryService stockQueryService = mock(StockQueryService.class);
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
-        WarehouseItemView warehouseView = mock(WarehouseItemView.class);
-        when(warehouseView.toInventoryItem()).thenReturn(new InventoryItem(EAN, MFN, 1200.0, "PLN", 3, 1, "Warehouse", true, true, false));
-        when(stockQueryService.searchAvailableByEans(eq(STORE_ID), argThat(eans -> eans.contains(EAN)))).thenReturn(List.of(warehouseView));
+        WarehouseItemView warehouseView = new WarehouseItemView(STORE_ID, "wh-1", "Widget", EAN, MFN, Price.fromNet(1200.0, 0.23), 3,
+                FulfilmentStatus.Delivered, ItemCondition.Sealed);
+        when(stockQueryService.searchAllAvailable(STORE_ID)).thenReturn(List.of(warehouseView));
 
         // when
         MatchedInventory matched = inventory.withEnabledSuppliersAndWarehouseData(STORE_ID, SupplierScope.FULFILMENT).findByEan(EAN);

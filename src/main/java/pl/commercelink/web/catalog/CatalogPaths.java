@@ -48,6 +48,10 @@ public final class CatalogPaths {
         return categorySettings(catalogId, categoryId) + "/basics";
     }
 
+    public static String categoryAutomaticList(String catalogId, String categoryId) {
+        return categoryBasics(catalogId, categoryId) + "/automatic-list";
+    }
+
     public static String categoryPricing(String catalogId, String categoryId) {
         return categorySettings(catalogId, categoryId) + "/pricing";
     }

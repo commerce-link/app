@@ -27,7 +27,8 @@ class BuiltInStockQueryServiceTest {
     void exposesPurchaseCostToInventoryWhenUnitSystemCostIsNotSet() {
         // given
         WarehouseItem item = anAvailableItem(20.0);
-        when(warehouseRepository.findAllAvailableByEans("store-1", List.of("5901234123457"))).thenReturn(List.of(item));
+        when(warehouseRepository.findAllFiltered("store-1", null, List.of(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered)))
+                .thenReturn(List.of(item));
 
         // when
         InventoryItem inventoryItem = firstInventoryItem();
@@ -41,7 +42,8 @@ class BuiltInStockQueryServiceTest {
         // given
         WarehouseItem item = anAvailableItem(20.0);
         item.setUnitSystemCost(150.0);
-        when(warehouseRepository.findAllAvailableByEans("store-1", List.of("5901234123457"))).thenReturn(List.of(item));
+        when(warehouseRepository.findAllFiltered("store-1", null, List.of(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered)))
+                .thenReturn(List.of(item));
 
         // when
         InventoryItem inventoryItem = firstInventoryItem();
@@ -168,25 +170,9 @@ class BuiltInStockQueryServiceTest {
         assertThat(summary.products()).isEqualTo(2);
     }
 
-    @Test
-    void excludesNotSealedItemsFromAvailableStockFoundByEans() {
-        // given
-        WarehouseItem sealed = anAvailableItem(20.0);
-        WarehouseItem openBox = anAvailableItem(20.0);
-        openBox.setCondition(ItemCondition.OpenBox);
-        when(warehouseRepository.findAllAvailableByEans("store-1", List.of("5901234123457"))).thenReturn(List.of(openBox, sealed));
-
-        // when
-        List<WarehouseItemView> views = new BuiltInStockQueryService(warehouseRepository)
-                .searchAvailableByEans("store-1", List.of("5901234123457"));
-
-        // then
-        assertThat(views).extracting(WarehouseItemView::getItemId).containsExactly(sealed.getItemId());
-    }
-
     private InventoryItem firstInventoryItem() {
         List<WarehouseItemView> views = new BuiltInStockQueryService(warehouseRepository)
-                .searchAvailableByEans("store-1", List.of("5901234123457"));
+                .searchAllAvailable("store-1");
         return views.get(0).toInventoryItem();
     }
 
