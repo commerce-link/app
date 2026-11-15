@@ -1260,6 +1260,33 @@ class CatalogCategoryControllerTest {
     }
 
     @Test
+    void theAutomaticListFragmentGoesThroughTheSameAccessCheckAsThePage() throws Exception {
+        // given
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
+        when(access.requireCategory(catalog, "someone-elses"))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+        // when / then
+        mvc.perform(get("/dashboard/catalogs/c1/category/someone-elses/settings/basics/automatic-list"))
+                .andExpect(status().isNotFound());
+        verify(dynamicCategoryProducts, never()).candidates(any(), any());
+    }
+
+    @Test
+    void aSaveTurningTheCategoryManualThatKeepsLosingTheRaceKeepsTheQuestionOnThePage() throws Exception {
+        // given
+        CategoryDefinition gpu = automaticListing(twoListed());
+        doThrow(exhausted()).when(definitions).saveBasics(any(), any(), any(), any());
+
+        // when / then
+        mvc.perform(turnManual(gpu).param("dynamicProducts", "store"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(model().attribute("errors", hasEntry("category-basics-form", "catalog.conflict")))
+                .andExpect(model().attribute("dynamicListCount", 2));
+        verify(dynamicCategoryProducts, times(1)).candidates(any(), any());
+    }
+
+    @Test
     void aRefusedSaveThatLeavesTheCategoryAutomaticDoesNotReadItsList() throws Exception {
         // given
         CategoryDefinition gpu = categoryOf("GPU");

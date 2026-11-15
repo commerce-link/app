@@ -64,12 +64,14 @@
                                        list is computed from the whole inventory of the category, so the page does not carry
                                        it: lazy-fragment.js fetches the question when "Ręczna" is chosen. A refused save that
                                        had to read the list renders it in place, which is also what a browser without
-                                       JavaScript gets: the save itself asks for the missing answer. */-->
+                                       JavaScript gets: the save itself asks for the missing answer. A saved form about to
+                                       navigate (redirectTo) is still drawn for the category as it was before the save, and
+                                       must not flash "counting" on its way out. */-->
                                 <th:block th:if="${existing and category.type.name() == 'Dynamic'}">
                                     <th:block th:if="${dynamicListCount != null}">
                                         <th:block th:replace="~{catalog/category-automatic-list :: question}"></th:block>
                                     </th:block>
-                                    <div th:if="${dynamicListCount == null and errors['type'] == null}"
+                                    <div th:if="${dynamicListCount == null and errors['type'] == null and redirectTo == null}"
                                          data-cl-variant-when="categoryType=Managed" th:hidden="${form.type != 'Managed'}"
                                          th:attr="data-cl-lazy-src=@{${automaticListHref}}" aria-live="polite">
                                         <p class="cl-card-inset cl-loading">

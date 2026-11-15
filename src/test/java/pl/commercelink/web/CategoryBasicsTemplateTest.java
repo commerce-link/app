@@ -195,6 +195,24 @@ class CategoryBasicsTemplateTest {
     }
 
     @Test
+    void aSavedFormAboutToNavigateDoesNotShowTheListBeingCounted() {
+        // given
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId();
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        CategoryBasicsForm turnedManual = automaticForm();
+        turnedManual.setType(CategoryDefinitionType.Managed.name());
+        Context context = context(gpu, true, turnedManual, Map.of());
+        context.setVariable("automaticListHref", "/dashboard/catalogs/c1/category/k1/settings/basics/automatic-list");
+        context.setVariable("redirectTo", "/dashboard/catalogs/c1/category/k1/settings");
+
+        // when
+        String html = render(context);
+
+        // then
+        assertThat(html).doesNotContain("data-cl-lazy-src").doesNotContain("Counting the products of the automatic list");
+    }
+
+    @Test
     void theFragmentAloneIsTheQuestionWithoutThePage() {
         // given
         Context context = new Context();
