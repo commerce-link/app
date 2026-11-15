@@ -11,7 +11,8 @@
 <div class="cl-page cl-dialog-host" th:fragment="addPaymentModal(formAction, expectedAmount, pendingPayment, paymentSources, loadMoneyJs)">
     <dialog class="cl-dialog is-form" id="addPaymentModal" aria-labelledby="add-payment-title" data-mode="order"
             th:attr="data-hint=#{order.payment.hint}, data-hint-full=#{order.payment.hint.full},
-                     data-hint-under=#{order.payment.hint.under}, data-hint-over=#{order.payment.hint.over}">
+                     data-hint-under=#{order.payment.hint.under}, data-hint-over=#{order.payment.hint.over},
+                     data-hint-pending=#{order.payment.hint.pending}">
         <form method="post" th:action="${formAction}">
             <h2 class="cl-dialog-title" id="add-payment-title" th:text="#{order.payment.action.add.title}"></h2>
             <div class="cl-dialog-body">

@@ -85,6 +85,11 @@
     function renderHint() {
         var bank = amountOf(bankEl);
         var fee = amountOf(feeEl);
+        // an order takes a typed 0 as the payment it still waits for; a delivery refuses it
+        if (!isDeliveryMode() && bank === 0 && bankEl.value.trim() !== '') {
+            hintEl.textContent = words('-pending', []);
+            return;
+        }
         if (bank <= 0 || (!isDeliveryMode() && directionEl.value === 'Outgoing')) {
             hintEl.textContent = '';
             return;
