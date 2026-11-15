@@ -73,6 +73,7 @@ public class CatalogCategoryController {
 
     private static final String BASICS_VIEW = "catalog/category-basics";
     private static final String BASICS_FRAGMENT = BASICS_VIEW + " :: basicsForm";
+    private static final String AUTOMATIC_LIST_FRAGMENT = "catalog/category-automatic-list :: question";
 
     private static final String PRICING_VIEW = "catalog/category-pricing";
     private static final String PRICING_FRAGMENT = PRICING_VIEW + " :: pricingForm";
@@ -186,8 +187,27 @@ public class CatalogCategoryController {
     public String basics(@PathVariable String catalogId, @PathVariable String categoryId, Model model, Locale locale) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
-        return renderBasics(catalog, category, CategoryBasicsForm.from(category), Map.of(), model, locale,
-                new AutomaticList(category).forThePage());
+        return renderBasics(catalog, category, CategoryBasicsForm.from(category), Map.of(), model, locale);
+    }
+
+    /**
+     * What the Basics page asks about the automatic list, fetched by the page only once the operator picks "Ręczna":
+     * computing the list reads the whole inventory of the category, far too much for every opening of a settings form.
+     */
+    @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/settings/basics/automatic-list")
+    public String automaticList(@PathVariable String catalogId, @PathVariable String categoryId, Model model) {
+        ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
+        CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        if (!category.hasType(CategoryDefinitionType.Dynamic)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        // The page shows its own "could not be counted" note for any failed answer; the save asks again.
+        List<ManagedCategoryProducts.Candidate> list = new AutomaticList(category).read()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE));
+        model.addAttribute("form", new CategoryBasicsForm());
+        model.addAttribute("errors", Map.of());
+        addAutomaticList(model, category, list);
+        return AUTOMATIC_LIST_FRAGMENT;
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/settings/basics")
@@ -208,8 +228,8 @@ public class CatalogCategoryController {
             errors.put("type", "catalog.category.type.managed.unavailable");
         }
         if (!errors.isEmpty()) {
-            return rejected(renderBasics(catalog, category, form, errors, model, locale, automaticList.forThePage()),
-                    BASICS_FRAGMENT, async, response);
+            return rejected(renderBasics(catalog, category, form, errors, model, locale,
+                    turnsManual ? automaticList.forThePage() : null), BASICS_FRAGMENT, async, response);
         }
         boolean becomesDynamic = category.hasType(CategoryDefinitionType.Managed) && form.isDynamic();
         CategoryDefinitions.Basics basics = form.toBasics();
@@ -220,7 +240,7 @@ public class CatalogCategoryController {
             saved = definitions.saveBasics(catalog, category, basics, agreedProducts);
         } catch (OptimisticLockingExhaustedException e) {
             return conflict(renderBasics(catalog, category, form, conflictAt(BASICS_FORM), model, locale,
-                    automaticList.forThePage()), BASICS_FRAGMENT, async, response);
+                    turnsManual ? automaticList.forThePage() : null), BASICS_FRAGMENT, async, response);
         }
         // The service saves a fresh read of the catalog, so the name the category now has is the one just posted.
         String message = messageSource.getMessage("catalog.category.basics.saved",
@@ -581,9 +601,10 @@ public class CatalogCategoryController {
 
     /**
      * The automatic list of a category, read at most once per request and only when something needs it. A manual
-     * category has none. Reading it asks the inventory and the PIM; when they cannot answer, the list is absent and the
-     * page works on without it (a WARN, the way {@link #emptyListWarning} treats the same inventory), instead of
-     * failing the Basics page of every automatic category.
+     * category has none. Reading it assembles the whole inventory of the category's PIM categories, so opening the
+     * Basics page never does it: only the question fetched on "Ręczna" and a save that turns the category manual do.
+     * When the inventory or the PIM cannot answer, the list is absent (a WARN, the way {@link #emptyListWarning} treats
+     * the same inventory) and the caller says so instead of failing.
      */
     private final class AutomaticList {
 
@@ -616,7 +637,10 @@ public class CatalogCategoryController {
         }
     }
 
-    /** The page without the automatic list: a new category, or the form a successful save re-renders before it navigates. */
+    /**
+     * The page without the automatic list: a new category, the form as it opens (the page fetches the list itself when
+     * it is needed), or the form a successful save re-renders before it navigates.
+     */
     private String renderBasics(ProductCatalog catalog, CategoryDefinition existing, CategoryBasicsForm form,
                                 Map<String, String> errors, Model model, Locale locale) {
         return renderBasics(catalog, existing, form, errors, model, locale, null);
@@ -658,15 +682,22 @@ public class CatalogCategoryController {
         List<Product> products = edit && existing.hasType(CategoryDefinitionType.Managed)
                 ? productRepository.findAll(existing.getCategoryId()) : List.of();
         model.addAttribute("managedProductsCount", products.size());
+        if (edit && existing.hasType(CategoryDefinitionType.Dynamic)) {
+            model.addAttribute("automaticListHref", CatalogPaths.categoryAutomaticList(catalogId, existing.getCategoryId()));
+        }
         if (edit && automaticList != null) {
-            model.addAttribute("dynamicListCount", automaticList.size());
-            model.addAttribute("keptProductsCount", productRepository.labelsOf(existing.getCategoryId()).size());
+            addAutomaticList(model, existing, automaticList);
         }
         model.addAttribute("labelsOutsideCount", edit && existing.hasGrouping()
                 ? products.stream().filter(product -> !existing.getGroupingOrder().contains(product.getLabel())).count() : 0L);
         model.addAttribute("deleteHref", edit && !existing.isDeletionProtection()
                 ? CatalogPaths.categoryDelete(catalogId, existing.getCategoryId()) : null);
         return BASICS_VIEW;
+    }
+
+    private void addAutomaticList(Model model, CategoryDefinition category, List<ManagedCategoryProducts.Candidate> automaticList) {
+        model.addAttribute("dynamicListCount", automaticList.size());
+        model.addAttribute("keptProductsCount", productRepository.labelsOf(category.getCategoryId()).size());
     }
 
     private Set<String> otherNames(ProductCatalog catalog, CategoryDefinition except) {

@@ -1,0 +1,48 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* What turning an automatic category manual asks about its list, for a list of dynamicListCount products of which
+       keptProductsCount are already rows of the category. Nothing is preselected, and the fieldset is switched off with
+       "Automatyczna", so the answer is sent only with "Ręczna". Rendered in the page after a refused save and alone for
+       lazy-fragment.js. */-->
+<th:block th:fragment="question">
+    <fieldset th:if="${dynamicListCount > 0}"
+              class="cl-choice-group" id="dynamicProducts" tabindex="-1"
+              data-cl-variant-when="categoryType=Managed"
+              th:with="error=${errors['dynamicProducts']}">
+        <legend class="cl-label" th:text="#{catalog.category.type.managed.choice}"></legend>
+        <div class="cl-alert is-warn">
+            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+            <div class="cl-alert-text">
+                <p th:text="#{catalog.category.type.managed.question(${dynamicListCount})}"></p>
+                <p th:if="${keptProductsCount > 0}"
+                   th:text="#{catalog.category.type.managed.kept(${keptProductsCount})}"></p>
+            </div>
+        </div>
+        <label class="cl-choice" th:each="choice : ${ {'store', 'skip'} }">
+            <input type="radio" name="dynamicProducts" th:value="${choice}"
+                   th:checked="${choice == form.dynamicProducts}"
+                   th:attr="aria-describedby='dynamicProducts-' + ${choice} + '-description'"/>
+            <span class="cl-choice-text">
+                <span class="cl-choice-title" th:text="#{'catalog.category.type.managed.' + ${choice}}"></span>
+                <span class="cl-choice-description" th:id="'dynamicProducts-' + ${choice} + '-description'"
+                      th:text="#{'catalog.category.type.managed.' + ${choice} + '.desc'}"></span>
+            </span>
+        </label>
+        <p th:if="${error != null}" class="cl-field-error" id="dynamicProducts-error">
+            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+            <span th:text="#{${error}}"></span>
+        </p>
+    </fieldset>
+    <div th:if="${dynamicListCount == 0}"
+         class="cl-alert is-info" data-cl-variant-when="categoryType=Managed">
+        <i class="fas fa-info-circle cl-alert-icon" aria-hidden="true"></i>
+        <div class="cl-alert-text">
+            <p th:text="#{catalog.category.type.managed.empty}"></p>
+            <p th:if="${keptProductsCount > 0}"
+               th:text="#{catalog.category.type.managed.kept(${keptProductsCount})}"></p>
+        </div>
+    </div>
+</th:block>
+</body>
+</html>
