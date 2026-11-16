@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.starter.csv.CSVLoader;
 import pl.commercelink.inventory.supplier.api.CsvRowParser;
+import pl.commercelink.inventory.supplier.api.FeedItem;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.InventoryRepository;
 
@@ -52,9 +53,24 @@ public class CsvProductFeedLoader {
 
     private List<InventoryItem> parseRows(CsvRowParser parser, Character separator, Reader reader, SupplierInfo supplierInfo, int taxonomyPenalty) {
         FeedProcessing processing = feedProcessor.start(supplierInfo.name(), taxonomyPenalty);
-        new CSVLoader(reader).readRows(separator, row ->
-                ParsedRow.tryParse(parser, row, supplierInfo).ifPresentOrElse(processing::add, processing::skipInvalid));
+        new CSVLoader(reader).readRows(separator, row -> route(parser, row, supplierInfo, processing));
         return dataCleanup.run(processing.finish());
+    }
+
+    // Same outcomes as ParsedRow.tryParse, except that a row without stock is told apart from a broken one.
+    private static void route(CsvRowParser parser, String[] row, SupplierInfo supplierInfo, FeedProcessing processing) {
+        try {
+            FeedItem feedItem = parser.parse(row);
+            if (feedItem == null) {
+                processing.skipInvalid();
+            } else if (ParsedRow.hasQty(feedItem)) {
+                processing.add(ParsedRow.of(feedItem, supplierInfo));
+            } else {
+                processing.skipOutOfStock(feedItem);
+            }
+        } catch (Exception e) {
+            processing.skipInvalid();
+        }
     }
 
 }

@@ -412,28 +412,64 @@ class FeedProcessingTest {
     @Test
     void placeholderOfferCompletedFromPimIsImported() {
         // given
-        givenTaxonomyIsBuiltFromTheOffer();
+        givenTaxonomyIsBuiltFromTheOffer("Kable");
         when(dataCorrection.run(any(InventoryItem.class))).thenAnswer(invocation -> {
             InventoryItem offer = invocation.getArgument(0);
             return "ZT51042-T1E0000Z".equals(offer.mfn()) ? offer.withBrandAndEan(offer.brand(), "5901234567801") : offer;
         });
-        when(enrichment.enrich(any())).then(returnsFirstArg());
-        when(enrichment.isPendingEligible(any())).thenReturn(false);
         FeedProcessing processing = processing(true);
         processing.add(row(PLACEHOLDER_EAN, "ZT51042-T1E0000Z", "Cable A"));
         processing.add(row(PLACEHOLDER_EAN, "ZT61046-T0E01C0Z", "Cable B"));
         processing.add(row(PLACEHOLDER_EAN, "CBL-DC-392A1-02", "Cable C"));
 
         // when
-        processing.finish();
+        List<InventoryItem> result = processing.finish();
 
         // then
+        assertEquals(1, result.size());
+        assertEquals("5901234567801", result.get(0).ean());
         ArgumentCaptor<InventoryItem> corrected = ArgumentCaptor.forClass(InventoryItem.class);
         verify(dataCorrection, times(3)).run(corrected.capture());
         corrected.getAllValues().forEach(offer -> assertNull(offer.ean()));
         verify(stats, times(2)).markInvalid();
-        verify(stats, never()).markImported();
-        verify(enrichment, times(1)).isPendingEligible(any());
+        verify(stats, times(1)).markImported();
+    }
+
+    @Test
+    void zeroStockRowsCountAsEvidenceOfAPlaceholderEan() {
+        // given
+        when(dataCorrection.run(any(InventoryItem.class))).then(returnsFirstArg());
+        FeedProcessing processing = processing(true);
+
+        // when
+        processing.skipOutOfStock(feedItem(PLACEHOLDER_EAN, "ZT61046-T0E01C0Z", "Brand"));
+        processing.add(row(PLACEHOLDER_EAN, "ZT51042-T1E0000Z", "Cable A"));
+        processing.skipOutOfStock(feedItem(PLACEHOLDER_EAN, "CBL-DC-392A1-02", "Brand"));
+        List<InventoryItem> result = processing.finish();
+
+        // then
+        assertTrue(result.isEmpty());
+        verify(taxonomyCache, never()).add(any());
+        verify(stats, times(3)).markInvalid();
+        verify(dataCorrection, times(1)).run(any(InventoryItem.class));
+    }
+
+    @Test
+    void zeroStockRowsDoNotMakeAPlaceholderWhenTheSwitchIsOff() {
+        // given
+        when(dataCorrection.run(any(InventoryItem.class))).then(returnsFirstArg());
+        givenTaxonomyIsBuiltFromTheOffer("Kable");
+        FeedProcessing processing = processing(false);
+
+        // when
+        processing.skipOutOfStock(feedItem(PLACEHOLDER_EAN, "ZT61046-T0E01C0Z", "Brand"));
+        processing.skipOutOfStock(feedItem(PLACEHOLDER_EAN, "CBL-DC-392A1-02", "Brand"));
+        processing.add(row(PLACEHOLDER_EAN, "ZT51042-T1E0000Z", "Cable A"));
+        List<InventoryItem> result = processing.finish();
+
+        // then
+        assertEquals(1, result.size());
+        verify(stats, times(2)).markInvalid();
     }
 
     @Test
@@ -533,10 +569,14 @@ class FeedProcessingTest {
     }
 
     private void givenTaxonomyIsBuiltFromTheOffer() {
+        givenTaxonomyIsBuiltFromTheOffer(null);
+    }
+
+    private void givenTaxonomyIsBuiltFromTheOffer(String category) {
         when(dataCorrection.run(any(SupplierProduct.class), any(InventoryItem.class))).thenAnswer(invocation -> {
             SupplierProduct product = invocation.getArgument(0);
             InventoryItem offer = invocation.getArgument(1);
-            return new Taxonomy(offer.ean(), offer.mfn(), offer.brand(), product.name(), null, 5, null, null);
+            return new Taxonomy(offer.ean(), offer.mfn(), offer.brand(), product.name(), category, 5, null, null);
         });
         when(enrichment.enrichFromOwnRecord(any())).then(returnsFirstArg());
     }

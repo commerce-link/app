@@ -96,6 +96,10 @@ class StoreScopedFeedLoaderTest {
     }
 
     private static FeedItem feedItem(String netPrice) {
+        return feedItem(netPrice, 1);
+    }
+
+    private static FeedItem feedItem(String netPrice, int qty) {
         return new FeedItem() {
             public String getEan() { return "5900000000001"; }
             public String getMfn() { return "MFN1"; }
@@ -104,7 +108,7 @@ class StoreScopedFeedLoaderTest {
             public String getCategory() { return "CPU"; }
             public double getNetPrice() { return Double.parseDouble(netPrice); }
             public String getCurrency() { return "PLN"; }
-            public int getQty() { return 1; }
+            public int getQty() { return qty; }
         };
     }
 
@@ -138,6 +142,43 @@ class StoreScopedFeedLoaderTest {
         verify(feedProcessor).start("Action", 1000);
         verify(processing).add(any(ParsedRow.class));
         verify(processing).finish();
+    }
+
+    @Test
+    void csvRowWithoutStockReachesTheEvidencePathAndIsNotAdded() throws Exception {
+        // given
+        when(storeFeedRepository.canRead("store-1", "Action", "csv")).thenReturn(true);
+        when(storeFeedRepository.read("store-1", "Action", "csv")).thenReturn(new StringReader("header\nrow"));
+        CsvRowParser parser = mock(CsvRowParser.class);
+        FeedItem outOfStock = feedItem("10.0", 0);
+        when(parser.parse(any())).thenReturn(outOfStock);
+        when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        loader.fetch(parser, ';', "store-1", supplierInfo("Action"), 0);
+
+        // then
+        verify(processing).skipOutOfStock(outOfStock);
+        verify(processing, never()).add(any(ParsedRow.class));
+        verify(processing, never()).skipInvalid();
+    }
+
+    @Test
+    void csvRowThatFailsToParseIsCountedAsInvalidNotAsEvidence() throws Exception {
+        // given
+        when(storeFeedRepository.canRead("store-1", "Action", "csv")).thenReturn(true);
+        when(storeFeedRepository.read("store-1", "Action", "csv")).thenReturn(new StringReader("header\nrow"));
+        CsvRowParser parser = mock(CsvRowParser.class);
+        when(parser.parse(any())).thenThrow(new IllegalArgumentException("bad row"));
+        when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        loader.fetch(parser, ';', "store-1", supplierInfo("Action"), 0);
+
+        // then
+        verify(processing).skipInvalid();
+        verify(processing, never()).skipOutOfStock(any());
+        verify(processing, never()).add(any(ParsedRow.class));
     }
 
     @Test

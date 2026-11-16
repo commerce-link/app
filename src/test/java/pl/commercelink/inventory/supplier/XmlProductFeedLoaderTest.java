@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -76,7 +77,8 @@ class XmlProductFeedLoaderTest {
         // then
         verify(processing, times(1)).add(argThat(parsed -> parsed.item().ean().equals("222")));
         verify(processing, times(1)).add(any());
-        verify(processing).skipInvalid();
+        verify(processing).skipOutOfStock(argThat(item -> item.getEan().equals("111")));
+        verify(processing, never()).skipInvalid();
     }
 
     @Test
