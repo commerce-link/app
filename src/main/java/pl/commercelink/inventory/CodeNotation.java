@@ -1,7 +1,11 @@
 package pl.commercelink.inventory;
 
+import java.util.Locale;
+import java.util.regex.Pattern;
+
 public final class CodeNotation {
 
+    private static final Pattern NOT_LETTER_OR_DIGIT = Pattern.compile("[^\\p{L}\\p{N}]");
     private static final int MIN_AFFIX_LENGTH = 4;
 
     private CodeNotation() {
@@ -11,7 +15,7 @@ public final class CodeNotation {
         if (code == null) {
             return "";
         }
-        return code.replaceAll("[^\\p{L}\\p{N}]", "").toUpperCase();
+        return NOT_LETTER_OR_DIGIT.matcher(code).replaceAll("").toUpperCase(Locale.ROOT);
     }
 
     public static boolean sameNotation(String a, String b) {
