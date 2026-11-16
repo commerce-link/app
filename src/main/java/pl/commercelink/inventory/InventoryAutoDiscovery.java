@@ -275,18 +275,15 @@ class InventoryAutoDiscovery {
                 i -> i.netPrice() > avg * 0.5 && i.netPrice() < avg * 1.5
         ).toList();
 
-        // as a result, we lose associations from PIM index; however, it's a valid solution because we eliminate rate cases here with questionable data quality
-        Set<String> eans = approvedItems.stream().map(InventoryItem::ean).collect(Collectors.toSet());
-        Set<String> productCodes = approvedItems.stream().map(InventoryItem::mfn).collect(Collectors.toSet());
-
-        return new MatchedInventory(new InventoryKey(eans, productCodes), approvedItems, taxonomyCache, supplierRegistry);
+        return createMatchedInventoryOf(approvedItems);
     }
 
     private boolean hasSingleCode(List<InventoryItem> inventoryItems) {
         return inventoryItems.stream().map(InventoryItem::mfn).distinct().count() == 1;
     }
 
-    // PIM associations are dropped on purpose, as in createMatchedInventoryFromPriceGroup
+    // The group is keyed by the EANs and codes of its own offers, so associations from the PIM index are lost.
+    // That is intended: these are rare cases of questionable data quality.
     private MatchedInventory createMatchedInventoryOf(List<InventoryItem> inventoryItems) {
         Set<String> eans = inventoryItems.stream().map(InventoryItem::ean).collect(Collectors.toSet());
         Set<String> productCodes = inventoryItems.stream().map(InventoryItem::mfn).collect(Collectors.toSet());

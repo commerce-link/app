@@ -2,14 +2,12 @@ package pl.commercelink.inventory;
 
 import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.inventory.supplier.SupplierIdentity;
-import pl.commercelink.products.brand.NoNameBrand;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -60,27 +58,19 @@ public final class ConflictingOffers {
     }
 
     private static boolean isJudged(InventoryItem offer, SharedManufacturerCodes sharedCodes) {
-        return hasKeys(offer) && isUsableBrand(offer.brand()) && !sharedCodes.isShared(offer);
+        return isIndexable(offer) && !sharedCodes.isShared(offer);
     }
 
     private static boolean hasKeys(InventoryItem offer) {
         return offer.ean() != null && offer.mfn() != null;
     }
 
-    private static boolean isUsableBrand(String brand) {
-        return brand != null && !brand.isBlank() && !NoNameBrand.is(brand);
-    }
-
     private static boolean isIndexable(InventoryItem offer) {
-        return hasKeys(offer) && isUsableBrand(offer.brand());
+        return hasKeys(offer) && offer.hasMatchableBrand();
     }
 
     private static BrandCode brandCodeOf(InventoryItem offer) {
-        return new BrandCode(brandKey(offer.brand()), offer.mfn());
-    }
-
-    private static String brandKey(String brand) {
-        return brand.trim().toLowerCase(Locale.ROOT);
+        return new BrandCode(offer.brandKey(), offer.mfn());
     }
 
     // A manual feed is a supplier of its own, any other identity counts as its adapter type, so one supplier

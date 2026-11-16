@@ -7,7 +7,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -63,8 +62,7 @@ public final class SharedManufacturerCodes {
     private record SupplierCode(String supplier, String mfn, String brand) {
 
         static SupplierCode of(InventoryItem offer) {
-            String brand = offer.brand() == null ? null : offer.brand().trim().toLowerCase(Locale.ROOT);
-            return new SupplierCode(offer.supplier(), offer.mfn(), brand);
+            return new SupplierCode(offer.supplier(), offer.mfn(), offer.brandKey());
         }
     }
 }
