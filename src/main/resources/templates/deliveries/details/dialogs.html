@@ -356,6 +356,7 @@
                 <label class="cl-label" for="estimatedDeliveryAt"><span th:text="#{deliveries.details.terms.date}"></span>
                     <span th:unless="${termsDialog.dateRequired()}" class="cl-optional" th:text="#{form.optional}"></span></label>
                 <input class="cl-input" type="date" id="estimatedDeliveryAt" name="estimatedDeliveryAt" th:value="${f.estimatedDeliveryAt}"
+                       th:disabled="${termsDialog.vatOnly()}"
                        th:classappend="${e.containsKey('estimatedDeliveryAt')} ? 'is-invalid' : ''"
                        th:attr="aria-invalid=${e.containsKey('estimatedDeliveryAt')} ? 'true' : null,
                                 aria-describedby=${e.containsKey('estimatedDeliveryAt')} ? 'estimatedDeliveryAt-error' : null">
@@ -365,7 +366,7 @@
             <div class="cl-span-3 cl-field">
                 <label class="cl-label" for="paymentTerms" th:text="#{deliveries.details.terms.paymentTerms}"></label>
                 <input class="cl-input" type="text" inputmode="numeric" id="paymentTerms" name="paymentTerms" autocomplete="off"
-                       th:value="${f.paymentTerms}" th:classappend="${e.containsKey('paymentTerms')} ? 'is-invalid' : ''"
+                       th:value="${f.paymentTerms}" th:disabled="${termsDialog.vatOnly()}" th:classappend="${e.containsKey('paymentTerms')} ? 'is-invalid' : ''"
                        th:attr="aria-invalid=${e.containsKey('paymentTerms')} ? 'true' : null,
                                 aria-describedby=${e.containsKey('paymentTerms')} ? 'paymentTerms-error' : null">
                 <p th:if="${e.containsKey('paymentTerms')}" class="cl-field-error" id="paymentTerms-error"><i
@@ -374,7 +375,7 @@
             <div class="cl-span-3 cl-field">
                 <label class="cl-label" for="shippingCost" th:text="#{deliveries.details.terms.shipping}"></label>
                 <input class="cl-input" type="text" inputmode="decimal" id="shippingCost" name="shippingCost" autocomplete="off"
-                       th:value="${f.shippingCost}" th:classappend="${e.containsKey('shippingCost')} ? 'is-invalid' : ''"
+                       th:value="${f.shippingCost}" th:disabled="${termsDialog.vatOnly()}" th:classappend="${e.containsKey('shippingCost')} ? 'is-invalid' : ''"
                        th:attr="aria-invalid=${e.containsKey('shippingCost')} ? 'true' : null,
                                 aria-describedby=${e.containsKey('shippingCost')} ? 'shippingCost-error' : null">
                 <p th:if="${e.containsKey('shippingCost')}" class="cl-field-error" id="shippingCost-error"><i
@@ -383,7 +384,7 @@
             <div class="cl-span-3 cl-field">
                 <label class="cl-label" for="paymentCost" th:text="#{deliveries.details.terms.payment}"></label>
                 <input class="cl-input" type="text" inputmode="decimal" id="paymentCost" name="paymentCost" autocomplete="off"
-                       th:value="${f.paymentCost}" th:classappend="${e.containsKey('paymentCost')} ? 'is-invalid' : ''"
+                       th:value="${f.paymentCost}" th:disabled="${termsDialog.vatOnly()}" th:classappend="${e.containsKey('paymentCost')} ? 'is-invalid' : ''"
                        th:attr="aria-invalid=${e.containsKey('paymentCost')} ? 'true' : null,
                                 aria-describedby=${e.containsKey('paymentCost')} ? 'paymentCost-error' : null">
                 <p th:if="${e.containsKey('paymentCost')}" class="cl-field-error" id="paymentCost-error"><i
@@ -400,7 +401,8 @@
                         aria-hidden="true"></i><span th:text="#{${e.get('vat')}}"></span></p>
             </div>
         </div>
-        <p class="cl-dialog-effect" th:text="#{deliveries.details.terms.effect}"></p>
+        <p class="cl-dialog-effect"
+           th:text="${termsDialog.vatOnly()} ? #{deliveries.details.terms.effect.received} : #{deliveries.details.terms.effect}"></p>
     </div>
     <div class="cl-dialog-actions">
         <button type="submit" class="cl-button is-primary" th:text="#{deliveries.details.terms.submit}"></button>

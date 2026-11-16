@@ -141,6 +141,37 @@ class DeliveryTermsFormTest {
     }
 
     @Test
+    void afterTheReceiptOnlyTheTypedVatReplacesTheStoredTerms() {
+        // given
+        Delivery delivery = new Delivery("store-1", "MH-1", "Manual-Hurt", LocalDate.of(2026, 10, 8), 19.9, 0, 14, 1.23);
+
+        // when
+        DeliveryTermsForm form = DeliveryTermsForm.vatOnly(delivery, "0");
+
+        // then
+        assertThat(form.validateVat()).isEmpty();
+        assertThat(form.tax()).isEqualTo(1.0);
+        assertThat(form.getVat()).isEqualTo("0");
+        assertThat(form.getEstimatedDeliveryAt()).isEqualTo("2026-10-08");
+        assertThat(form.getPaymentTerms()).isEqualTo("14");
+        assertThat(form.getShippingCost()).isEqualTo("19.90");
+    }
+
+    @Test
+    void aVatOutsideTheRangeIsTheOnlyErrorAfterTheReceipt() {
+        // given
+        Delivery delivery = new Delivery("store-1", "MH-1", "Manual-Hurt", null, 0, 0, 14, 1.23);
+
+        // when
+        Map<String, String> tooHigh = DeliveryTermsForm.vatOnly(delivery, "101").validateVat();
+        Map<String, String> missing = DeliveryTermsForm.vatOnly(delivery, null).validateVat();
+
+        // then
+        assertThat(tooHigh).containsExactly(Map.entry("vat", "deliveries.details.terms.error.vat"));
+        assertThat(missing).containsExactly(Map.entry("vat", "deliveries.details.terms.error.vat"));
+    }
+
+    @Test
     void anUnsetVatShowsAsAnEmptyField() {
         // given
         Delivery delivery = new Delivery("store-1", "MH-2", "Manual-Hurt", LocalDate.of(2026, 10, 8), 0, 0, 14, 0.0);

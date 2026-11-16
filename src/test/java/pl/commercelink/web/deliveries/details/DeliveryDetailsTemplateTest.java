@@ -708,6 +708,31 @@ class DeliveryDetailsTemplateTest {
     }
 
     @Test
+    void aReceivedDeliveryOffersTheTermsDialogWithOnlyTheVatToType() {
+        // when
+        String html = render(data(received(warehouse())), ADMIN);
+
+        // then
+        assertThat(html).contains("data-cl-dialog-open=\"terms-dialog\"").contains("id=\"terms-dialog\"")
+                .containsPattern("id=\"estimatedDeliveryAt\"[^>]*disabled").containsPattern("id=\"paymentTerms\"[^>]*disabled")
+                .containsPattern("id=\"shippingCost\"[^>]*disabled").containsPattern("id=\"paymentCost\"[^>]*disabled")
+                .doesNotContainPattern("id=\"vat\"[^>]*disabled")
+                .contains("Dostawa została odebrana — zmienić można tylko stawkę VAT.")
+                .doesNotContain("Późniejszy termin dostawy przesunie")
+                .contains("data-cl-dialog-open=\"comment-dialog\"").contains("id=\"comment-dialog\"");
+    }
+
+    @Test
+    void aDeliveryInTransitKeepsEveryTermsFieldOpen() {
+        // when
+        String html = render(data(warehouse()), ADMIN);
+
+        // then
+        assertThat(html).doesNotContainPattern("id=\"(estimatedDeliveryAt|paymentTerms|shippingCost|paymentCost|vat)\"[^>]*disabled")
+                .contains("Późniejszy termin dostawy przesunie").contains("id=\"comment-dialog\"");
+    }
+
+    @Test
     void readOnlyViewersGetNoDialogs() {
         // when
         String html = render(data(received(warehouse())), USER);

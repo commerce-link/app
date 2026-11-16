@@ -52,6 +52,12 @@ public class DeliveryTermsForm {
         return form;
     }
 
+    public static DeliveryTermsForm vatOnly(Delivery received, String vat) {
+        DeliveryTermsForm form = of(received);
+        form.vat = vat;
+        return form;
+    }
+
     /** An unset VAT (below 1.0, e.g. 0.0 on deliveries created from a purchase) is an empty field, not "-100". */
     public static String vatPercent(double tax) {
         if (tax < 1.0) {
@@ -80,11 +86,21 @@ public class DeliveryTermsForm {
         if (!isCost(paymentCost)) {
             errors.put("paymentCost", "deliveries.details.terms.error.paymentCost");
         }
+        errors.putAll(validateVat());
+        return errors;
+    }
+
+    public Map<String, String> validateVat() {
+        Map<String, String> errors = new LinkedHashMap<>();
         BigDecimal percent = StringUtils.isBlank(vat) ? null : AmountParser.parse(vat);
         if (percent == null || percent.signum() < 0 || percent.compareTo(HUNDRED) > 0) {
             errors.put("vat", "deliveries.details.terms.error.vat");
         }
         return errors;
+    }
+
+    public double tax() {
+        return BigDecimal.ONE.add(AmountParser.parse(vat).movePointLeft(2)).doubleValue();
     }
 
     public Delivery toDelivery(String storeId) {
@@ -95,7 +111,7 @@ public class DeliveryTermsForm {
         delivery.setPaymentTerms(terms());
         delivery.setShippingCost(AmountParser.parse(shippingCost).doubleValue());
         delivery.setPaymentCost(AmountParser.parse(paymentCost).doubleValue());
-        delivery.setTax(BigDecimal.ONE.add(AmountParser.parse(vat).movePointLeft(2)).doubleValue());
+        delivery.setTax(tax());
         delivery.setComment(StringUtils.isBlank(comment) ? null : comment);
         return delivery;
     }

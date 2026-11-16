@@ -46,7 +46,7 @@ public final class DeliveryRules {
     }
 
     public static boolean headerEditable(DeliveryViewer viewer, Delivery delivery) {
-        return viewer.manages() && !delivery.hasBeenReceived() && (!delivery.isAwaitingApproval() || viewer.superAdmin());
+        return viewer.manages() && (!delivery.isAwaitingApproval() || viewer.superAdmin());
     }
 
     public static boolean allocationsEditable(DeliveryViewer viewer, Delivery delivery) {

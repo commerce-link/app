@@ -329,24 +329,125 @@ class DeliveriesControllerDetailsPageTest {
     }
 
     @Test
-    void aReceivedDeliveryRefusesTheSaveAndTheStoreAdminCannotChangeOneAwaitingApproval() {
+    void aReceivedDeliveryTakesOnlyTheVatFromTheTermsDialog() {
         // given
         Delivery received = delivery();
         received.setReceivedAt(java.time.LocalDateTime.of(2026, 10, 2, 9, 0));
+        received.setComment("Rampa B");
+        when(deliveriesRepository.findById(STORE_ID, received.getDeliveryId())).thenReturn(received);
+        DeliveryTermsForm form = new DeliveryTermsForm();
+        form.setDeliveryId(received.getDeliveryId());
+        form.setVat("0");
+        form.setEstimatedDeliveryAt("2026-11-01");
+        form.setPaymentTerms("30");
+        form.setShippingCost("19,90");
+        form.setPaymentCost("5");
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = controller.updateDelivery(form, "fetch", request, response, model, redirectAttributes, PL);
+
+        // then
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesManager).updateDelivery(saved.capture());
+        assertThat(view).isEqualTo("deliveries/details/dialogs :: termsForm");
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(saved.getValue().getTax()).isEqualTo(1.0);
+        assertThat(saved.getValue().getEstimatedDeliveryAt()).isEqualTo(LocalDate.of(2026, 10, 8));
+        assertThat(saved.getValue().getPaymentTerms()).isEqualTo(14);
+        assertThat(saved.getValue().getShippingCost()).isEqualTo(0.0);
+        assertThat(saved.getValue().getPaymentCost()).isEqualTo(0.0);
+        assertThat(saved.getValue().getComment()).isEqualTo("Rampa B");
+        assertThat(((TermsDialog) model.getAttribute("termsDialog")).form().getVat()).isEqualTo("0");
+    }
+
+    @Test
+    void aReceivedDeliveryWithoutAPlannedDateSavesItsVatFromTheOnlyPostedField() {
+        // given
+        Delivery received = delivery();
+        received.setReceivedAt(java.time.LocalDateTime.of(2026, 10, 2, 9, 0));
+        received.setEstimatedDeliveryAt(null);
+        when(deliveriesRepository.findById(STORE_ID, received.getDeliveryId())).thenReturn(received);
+        DeliveryTermsForm form = new DeliveryTermsForm();
+        form.setDeliveryId(received.getDeliveryId());
+        form.setVat("8");
+
+        // when
+        controller.updateDelivery(form, "fetch", request, response, new ConcurrentModel(), redirectAttributes, PL);
+
+        // then
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesManager).updateDelivery(saved.capture());
+        assertThat(saved.getValue().getTax()).isEqualTo(1.08);
+        assertThat(saved.getValue().getEstimatedDeliveryAt()).isNull();
+        assertThat(saved.getValue().getPaymentTerms()).isEqualTo(14);
+    }
+
+    @Test
+    void aReceivedDeliveryRefusesAWrongVatAndShowsTheStoredTerms() {
+        // given
+        Delivery received = delivery();
+        received.setReceivedAt(java.time.LocalDateTime.of(2026, 10, 2, 9, 0));
+        when(deliveriesRepository.findById(STORE_ID, received.getDeliveryId())).thenReturn(received);
+        DeliveryTermsForm form = new DeliveryTermsForm();
+        form.setDeliveryId(received.getDeliveryId());
+        form.setVat("150");
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = controller.updateDelivery(form, "fetch", request, response, model, redirectAttributes, PL);
+
+        // then
+        TermsDialog dialog = (TermsDialog) model.getAttribute("termsDialog");
+        assertThat(view).isEqualTo("deliveries/details/dialogs :: termsForm");
+        assertThat(response.getStatus()).isEqualTo(422);
+        assertThat(dialog.errors()).containsOnlyKeys("vat");
+        assertThat(dialog.form().getVat()).isEqualTo("150");
+        assertThat(dialog.form().getPaymentTerms()).isEqualTo("14");
+        verify(deliveriesManager, never()).updateDelivery(any());
+    }
+
+    @Test
+    void aReceivedDeliveryStillSavesItsCommentAndKeepsTheStoredTerms() {
+        // given
+        Delivery received = delivery();
+        received.setReceivedAt(java.time.LocalDateTime.of(2026, 10, 2, 9, 0));
+        when(deliveriesRepository.findById(STORE_ID, received.getDeliveryId())).thenReturn(received);
+        DeliveryTermsForm comment = new DeliveryTermsForm();
+        comment.setSource(DeliveryTermsForm.COMMENT);
+        comment.setDeliveryId(received.getDeliveryId());
+        comment.setComment("Kierowca dzwoni");
+        comment.setVat("0");
+
+        // when
+        String view = controller.updateDelivery(comment, "fetch", request, response, new ConcurrentModel(), redirectAttributes, PL);
+
+        // then
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveriesManager).updateDelivery(saved.capture());
+        assertThat(view).isEqualTo("deliveries/details/dialogs :: commentForm");
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(saved.getValue().getComment()).isEqualTo("Kierowca dzwoni");
+        assertThat(saved.getValue().getTax()).isEqualTo(1.23);
+        assertThat(saved.getValue().getPaymentTerms()).isEqualTo(14);
+    }
+
+    @Test
+    void theStoreAdminCannotChangeADeliveryAwaitingApproval() {
+        // given
         Delivery awaiting = delivery();
         awaiting.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
-        when(deliveriesRepository.findById(STORE_ID, received.getDeliveryId())).thenReturn(received);
         when(deliveriesRepository.findById(STORE_ID, awaiting.getDeliveryId())).thenReturn(awaiting);
         Model model = new ConcurrentModel();
 
         // when
-        String async = controller.updateDelivery(terms(received), "fetch", request, response, model, redirectAttributes, PL);
+        String async = controller.updateDelivery(terms(awaiting), "fetch", request, response, model, redirectAttributes, PL);
         controller.updateDelivery(terms(awaiting), null, request, new MockHttpServletResponse(), new ConcurrentModel(), redirectAttributes, PL);
 
         // then
         assertThat(async).isEqualTo("deliveries/details/dialogs :: termsForm");
         assertThat(response.getStatus()).isEqualTo(422);
-        assertThat(((TermsDialog) model.getAttribute("termsDialog")).refusal()).isEqualTo("deliveries.details.terms.locked.received");
+        assertThat(((TermsDialog) model.getAttribute("termsDialog")).refusal()).isEqualTo("deliveries.edit.locked.awaitingApproval");
         verify(redirectAttributes).addFlashAttribute("errorMessage", "deliveries.edit.locked.awaitingApproval");
         verify(deliveriesManager, never()).updateDelivery(any());
     }
