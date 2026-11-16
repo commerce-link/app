@@ -85,7 +85,7 @@ public class XmlProductFeedLoader {
                     if (ParsedRow.hasQty(xmlItem)) {
                         processing.add(ParsedRow.of(xmlItem, supplierInfo));
                     } else {
-                        processing.skipOutOfStock(xmlItem);
+                        processing.skipInvalid();
                     }
                 } else {
                     xsr.next();

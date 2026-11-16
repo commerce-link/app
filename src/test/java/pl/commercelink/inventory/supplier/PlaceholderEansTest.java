@@ -49,19 +49,6 @@ class PlaceholderEansTest {
     }
 
     @Test
-    void rowsWithoutStockCountAsEvidence() {
-        // given
-        List<InventoryItem> rows = List.of(offer("9999999999994", "A-1", 5),
-                offer("9999999999994", "B-2", 0), offer("9999999999994", "C-3", 0));
-
-        // when
-        PlaceholderEans eans = PlaceholderEans.of(rows);
-
-        // then
-        assertThat(eans.contains("9999999999994")).isTrue();
-    }
-
-    @Test
     void rowsWithoutManufacturerCodeAreIgnored() {
         // given
         List<InventoryItem> rows = List.of(offer("9999999999994", "A-1", 5),

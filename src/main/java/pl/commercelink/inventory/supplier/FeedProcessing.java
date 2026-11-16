@@ -4,14 +4,12 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import pl.commercelink.inventory.SharedManufacturerCodes;
-import pl.commercelink.inventory.supplier.api.FeedItem;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Stream;
 
 @Slf4j
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
@@ -24,7 +22,6 @@ class FeedProcessing {
     private final int taxonomyPenalty;
     private final boolean ignorePlaceholderEans;
     private final List<ParsedRow> rows = new ArrayList<>();
-    private final List<InventoryItem> outOfStockRows = new ArrayList<>();
     private final List<InventoryItem> sellableOffers = new ArrayList<>();
     private final List<InventoryItem> imported = new ArrayList<>();
     private final List<WaitingRow> waitingForCodeIndex = new ArrayList<>();
@@ -53,29 +50,13 @@ class FeedProcessing {
         return true;
     }
 
-    // Counted as invalid, but a code listed without stock is still evidence that an EAN is shared.
-    void skipOutOfStock(FeedItem feedItem) {
-        stats.markInvalid();
-        if (!ignorePlaceholderEans) {
-            return;
-        }
-        try {
-            InventoryItem evidence = new InventoryItem(feedItem.getEan(), feedItem.getMfn(), 0, "", 0, 0, "");
-            if (evidence.hasEan() && evidence.hasMfn()) {
-                outOfStockRows.add(evidence);
-            }
-        } catch (Exception e) {
-            // a value that fails in the adapter's getter is no evidence
-        }
-    }
-
     void skipInvalid() {
         stats.markInvalid();
     }
 
     List<InventoryItem> finish() {
         PlaceholderEans placeholderEans = ignorePlaceholderEans
-                ? PlaceholderEans.of(Stream.concat(rows.stream().map(ParsedRow::item), outOfStockRows.stream()).toList())
+                ? PlaceholderEans.of(rows.stream().map(ParsedRow::item).toList())
                 : PlaceholderEans.none();
         int rejectedUnderPlaceholder = 0;
         for (ParsedRow row : rows) {

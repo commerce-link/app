@@ -436,40 +436,26 @@ class FeedProcessingTest {
     }
 
     @Test
-    void zeroStockRowsCountAsEvidenceOfAPlaceholderEan() {
-        // given
-        when(dataCorrection.run(any(InventoryItem.class))).then(returnsFirstArg());
-        FeedProcessing processing = processing(true);
-
-        // when
-        processing.skipOutOfStock(feedItem(PLACEHOLDER_EAN, "ZT61046-T0E01C0Z", "Brand"));
-        processing.add(row(PLACEHOLDER_EAN, "ZT51042-T1E0000Z", "Cable A"));
-        processing.skipOutOfStock(feedItem(PLACEHOLDER_EAN, "CBL-DC-392A1-02", "Brand"));
-        List<InventoryItem> result = processing.finish();
-
-        // then
-        assertTrue(result.isEmpty());
-        verify(taxonomyCache, never()).add(any());
-        verify(stats, times(3)).markInvalid();
-        verify(dataCorrection, times(1)).run(any(InventoryItem.class));
-    }
-
-    @Test
-    void zeroStockRowsDoNotMakeAPlaceholderWhenTheSwitchIsOff() {
+    void onlyRowsInStockCountTowardsAPlaceholderEan() {
         // given
         when(dataCorrection.run(any(InventoryItem.class))).then(returnsFirstArg());
         givenTaxonomyIsBuiltFromTheOffer("Kable");
-        FeedProcessing processing = processing(false);
+        FeedProcessing placeholder = processing(true);
+        placeholder.add(row(PLACEHOLDER_EAN, "ZT51042-T1E0000Z", "Cable A"));
+        placeholder.add(row(PLACEHOLDER_EAN, "ZT61046-T0E01C0Z", "Cable B"));
+        placeholder.add(row(PLACEHOLDER_EAN, "CBL-DC-392A1-02", "Cable C"));
+        FeedProcessing aliased = processing(true);
+        aliased.add(row("5901234567801", "MAGFORGE100M", "Case"));
+        aliased.add(row("5901234567801", "306-7G03M49-809", "Case"));
+        aliased.skipInvalid();
 
         // when
-        processing.skipOutOfStock(feedItem(PLACEHOLDER_EAN, "ZT61046-T0E01C0Z", "Brand"));
-        processing.skipOutOfStock(feedItem(PLACEHOLDER_EAN, "CBL-DC-392A1-02", "Brand"));
-        processing.add(row(PLACEHOLDER_EAN, "ZT51042-T1E0000Z", "Cable A"));
-        List<InventoryItem> result = processing.finish();
+        List<InventoryItem> rejected = placeholder.finish();
+        List<InventoryItem> imported = aliased.finish();
 
         // then
-        assertEquals(1, result.size());
-        verify(stats, times(2)).markInvalid();
+        assertTrue(rejected.isEmpty());
+        assertEquals(2, imported.size());
     }
 
     @Test
