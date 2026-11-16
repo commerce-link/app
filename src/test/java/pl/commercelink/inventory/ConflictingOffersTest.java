@@ -183,6 +183,34 @@ class ConflictingOffersTest {
         assertThat(result.contains(odd)).isTrue();
     }
 
+    @Test
+    void offerWithoutEanIsIgnoredWithoutError() {
+        // given
+        InventoryItem noEan = offer("Elko", "Sapphire", null, CODE_9060, 3563);
+        List<InventoryItem> pool = new ArrayList<>(List.of(noEan));
+        pool.addAll(sapphireWitnesses());
+
+        // when
+        ConflictingOffers result = ConflictingOffers.of(pool, List.of(), SharedManufacturerCodes.of(pool));
+
+        // then
+        assertThat(result.contains(noEan)).isFalse();
+    }
+
+    @Test
+    void offerWithoutCodeIsIgnoredWithoutError() {
+        // given
+        InventoryItem noCode = offer("Elko", "Sapphire", EAN_7600, null, 3563);
+        List<InventoryItem> pool = new ArrayList<>(List.of(noCode));
+        pool.addAll(sapphireWitnesses());
+
+        // when
+        ConflictingOffers result = ConflictingOffers.of(pool, List.of(), SharedManufacturerCodes.of(pool));
+
+        // then
+        assertThat(result.contains(noCode)).isFalse();
+    }
+
     private List<InventoryItem> sapphireWitnesses() {
         List<InventoryItem> witnesses = new ArrayList<>();
         witnesses.addAll(holders("Sapphire", EAN_7600, CODE_7600, 1800, "Asbis", "Morele"));

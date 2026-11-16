@@ -532,6 +532,70 @@ class InventoryAutoDiscoveryTest {
         assertThat(result).flatExtracting(MatchedInventory::getInventoryItems).contains(elko);
     }
 
+    @Test
+    void singleCodeGroupWithDistantPricesSplitsByEan() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        List<InventoryItem> offers = lexmarkOffers();
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(offers);
+
+        // then
+        assertThat(result).hasSize(2);
+        assertThat(result).allSatisfy(m -> assertThat(m.getEans()).hasSize(1));
+    }
+
+    @Test
+    void splitGroupOfAPimEntryIsStillFoundByEachEan() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of(pimEntry("PIM1", "Lexmark", gtin("734646731461"), gtin("734646763349"), mpn("38S0910"))));
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(lexmarkOffers());
+
+        // then
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting(m -> m.getEans().iterator().next())
+                .containsExactlyInAnyOrder("734646731461", "734646763349");
+    }
+
+    @Test
+    void offersOfOneSupplierAreNotSplit() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of(pimEntry("PIM1", "Lexmark", gtin("734646731461"), gtin("734646763349"))));
+        InventoryItem cheap = item("734646731461", "38S0910", 2283.68, "A", "Lexmark");
+        InventoryItem dear = item("734646763349", "38S0910", 6249.53, "A", "Lexmark");
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(List.of(cheap, dear));
+
+        // then
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void withTheSwitchOffTheGroupStaysWhole() {
+        // given
+        autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
+                new InventoryMatchingProperties(true, true, false));
+        when(pimView.findAll()).thenReturn(List.of());
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(lexmarkOffers());
+
+        // then
+        assertThat(result).hasSize(1);
+    }
+
+    private List<InventoryItem> lexmarkOffers() {
+        return List.of(
+                item("734646731461", "38S0910", 2283.68, "A", "Lexmark"),
+                item("734646731461", "38S0910", 2290.00, "C", "Lexmark"),
+                item("734646763349", "38S0910", 6249.53, "B", "Lexmark"),
+                item("734646763349", "38S0910", 6300.00, "D", "Lexmark"));
+    }
+
     private List<InventoryItem> sapphireWitnesses() {
         return List.of(
                 item("4895106293618", "11324-01-20G", 1800, "Asbis", "Sapphire"),

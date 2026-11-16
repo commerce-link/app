@@ -181,6 +181,13 @@ class InventoryAutoDiscovery {
 
         List<InventoryItem> inventoryItems = matchedInventory.getInventoryItems();
 
+        if (matchingProperties.splitSingleCodeByPrice() && hasSingleCode(inventoryItems)) {
+            List<List<InventoryItem>> parts = SingleCodePriceSplit.byEan(inventoryItems);
+            if (parts.size() > 1) {
+                return parts.stream().map(this::createMatchedInventoryOf).toList();
+            }
+        }
+
         // uniform groups does not require further analysis
         if (isUniformGroupOfItems(inventoryItems)) {
             return Collections.singletonList(matchedInventory);
@@ -271,6 +278,17 @@ class InventoryAutoDiscovery {
         Set<String> productCodes = approvedItems.stream().map(InventoryItem::mfn).collect(Collectors.toSet());
 
         return new MatchedInventory(new InventoryKey(eans, productCodes), approvedItems, taxonomyCache, supplierRegistry);
+    }
+
+    private boolean hasSingleCode(List<InventoryItem> inventoryItems) {
+        return inventoryItems.stream().map(InventoryItem::mfn).distinct().count() == 1;
+    }
+
+    // PIM associations are dropped on purpose, as in createMatchedInventoryFromPriceGroup
+    private MatchedInventory createMatchedInventoryOf(List<InventoryItem> inventoryItems) {
+        Set<String> eans = inventoryItems.stream().map(InventoryItem::ean).collect(Collectors.toSet());
+        Set<String> productCodes = inventoryItems.stream().map(InventoryItem::mfn).collect(Collectors.toSet());
+        return new MatchedInventory(new InventoryKey(eans, productCodes), inventoryItems, taxonomyCache, supplierRegistry);
     }
 
     private boolean isUniformGroupOfItems(List<InventoryItem> inventoryItems) {

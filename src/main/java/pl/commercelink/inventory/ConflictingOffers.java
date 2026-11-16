@@ -60,7 +60,11 @@ public final class ConflictingOffers {
     }
 
     private static boolean isJudged(InventoryItem offer, SharedManufacturerCodes sharedCodes) {
-        return isUsableBrand(offer.brand()) && !sharedCodes.isShared(offer);
+        return hasKeys(offer) && isUsableBrand(offer.brand()) && !sharedCodes.isShared(offer);
+    }
+
+    private static boolean hasKeys(InventoryItem offer) {
+        return offer.ean() != null && offer.mfn() != null;
     }
 
     private static boolean isUsableBrand(String brand) {
@@ -91,7 +95,7 @@ public final class ConflictingOffers {
         private final Map<BrandCode, Set<String>> eansByBrandCode = new HashMap<>();
 
         void add(InventoryItem offer) {
-            if (!isUsableBrand(offer.brand())) {
+            if (!hasKeys(offer) || !isUsableBrand(offer.brand())) {
                 return;
             }
             BrandCode brandCode = new BrandCode(brandKey(offer.brand()), offer.mfn());
