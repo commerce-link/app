@@ -70,6 +70,8 @@ class StoreInventoryProviderTest {
     private PimView pimView;
     @Mock
     private TaxonomyCache taxonomyCache;
+    @Mock
+    private StoreInventoryRefresher refresher;
 
     @InjectMocks
     private StoreInventoryProvider provider;
@@ -92,6 +94,96 @@ class StoreInventoryProviderTest {
         // when / then
         assertSame(cached, provider.get("store-1"));
         verify(cache, never()).put(any(), any(), any());
+    }
+
+    @Test
+    void freshSnapshotStartsNoRefresh() {
+        // given
+        provider.defaultTtlMinutes = 60;
+        StoreInventory cached = new StoreInventory(InventoryIndex.of(new LinkedList<>()), LocalDateTime.now().minusMinutes(59));
+        when(cache.get("store-1")).thenReturn(Optional.of(cached));
+
+        // when
+        StoreInventory result = provider.get("store-1");
+
+        // then
+        assertSame(cached, result);
+        verify(refresher, never()).refreshInBackground(any(), any());
+    }
+
+    @Test
+    void staleSnapshotIsReturnedAtOnceAndRefreshedInBackground() {
+        // given
+        provider.defaultTtlMinutes = 60;
+        StoreInventory cached = new StoreInventory(InventoryIndex.of(new LinkedList<>()), LocalDateTime.now().minusMinutes(61));
+        when(cache.get("store-1")).thenReturn(Optional.of(cached));
+
+        // when
+        StoreInventory result = provider.get("store-1");
+
+        // then
+        assertSame(cached, result);
+        verify(refresher).refreshInBackground(eq("store-1"), any(Runnable.class));
+        verify(cache, never()).put(any(), any(), any());
+        verify(autoDiscovery, never()).run(anyList(), any());
+    }
+
+    @Test
+    void staleSnapshotOfAStoreWithItsOwnFreshnessIsRefreshed() {
+        // given
+        provider.defaultTtlMinutes = 1440;
+        Store store = mock(Store.class);
+        when(store.getStoreId()).thenReturn("store-1");
+        when(store.hasOwnOrManualSupplierConnections()).thenReturn(true);
+        when(store.getInventoryCacheTtlMinutes()).thenReturn(Optional.of(30));
+        StoreInventory cached = new StoreInventory(InventoryIndex.of(new LinkedList<>()), LocalDateTime.now().minusMinutes(31));
+        when(cache.get("store-1")).thenReturn(Optional.of(cached));
+
+        // when
+        StoreInventory result = provider.ownInventory(store);
+
+        // then
+        assertSame(cached, result);
+        verify(refresher).refreshInBackground(eq("store-1"), any(Runnable.class));
+    }
+
+    @Test
+    void backgroundRefreshRebuildsAndOverwritesTheSnapshot() {
+        // given
+        provider.defaultTtlMinutes = 60;
+        StoreInventory cached = new StoreInventory(InventoryIndex.of(new LinkedList<>()), LocalDateTime.now().minusHours(2));
+        when(cache.get("store-1")).thenReturn(Optional.of(cached));
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        when(autoDiscovery.run(anyList(), any())).thenReturn(List.of());
+        org.mockito.ArgumentCaptor<Runnable> refresh = org.mockito.ArgumentCaptor.forClass(Runnable.class);
+        provider.get("store-1");
+        verify(refresher).refreshInBackground(eq("store-1"), refresh.capture());
+
+        // when
+        refresh.getValue().run();
+
+        // then
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(60).plusHours(24)));
+    }
+
+    @Test
+    void refreshRebuildsEvenWhenTheSnapshotIsFresh() {
+        // given
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        when(autoDiscovery.run(anyList(), any())).thenReturn(List.of());
+
+        // when
+        provider.refresh("store-1");
+
+        // then
+        verify(cache, never()).get(any());
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class));
     }
 
     @Test
@@ -139,7 +231,7 @@ class StoreInventoryProviderTest {
     }
 
     @Test
-    void usesStoreTtlWhenConfigured() {
+    void keepsSnapshotADayPastTheStoreFreshness() {
         // given
         when(cache.get("store-1")).thenReturn(Optional.empty());
         Store storeEntity = mock(Store.class);
@@ -153,11 +245,11 @@ class StoreInventoryProviderTest {
         provider.get("store-1");
 
         // then
-        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(30)));
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(30).plusHours(24)));
     }
 
     @Test
-    void usesDefaultTtlWhenStoreHasNone() {
+    void keepsSnapshotADayPastTheDefaultFreshness() {
         // given
         provider.defaultTtlMinutes = 60;
         when(cache.get("store-1")).thenReturn(Optional.empty());
@@ -172,11 +264,11 @@ class StoreInventoryProviderTest {
         provider.get("store-1");
 
         // then
-        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(60)));
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(60).plusHours(24)));
     }
 
     @Test
-    void usesDefaultTtlWhenStoreTtlIsZeroOrNegative() {
+    void usesDefaultFreshnessWhenStoreValueIsZeroOrNegative() {
         // given
         provider.defaultTtlMinutes = 60;
         when(cache.get("store-1")).thenReturn(Optional.empty());
@@ -191,7 +283,7 @@ class StoreInventoryProviderTest {
         provider.get("store-1");
 
         // then
-        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(60)));
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(60).plusHours(24)));
     }
 
     @Test

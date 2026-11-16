@@ -22,10 +22,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class StoreInventoryProvider {
+
+    // how long a stale snapshot stays readable past its freshness, so a request is served while the rebuild runs
+    private static final Duration STALE_RETENTION = Duration.ofHours(24);
 
     private final StoreInventoryCache cache;
     private final StoresRepository storesRepository;
@@ -34,12 +39,19 @@ public class StoreInventoryProvider {
     private final StoreFeedItemLoader storeFeedItemLoader;
     private final ExchangeRates exchangeRates;
     private final PimCatalog pimCatalog;
+    private final StoreInventoryRefresher refresher;
+
+    private final Map<String, Object> refreshLocks = new ConcurrentHashMap<>();
 
     @Value("${inventory.store-cache.ttl-minutes}")
     long defaultTtlMinutes;
 
     public StoreInventory get(String storeId) {
-        return cache.get(storeId).orElseGet(() -> buildAndCache(storesRepository.findById(storeId), storeId));
+        Optional<StoreInventory> cached = cache.get(storeId);
+        if (cached.isEmpty()) {
+            return buildAndCache(storesRepository.findById(storeId), storeId);
+        }
+        return servingStale(cached.get(), storeId, () -> storesRepository.findById(storeId));
     }
 
     public InventoryIndex ownIndex(Store store) {
@@ -51,16 +63,36 @@ public class StoreInventoryProvider {
             return new StoreInventory(InventoryIndex.of(List.of()), null);
         }
         String storeId = store.getStoreId();
-        return cache.get(storeId).orElseGet(() -> buildAndCache(store, storeId));
+        Optional<StoreInventory> cached = cache.get(storeId);
+        if (cached.isEmpty()) {
+            return buildAndCache(store, storeId);
+        }
+        return servingStale(cached.get(), storeId, () -> store);
+    }
+
+    // Refreshes of one store run one after another on this instance, each reading the feed files only once it holds
+    // the lock: otherwise a rebuild started before a feed import could finish after it and overwrite the newer snapshot.
+    public void refresh(String storeId) {
+        synchronized (refreshLocks.computeIfAbsent(storeId, id -> new Object())) {
+            buildAndCache(storesRepository.findById(storeId), storeId);
+        }
+    }
+
+    private StoreInventory servingStale(StoreInventory cached, String storeId, Supplier<Store> store) {
+        LocalDateTime builtAt = cached.builtAt();
+        if (builtAt != null && builtAt.plus(freshFor(store.get())).isBefore(LocalDateTime.now())) {
+            refresher.refreshInBackground(storeId, () -> refresh(storeId));
+        }
+        return cached;
     }
 
     private StoreInventory buildAndCache(Store store, String storeId) {
         StoreInventory built = build(storeId, store);
-        cache.put(storeId, built, resolveTtl(store));
+        cache.put(storeId, built, freshFor(store).plus(STALE_RETENTION));
         return built;
     }
 
-    private Duration resolveTtl(Store storeEntity) {
+    private Duration freshFor(Store storeEntity) {
         long minutes = Optional.ofNullable(storeEntity)
                 .flatMap(Store::getInventoryCacheTtlMinutes)
                 .filter(value -> value > 0)

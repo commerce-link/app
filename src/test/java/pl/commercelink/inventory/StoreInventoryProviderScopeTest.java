@@ -43,6 +43,7 @@ class StoreInventoryProviderScopeTest {
     private static final String MPN = "MPN-S1";
 
     @Mock private StoreInventoryCache cache;
+    @Mock private StoreInventoryRefresher refresher;
     @Mock private StoresRepository storesRepository;
     @Mock private SupplierProviderFactory supplierProviderFactory;
     @Mock private StoreFeedItemLoader storeFeedItemLoader;
@@ -63,7 +64,7 @@ class StoreInventoryProviderScopeTest {
     private Collection<MatchedInventory> inventoryOf(String storeId, PimCatalog pimCatalog) {
         InventoryAutoDiscovery autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry);
         StoreInventoryProvider provider = new StoreInventoryProvider(cache, storesRepository, supplierProviderFactory,
-                autoDiscovery, storeFeedItemLoader, exchangeRates, pimCatalog);
+                autoDiscovery, storeFeedItemLoader, exchangeRates, pimCatalog, refresher);
 
         Store store = new Store();
         store.setStoreId(storeId);

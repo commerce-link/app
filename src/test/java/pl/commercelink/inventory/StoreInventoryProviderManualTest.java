@@ -43,6 +43,7 @@ class StoreInventoryProviderManualTest {
     @Mock pl.commercelink.pim.api.PimCatalog pimCatalog;
     @Mock
     private PimView pimView;
+    @Mock StoreInventoryRefresher refresher;
     @InjectMocks StoreInventoryProvider provider;
 
     @Captor ArgumentCaptor<SupplierProviderDescriptor> descriptorCaptor;
