@@ -984,7 +984,8 @@ public class OrdersController extends BaseController {
     public String createInvoice(@PathVariable String orderId, @RequestParam DocumentType documentType, @RequestParam(defaultValue = "false") boolean send, Locale locale, RedirectAttributes redirectAttributes) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
 
-        // the cancelled page offers no "Wystaw"; a stale page or a hand-made request would invoice items priced at zero
+        // the cancelled page offers no "Wystaw"; a stale page or a hand-made request would invoice goods that were never sold
+        // (cancelled items keep their prices)
         if (order.hasStatus(OrderStatus.Cancelled)) {
             return refuse(redirectAttributes, orderId, INVOICING_CANCELLED, locale);
         }

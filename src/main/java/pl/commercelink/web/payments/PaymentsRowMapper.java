@@ -100,7 +100,7 @@ public class PaymentsRowMapper {
                 entry.method() == null ? "" : text("PaymentSource." + entry.method().name()),
                 stateLabel(entry.standing(), "receivable"), stateTone(entry.standing()),
                 money(entry.amount()),
-                paidOf ? text("payments.row.paidOf", plain(o.getPaidAmount()), plain(o.getTotalPrice()))
+                paidOf ? text("payments.row.paidOf", plain(o.getPaidAmount()), plain(o.getAmountDue()))
                         : text("payments.row.net", money(Math.abs(o.getUnpaidAmountNet()))),
                 paidOf, refund,
                 o.getOrderId(),

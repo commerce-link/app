@@ -551,8 +551,10 @@ class OrdersManagerTest {
         verify(reservationService, times(1)).remove(any(Reservation.class));
         assertThat(List.of(reserved, fresh, service)).allMatch(OrderItem::isCancelled);
         assertThat(reserved.getDeliveryId()).isNull();
+        assertThat(fresh.getPrice()).isEqualTo(100.0);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.Cancelled);
-        assertThat(order.getTotalPrice()).isZero();
+        assertThat(order.getTotalPrice()).isEqualTo(250.0);
+        assertThat(order.getAmountDue()).isZero();
         verify(orderItemsRepository).batchSave(List.of(reserved, fresh, service));
         verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCancelled);
     }

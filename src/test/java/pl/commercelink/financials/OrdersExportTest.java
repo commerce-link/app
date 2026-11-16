@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
+import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.BillingDetails;
@@ -59,6 +60,21 @@ class OrdersExportTest {
 
         // then
         assertThat(csv).contains("order-2");
+    }
+
+    @Test
+    void aCancelledOrderIsLeftOutAlthoughItKeepsItsValue() {
+        // given
+        Order cancelled = order("order-cancelled");
+        cancelled.setTotalPrice(500);
+        cancelled.setStatus(OrderStatus.Cancelled);
+        when(ordersRepository.findAllOrders(eq("store-1"), any(), any())).thenReturn(List.of(cancelled, order("order-kept")));
+
+        // when
+        String csv = ordersExport.run("store-1", FROM, TO);
+
+        // then
+        assertThat(csv).contains("order-kept").doesNotContain("order-cancelled");
     }
 
     @Test

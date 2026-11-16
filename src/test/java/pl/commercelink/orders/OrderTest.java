@@ -627,6 +627,8 @@ class OrderTest {
         // given
         OrderItem fresh = product(FulfilmentStatus.New);
         fresh.setEan("5901234123457");
+        OrderItem supplierAssigned = product(FulfilmentStatus.New);
+        supplierAssigned.setDeliveryId("Acme");
         OrderItem waitingForSupplier = product(FulfilmentStatus.Allocation);
         waitingForSupplier.setDeliveryId("Acme");
         OrderItem service = new OrderItem("o1", "Dostawa", "Kurier", 1, 20, null, false, 0);
@@ -637,15 +639,19 @@ class OrderTest {
         order.addPayment(new Payment("REF", "Jan", PaymentSource.BankTransfer, 220, 0));
 
         // when
-        order.cancel(List.of(fresh, waitingForSupplier, service));
+        order.cancel(List.of(fresh, supplierAssigned, waitingForSupplier, service));
 
-        // then: the payment stays, so the whole amount shows as owed back to the customer
-        assertThat(List.of(fresh, waitingForSupplier, service)).allMatch(OrderItem::isCancelled)
-                .allMatch(item -> item.getPrice() == 0 && item.getCost() == 0);
+        // then: the items and the order keep their value, nothing is left to pay, so the payment is owed back
+        assertThat(List.of(fresh, supplierAssigned, waitingForSupplier, service)).allMatch(OrderItem::isCancelled);
+        assertThat(fresh.getPrice()).isEqualTo(100);
+        assertThat(service.getPrice()).isEqualTo(20);
         assertThat(fresh.getEan()).isEqualTo("5901234123457");
+        assertThat(supplierAssigned.getDeliveryId()).isNull();
+        assertThat(service.getDeliveryId()).isNull();
         assertThat(waitingForSupplier.getDeliveryId()).isNull();
         assertThat(order.getStatus()).isEqualTo(OrderStatus.Cancelled);
-        assertThat(order.getTotalPrice()).isZero();
+        assertThat(order.getTotalPrice()).isEqualTo(220);
+        assertThat(order.getAmountDue()).isZero();
         assertThat(order.getUnpaidAmount()).isEqualTo(-220);
     }
 

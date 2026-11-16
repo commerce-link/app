@@ -382,9 +382,18 @@ public class Order {
         return payments.stream().anyMatch(payment -> !payment.isUnsettled());
     }
 
+    /**
+     * What the customer is to pay for the order: nothing once it is cancelled. totalPrice itself stays as the value
+     * the order had, so cancelled orders can still be added up; what was paid for one is therefore owed back.
+     */
+    @DynamoDBIgnore
+    public double getAmountDue() {
+        return hasStatus(OrderStatus.Cancelled) ? 0 : totalPrice;
+    }
+
     @DynamoDBIgnore
     public double getUnpaidAmount() {
-        return totalPrice - getPaidAmount();
+        return getAmountDue() - getPaidAmount();
     }
 
     @DynamoDBIgnore
@@ -487,18 +496,20 @@ public class Order {
             orderItems.stream()
                     .filter(i -> i.isService())
                     .forEach(OrderItem::markAsReturned);
+            this.totalPrice = orderItems.stream()
+                    .mapToDouble(OrderItem::getTotalPrice)
+                    .sum();
         } else {
+            // prices and totalPrice stay: the order keeps the value it was cancelled with (see getAmountDue)
             orderItems.forEach(item -> {
                 if (item.isProduct() && !item.isNew()) {
                     item.removeFulfilment();
                 }
+                // also a supplier assigned to an item not yet sent to allocation, and a service's warehouse marker
+                item.setDeliveryId(null);
                 item.markAsCancelled();
             });
         }
-
-        this.totalPrice = orderItems.stream()
-                .mapToDouble(OrderItem::getTotalPrice)
-                .sum();
 
         this.status = OrderStatus.Cancelled;
 
