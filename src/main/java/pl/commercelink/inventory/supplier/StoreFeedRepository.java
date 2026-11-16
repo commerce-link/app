@@ -6,15 +6,18 @@ import pl.commercelink.starter.storage.FileStorage;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 @Repository
 public class StoreFeedRepository {
 
     private static final String FEED_MARKER = "-feed.";
+    private static final String HASH_EXTENSION = "sha256";
 
     private final FileStorage fileStorage;
     private final String bucketName;
@@ -26,6 +29,20 @@ public class StoreFeedRepository {
 
     public void store(String storeId, String supplierName, byte[] data, String fileExtension) {
         fileStorage.put(bucketName, key(storeId, supplierName, fileExtension), data);
+    }
+
+    public Optional<String> storedHash(String storeId, String supplierName) {
+        String key = key(storeId, supplierName, HASH_EXTENSION);
+        if (!fileStorage.canRead(bucketName, key)) {
+            return Optional.empty();
+        }
+        return Optional.of(new String(fileStorage.getBytes(bucketName, key), StandardCharsets.UTF_8).trim());
+    }
+
+    // Kept next to the feed under the feed's prefix, so deleting the feed deletes it too. Written again by an import
+    // that found the feed unchanged, which is what keeps the "last update" date of the connection moving.
+    public void storeHash(String storeId, String supplierName, String hash) {
+        fileStorage.put(bucketName, key(storeId, supplierName, HASH_EXTENSION), hash.getBytes(StandardCharsets.UTF_8));
     }
 
     public boolean canRead(String storeId, String supplierName, String fileExtension) {
@@ -53,9 +70,13 @@ public class StoreFeedRepository {
             if (marker <= 0) {
                 continue;
             }
-            byIdentity.put(fileName.substring(0, marker), entry.getValue());
+            byIdentity.merge(fileName.substring(0, marker), entry.getValue(), StoreFeedRepository::later);
         }
         return byIdentity;
+    }
+
+    private static LocalDateTime later(LocalDateTime first, LocalDateTime second) {
+        return first.isAfter(second) ? first : second;
     }
 
     private String key(String storeId, String supplierName, String fileExtension) {
