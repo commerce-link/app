@@ -198,7 +198,7 @@ class InventoryAutoDiscovery {
         var splitPrice = calculateSplitPrice(inventoryItems);
 
         // price is too small to be considered a valid discriminator
-        if (splitPrice < 50) {
+        if (PriceSplitThresholds.isTooLowToSplit(splitPrice)) {
             return Collections.singletonList(matchedInventory);
         }
 
@@ -314,7 +314,7 @@ class InventoryAutoDiscovery {
             mfnToPriceAvg.compute(inventoryItem.mfn(), (k, v) -> v == null ?
                     inventoryItem.netPrice() : (v + inventoryItem.netPrice()) / 2);
         }
-        return mfnToPriceAvg.values().stream().max(Double::compareTo).orElse(0.0) * 0.5;
+        return PriceSplitThresholds.splitPriceOf(mfnToPriceAvg.values().stream().max(Double::compareTo).orElse(0.0));
     }
 
     private boolean doesNotHaveItemsWithMfn(String mfn, List<InventoryItem> inventoryItems) {
