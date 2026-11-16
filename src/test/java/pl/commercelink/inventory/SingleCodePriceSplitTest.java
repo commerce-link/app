@@ -63,6 +63,18 @@ class SingleCodePriceSplitTest {
     }
 
     @Test
+    void highestMeanOfExactlyFiftySplits() {
+        // given
+        List<InventoryItem> items = List.of(offer("E1", 20, "A"), offer("E2", 50, "B"));
+
+        // when
+        List<List<InventoryItem>> result = SingleCodePriceSplit.byEan(items);
+
+        // then
+        assertThat(result).hasSize(2);
+    }
+
+    @Test
     void averageIsTakenPerEan() {
         // given
         List<InventoryItem> items = List.of(offer("EA", 100, "A"), offer("EA", 300, "B"), offer("EB", 150, "C"));

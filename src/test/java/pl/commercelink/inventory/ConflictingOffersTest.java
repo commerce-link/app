@@ -123,6 +123,55 @@ class ConflictingOffersTest {
     }
 
     @Test
+    void conflictStaysAmongThousandsOfUnrelatedWitnesses() {
+        // given
+        InventoryItem elko = offer("Elko", "Sapphire", EAN_7600, CODE_9060, 3563);
+        List<InventoryItem> own = List.of(elko);
+        List<InventoryItem> witnesses = new ArrayList<>(unrelatedWitnesses(5000));
+        witnesses.addAll(sapphireWitnesses());
+        witnesses.addAll(unrelatedWitnesses(5000));
+
+        // when
+        ConflictingOffers result = ConflictingOffers.of(own, witnesses, SharedManufacturerCodes.of(own));
+
+        // then
+        assertThat(result.contains(elko)).isTrue();
+    }
+
+    @Test
+    void witnessLinkingTheSidesIsFoundAlthoughItSharesNoKeyWithTheScope() {
+        // given: the link holds the EAN of one confirmed side and the code of the other, neither of them the
+        // scope offer's own, so it is related to the scope only through the confirming witnesses
+        InventoryItem elko = offer("Elko", "Sapphire", EAN_7600, CODE_9060, 3563);
+        List<InventoryItem> own = List.of(elko);
+        List<InventoryItem> witnesses = new ArrayList<>(unrelatedWitnesses(1000));
+        witnesses.addAll(sapphireWitnesses());
+        witnesses.add(offer("Ingram", "Sapphire", EAN_9060, CODE_7600, 3000));
+
+        // when
+        ConflictingOffers result = ConflictingOffers.of(own, witnesses, SharedManufacturerCodes.of(own));
+
+        // then
+        assertThat(result.contains(elko)).isFalse();
+    }
+
+    @Test
+    void witnessesConfirmUnderAnotherSpellingOfTheBrand() {
+        // given
+        InventoryItem elko = offer("Elko", "Sapphire", EAN_7600, CODE_9060, 3563);
+        List<InventoryItem> own = List.of(elko);
+        List<InventoryItem> witnesses = new ArrayList<>();
+        witnesses.addAll(holders(" SAPPHIRE ", EAN_7600, CODE_7600, 1800, "Asbis", "Morele"));
+        witnesses.addAll(holders("sapphire", EAN_9060, CODE_9060, 2600, "Asbis", "Wave"));
+
+        // when
+        ConflictingOffers result = ConflictingOffers.of(own, witnesses, SharedManufacturerCodes.of(own));
+
+        // then
+        assertThat(result.contains(elko)).isTrue();
+    }
+
+    @Test
     void noNameAndBrandlessOffersAreSkipped() {
         // given
         InventoryItem noName = offer("Elko", "NoName", EAN_7600, CODE_9060, 3563);
@@ -215,6 +264,15 @@ class ConflictingOffersTest {
         List<InventoryItem> witnesses = new ArrayList<>();
         witnesses.addAll(holders("Sapphire", EAN_7600, CODE_7600, 1800, "Asbis", "Morele"));
         witnesses.addAll(holders("Sapphire", EAN_9060, CODE_9060, 2600, "Asbis", "Wave"));
+        return witnesses;
+    }
+
+    private List<InventoryItem> unrelatedWitnesses(int count) {
+        List<InventoryItem> witnesses = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            String ean = String.format("59%011d", i);
+            witnesses.addAll(holders("Brand" + (i % 50), ean, "CODE-" + i, 100 + i, "Asbis", "Morele", "Wave"));
+        }
         return witnesses;
     }
 

@@ -39,7 +39,7 @@ public final class ConflictingOffers {
                                        SharedManufacturerCodes sharedCodes) {
         Index index = new Index();
         offers.forEach(index::add);
-        witnesses.forEach(index::add);
+        index.addRelated(witnesses);
 
         // by identity, like SharedManufacturerCodes: callers ask about the same instances
         Set<InventoryItem> conflicting = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -71,6 +71,14 @@ public final class ConflictingOffers {
         return brand != null && !brand.isBlank() && !NoNameBrand.is(brand);
     }
 
+    private static boolean isIndexable(InventoryItem offer) {
+        return hasKeys(offer) && isUsableBrand(offer.brand());
+    }
+
+    private static BrandCode brandCodeOf(InventoryItem offer) {
+        return new BrandCode(brandKey(offer.brand()), offer.mfn());
+    }
+
     private static String brandKey(String brand) {
         return brand.trim().toLowerCase(Locale.ROOT);
     }
@@ -94,11 +102,38 @@ public final class ConflictingOffers {
         private final Map<String, Set<BrandCode>> brandCodesByEan = new HashMap<>();
         private final Map<BrandCode, Set<String>> eansByBrandCode = new HashMap<>();
 
+        /**
+         * Indexes only the witnesses a judged offer can ever look up, which gives the same verdicts as indexing all
+         * of them. Every lookup goes through the judged offer's EAN or its brand and code, except the link
+         * (e2, b1, c1) of two confirmed sides, whose EAN and brand with code each belong to an offer found by the
+         * first kind. Hence two passes: one pass would miss a link held only by witnesses and exclude a legitimate offer.
+         */
+        void addRelated(Collection<InventoryItem> witnesses) {
+            Set<String> scopeEans = new HashSet<>(brandCodesByEan.keySet());
+            Set<BrandCode> scopeBrandCodes = new HashSet<>(eansByBrandCode.keySet());
+            for (InventoryItem witness : witnesses) {
+                if (isIndexable(witness) && sharesAKeyWith(witness, scopeEans, scopeBrandCodes)) {
+                    add(witness);
+                }
+            }
+            for (InventoryItem witness : witnesses) {
+                if (isIndexable(witness) && !sharesAKeyWith(witness, scopeEans, scopeBrandCodes)
+                        && brandCodesByEan.containsKey(witness.ean())
+                        && eansByBrandCode.containsKey(brandCodeOf(witness))) {
+                    add(witness);
+                }
+            }
+        }
+
+        private static boolean sharesAKeyWith(InventoryItem witness, Set<String> eans, Set<BrandCode> brandCodes) {
+            return eans.contains(witness.ean()) || brandCodes.contains(brandCodeOf(witness));
+        }
+
         void add(InventoryItem offer) {
-            if (!hasKeys(offer) || !isUsableBrand(offer.brand())) {
+            if (!isIndexable(offer)) {
                 return;
             }
-            BrandCode brandCode = new BrandCode(brandKey(offer.brand()), offer.mfn());
+            BrandCode brandCode = brandCodeOf(offer);
             suppliersByTriple.computeIfAbsent(new Triple(offer.ean(), brandCode.brand(), brandCode.code()), k -> new HashSet<>())
                     .add(supplierOf(offer));
             brandCodesByEan.computeIfAbsent(offer.ean(), k -> new HashSet<>()).add(brandCode);
@@ -108,7 +143,7 @@ public final class ConflictingOffers {
         boolean isConflicting(InventoryItem offer) {
             String own = supplierOf(offer);
             String ean = offer.ean();
-            BrandCode brandCode = new BrandCode(brandKey(offer.brand()), offer.mfn());
+            BrandCode brandCode = brandCodeOf(offer);
 
             if (holdersOtherThan(new Triple(ean, brandCode.brand(), brandCode.code()), own) > 0) {
                 return false;

@@ -62,6 +62,19 @@ class PlaceholderEansTest {
     }
 
     @Test
+    void codeWithoutStockDoesNotCountTowardsAPlaceholder() {
+        // given
+        List<InventoryItem> rows = List.of(offer("8596375178328", "A-1", 5),
+                offer("8596375178328", "B-2", 5), offer("8596375178328", "C-3", 0));
+
+        // when
+        PlaceholderEans eans = PlaceholderEans.of(rows);
+
+        // then
+        assertThat(eans.contains("8596375178328")).isFalse();
+    }
+
+    @Test
     void noneContainsNothing() {
         // when
         PlaceholderEans eans = PlaceholderEans.none();

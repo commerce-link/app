@@ -516,6 +516,20 @@ class FeedProcessingTest {
     }
 
     @Test
+    void withTheSwitchOffRowsAreProcessedAsTheyArrive() {
+        // given
+        givenRowsAreTakenAsTheyCome();
+        FeedProcessing processing = processing(false);
+
+        // when
+        processing.add(row(PLACEHOLDER_EAN, "A-1", "Cable A"));
+
+        // then
+        verify(dataCorrection).run(any(InventoryItem.class));
+        verify(stats, never()).log();
+    }
+
+    @Test
     void offerWithoutBrandUnderAPlaceholderEanIsRejectedWithoutError() {
         // given
         PimCatalog pimWithoutTheProduct = ScopedPimCatalog.of();

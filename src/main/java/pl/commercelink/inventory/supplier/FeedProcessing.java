@@ -26,8 +26,13 @@ class FeedProcessing {
     private final List<InventoryItem> imported = new ArrayList<>();
     private final List<WaitingRow> waitingForCodeIndex = new ArrayList<>();
 
+    // A placeholder EAN is known only once the whole feed is read, so rows wait for finish() only while that guard is on.
     void add(ParsedRow parsed) {
-        rows.add(parsed);
+        if (ignorePlaceholderEans) {
+            rows.add(parsed);
+        } else {
+            process(parsed, PlaceholderEans.none());
+        }
     }
 
     private boolean process(ParsedRow parsed, PlaceholderEans placeholderEans) {
@@ -55,9 +60,7 @@ class FeedProcessing {
     }
 
     List<InventoryItem> finish() {
-        PlaceholderEans placeholderEans = ignorePlaceholderEans
-                ? PlaceholderEans.of(rows.stream().map(ParsedRow::item).toList())
-                : PlaceholderEans.none();
+        PlaceholderEans placeholderEans = PlaceholderEans.of(rows.stream().map(ParsedRow::item).toList());
         int rejectedUnderPlaceholder = 0;
         for (ParsedRow row : rows) {
             if (!process(row, placeholderEans) && placeholderEans.contains(row.item().ean())) {

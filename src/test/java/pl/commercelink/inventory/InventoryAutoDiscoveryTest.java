@@ -17,6 +17,8 @@ import pl.commercelink.taxonomy.TaxonomyCache;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
@@ -473,7 +475,7 @@ class InventoryAutoDiscoveryTest {
 
         // when
         Collection<MatchedInventory> result = autoDiscovery.run(
-                List.of(kosatec7600, kosatec9060, incom9060, elko), pimView, sapphireWitnesses());
+                List.of(kosatec7600, kosatec9060, incom9060, elko), pimView, this::sapphireWitnesses);
 
         // then
         assertThat(result).flatExtracting(MatchedInventory::getInventoryItems).doesNotContain(elko);
@@ -491,7 +493,7 @@ class InventoryAutoDiscoveryTest {
         List<InventoryItem> witnesses = sapphireWitnesses();
 
         // when
-        Collection<MatchedInventory> result = autoDiscovery.run(List.of(own), pimView, witnesses);
+        Collection<MatchedInventory> result = autoDiscovery.run(List.of(own), pimView, () -> witnesses);
 
         // then
         assertThat(result).flatExtracting(MatchedInventory::getInventoryItems).containsExactly(own);
@@ -508,7 +510,7 @@ class InventoryAutoDiscoveryTest {
 
         // when
         Collection<MatchedInventory> result = autoDiscovery.run(
-                List.of(kosatec9060, incom9060, elko), pimView, sapphireWitnesses());
+                List.of(kosatec9060, incom9060, elko), pimView, this::sapphireWitnesses);
 
         // then
         assertThat(result).flatExtracting(MatchedInventory::getInventoryItems).doesNotContain(elko);
@@ -526,10 +528,96 @@ class InventoryAutoDiscoveryTest {
 
         // when
         Collection<MatchedInventory> result = autoDiscovery.run(
-                List.of(kosatec9060, incom9060, elko), pimView, sapphireWitnesses());
+                List.of(kosatec9060, incom9060, elko), pimView, this::sapphireWitnesses);
 
         // then
         assertThat(result).flatExtracting(MatchedInventory::getInventoryItems).contains(elko);
+    }
+
+    @Test
+    void witnessesAreFetchedOnceWhenTheScopeHasOffers() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        AtomicInteger fetches = new AtomicInteger();
+        Supplier<List<InventoryItem>> witnesses = () -> {
+            fetches.incrementAndGet();
+            return sapphireWitnesses();
+        };
+        InventoryItem elko = item("4895106293618", "11350-03-20G", 3563, "Elko", "Sapphire");
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(List.of(elko), pimView, witnesses);
+
+        // then
+        assertThat(fetches).hasValue(1);
+        assertThat(result).flatExtracting(MatchedInventory::getInventoryItems).doesNotContain(elko);
+    }
+
+    @Test
+    void witnessesAreNotFetchedForAnEmptyScope() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        AtomicInteger fetches = new AtomicInteger();
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(List.of(), pimView, () -> {
+            fetches.incrementAndGet();
+            return sapphireWitnesses();
+        });
+
+        // then
+        assertThat(result).isEmpty();
+        assertThat(fetches).hasValue(0);
+    }
+
+    @Test
+    void witnessesAreNotFetchedWithTheSwitchOff() {
+        // given
+        autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
+                new InventoryMatchingProperties(false, true, true));
+        when(pimView.findAll()).thenReturn(List.of());
+        AtomicInteger fetches = new AtomicInteger();
+        InventoryItem elko = item("4895106293618", "11350-03-20G", 3563, "Elko", "Sapphire");
+
+        // when
+        autoDiscovery.run(List.of(elko), pimView, () -> {
+            fetches.incrementAndGet();
+            return sapphireWitnesses();
+        });
+
+        // then
+        assertThat(fetches).hasValue(0);
+    }
+
+    @Test
+    void groupOfSeveralCodesIsNotSplitByEanPrices() {
+        // given: by EAN the means are 20 and 90, which alone would split a single-code group
+        when(pimView.findAll()).thenReturn(List.of());
+        InventoryItem first = item("5900000000001", "C-1", 20, "A");
+        InventoryItem second = item("5900000000001", "C-2", 20, "B");
+        InventoryItem third = item("5900000000002", "C-2", 90, "C");
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(List.of(first, second, third));
+
+        // then
+        assertThat(result).singleElement()
+                .satisfies(m -> assertThat(m.getInventoryItems()).containsExactlyInAnyOrder(first, second, third));
+    }
+
+    @Test
+    void groupOfOneEanUnderSeveralCodesStaysWhole() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        InventoryItem cheap = item("5900000000001", "C-1", 100, "A");
+        InventoryItem dear = item("5900000000001", "C-2", 900, "B");
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(List.of(cheap, dear));
+
+        // then
+        assertThat(result).singleElement()
+                .satisfies(m -> assertThat(m.getInventoryItems()).containsExactlyInAnyOrder(cheap, dear));
     }
 
     @Test

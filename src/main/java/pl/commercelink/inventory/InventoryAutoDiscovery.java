@@ -11,6 +11,7 @@ import pl.commercelink.pim.api.PimView;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -45,17 +46,18 @@ class InventoryAutoDiscovery {
 
     /** @param pim the PIM view to match known entries in: a store's own inventory uses that store's view */
     Collection<MatchedInventory> run(List<InventoryItem> inventoryItems, PimView pim) {
-        return run(inventoryItems, pim, List.of());
+        return run(inventoryItems, pim, List::of);
     }
 
     /**
-     * @param witnesses offers of another scope that only confirm which keys belong together; they are never added to a group
+     * @param witnesses offers of another scope that only confirm which keys belong together; they are never added to a group.
+     *                  Fetched only when the conflicting-offer guard runs, since the global inventory is large.
      */
-    Collection<MatchedInventory> run(List<InventoryItem> allOffers, PimView pim, Collection<InventoryItem> witnesses) {
+    Collection<MatchedInventory> run(List<InventoryItem> allOffers, PimView pim, Supplier<? extends Collection<InventoryItem>> witnesses) {
         SharedManufacturerCodes sharedCodes = SharedManufacturerCodes.of(allOffers);
 
-        ConflictingOffers conflicting = matchingProperties.excludeConflictingOffers()
-                ? ConflictingOffers.of(allOffers, witnesses, sharedCodes)
+        ConflictingOffers conflicting = matchingProperties.excludeConflictingOffers() && !allOffers.isEmpty()
+                ? ConflictingOffers.of(allOffers, witnesses.get(), sharedCodes)
                 : ConflictingOffers.none();
         List<InventoryItem> inventoryItems = allOffers;
         if (conflicting.size() > 0) {

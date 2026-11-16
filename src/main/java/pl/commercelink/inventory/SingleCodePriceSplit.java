@@ -2,6 +2,7 @@ package pl.commercelink.inventory;
 
 import pl.commercelink.inventory.supplier.InventoryItem;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,13 +24,13 @@ final class SingleCodePriceSplit {
     static List<List<InventoryItem>> byEan(List<InventoryItem> items) {
         Map<String, List<InventoryItem>> byEan = new LinkedHashMap<>();
         for (InventoryItem item : items) {
-            byEan.computeIfAbsent(item.ean(), k -> new java.util.ArrayList<>()).add(item);
+            byEan.computeIfAbsent(item.ean(), k -> new ArrayList<>()).add(item);
         }
         if (byEan.size() < 2) {
             return List.of(items);
         }
 
-        double highest = Double.MIN_VALUE;
+        double highest = 0.0;
         double lowest = Double.MAX_VALUE;
         for (Collection<InventoryItem> group : byEan.values()) {
             double average = group.stream().mapToDouble(InventoryItem::netPrice).average().orElse(0.0);

@@ -283,6 +283,7 @@ class StoreInventoryProviderTest {
                 .toList();
         assertThat(loadedSuppliers).containsExactly("Action");
     }
+
     @Test
     void globalOffersWitnessTheStoreGrouping() {
         // given
@@ -299,7 +300,7 @@ class StoreInventoryProviderTest {
         provider.get("store-1");
 
         // then
-        verify(autoDiscovery).run(anyList(), any(), same(globalOffers));
+        verify(autoDiscovery).run(anyList(), any(), argThat(witnesses -> witnesses.get() == globalOffers));
     }
 
     @org.junit.jupiter.api.BeforeEach

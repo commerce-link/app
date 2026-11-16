@@ -28,11 +28,12 @@ final class PlaceholderEans {
         return NONE;
     }
 
-    // Rows without stock or in a category still count: the number is shared whatever happens to the offer later.
+    // Only rows in stock count: suppliers keep old code aliases of a real product listed without stock, and
+    // counting those would flag a real EAN as a placeholder.
     static PlaceholderEans of(Collection<InventoryItem> feedRows) {
         Map<String, Set<String>> codesByEan = new HashMap<>();
         for (InventoryItem row : feedRows) {
-            if (row.hasEan() && row.hasMfn()) {
+            if (row.hasEan() && row.hasMfn() && row.hasQty()) {
                 codesByEan.computeIfAbsent(row.ean(), ean -> new HashSet<>()).add(CodeNotation.normalize(row.mfn()));
             }
         }
