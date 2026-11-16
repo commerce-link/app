@@ -15,7 +15,12 @@ import java.util.Map;
 final class SingleCodePriceSplit {
 
     static final double MAX_RATIO = 2.0;
-    static final double MIN_PRICE = 50.0;
+
+    /**
+     * Same floor as the existing price control in {@code InventoryAutoDiscovery}: half of the highest average
+     * has to reach this value, below it a price is too small to tell products apart.
+     */
+    static final double MIN_SPLIT_PRICE = 50.0;
 
     private SingleCodePriceSplit() {
     }
@@ -38,7 +43,7 @@ final class SingleCodePriceSplit {
             lowest = Math.min(lowest, average);
         }
 
-        if (highest < MIN_PRICE || highest / lowest <= MAX_RATIO) {
+        if (highest / MAX_RATIO < MIN_SPLIT_PRICE || highest / lowest <= MAX_RATIO) {
             return List.of(items);
         }
         return List.copyOf(byEan.values());

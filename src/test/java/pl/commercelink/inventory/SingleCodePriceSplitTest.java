@@ -51,9 +51,9 @@ class SingleCodePriceSplitTest {
     }
 
     @Test
-    void everythingBelowFiftyDoesNotSplit() {
+    void halfOfHighestMeanBelowFiftyDoesNotSplit() {
         // given
-        List<InventoryItem> items = List.of(offer("E1", 20, "A"), offer("E2", 49, "B"));
+        List<InventoryItem> items = List.of(offer("E1", 32, "A"), offer("E2", 99.99, "B"));
 
         // when
         List<List<InventoryItem>> result = SingleCodePriceSplit.byEan(items);
@@ -63,9 +63,9 @@ class SingleCodePriceSplitTest {
     }
 
     @Test
-    void highestMeanOfExactlyFiftySplits() {
+    void halfOfHighestMeanOfExactlyFiftySplits() {
         // given
-        List<InventoryItem> items = List.of(offer("E1", 20, "A"), offer("E2", 50, "B"));
+        List<InventoryItem> items = List.of(offer("E1", 32, "A"), offer("E2", 100, "B"));
 
         // when
         List<List<InventoryItem>> result = SingleCodePriceSplit.byEan(items);
