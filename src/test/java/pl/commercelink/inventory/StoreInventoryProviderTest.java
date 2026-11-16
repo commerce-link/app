@@ -69,6 +69,8 @@ class StoreInventoryProviderTest {
     @Mock
     private PimView pimView;
     @Mock
+    private GlobalMatchedInventory globalInventory;
+    @Mock
     private TaxonomyCache taxonomyCache;
 
     @InjectMocks
@@ -110,7 +112,7 @@ class StoreInventoryProviderTest {
                 .thenReturn(List.of(item("Wortmann")));
         MatchedInventory matched = mock(MatchedInventory.class);
         when(matched.getInventoryKey()).thenReturn(new InventoryKey());
-        when(autoDiscovery.run(anyList(), any())).thenReturn(List.of(matched));
+        when(autoDiscovery.run(anyList(), any(), any())).thenReturn(List.of(matched));
 
         // when
         StoreInventory result = provider.get("store-1");
@@ -118,7 +120,7 @@ class StoreInventoryProviderTest {
         // then
         assertEquals(List.of(matched), result.items());
         verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class));
-        verify(autoDiscovery).run(argThat(list -> list.size() == 1), any());
+        verify(autoDiscovery).run(argThat(list -> list.size() == 1), any(), any());
     }
 
     @Test
@@ -129,13 +131,13 @@ class StoreInventoryProviderTest {
         when(storesRepository.findById("store-1")).thenReturn(storeEntity);
         when(storeEntity.getOwnSupplierNames()).thenReturn(List.of());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of("PLN", 1.0));
-        when(autoDiscovery.run(anyList(), any())).thenReturn(List.of());
+        when(autoDiscovery.run(anyList(), any(), any())).thenReturn(List.of());
 
         // when
         provider.get("store-1");
 
         // then
-        verify(autoDiscovery).run(argThat(List::isEmpty), any());
+        verify(autoDiscovery).run(argThat(List::isEmpty), any(), any());
     }
 
     @Test
@@ -147,7 +149,7 @@ class StoreInventoryProviderTest {
         when(storeEntity.getOwnSupplierNames()).thenReturn(List.of());
         when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.of(30));
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.run(anyList(), any())).thenReturn(List.of());
+        when(autoDiscovery.run(anyList(), any(), any())).thenReturn(List.of());
 
         // when
         provider.get("store-1");
@@ -166,7 +168,7 @@ class StoreInventoryProviderTest {
         when(storeEntity.getOwnSupplierNames()).thenReturn(List.of());
         when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.run(anyList(), any())).thenReturn(List.of());
+        when(autoDiscovery.run(anyList(), any(), any())).thenReturn(List.of());
 
         // when
         provider.get("store-1");
@@ -185,7 +187,7 @@ class StoreInventoryProviderTest {
         when(storeEntity.getOwnSupplierNames()).thenReturn(List.of());
         when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.of(0));
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.run(anyList(), any())).thenReturn(List.of());
+        when(autoDiscovery.run(anyList(), any(), any())).thenReturn(List.of());
 
         // when
         provider.get("store-1");
@@ -267,7 +269,7 @@ class StoreInventoryProviderTest {
         InventoryItem ownItem = new InventoryItem("111", "AAA", 100.0, "PLN", 5, 2, "Action", true, true, false);
         when(storeFeedItemLoader.load(eq("store-1"), eq("Action"), same(descriptor), anyMap()))
                 .thenReturn(List.of(ownItem));
-        when(autoDiscovery.run(anyList(), any())).thenAnswer(inv -> {
+        when(autoDiscovery.run(anyList(), any(), any())).thenAnswer(inv -> {
             List<InventoryItem> items = inv.getArgument(0);
             return List.of(new MatchedInventory(new InventoryKey("111", "AAA"), items, taxonomyCache, supplierRegistry));
         });
@@ -281,6 +283,25 @@ class StoreInventoryProviderTest {
                 .toList();
         assertThat(loadedSuppliers).containsExactly("Action");
     }
+    @Test
+    void globalOffersWitnessTheStoreGrouping() {
+        // given
+        when(cache.get("store-1")).thenReturn(Optional.empty());
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.getOwnAndManualConnections()).thenReturn(List.of());
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of("PLN", 1.0));
+        List<InventoryItem> globalOffers = List.of(item("Asbis"));
+        when(globalInventory.allItems()).thenReturn(globalOffers);
+        when(autoDiscovery.run(anyList(), any(), any())).thenReturn(List.of());
+
+        // when
+        provider.get("store-1");
+
+        // then
+        verify(autoDiscovery).run(anyList(), any(), same(globalOffers));
+    }
+
     @org.junit.jupiter.api.BeforeEach
     void pimStoreViewIsTheCatalog() {
         org.mockito.Mockito.lenient().when(pimCatalog.withStoreData(org.mockito.ArgumentMatchers.any())).thenReturn(pimView);

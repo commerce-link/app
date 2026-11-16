@@ -1,5 +1,7 @@
 package pl.commercelink.inventory;
 
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.InventoryItem;
@@ -11,17 +13,26 @@ import pl.commercelink.taxonomy.TaxonomyCache;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Component
 class InventoryAutoDiscovery {
 
     private PimCatalog pimCatalog;
     private TaxonomyCache taxonomyCache;
     private SupplierRegistry supplierRegistry;
+    private InventoryMatchingProperties matchingProperties;
 
     public InventoryAutoDiscovery(PimCatalog pimCatalog, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
+        this(pimCatalog, taxonomyCache, supplierRegistry, InventoryMatchingProperties.allEnabled());
+    }
+
+    @Autowired
+    public InventoryAutoDiscovery(PimCatalog pimCatalog, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry,
+                                  InventoryMatchingProperties matchingProperties) {
         this.pimCatalog = pimCatalog;
         this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
+        this.matchingProperties = matchingProperties;
     }
 
     /*
@@ -34,7 +45,23 @@ class InventoryAutoDiscovery {
 
     /** @param pim the PIM view to match known entries in: a store's own inventory uses that store's view */
     Collection<MatchedInventory> run(List<InventoryItem> inventoryItems, PimView pim) {
-        SharedManufacturerCodes sharedCodes = SharedManufacturerCodes.of(inventoryItems);
+        return run(inventoryItems, pim, List.of());
+    }
+
+    /**
+     * @param witnesses offers of another scope that only confirm which keys belong together; they are never added to a group
+     */
+    Collection<MatchedInventory> run(List<InventoryItem> allOffers, PimView pim, Collection<InventoryItem> witnesses) {
+        SharedManufacturerCodes sharedCodes = SharedManufacturerCodes.of(allOffers);
+
+        ConflictingOffers conflicting = matchingProperties.excludeConflictingOffers()
+                ? ConflictingOffers.of(allOffers, witnesses, sharedCodes)
+                : ConflictingOffers.none();
+        List<InventoryItem> inventoryItems = allOffers;
+        if (conflicting.size() > 0) {
+            log.warn("Left {} offers out of grouping: their EAN and their brand with manufacturer code point to different products", conflicting.size());
+            inventoryItems = allOffers.stream().filter(offer -> !conflicting.contains(offer)).toList();
+        }
 
         // Build a mapping of EANs and product codes to inventory items for quick lookup
         Map<String, List<InventoryItem>> mappedByEan = new HashMap<>();

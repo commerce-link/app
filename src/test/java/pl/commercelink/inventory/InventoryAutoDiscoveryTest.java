@@ -3,7 +3,6 @@ package pl.commercelink.inventory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -35,11 +34,11 @@ class InventoryAutoDiscoveryTest {
     @Mock
     private SupplierRegistry supplierRegistry;
 
-    @InjectMocks
     private InventoryAutoDiscovery autoDiscovery;
 
     @BeforeEach
     void globalInventoryMatchesAgainstTheGlobalView() {
+        autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry, InventoryMatchingProperties.allEnabled());
         lenient().when(pimCatalog.withGlobalData()).thenReturn(pimView);
     }
 
@@ -461,6 +460,84 @@ class InventoryAutoDiscoveryTest {
             assertThat(m.getInventoryKey().getId()).isNull();
             assertThat(m.getInventoryItems()).containsExactly(action);
         });
+    }
+
+    @Test
+    void conflictingOfferIsLeftOutOfEveryGroup() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        InventoryItem kosatec7600 = item("4895106293618", "11324-01-20G", 1843, "Kosatec", "Sapphire");
+        InventoryItem kosatec9060 = item("4895106296381", "11350-03-20G", 2613, "Kosatec", "Sapphire");
+        InventoryItem incom9060 = item("4895106296381", "11350-03-20G", 2663, "IncomGroup", "Sapphire");
+        InventoryItem elko = item("4895106293618", "11350-03-20G", 3563, "Elko", "Sapphire");
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(
+                List.of(kosatec7600, kosatec9060, incom9060, elko), pimView, sapphireWitnesses());
+
+        // then
+        assertThat(result).flatExtracting(MatchedInventory::getInventoryItems).doesNotContain(elko);
+        assertThat(result).filteredOn(m -> m.getEans().contains("4895106296381")).singleElement()
+                .satisfies(m -> assertThat(m.getEans()).doesNotContain("4895106293618"));
+        assertThat(result).filteredOn(m -> m.getInventoryItems().contains(kosatec7600)).singleElement()
+                .satisfies(m -> assertThat(m.getInventoryItems()).containsExactly(kosatec7600));
+    }
+
+    @Test
+    void witnessesAreNeverPartOfTheReturnedGroups() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        InventoryItem own = item("4895106293618", "11324-01-20G", 1843, "Kosatec", "Sapphire");
+        List<InventoryItem> witnesses = sapphireWitnesses();
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(List.of(own), pimView, witnesses);
+
+        // then
+        assertThat(result).flatExtracting(MatchedInventory::getInventoryItems).containsExactly(own);
+    }
+
+    @Test
+    void pimEntryListingBothEansDoesNotBringTheConflictingOfferBack() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of(pimEntry("pim-1", "Sapphire",
+                gtin("4895106293618"), gtin("4895106296381"), mpn("11350-03-20G"))));
+        InventoryItem kosatec9060 = item("4895106296381", "11350-03-20G", 2613, "Kosatec", "Sapphire");
+        InventoryItem incom9060 = item("4895106296381", "11350-03-20G", 2663, "IncomGroup", "Sapphire");
+        InventoryItem elko = item("4895106293618", "11350-03-20G", 3563, "Elko", "Sapphire");
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(
+                List.of(kosatec9060, incom9060, elko), pimView, sapphireWitnesses());
+
+        // then
+        assertThat(result).flatExtracting(MatchedInventory::getInventoryItems).doesNotContain(elko);
+    }
+
+    @Test
+    void withTheSwitchOffTheConflictingOfferJoinsAsToday() {
+        // given
+        autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
+                new InventoryMatchingProperties(false, true, true));
+        when(pimView.findAll()).thenReturn(List.of());
+        InventoryItem kosatec9060 = item("4895106296381", "11350-03-20G", 2613, "Kosatec", "Sapphire");
+        InventoryItem incom9060 = item("4895106296381", "11350-03-20G", 2663, "IncomGroup", "Sapphire");
+        InventoryItem elko = item("4895106293618", "11350-03-20G", 3563, "Elko", "Sapphire");
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(
+                List.of(kosatec9060, incom9060, elko), pimView, sapphireWitnesses());
+
+        // then
+        assertThat(result).flatExtracting(MatchedInventory::getInventoryItems).contains(elko);
+    }
+
+    private List<InventoryItem> sapphireWitnesses() {
+        return List.of(
+                item("4895106293618", "11324-01-20G", 1800, "Asbis", "Sapphire"),
+                item("4895106293618", "11324-01-20G", 1810, "Morele", "Sapphire"),
+                item("4895106296381", "11350-03-20G", 2600, "Asbis", "Sapphire"),
+                item("4895106296381", "11350-03-20G", 2610, "Wave", "Sapphire"));
     }
 
     private InventoryItem item(String ean, String mfn, double netPrice, String supplier) {
