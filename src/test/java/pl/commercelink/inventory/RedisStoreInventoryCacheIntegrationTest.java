@@ -96,7 +96,7 @@ class RedisStoreInventoryCacheIntegrationTest {
         RedisStoreInventoryCache cache = cache();
 
         // when
-        cache.put("s1", sampleInventory(), Duration.ofMinutes(60));
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), cache.clockMillis());
         Optional<StoreInventory> result = cache.get("s1");
 
         // then
@@ -111,11 +111,70 @@ class RedisStoreInventoryCacheIntegrationTest {
         RedisStoreInventoryCache cache = cache();
 
         // when
-        cache.put("s1", sampleInventory(), Duration.ofMinutes(60));
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), cache.clockMillis());
 
         // then
         Long ttl = redisTemplate.getExpire("store-inventory:v2:s1");
         assertTrue(ttl != null && ttl > 0 && ttl <= 3600);
+    }
+
+    @Test
+    void buildThatStartedEarlierDoesNotReplaceALaterOne() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        long earlier = cache.clockMillis();
+        long later = earlier + 5_000;
+        cache.put("s1", largeInventory(2), Duration.ofMinutes(60), later);
+
+        // when
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), earlier);
+
+        // then
+        assertEquals(2, cache.get("s1").orElseThrow().items().size());
+    }
+
+    @Test
+    void buildThatStartedLaterReplacesAnEarlierOne() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        long earlier = cache.clockMillis();
+        cache.put("s1", largeInventory(2), Duration.ofMinutes(60), earlier);
+
+        // when
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), earlier + 5_000);
+
+        // then
+        assertEquals(1, cache.get("s1").orElseThrow().items().size());
+    }
+
+    @Test
+    void buildThatStartedBeforeAnEvictionIsNotStored() throws InterruptedException {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        long startedBeforeEviction = cache.clockMillis();
+        Thread.sleep(5);
+        cache.evict("s1");
+
+        // when
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), startedBeforeEviction);
+
+        // then
+        assertTrue(cache.get("s1").isEmpty());
+    }
+
+    @Test
+    void buildThatStartedAfterAnEvictionIsStored() throws InterruptedException {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        cache.put("s1", largeInventory(2), Duration.ofMinutes(60), cache.clockMillis());
+        cache.evict("s1");
+        Thread.sleep(5);
+
+        // when
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), cache.clockMillis());
+
+        // then
+        assertEquals(1, cache.get("s1").orElseThrow().items().size());
     }
 
     @Test
@@ -137,7 +196,7 @@ class RedisStoreInventoryCacheIntegrationTest {
                 .getBytes(StandardCharsets.UTF_8).length;
 
         // when
-        cache.put("big", large, Duration.ofMinutes(60));
+        cache.put("big", large, Duration.ofMinutes(60), cache.clockMillis());
         Optional<StoreInventory> result = cache.get("big");
 
         // then
