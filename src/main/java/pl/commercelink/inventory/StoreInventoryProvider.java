@@ -60,8 +60,10 @@ public class StoreInventoryProvider {
     }
 
     private StoreInventory buildAndCache(Store store, String storeId) {
+        // read before the feed files are: the cache keeps the inventory of the build that started last
+        long startedAt = cache.clockMillis();
         StoreInventory built = build(storeId, store);
-        cache.put(storeId, built, resolveTtl(store));
+        cache.put(storeId, built, resolveTtl(store), startedAt);
         return built;
     }
 

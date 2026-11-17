@@ -4,11 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -24,9 +27,11 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -67,10 +72,9 @@ class RedisStoreInventoryCacheTest {
     void getRehydratesStoredSnapshot() {
         // given
         RedisStoreInventoryCache cache = cache();
-        ArgumentCaptor<String> stored = ArgumentCaptor.forClass(String.class);
-        cache.put("s1", sampleInventory(), Duration.ofMinutes(60));
-        verify(valueOps).set(eq("store-inventory:v2:s1"), stored.capture(), eq(Duration.ofMinutes(60)));
-        when(valueOps.get("store-inventory:v2:s1")).thenReturn(stored.getValue());
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), 1_000L);
+        String stored = storedPayload();
+        when(valueOps.get("store-inventory:v2:s1")).thenReturn(stored);
 
         // when
         Optional<StoreInventory> result = cache.get("s1");
@@ -82,16 +86,70 @@ class RedisStoreInventoryCacheTest {
     }
 
     @Test
-    void writesValueWithProvidedPerKeyTtl() {
+    void putSendsTheBuildStartAndBothLifetimesWithTheSnapshot() {
         // given
         RedisStoreInventoryCache cache = cache();
         StoreInventory inventory = new StoreInventory(InventoryIndex.of(new ArrayList<>()), LocalDateTime.now());
 
         // when
-        cache.put("store-1", inventory, Duration.ofMinutes(15));
+        cache.put("store-1", inventory, Duration.ofMinutes(2880), 1_700_000_000_123L);
 
         // then
-        verify(valueOps).set(eq("store-inventory:v2:store-1"), anyString(), eq(Duration.ofMinutes(15)));
+        verify(redisTemplate).execute(any(RedisScript.class),
+                eq(List.of("store-inventory:v2:store-1", "store-inventory:v2:store-1:build-started")),
+                eq("1700000000123"), anyString(), eq("172800000"), eq("172800000"));
+    }
+
+    @Test
+    void buildStartMarkOfAShortLivedSnapshotStillLivesAnHour() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        StoreInventory inventory = new StoreInventory(InventoryIndex.of(new ArrayList<>()), LocalDateTime.now());
+
+        // when
+        cache.put("store-1", inventory, Duration.ofMinutes(15), 5L);
+
+        // then
+        verify(redisTemplate).execute(any(RedisScript.class), anyList(), eq("5"), anyString(), eq("900000"), eq("3600000"));
+    }
+
+    @Test
+    void evictMarksTheStoreBeforeDeletingTheSnapshot() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        when(redisTemplate.execute(any(RedisCallback.class))).thenReturn(4_242L);
+
+        // when
+        cache.evict("s1");
+
+        // then
+        InOrder order = inOrder(valueOps, redisTemplate);
+        order.verify(valueOps).set("store-inventory:v2:s1:build-started", "4242", Duration.ofHours(1));
+        order.verify(redisTemplate).delete("store-inventory:v2:s1");
+    }
+
+    @Test
+    void clockIsReadFromRedis() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        when(redisTemplate.execute(any(RedisCallback.class))).thenReturn(4_242L);
+
+        // when / then
+        assertEquals(4_242L, cache.clockMillis());
+    }
+
+    @Test
+    void clockFallsBackToTheInstanceWhenRedisFails() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        when(redisTemplate.execute(any(RedisCallback.class))).thenThrow(new RuntimeException("redis down"));
+        long before = System.currentTimeMillis();
+
+        // when
+        long clock = cache.clockMillis();
+
+        // then
+        assertTrue(clock >= before);
     }
 
     @Test
@@ -108,11 +166,11 @@ class RedisStoreInventoryCacheTest {
     void putSwallowsRedisFailure() {
         // given
         RedisStoreInventoryCache cache = cache();
-        doThrow(new RuntimeException("redis down")).when(valueOps)
-                .set(eq("store-inventory:v2:s1"), anyString(), eq(Duration.ofMinutes(60)));
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class)))
+                .thenThrow(new RuntimeException("redis down"));
 
         // when / then
-        assertDoesNotThrow(() -> cache.put("s1", sampleInventory(), Duration.ofMinutes(60)));
+        assertDoesNotThrow(() -> cache.put("s1", sampleInventory(), Duration.ofMinutes(60), 1L));
     }
 
     @Test
@@ -121,14 +179,18 @@ class RedisStoreInventoryCacheTest {
         RedisStoreInventoryCache cache = cache();
         StoreInventory inventory = largeInventory(2000);
         String rawJson = objectMapper.writeValueAsString(StoreInventorySnapshot.from(inventory));
-        ArgumentCaptor<String> stored = ArgumentCaptor.forClass(String.class);
 
         // when
-        cache.put("s1", inventory, Duration.ofMinutes(60));
+        cache.put("s1", inventory, Duration.ofMinutes(60), 1L);
 
         // then
-        verify(valueOps).set(eq("store-inventory:v2:s1"), stored.capture(), eq(Duration.ofMinutes(60)));
-        assertTrue(stored.getValue().length() < rawJson.length());
+        assertTrue(storedPayload().length() < rawJson.length());
+    }
+
+    private String storedPayload() {
+        ArgumentCaptor<Object[]> arguments = ArgumentCaptor.forClass(Object[].class);
+        verify(redisTemplate).execute(any(RedisScript.class), anyList(), arguments.capture());
+        return (String) arguments.getValue()[1];
     }
 
     private StoreInventory largeInventory(int count) {

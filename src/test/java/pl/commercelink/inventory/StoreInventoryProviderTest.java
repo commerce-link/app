@@ -36,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -93,7 +94,7 @@ class StoreInventoryProviderTest {
 
         // when / then
         assertSame(cached, provider.get("store-1"));
-        verify(cache, never()).put(any(), any(), any());
+        verify(cache, never()).put(any(), any(), any(), anyLong());
     }
 
     @Test
@@ -119,7 +120,7 @@ class StoreInventoryProviderTest {
 
         // then
         assertEquals(List.of(matched), result.items());
-        verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class));
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class), anyLong());
         verify(autoDiscovery).run(argThat(list -> list.size() == 1), any(), any());
     }
 
@@ -137,7 +138,28 @@ class StoreInventoryProviderTest {
 
         // then
         verify(cache, never()).get(any());
-        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(30)));
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(30)), anyLong());
+    }
+
+    @Test
+    void buildIsTimedBeforeTheFeedsAreRead() {
+        // given
+        when(cache.get("store-1")).thenReturn(Optional.empty());
+        when(cache.clockMillis()).thenReturn(4_242L);
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        when(autoDiscovery.run(anyList(), any())).thenReturn(List.of());
+
+        // when
+        provider.get("store-1");
+
+        // then
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(cache, exchangeRates);
+        order.verify(cache).clockMillis();
+        order.verify(exchangeRates).getCurrentSellRates();
+        order.verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class), eq(4_242L));
     }
 
     @Test
@@ -172,7 +194,7 @@ class StoreInventoryProviderTest {
         provider.get("store-1");
 
         // then
-        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(30)));
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(30)), anyLong());
     }
 
     @Test
@@ -191,7 +213,7 @@ class StoreInventoryProviderTest {
         provider.get("store-1");
 
         // then
-        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(60)));
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(60)), anyLong());
     }
 
     @Test
@@ -210,7 +232,7 @@ class StoreInventoryProviderTest {
         provider.get("store-1");
 
         // then
-        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(60)));
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(60)), anyLong());
     }
 
     @Test
@@ -224,7 +246,7 @@ class StoreInventoryProviderTest {
 
         // then
         assertEquals(0, result.items().size());
-        verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class));
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class), anyLong());
     }
 
     @Test
@@ -249,7 +271,7 @@ class StoreInventoryProviderTest {
         // then
         assertThat(result.all()).isEmpty();
         verify(cache, never()).get(any());
-        verify(cache, never()).put(any(), any(), any());
+        verify(cache, never()).put(any(), any(), any(), anyLong());
     }
 
     @Test
