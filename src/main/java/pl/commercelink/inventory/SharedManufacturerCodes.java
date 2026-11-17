@@ -13,14 +13,18 @@ import java.util.Set;
 /**
  * Manufacturer codes a supplier gives to several EANs of one brand. Such a code names a model (one code for every
  * size), the brand itself or a customs heading rather than a product, so offers under it join others only by EAN.
- * A code is shared per supplier: the same code at another supplier, with one EAN, still joins as before.
+ * A code is shared per supplier: for {@link #isShared} the same code at another supplier, with one EAN, still joins
+ * as before. The same pairs without the supplier, {@link #variantCodes}, are used to refuse a link between an own
+ * and a global group.
  */
 public final class SharedManufacturerCodes {
 
     private final Set<InventoryItem> offersUnderSharedCode;
+    private final VariantCodes variantCodes;
 
-    private SharedManufacturerCodes(Set<InventoryItem> offersUnderSharedCode) {
+    private SharedManufacturerCodes(Set<InventoryItem> offersUnderSharedCode, VariantCodes variantCodes) {
         this.offersUnderSharedCode = offersUnderSharedCode;
+        this.variantCodes = variantCodes;
     }
 
     public static SharedManufacturerCodes of(Collection<InventoryItem> offers) {
@@ -35,7 +39,7 @@ public final class SharedManufacturerCodes {
                 }
             }
         }
-        return new SharedManufacturerCodes(offersUnderSharedCode);
+        return new SharedManufacturerCodes(offersUnderSharedCode, variantCodes(sharedCodes));
     }
 
     public boolean isShared(InventoryItem offer) {
@@ -44,6 +48,22 @@ public final class SharedManufacturerCodes {
 
     public Set<InventoryItem> offersUnderSharedCode() {
         return Collections.unmodifiableSet(offersUnderSharedCode);
+    }
+
+    /** The brand and code of every per-supplier shared code, without the supplier. */
+    public VariantCodes variantCodes() {
+        return variantCodes;
+    }
+
+    private static VariantCodes variantCodes(Set<SupplierCode> sharedCodes) {
+        Set<VariantCodes.BrandCode> pairs = new HashSet<>();
+        for (SupplierCode code : sharedCodes) {
+            // a pair without a brand or a code names no product: it is never a variant code
+            if (code.brand() != null && code.mfn() != null) {
+                pairs.add(new VariantCodes.BrandCode(code.brand(), code.mfn()));
+            }
+        }
+        return VariantCodes.of(pairs);
     }
 
     private static Set<SupplierCode> sharedCodes(Collection<InventoryItem> offers) {

@@ -7,9 +7,10 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record InventoryMatchingProperties(
         @DefaultValue("true") boolean excludeConflictingOffers,
         @DefaultValue("true") boolean ignorePlaceholderEans,
-        @DefaultValue("true") boolean splitSingleCodeByPrice) {
+        @DefaultValue("true") boolean splitSingleCodeByPrice,
+        @DefaultValue("true") boolean linkOwnToGlobalByCode) {
 
     public static InventoryMatchingProperties allEnabled() {
-        return new InventoryMatchingProperties(true, true, true);
+        return new InventoryMatchingProperties(true, true, true, true);
     }
 }

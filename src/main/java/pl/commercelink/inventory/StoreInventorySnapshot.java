@@ -1,5 +1,6 @@
 package pl.commercelink.inventory;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.taxonomy.TaxonomyCache;
@@ -37,7 +38,9 @@ public record StoreInventorySnapshot(LocalDateTime builtAt, List<Entry> entries)
         }
     }
 
-    public record Entry(String id, InventoryKey key, List<ItemData> items) {
+    /** {@code linkedEans}: the link of an own group to a global group, absent (null) in older snapshots. */
+    public record Entry(String id, InventoryKey key, List<ItemData> items,
+                        @JsonInclude(JsonInclude.Include.NON_EMPTY) List<String> linkedEans) {
     }
 
     public static StoreInventorySnapshot from(StoreInventory inventory) {
@@ -46,7 +49,8 @@ public record StoreInventorySnapshot(LocalDateTime builtAt, List<Entry> entries)
             List<ItemData> items = matched.getInventoryItems().stream()
                     .map(ItemData::from)
                     .toList();
-            entries.add(new Entry(matched.getInventoryKey().getId(), matched.getInventoryKey(), items));
+            InventoryKey key = matched.getInventoryKey();
+            entries.add(new Entry(key.getId(), key, items, List.copyOf(key.getLinkedEans())));
         }
         return new StoreInventorySnapshot(inventory.builtAt(), entries);
     }
@@ -66,6 +70,9 @@ public record StoreInventorySnapshot(LocalDateTime builtAt, List<Entry> entries)
         InventoryKey key = new InventoryKey(entry.id());
         entry.key().getProductEans().forEach(key::addEan);
         entry.key().getProductCodes().forEach(key::addManufacturerCode);
+        if (entry.linkedEans() != null && !entry.linkedEans().isEmpty()) {
+            key.linkTo(entry.linkedEans());
+        }
         return key;
     }
 }

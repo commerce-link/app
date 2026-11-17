@@ -193,4 +193,24 @@ class InventoryStatisticsCalculatorTest {
         assertThat(stats.distinctProducts()).isEqualTo(1);
         assertThat(stats.bySupplier()).containsOnlyKeys("Elko", "Kosatec");
     }
+
+    @Test
+    void linkedOwnGroupCountsAsOneProductWithItsGlobalGroup() {
+        // given
+        MatchedInventory global = group("8720689010825", "QP1324/20", item("8720689010825", "QP1324/20", "MxSolution", 2));
+        MatchedInventory own = group("8720689021180", "QP1324/20",
+                item("8720689021180", "QP1324/20", "Action", 3), item("8720689021180", "QP1324/20", "Elko", 0));
+        InventoryIndex ownIndex = InventoryIndex.of(List.of(own));
+        ownIndex.link(own, global.getInventoryKey().getProductEans());
+
+        // when
+        InventoryStatistics stats = InventoryStatisticsCalculator.calculate(InventoryIndex.of(List.of(global)),
+                Set.of("MxSolution")::contains, ownIndex, STORE_ENTRY);
+
+        // then
+        assertThat(stats.distinctProducts()).isEqualTo(1);
+        assertThat(stats.productsInStock()).isEqualTo(1);
+        assertThat(stats.bySupplier()).containsOnlyKeys("MxSolution", "Action", "Elko");
+        assertThat(stats.bySupplier().get("Action")).isEqualTo(new SupplierOfferStats(1, 1));
+    }
 }

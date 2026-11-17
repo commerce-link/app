@@ -81,8 +81,9 @@ public class RedisStoreInventoryCache implements StoreInventoryCache {
         }
     }
 
-    // the version changes with the grouping of offers, so a snapshot grouped the old way is never read back
+    // the version changes with the grouping of offers (v3: links of own groups to global groups), so a snapshot
+    // grouped the old way is never read back
     private String key(String storeId) {
-        return "store-inventory:v2:" + storeId;
+        return "store-inventory:v3:" + storeId;
     }
 }

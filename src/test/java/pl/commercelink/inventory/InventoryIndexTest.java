@@ -10,6 +10,7 @@ import pl.commercelink.taxonomy.TaxonomyCache;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(MockitoExtension.class)
 class InventoryIndexTest {
@@ -111,5 +112,104 @@ class InventoryIndexTest {
         // when / then
         assertThat(index.contains(new InventoryKey("5901234567890", "OTHER"))).isTrue();
         assertThat(index.contains(new InventoryKey("0000000000000", "OTHER"))).isFalse();
+    }
+
+    private static final String GLOBAL_EAN = "8720689010825";
+    private static final String OWN_EAN = "8720689021180";
+
+    private MatchedInventory philipsGlobal() {
+        return group(new InventoryKey(GLOBAL_EAN, "QP1324/20"));
+    }
+
+    private MatchedInventory philipsOwn() {
+        return group(new InventoryKey(OWN_EAN, "QP1324/20"));
+    }
+
+    @Test
+    void linkedOwnGroupIsFoundByTheGlobalKey() {
+        // given
+        MatchedInventory global = philipsGlobal();
+        MatchedInventory own = philipsOwn();
+        InventoryIndex ownIndex = InventoryIndex.of(List.of(own));
+
+        // when
+        ownIndex.link(own, global.getInventoryKey().getProductEans());
+
+        // then
+        assertThat(ownIndex.findMatching(global.getInventoryKey())).containsExactly(own);
+        assertThat(ownIndex.contains(global.getInventoryKey())).isTrue();
+        assertThat(own.getInventoryKey().getLinkedEans()).containsExactly(GLOBAL_EAN);
+    }
+
+    @Test
+    void globalIndexCoversALinkedOwnKey() {
+        // given
+        MatchedInventory global = philipsGlobal();
+        MatchedInventory own = philipsOwn();
+        InventoryIndex globalIndex = InventoryIndex.of(List.of(global));
+        InventoryIndex ownIndex = InventoryIndex.of(List.of(own));
+        assertThat(globalIndex.covers(own.getInventoryKey(), id -> false)).isFalse();
+
+        // when
+        ownIndex.link(own, global.getInventoryKey().getProductEans());
+
+        // then
+        assertThat(globalIndex.covers(own.getInventoryKey(), id -> false)).isTrue();
+        assertThat(globalIndex.contains(own.getInventoryKey())).isTrue();
+        assertThat(globalIndex.findMatching(own.getInventoryKey())).containsExactly(global);
+    }
+
+    @Test
+    void matchesByEanComeBeforeLinkedOnes() {
+        // given
+        MatchedInventory global = philipsGlobal();
+        MatchedInventory linked = philipsOwn();
+        MatchedInventory sameEan = group(new InventoryKey(GLOBAL_EAN, "OTHER"));
+        InventoryIndex ownIndex = InventoryIndex.of(List.of(linked, sameEan));
+        ownIndex.link(linked, global.getInventoryKey().getProductEans());
+
+        // when / then
+        assertThat(ownIndex.findMatching(global.getInventoryKey())).containsExactly(sameEan, linked);
+    }
+
+    @Test
+    void indexBuiltFromKeysThatAlreadyCarryALinkFindsThem() {
+        // given
+        MatchedInventory global = philipsGlobal();
+        MatchedInventory own = philipsOwn();
+        InventoryIndex.of(List.of(own)).link(own, global.getInventoryKey().getProductEans());
+
+        // when
+        InventoryIndex rebuilt = InventoryIndex.of(List.of(own));
+
+        // then
+        assertThat(rebuilt.findMatching(global.getInventoryKey())).containsExactly(own);
+        assertThat(rebuilt.contains(InventoryKey.fromEan(GLOBAL_EAN))).isTrue();
+    }
+
+    @Test
+    void withoutLinksLookupsAreUnchanged() {
+        // given
+        MatchedInventory global = philipsGlobal();
+        MatchedInventory own = philipsOwn();
+        InventoryIndex ownIndex = InventoryIndex.of(List.of(own));
+        InventoryIndex globalIndex = InventoryIndex.of(List.of(global));
+
+        // when / then
+        assertThat(ownIndex.findMatching(global.getInventoryKey())).isEmpty();
+        assertThat(ownIndex.contains(global.getInventoryKey())).isFalse();
+        assertThat(globalIndex.findMatching(own.getInventoryKey())).isEmpty();
+        assertThat(globalIndex.covers(own.getInventoryKey(), id -> false)).isFalse();
+        assertThat(ownIndex.findMatching(own.getInventoryKey())).containsExactly(own);
+    }
+
+    @Test
+    void linkingAGroupOfAnotherIndexIsRejected() {
+        // given
+        InventoryIndex ownIndex = InventoryIndex.of(List.of(philipsOwn()));
+
+        // when / then
+        assertThatThrownBy(() -> ownIndex.link(philipsOwn(), List.of(GLOBAL_EAN)))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }
