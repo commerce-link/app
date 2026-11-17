@@ -163,58 +163,38 @@ class StoreInventoryProviderTest {
     }
 
     @Test
-    void recentSnapshotIsKeptLongerWithoutARebuild() {
+    void recentSnapshotIsKeptWithoutBeingReadOrRebuilt() {
         // given
         Store storeEntity = mock(Store.class);
         when(storesRepository.findById("store-1")).thenReturn(storeEntity);
         when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.of(30));
-        when(cache.get("store-1")).thenReturn(Optional.of(
-                new StoreInventory(InventoryIndex.of(new LinkedList<>()), LocalDateTime.now().minusHours(23))));
+        when(cache.keepIfBuiltWithin("store-1", Duration.ofHours(24), Duration.ofMinutes(30))).thenReturn(true);
 
         // when
         provider.keepOrRefresh("store-1");
 
         // then
-        verify(cache).extend("store-1", Duration.ofMinutes(30));
+        verify(cache, never()).get(any());
         verify(cache, never()).put(any(), any(), any(), anyLong());
         verify(autoDiscovery, never()).run(anyList(), any());
     }
 
     @Test
-    void snapshotOlderThanADayIsRebuiltInsteadOfKept() {
+    void snapshotThatWasNotKeptIsRebuilt() {
         // given
         Store storeEntity = mock(Store.class);
         when(storesRepository.findById("store-1")).thenReturn(storeEntity);
         when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
         when(autoDiscovery.run(anyList(), any())).thenReturn(List.of());
-        when(cache.get("store-1")).thenReturn(Optional.of(
-                new StoreInventory(InventoryIndex.of(new LinkedList<>()), LocalDateTime.now().minusHours(25))));
+        when(cache.keepIfBuiltWithin(eq("store-1"), any(), any())).thenReturn(false);
 
         // when
         provider.keepOrRefresh("store-1");
 
         // then
+        verify(cache, never()).get(any());
         verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class), anyLong());
-        verify(cache, never()).extend(any(), any());
-    }
-
-    @Test
-    void missingSnapshotIsBuiltInsteadOfKept() {
-        // given
-        Store storeEntity = mock(Store.class);
-        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
-        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
-        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.run(anyList(), any())).thenReturn(List.of());
-        when(cache.get("store-1")).thenReturn(Optional.empty());
-
-        // when
-        provider.keepOrRefresh("store-1");
-
-        // then
-        verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class), anyLong());
-        verify(cache, never()).extend(any(), any());
     }
 
     @Test

@@ -65,13 +65,7 @@ public class StoreInventoryProvider {
     // though, since its prices carry the exchange rates of the day it was built.
     public void keepOrRefresh(String storeId) {
         Store store = storesRepository.findById(storeId);
-        boolean recent = cache.get(storeId)
-                .map(StoreInventory::builtAt)
-                .filter(builtAt -> builtAt.isAfter(LocalDateTime.now().minus(MAX_AGE_OF_KEPT_SNAPSHOT)))
-                .isPresent();
-        if (recent) {
-            cache.extend(storeId, resolveTtl(store));
-        } else {
+        if (!cache.keepIfBuiltWithin(storeId, MAX_AGE_OF_KEPT_SNAPSHOT, resolveTtl(store))) {
             buildAndCache(store, storeId);
         }
     }
