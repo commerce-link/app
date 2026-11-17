@@ -410,4 +410,58 @@ class GroupInventorySourceTest {
         // then
         assertThat(result.isEmpty()).isTrue();
     }
+
+    private static final String GLOBAL_EAN = "8720689010825";
+    private static final String OWN_EAN = "8720689021180";
+
+    private InventoryItem philips(String ean, String supplier, double price) {
+        return new InventoryItem("Philips", null, ean, "QP1324/20", supplier, price, "PLN", 5, 1, true, true, false);
+    }
+
+    private MatchedInventory philipsGlobal() {
+        return group(new InventoryKey(GLOBAL_EAN, "QP1324/20"), philips(GLOBAL_EAN, "MxSolution", 107.11));
+    }
+
+    private MatchedInventory philipsOwn() {
+        return group(new InventoryKey(OWN_EAN, "QP1324/20"),
+                philips(OWN_EAN, "Action", 75.00), philips(OWN_EAN, "Elko", 65.76));
+    }
+
+    @Test
+    void ownGroupLinkedToTheRowIsMergedWhenNothingMatchesByEan() {
+        // given
+        MatchedInventory global = philipsGlobal();
+        MatchedInventory own = philipsOwn();
+        InventoryIndex ownIndex = InventoryIndex.of(List.of(own));
+        ownIndex.link(own, global.getInventoryKey().getProductEans());
+        GroupInventorySource source = GroupInventorySource.own(ownIndex);
+        InventoryKey lookupKey = global.getInventoryKey().copy();
+        MatchedInventory result = accumulator(lookupKey);
+
+        // when
+        source.mergeInto(result, lookupKey);
+
+        // then
+        assertThat(result.getSuppliers()).containsExactlyInAnyOrder("Action", "Elko");
+        assertThat(result.getInventoryKey().getLinkedEans()).containsExactly(GLOBAL_EAN);
+    }
+
+    @Test
+    void groupMatchedByEanWinsOverALinkedOne() {
+        // given
+        MatchedInventory global = philipsGlobal();
+        MatchedInventory linked = philipsOwn();
+        MatchedInventory byEan = group(new InventoryKey(GLOBAL_EAN, "QP1324/20"), philips(GLOBAL_EAN, "Kosatec", 99.0));
+        InventoryIndex ownIndex = InventoryIndex.of(List.of(linked, byEan));
+        ownIndex.link(linked, global.getInventoryKey().getProductEans());
+        GroupInventorySource source = GroupInventorySource.own(ownIndex);
+        InventoryKey lookupKey = global.getInventoryKey().copy();
+        MatchedInventory result = accumulator(lookupKey);
+
+        // when
+        source.mergeInto(result, lookupKey);
+
+        // then
+        assertThat(result.getSuppliers()).containsExactly("Kosatec");
+    }
 }

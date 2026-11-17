@@ -362,6 +362,31 @@ class InventoryBrowseTest {
         assertThat(facets.bySupplier()).containsOnly(entry("AB", 1));
     }
 
+    @Test
+    void linkedOwnGroupIsBrowsedInsideItsGlobalProduct() {
+        // given
+        when(store.getGlobalSupplierNames()).thenReturn(List.of("MxSolution"));
+        MatchedInventory global = product("8720689010825", "QP1324/20", "Philips QP1324/20", "31",
+                item("8720689010825", "QP1324/20", "MxSolution", 107.11, 4));
+        MatchedInventory ownGroup = product("8720689021180", "QP1324/20", "Philips QP1324/20", "31",
+                item("8720689021180", "QP1324/20", "Action", 75.00, 2),
+                item("8720689021180", "QP1324/20", "Elko", 65.76, 1));
+        // the link lives in the group's key; the store's own index is rebuilt from `own` on every call and picks it up
+        InventoryIndex.of(List.of(ownGroup)).link(ownGroup, global.getInventoryKey().getProductEans());
+        this.global.replace(List.of(global));
+        own.add(ownGroup);
+
+        // when
+        BrowseResult result = browse.browse(STORE_ID, BrowseCriteria.all());
+
+        // then
+        assertThat(result.total()).isEqualTo(1);
+        BrowseRow row = result.rows().get(0);
+        assertThat(row.suppliers()).isEqualTo(3);
+        assertThat(row.qty()).isEqualTo(7);
+        assertThat(row.lowestSupplier()).isEqualTo("Elko");
+    }
+
     private MatchedInventory product(String ean, String mfn, String name, String categoryId, InventoryItem... items) {
         InventoryKey key = new InventoryKey(ean, mfn);
         Taxonomy taxonomy = new Taxonomy(ean, mfn, "Brand", name, "Kategoria " + categoryId, 1, null, null, null, categoryId);

@@ -23,4 +23,15 @@ final class PriceSplitThresholds {
     static boolean isTooLowToSplit(double splitPrice) {
         return splitPrice < MIN_SPLIT_PRICE;
     }
+
+    /**
+     * Whether two average prices are further apart than MAX_RATIO; a non-positive or NaN price is always too far
+     * (fail-safe: NaN fails every comparison, so without the explicit check it would count as close).
+     */
+    static boolean areTooFarApart(double averagePrice, double otherAveragePrice) {
+        if (Double.isNaN(averagePrice) || Double.isNaN(otherAveragePrice) || averagePrice <= 0 || otherAveragePrice <= 0) {
+            return true;
+        }
+        return Math.max(averagePrice, otherAveragePrice) / Math.min(averagePrice, otherAveragePrice) > MAX_RATIO;
+    }
 }

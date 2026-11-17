@@ -83,8 +83,8 @@ public class Inventory {
     }
 
     private void load(List<InventoryItem> items) {
-        Collection<MatchedInventory> autoDiscoveredItems = autoDiscovery.run(items);
-        globalInventory.replace(autoDiscoveredItems);
+        InventoryAutoDiscovery.Grouping grouping = autoDiscovery.group(items, pimCatalog.withGlobalData(), List::of, VariantCodes.none());
+        globalInventory.replace(grouping.groups(), grouping.variantCodes());
     }
 
     public InventoryView withGlobalData() {

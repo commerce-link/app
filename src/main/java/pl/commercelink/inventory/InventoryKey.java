@@ -4,10 +4,13 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.products.Product;
+import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.*;
 
@@ -20,6 +23,10 @@ public class InventoryKey {
     private Set<String> eans = new HashSet<>();
     @JsonProperty("productCodes")
     private Set<String> productCodes = new HashSet<>();
+    // EANs of the global group this own group was linked to (same product under other EANs). Never part of the key's
+    // JSON: it travels in the store snapshot only. Always an immutable set, shared freely between copies.
+    @JsonIgnore
+    private Set<String> linkedEans = Set.of();
 
     public InventoryKey() {
     }
@@ -56,6 +63,30 @@ public class InventoryKey {
         }
         eans.addAll(other.eans);
         productCodes.addAll(other.productCodes);
+        if (!other.linkedEans.isEmpty() && !linkedEans.containsAll(other.linkedEans)) {
+            Set<String> union = new HashSet<>(linkedEans);
+            union.addAll(other.linkedEans);
+            linkedEans = Set.copyOf(union);
+        }
+    }
+
+    /** Links this key to the global group with the given EANs, replacing any previous link. */
+    void linkTo(Collection<String> globalEans) {
+        linkedEans = globalEans.stream()
+                .filter(Objects::nonNull)
+                .map(UnifiedProductIdentifiers::unifyEan)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    @JsonIgnore
+    public Collection<String> getLinkedEans() {
+        return linkedEans;
+    }
+
+    /** Whether one of the two keys is linked to the other: its linked EANs hit the other's EANs. */
+    public boolean isLinkedWith(InventoryKey other) {
+        return hasAnyEan(other.linkedEans) || other.hasAnyEan(linkedEans);
     }
 
     public boolean matches(InventoryKey other) {
@@ -116,6 +147,7 @@ public class InventoryKey {
         copy.id = id;
         copy.eans = new HashSet<>(eans);
         copy.productCodes = new HashSet<>(productCodes);
+        copy.linkedEans = linkedEans;
         return copy;
     }
 
@@ -125,6 +157,7 @@ public class InventoryKey {
                 "id=" + id +
                 "eans=" + eans +
                 ", productCodes=" + productCodes +
+                (linkedEans.isEmpty() ? "" : ", linkedEans=" + linkedEans) +
                 '}';
     }
 

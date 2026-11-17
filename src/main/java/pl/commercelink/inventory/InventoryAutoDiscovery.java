@@ -54,7 +54,27 @@ class InventoryAutoDiscovery {
      *                  Fetched only when the conflicting-offer guard runs, since the global inventory is large.
      */
     Collection<MatchedInventory> run(List<InventoryItem> allOffers, PimView pim, Supplier<? extends Collection<InventoryItem>> witnesses) {
+        return group(allOffers, pim, witnesses, VariantCodes.none()).groups();
+    }
+
+    /**
+     * The groups of one pool together with its variant codes: the pairs some supplier of the pool (or of an inherited
+     * wider pool) lists under several EANs. The codes do not shape the groups; they are returned for linking own
+     * groups to global ones.
+     */
+    record Grouping(Collection<MatchedInventory> groups, VariantCodes variantCodes) {
+    }
+
+    /**
+     * @param inherited variant codes of a wider pool (a store inherits the global ones); they do not influence the
+     *                  groups, only the returned variant codes
+     * @return the groups and the variant codes of this pool united with the inherited ones, used to link own groups
+     *         to global ones
+     */
+    Grouping group(List<InventoryItem> allOffers, PimView pim,
+                   Supplier<? extends Collection<InventoryItem>> witnesses, VariantCodes inherited) {
         SharedManufacturerCodes sharedCodes = SharedManufacturerCodes.of(allOffers);
+        VariantCodes variantCodes = sharedCodes.variantCodes().plus(inherited);
 
         ConflictingOffers conflicting = matchingProperties.excludeConflictingOffers() && !allOffers.isEmpty()
                 ? ConflictingOffers.of(allOffers, witnesses.get(), sharedCodes)
@@ -128,7 +148,7 @@ class InventoryAutoDiscovery {
             }
         }
 
-        return processMatchedInventoryCandidates(keyToMatchedInventory.values());
+        return new Grouping(processMatchedInventoryCandidates(keyToMatchedInventory.values()), variantCodes);
     }
 
     private static Collection<InventoryItem> findItemsByKeysModifyingCollection(Collection<String> keys, Map<String, List<InventoryItem>> col) {

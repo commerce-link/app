@@ -210,6 +210,6 @@ class BrowseIndexHolderTest {
     }
 
     private GlobalMatchedInventory.Generation generation() {
-        return new GlobalMatchedInventory.Generation(global.version(), List.of(), InventoryIndex.of(List.of()));
+        return new GlobalMatchedInventory.Generation(global.version(), List.of(), InventoryIndex.of(List.of()), VariantCodes.none());
     }
 }
