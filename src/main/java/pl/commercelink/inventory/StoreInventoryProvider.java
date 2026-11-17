@@ -55,6 +55,10 @@ public class StoreInventoryProvider {
         return cache.get(storeId).orElseGet(() -> buildAndCache(store, storeId));
     }
 
+    public void refresh(String storeId) {
+        buildAndCache(storesRepository.findById(storeId), storeId);
+    }
+
     private StoreInventory buildAndCache(Store store, String storeId) {
         StoreInventory built = build(storeId, store);
         cache.put(storeId, built, resolveTtl(store));

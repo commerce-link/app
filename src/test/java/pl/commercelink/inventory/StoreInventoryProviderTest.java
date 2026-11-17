@@ -124,6 +124,23 @@ class StoreInventoryProviderTest {
     }
 
     @Test
+    void refreshRebuildsAndOverwritesWithoutReadingTheSnapshot() {
+        // given
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.of(30));
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        when(autoDiscovery.run(anyList(), any())).thenReturn(List.of());
+
+        // when
+        provider.refresh("store-1");
+
+        // then
+        verify(cache, never()).get(any());
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(30)));
+    }
+
+    @Test
     void buildsWithEmptyListWhenNoOwnSuppliers() {
         // given
         when(cache.get("store-1")).thenReturn(Optional.empty());
