@@ -43,6 +43,7 @@ class StoreInventoryProviderManualTest {
     @Mock pl.commercelink.pim.api.PimCatalog pimCatalog;
     @Mock
     private PimView pimView;
+    @Mock GlobalMatchedInventory globalInventory;
     @InjectMocks StoreInventoryProvider provider;
 
     @Captor ArgumentCaptor<SupplierProviderDescriptor> descriptorCaptor;
@@ -59,7 +60,7 @@ class StoreInventoryProviderManualTest {
 
         when(cache.get("store-1")).thenReturn(java.util.Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.run(any(), any())).thenReturn(List.of());
+        when(autoDiscovery.run(any(), any(), any())).thenReturn(List.of());
         when(storeFeedItemLoader.load(eq("store-1"), any(String.class), any(SupplierProviderDescriptor.class), any()))
                 .thenReturn(List.of());
 
@@ -87,7 +88,7 @@ class StoreInventoryProviderManualTest {
 
         when(cache.get("store-1")).thenReturn(java.util.Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.run(any(), any())).thenReturn(List.of());
+        when(autoDiscovery.run(any(), any(), any())).thenReturn(List.of());
         when(storeFeedItemLoader.load(eq("store-1"), any(String.class), any(SupplierProviderDescriptor.class), any()))
                 .thenReturn(List.of());
 

@@ -34,6 +34,7 @@ public class StoreInventoryProvider {
     private final StoreFeedItemLoader storeFeedItemLoader;
     private final ExchangeRates exchangeRates;
     private final PimCatalog pimCatalog;
+    private final GlobalMatchedInventory globalInventory;
 
     @Value("${inventory.store-cache.ttl-minutes}")
     long defaultTtlMinutes;
@@ -86,7 +87,7 @@ public class StoreInventoryProvider {
             }
         }
 
-        return new StoreInventory(InventoryIndex.of(autoDiscovery.run(ownItems, pimCatalog.withStoreData(storeId))), LocalDateTime.now());
+        return new StoreInventory(InventoryIndex.of(autoDiscovery.run(ownItems, pimCatalog.withStoreData(storeId), globalInventory::allItems)), LocalDateTime.now());
     }
 
     private SupplierProviderDescriptor descriptorFor(StoreSupplierConnection connection) {

@@ -23,9 +23,11 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.AdditionalAnswers.returnsFirstArg;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.never;
@@ -47,6 +49,8 @@ class FeedProcessingTest {
 
     private static final SupplierInfo ACME = new SupplierInfo("Acme", SupplierType.Distributor, 5, "PL",
             new ShippingPolicy(new ShippingTerms(1, new ShippingCostPolicy.Free())));
+
+    private static final String PLACEHOLDER_EAN = "9999999999994";
 
     private final InventoryItem sellableItem =
             new InventoryItem("1234567890123", "MFN-1", 10.0, "PLN", 5, 1, "Acme", true);
@@ -85,7 +89,7 @@ class FeedProcessingTest {
         DataCorrection realCorrection = new DataCorrection(pimWithoutTheProduct, new BrandMapper(pimWithoutTheProduct));
         when(enrichment.enrichFromOwnRecord(any()))
                 .thenAnswer(invocation -> invocation.<Taxonomy>getArgument(0).withCategory("Kable", "120"));
-        FeedProcessing processing = new FeedProcessing(realCorrection, taxonomyCache, enrichment, stats, 0);
+        FeedProcessing processing = new FeedProcessing(realCorrection, taxonomyCache, enrichment, stats, 0, true);
 
         // when
         processing.add(ParsedRow.of(feedItemWithBrand("No Name"), ACME));
@@ -386,8 +390,170 @@ class FeedProcessingTest {
         verify(taxonomyCache).add(eq(StoreFeedTaxonomy.deprioritized(categorizedTaxonomy, 1000)));
     }
 
+    @Test
+    void offersUnderAPlaceholderEanAreNotImported() {
+        // given
+        when(dataCorrection.run(any(InventoryItem.class))).then(returnsFirstArg());
+        FeedProcessing processing = processing(true);
+
+        // when
+        processing.add(row(PLACEHOLDER_EAN, "ZT51042-T1E0000Z", "Cable A"));
+        processing.add(row(PLACEHOLDER_EAN, "ZT61046-T0E01C0Z", "Cable B"));
+        processing.add(row(PLACEHOLDER_EAN, "CBL-DC-392A1-02", "Cable C"));
+        List<InventoryItem> result = processing.finish();
+
+        // then
+        assertTrue(result.isEmpty());
+        verify(taxonomyCache, never()).add(any());
+        verify(stats, times(3)).markInvalid();
+        verify(stats, never()).markImported();
+    }
+
+    @Test
+    void placeholderOfferCompletedFromPimIsImported() {
+        // given
+        givenTaxonomyIsBuiltFromTheOffer("Kable");
+        when(dataCorrection.run(any(InventoryItem.class))).thenAnswer(invocation -> {
+            InventoryItem offer = invocation.getArgument(0);
+            return "ZT51042-T1E0000Z".equals(offer.mfn()) ? offer.withBrandAndEan(offer.brand(), "5901234567801") : offer;
+        });
+        FeedProcessing processing = processing(true);
+        processing.add(row(PLACEHOLDER_EAN, "ZT51042-T1E0000Z", "Cable A"));
+        processing.add(row(PLACEHOLDER_EAN, "ZT61046-T0E01C0Z", "Cable B"));
+        processing.add(row(PLACEHOLDER_EAN, "CBL-DC-392A1-02", "Cable C"));
+
+        // when
+        List<InventoryItem> result = processing.finish();
+
+        // then
+        assertEquals(1, result.size());
+        assertEquals("5901234567801", result.get(0).ean());
+        ArgumentCaptor<InventoryItem> corrected = ArgumentCaptor.forClass(InventoryItem.class);
+        verify(dataCorrection, times(3)).run(corrected.capture());
+        corrected.getAllValues().forEach(offer -> assertNull(offer.ean()));
+        verify(stats, times(2)).markInvalid();
+        verify(stats, times(1)).markImported();
+    }
+
+    @Test
+    void onlyRowsInStockCountTowardsAPlaceholderEan() {
+        // given
+        when(dataCorrection.run(any(InventoryItem.class))).then(returnsFirstArg());
+        givenTaxonomyIsBuiltFromTheOffer("Kable");
+        FeedProcessing placeholder = processing(true);
+        placeholder.add(row(PLACEHOLDER_EAN, "ZT51042-T1E0000Z", "Cable A"));
+        placeholder.add(row(PLACEHOLDER_EAN, "ZT61046-T0E01C0Z", "Cable B"));
+        placeholder.add(row(PLACEHOLDER_EAN, "CBL-DC-392A1-02", "Cable C"));
+        FeedProcessing aliased = processing(true);
+        aliased.add(row("5901234567801", "MAGFORGE100M", "Case"));
+        aliased.add(row("5901234567801", "306-7G03M49-809", "Case"));
+        aliased.skipInvalid();
+
+        // when
+        List<InventoryItem> rejected = placeholder.finish();
+        List<InventoryItem> imported = aliased.finish();
+
+        // then
+        assertTrue(rejected.isEmpty());
+        assertEquals(2, imported.size());
+    }
+
+    @Test
+    void placeholderEanReturnedByPimIsStillRejected() {
+        // given
+        when(dataCorrection.run(any(InventoryItem.class)))
+                .thenAnswer(invocation -> invocation.<InventoryItem>getArgument(0).withBrandAndEan("Brand", PLACEHOLDER_EAN));
+        FeedProcessing processing = processing(true);
+
+        // when
+        processing.add(row(PLACEHOLDER_EAN, "ZT51042-T1E0000Z", "Cable A"));
+        processing.add(row(PLACEHOLDER_EAN, "ZT61046-T0E01C0Z", "Cable B"));
+        processing.add(row(PLACEHOLDER_EAN, "CBL-DC-392A1-02", "Cable C"));
+        List<InventoryItem> result = processing.finish();
+
+        // then
+        assertTrue(result.isEmpty());
+        verify(taxonomyCache, never()).add(any());
+        verify(stats, times(3)).markInvalid();
+    }
+
+    @Test
+    void twoCodesUnderOneEanAreImportedAsToday() {
+        // given
+        givenRowsAreTakenAsTheyCome();
+        when(enrichment.enrich(any())).then(returnsFirstArg());
+        when(enrichment.isPendingEligible(any())).thenReturn(false);
+        FeedProcessing processing = processing(true);
+
+        // when
+        processing.add(row(PLACEHOLDER_EAN, "A-1", "Cable A"));
+        processing.add(row(PLACEHOLDER_EAN, "B-2", "Cable B"));
+        processing.finish();
+
+        // then
+        verify(stats, never()).markInvalid();
+        verify(dataCorrection, times(2)).run(any(InventoryItem.class));
+        verify(dataCorrection, times(2)).run(any(SupplierProduct.class), argThat(offer -> PLACEHOLDER_EAN.equals(offer.ean())));
+    }
+
+    @Test
+    void withTheSwitchOffPlaceholderEansAreImportedAsToday() {
+        // given
+        givenRowsAreTakenAsTheyCome();
+        when(enrichment.enrich(any())).then(returnsFirstArg());
+        when(enrichment.isPendingEligible(any())).thenReturn(false);
+        FeedProcessing processing = processing(false);
+
+        // when
+        processing.add(row(PLACEHOLDER_EAN, "ZT51042-T1E0000Z", "Cable A"));
+        processing.add(row(PLACEHOLDER_EAN, "ZT61046-T0E01C0Z", "Cable B"));
+        processing.add(row(PLACEHOLDER_EAN, "CBL-DC-392A1-02", "Cable C"));
+        processing.finish();
+
+        // then
+        verify(stats, never()).markInvalid();
+        verify(dataCorrection, times(3)).run(any(SupplierProduct.class), argThat(offer -> PLACEHOLDER_EAN.equals(offer.ean())));
+    }
+
+    @Test
+    void withTheSwitchOffRowsAreProcessedAsTheyArrive() {
+        // given
+        givenRowsAreTakenAsTheyCome();
+        FeedProcessing processing = processing(false);
+
+        // when
+        processing.add(row(PLACEHOLDER_EAN, "A-1", "Cable A"));
+
+        // then
+        verify(dataCorrection).run(any(InventoryItem.class));
+        verify(stats, never()).log();
+    }
+
+    @Test
+    void offerWithoutBrandUnderAPlaceholderEanIsRejectedWithoutError() {
+        // given
+        PimCatalog pimWithoutTheProduct = ScopedPimCatalog.of();
+        DataCorrection realCorrection = new DataCorrection(pimWithoutTheProduct, new BrandMapper(pimWithoutTheProduct));
+        FeedProcessing processing = new FeedProcessing(realCorrection, taxonomyCache, enrichment, stats, 0, true);
+
+        // when
+        processing.add(ParsedRow.of(feedItem(PLACEHOLDER_EAN, "ZT51042-T1E0000Z", null), ACME));
+        processing.add(ParsedRow.of(feedItem(PLACEHOLDER_EAN, "ZT61046-T0E01C0Z", null), ACME));
+        processing.add(ParsedRow.of(feedItem(PLACEHOLDER_EAN, "CBL-DC-392A1-02", null), ACME));
+        List<InventoryItem> result = processing.finish();
+
+        // then
+        assertTrue(result.isEmpty());
+        verify(stats, times(3)).markInvalid();
+        verify(taxonomyCache, never()).add(any());
+    }
+
     private FeedProcessing processing(int taxonomyPenalty) {
-        return new FeedProcessing(dataCorrection, taxonomyCache, enrichment, stats, taxonomyPenalty);
+        return new FeedProcessing(dataCorrection, taxonomyCache, enrichment, stats, taxonomyPenalty, true);
+    }
+
+    private FeedProcessing processing(boolean ignorePlaceholderEans) {
+        return new FeedProcessing(dataCorrection, taxonomyCache, enrichment, stats, 0, ignorePlaceholderEans);
     }
 
     private void givenAPendingRow() {
@@ -399,18 +565,30 @@ class FeedProcessingTest {
 
     private void givenRowsAreTakenAsTheyCome() {
         when(dataCorrection.run(any(InventoryItem.class))).then(returnsFirstArg());
+        givenTaxonomyIsBuiltFromTheOffer();
+    }
+
+    private void givenTaxonomyIsBuiltFromTheOffer() {
+        givenTaxonomyIsBuiltFromTheOffer(null);
+    }
+
+    private void givenTaxonomyIsBuiltFromTheOffer(String category) {
         when(dataCorrection.run(any(SupplierProduct.class), any(InventoryItem.class))).thenAnswer(invocation -> {
             SupplierProduct product = invocation.getArgument(0);
             InventoryItem offer = invocation.getArgument(1);
-            return new Taxonomy(offer.ean(), offer.mfn(), offer.brand(), product.name(), null, 5, null, null);
+            return new Taxonomy(offer.ean(), offer.mfn(), offer.brand(), product.name(), category, 5, null, null);
         });
         when(enrichment.enrichFromOwnRecord(any())).then(returnsFirstArg());
     }
 
     private static FeedItem feedItemWithBrand(String brand) {
+        return feedItem("5901234567890", "KAB-HDMI-2M", brand);
+    }
+
+    private static FeedItem feedItem(String ean, String mfn, String brand) {
         return new FeedItem() {
-            public String getEan() { return "5901234567890"; }
-            public String getMfn() { return "KAB-HDMI-2M"; }
+            public String getEan() { return ean; }
+            public String getMfn() { return mfn; }
             public String getBrand() { return brand; }
             public String getName() { return "Kabel HDMI 2 m"; }
             public String getCategory() { return "Kable"; }
