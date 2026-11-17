@@ -30,7 +30,8 @@ public class ItemHistoryPageFactory {
 
     private static final String SEP = " · ";
     private static final Set<FulfilmentStatus> ITEM_STATUS_WORTH_SAYING =
-            EnumSet.of(FulfilmentStatus.Returned, FulfilmentStatus.Replaced, FulfilmentStatus.InRMA, FulfilmentStatus.Destroyed);
+            EnumSet.of(FulfilmentStatus.Returned, FulfilmentStatus.Replaced, FulfilmentStatus.InRMA, FulfilmentStatus.Destroyed,
+                    FulfilmentStatus.Cancelled);
 
     private final MessageSource messages;
 

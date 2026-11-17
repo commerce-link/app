@@ -9,6 +9,7 @@ import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentSource;
@@ -22,6 +23,7 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * The Payments page (spec docs/active/payments-redesign): reads the store's unpaid deliveries and its open orders
@@ -38,12 +40,25 @@ public class PaymentsModelFactory {
     private final SupplierLabels supplierLabels;
     private final MessageSource messages;
 
+    static final int CANCELLED_ORDERS_WINDOW_DAYS = 90;
+
+    /**
+     * A cancelled order keeps the customer's payments, so it stays here until the refund is recorded. Limited to the
+     * orders placed lately: the cancelled orders of a store only grow, and this page is opened all day.
+     */
+    private Stream<Order> recentlyCancelled(String storeId, LocalDate today) {
+        return orders.findByStatusOrderedBetween(storeId, OrderStatus.Cancelled,
+                today.minusDays(CANCELLED_ORDERS_WINDOW_DAYS), today).stream();
+    }
+
     public PaymentsPageModel page(String storeId, PaymentsQuery query, LocalDate today, Locale locale) {
         SupplierLabelMap labels = supplierLabels.forStoreId(storeId);
         PaymentsRowMapper mapper = new PaymentsRowMapper(messages, locale, labels);
         List<PayableEntry> payables = deliveries.findUnpaidDeliveries(storeId).stream()
                 .map(PayableEntry::of).flatMap(Optional::stream).toList();
-        List<ReceivableEntry> receivables = orders.findByStoreAndStatuses(storeId, ReceivableEntry.OPEN_STATUSES).stream()
+        List<ReceivableEntry> receivables = Stream.concat(
+                        orders.findByStoreAndStatuses(storeId, ReceivableEntry.OPEN_STATUSES).stream(),
+                        recentlyCancelled(storeId, today))
                 .map(o -> ReceivableEntry.of(o, today)).flatMap(Optional::stream).toList();
 
         Predicate<PayableEntry> payableBase = e -> (query.focus() == null || query.focus().matches(e, today))

@@ -165,6 +165,24 @@ class PaymentsModelFactoryTest {
     }
 
     @Test
+    void anOrderCancelledWithTheCustomersMoneyOnItWaitsForItsRefund() {
+        // given: both cancelled with nothing left to pay for; only one still holds a payment
+        Order owedBack = receivable("e0000001", 0, OrderStatus.Cancelled, PaymentSource.BankTransfer, 250, null);
+        Order settled = receivable("e0000002", 0, OrderStatus.Cancelled, PaymentSource.BankTransfer, 0, null);
+        when(orders.findByStatusOrderedBetween("store-1", OrderStatus.Cancelled,
+                TODAY.minusDays(PaymentsModelFactory.CANCELLED_ORDERS_WINDOW_DAYS), TODAY))
+                .thenReturn(List.of(owedBack, settled));
+
+        // when
+        PaymentsPageModel page = page("side", "receivables");
+
+        // then
+        assertThat(page.receivables()).extracting(ReceivableRow::number).containsExactly("e0000001");
+        assertThat(page.receivables().get(0).refund()).isTrue();
+        assertThat(page.receivables().get(0).shipText()).isEqualTo("anulowane");
+    }
+
+    @Test
     void switchingATileOffKeepsTheShownSide() {
         // given
         unpaid.add(withProvider(delivery(100, TODAY.minusDays(20), 14), "aaaa0001", "Acme"));

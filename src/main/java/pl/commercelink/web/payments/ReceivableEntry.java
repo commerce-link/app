@@ -13,7 +13,8 @@ import java.util.Set;
 import java.util.function.Function;
 
 /**
- * An open order whose customer still owes money or is owed a refund (spec §5.2). Urgency follows fulfilment (spec D3):
+ * An open order whose customer still owes money or is owed a refund (spec §5.2), or an order cancelled with the
+ * customer's money still on it. Urgency follows fulfilment (spec D3):
  * goods that left without the money are urgent; cash on delivery is normal until the order is Delivered.
  */
 public record ReceivableEntry(Order order, double unpaid, PaymentsAmounts.Standing standing, PaymentSource method,
@@ -49,7 +50,8 @@ public record ReceivableEntry(Order order, double unpaid, PaymentsAmounts.Standi
                 : cod ? PaymentsAmounts.Standing.COD : PaymentsAmounts.Standing.UNPAID;
         LocalDate shipDate = !shipped ? order.getShippingDueAt()
                 : latest(order, delivered ? Shipment::getDeliveredAt : Shipment::getShippedAt);
-        Urgency urgency = unpaid < 0 ? Urgency.NONE : urgency(cod, shipped, delivered, order.getShippingDueAt(), today);
+        // nothing of a cancelled order is waiting to ship or was shipped unpaid: only its balance is left to settle
+        Urgency urgency = unpaid < 0 || order.hasStatus(OrderStatus.Cancelled) ? Urgency.NONE : urgency(cod, shipped, delivered, order.getShippingDueAt(), today);
         return Optional.of(new ReceivableEntry(order, unpaid, standing, method, urgency, shipDate, shipped, delivered));
     }
 

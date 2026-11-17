@@ -9,7 +9,7 @@
          th:with="payments=${page.payments()}">
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="payments-title" th:text="#{order.card.payments}"></h2>
-        <div class="cl-card-actions" th:unless="${page.readOnly()}">
+        <div class="cl-card-actions" th:if="${payments.editable()}">
             <button type="button" class="cl-button" data-cl-dialog-open="addPaymentModal" data-mode="order">
                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
                 <span th:text="#{order.payments.add}"></span>
@@ -67,7 +67,7 @@
     </p>
 </section>
 
-<!--/* One dialog per payment; none on a read-only page. Adding is the shared "Dodaj wpłatę" dialog. */-->
+<!--/* One dialog per payment; none where payments are not editable. Adding is the shared "Dodaj wpłatę" dialog. */-->
 <th:block th:fragment="dialogs" th:with="payments=${page.payments()}">
     <!--/* th:replace runs before th:each on one element, so it sits on its own block. */-->
     <th:block th:each="form : ${payments.forms()}"><dialog th:replace="~{orders/details/payments :: paymentDialog(${form})}"></dialog></th:block>
