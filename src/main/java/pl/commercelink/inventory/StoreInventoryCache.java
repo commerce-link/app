@@ -9,5 +9,7 @@ public interface StoreInventoryCache {
 
     void put(String storeId, StoreInventory inventory, Duration ttl);
 
+    void extend(String storeId, Duration ttl);
+
     void evict(String storeId);
 }

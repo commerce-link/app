@@ -48,6 +48,44 @@ class StoreFeedRepositoryTest {
     }
 
     @Test
+    void hashIsKeptNextToTheFeedUnderItsPrefix() {
+        // when
+        repository.storeHash("oh4d5y15it", "Acme", "abc123");
+
+        // then
+        verify(fileStorage).put("commercelink-stores", "oh4d5y15it/supplier-feeds/acme-feed.sha256", "abc123".getBytes());
+    }
+
+    @Test
+    void storedHashIsReadBack() {
+        // given
+        when(fileStorage.canRead("commercelink-stores", "oh4d5y15it/supplier-feeds/acme-feed.sha256")).thenReturn(true);
+        when(fileStorage.getBytes("commercelink-stores", "oh4d5y15it/supplier-feeds/acme-feed.sha256")).thenReturn("abc123\n".getBytes());
+
+        // when / then
+        assertEquals(java.util.Optional.of("abc123"), repository.storedHash("oh4d5y15it", "Acme"));
+    }
+
+    @Test
+    void feedWithoutAHashHasNone() {
+        // when / then
+        assertEquals(java.util.Optional.empty(), repository.storedHash("oh4d5y15it", "Acme"));
+    }
+
+    @Test
+    void lastModifiedIsTheLaterOfTheFeedAndItsHash() {
+        // given
+        LocalDateTime stored = LocalDateTime.of(2026, 11, 14, 2, 0);
+        LocalDateTime checked = LocalDateTime.of(2026, 11, 16, 2, 0);
+        when(fileStorage.getAllObjectLastModified("commercelink-stores", "oh4d5y15it/supplier-feeds/")).thenReturn(Map.of(
+                "oh4d5y15it/supplier-feeds/acme-feed.csv", stored,
+                "oh4d5y15it/supplier-feeds/acme-feed.sha256", checked));
+
+        // when / then
+        assertEquals(Map.of("acme", checked), repository.feedLastModifiedByIdentity("oh4d5y15it"));
+    }
+
+    @Test
     void canReadChecksStoreNamespacedKey() {
         // given
         when(fileStorage.canRead("commercelink-stores", "oh4d5y15it/supplier-feeds/acme-feed.csv")).thenReturn(true);

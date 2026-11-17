@@ -54,6 +54,29 @@ class RedisStoreInventoryCacheTest {
     }
 
     @Test
+    void extendSetsANewLifetimeOnTheStoredSnapshot() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+
+        // when
+        cache.extend("s1", Duration.ofMinutes(2880));
+
+        // then
+        verify(redisTemplate).expire("store-inventory:v2:s1", Duration.ofMinutes(2880));
+    }
+
+    @Test
+    void extendSwallowsARedisFailure() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        when(redisTemplate.expire("store-inventory:v2:s1", Duration.ofMinutes(2880)))
+                .thenThrow(new IllegalStateException("redis down"));
+
+        // when / then
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> cache.extend("s1", Duration.ofMinutes(2880)));
+    }
+
+    @Test
     void getReturnsEmptyOnMiss() {
         // given
         RedisStoreInventoryCache cache = cache();

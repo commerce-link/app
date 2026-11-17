@@ -141,6 +141,61 @@ class StoreInventoryProviderTest {
     }
 
     @Test
+    void recentSnapshotIsKeptLongerWithoutARebuild() {
+        // given
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.of(30));
+        when(cache.get("store-1")).thenReturn(Optional.of(
+                new StoreInventory(InventoryIndex.of(new LinkedList<>()), LocalDateTime.now().minusHours(23))));
+
+        // when
+        provider.keepOrRefresh("store-1");
+
+        // then
+        verify(cache).extend("store-1", Duration.ofMinutes(30));
+        verify(cache, never()).put(any(), any(), any());
+        verify(autoDiscovery, never()).run(anyList(), any());
+    }
+
+    @Test
+    void snapshotOlderThanADayIsRebuiltInsteadOfKept() {
+        // given
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        when(autoDiscovery.run(anyList(), any())).thenReturn(List.of());
+        when(cache.get("store-1")).thenReturn(Optional.of(
+                new StoreInventory(InventoryIndex.of(new LinkedList<>()), LocalDateTime.now().minusHours(25))));
+
+        // when
+        provider.keepOrRefresh("store-1");
+
+        // then
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class));
+        verify(cache, never()).extend(any(), any());
+    }
+
+    @Test
+    void missingSnapshotIsBuiltInsteadOfKept() {
+        // given
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        when(autoDiscovery.run(anyList(), any())).thenReturn(List.of());
+        when(cache.get("store-1")).thenReturn(Optional.empty());
+
+        // when
+        provider.keepOrRefresh("store-1");
+
+        // then
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class));
+        verify(cache, never()).extend(any(), any());
+    }
+
+    @Test
     void buildsWithEmptyListWhenNoOwnSuppliers() {
         // given
         when(cache.get("store-1")).thenReturn(Optional.empty());

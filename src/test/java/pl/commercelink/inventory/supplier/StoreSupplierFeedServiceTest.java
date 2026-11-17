@@ -88,6 +88,74 @@ class StoreSupplierFeedServiceTest {
     }
 
     @Test
+    void firstImportStoresTheHashAfterTheRebuild() throws ResourceDownloadException {
+        // given
+        byte[] data = "rows".getBytes();
+        supplierReturns("store-1", data);
+        when(storeFeedRepository.storedHash("store-1", "Wortmann")).thenReturn(Optional.empty());
+
+        // when
+        service.loadStoreFeed("store-1", "Wortmann");
+
+        // then
+        org.mockito.InOrder order = inOrder(storeFeedRepository, storeInventoryProvider);
+        order.verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
+        order.verify(storeInventoryProvider).refresh("store-1");
+        order.verify(storeFeedRepository).storeHash("store-1", "Wortmann", FeedHash.of(data, "csv"));
+    }
+
+    @Test
+    void unchangedFeedIsNotStoredAndTheSnapshotIsOnlyKept() throws ResourceDownloadException {
+        // given
+        byte[] data = "rows".getBytes();
+        supplierReturns("store-1", data);
+        when(storeFeedRepository.storedHash("store-1", "Wortmann")).thenReturn(Optional.of(FeedHash.of(data, "csv")));
+
+        // when
+        service.loadStoreFeed("store-1", "Wortmann");
+
+        // then
+        verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
+        verify(storeInventoryProvider).keepOrRefresh("store-1");
+        verify(storeInventoryProvider, never()).refresh(anyString());
+        verify(storeFeedRepository).storeHash("store-1", "Wortmann", FeedHash.of(data, "csv"));
+    }
+
+    @Test
+    void changedFeedIsStoredAndTheInventoryRebuilt() throws ResourceDownloadException {
+        // given
+        byte[] data = "new rows".getBytes();
+        supplierReturns("store-1", data);
+        when(storeFeedRepository.storedHash("store-1", "Wortmann")).thenReturn(Optional.of(FeedHash.of("rows".getBytes(), "csv")));
+
+        // when
+        service.loadStoreFeed("store-1", "Wortmann");
+
+        // then
+        verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
+        verify(storeInventoryProvider).refresh("store-1");
+        verify(storeInventoryProvider, never()).keepOrRefresh(anyString());
+        verify(storeFeedRepository).storeHash("store-1", "Wortmann", FeedHash.of(data, "csv"));
+    }
+
+    @Test
+    void failedRebuildLeavesTheHashUnwritten() {
+        // given
+        supplierReturns("store-1", "rows".getBytes());
+        doThrow(new IllegalStateException("rates unavailable")).when(storeInventoryProvider).refresh("store-1");
+
+        // when / then
+        assertThrows(IllegalStateException.class, () -> service.loadStoreFeed("store-1", "Wortmann"));
+        verify(storeFeedRepository, never()).storeHash(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void sameBytesUnderAnotherExtensionAreAChangedFeed() {
+        // when / then
+        org.junit.jupiter.api.Assertions.assertNotEquals(FeedHash.of("rows".getBytes(), "csv"), FeedHash.of("rows".getBytes(), "xml"));
+    }
+
+    @Test
     void failedRebuildFailsTheImport() {
         // given
         supplierReturns("store-1", "rows".getBytes());

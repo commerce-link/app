@@ -27,6 +27,8 @@ import java.util.Optional;
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class StoreInventoryProvider {
 
+    private static final Duration MAX_AGE_OF_KEPT_SNAPSHOT = Duration.ofHours(24);
+
     private final StoreInventoryCache cache;
     private final StoresRepository storesRepository;
     private final SupplierProviderFactory supplierProviderFactory;
@@ -57,6 +59,21 @@ public class StoreInventoryProvider {
 
     public void refresh(String storeId) {
         buildAndCache(storesRepository.findById(storeId), storeId);
+    }
+
+    // For an import that found its feed unchanged: the snapshot only lives on, without a rebuild. Not past a day
+    // though, since its prices carry the exchange rates of the day it was built.
+    public void keepOrRefresh(String storeId) {
+        Store store = storesRepository.findById(storeId);
+        boolean recent = cache.get(storeId)
+                .map(StoreInventory::builtAt)
+                .filter(builtAt -> builtAt.isAfter(LocalDateTime.now().minus(MAX_AGE_OF_KEPT_SNAPSHOT)))
+                .isPresent();
+        if (recent) {
+            cache.extend(storeId, resolveTtl(store));
+        } else {
+            buildAndCache(store, storeId);
+        }
     }
 
     private StoreInventory buildAndCache(Store store, String storeId) {

@@ -1,6 +1,7 @@
 package pl.commercelink.inventory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -16,6 +17,7 @@ import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+@Slf4j
 @Component
 public class RedisStoreInventoryCache implements StoreInventoryCache {
 
@@ -54,6 +56,15 @@ public class RedisStoreInventoryCache implements StoreInventoryCache {
             redisTemplate.opsForValue().set(key(storeId), compress(json), ttl);
         } catch (Exception e) {
             System.err.println("Redis store-inventory put failed for " + storeId + ": " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void extend(String storeId, Duration ttl) {
+        try {
+            redisTemplate.expire(key(storeId), ttl);
+        } catch (Exception e) {
+            log.error("Store inventory snapshot of {} was not extended and expires as it was set", storeId, e);
         }
     }
 
