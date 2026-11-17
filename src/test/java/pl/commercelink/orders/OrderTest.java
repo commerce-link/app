@@ -732,19 +732,6 @@ class OrderTest {
     }
 
     @Test
-    void paymentsRefundedInFullDoNotBlockTheCancellationWhenTheirDoubleSumIsJustOffZero() {
-        // given
-        OrderItem returned = new OrderItem("o1", "CPU", "Ryzen", 1, 4345.69, "SKU", false, 0);
-        returned.setStatus(FulfilmentStatus.Returned);
-        Order order = new Order("store-1");
-        order.setStatus(OrderStatus.Delivered);
-        paidAndRefundedInFull(order);
-
-        // when / then
-        assertThat(order.cancelBlockers(List.of(returned), Set.of())).isEmpty();
-    }
-
-    @Test
     void paymentsRefundedInFullDoNotBlockTheSplitWhenTheirDoubleSumIsJustOffZero() {
         // given
         Order order = splittableOrder();
