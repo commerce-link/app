@@ -181,7 +181,7 @@ class StoreInventoryProviderTest {
         // then
         verify(cache, never()).get(any());
         verify(cache, never()).put(any(), any(), any(), anyLong());
-        verify(autoDiscovery, never()).run(anyList(), any());
+        verify(autoDiscovery, never()).group(anyList(), any(), any(), any());
     }
 
     @Test
@@ -191,7 +191,7 @@ class StoreInventoryProviderTest {
         when(storesRepository.findById("store-1")).thenReturn(storeEntity);
         when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.run(anyList(), any())).thenReturn(List.of());
+        when(autoDiscovery.group(anyList(), any(), any(), any())).thenReturn(grouping(List.of()));
         when(cache.keepIfBuiltWithin(eq("store-1"), any(), any())).thenReturn(false);
 
         // when

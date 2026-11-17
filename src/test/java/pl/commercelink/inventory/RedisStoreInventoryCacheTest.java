@@ -72,7 +72,7 @@ class RedisStoreInventoryCacheTest {
         // then
         assertTrue(kept);
         verify(redisTemplate).execute(any(RedisScript.class),
-                eq(List.of("store-inventory:v2:s1", "store-inventory:v2:s1:build-started")),
+                eq(List.of("store-inventory:v3:s1", "store-inventory:v3:s1:build-started")),
                 eq("9000"), eq("86400000"), eq("172800000"), eq("172800000"));
     }
 

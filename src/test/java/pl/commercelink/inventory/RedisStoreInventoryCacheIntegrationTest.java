@@ -189,8 +189,8 @@ class RedisStoreInventoryCacheIntegrationTest {
 
         // then
         assertTrue(kept);
-        Long snapshotTtl = redisTemplate.getExpire("store-inventory:v2:s1");
-        Long markTtl = redisTemplate.getExpire("store-inventory:v2:s1:build-started");
+        Long snapshotTtl = redisTemplate.getExpire("store-inventory:v3:s1");
+        Long markTtl = redisTemplate.getExpire("store-inventory:v3:s1:build-started");
         assertTrue(snapshotTtl != null && snapshotTtl > 172_000 && snapshotTtl <= 172_800);
         assertTrue(markTtl != null && markTtl > 172_000 && markTtl <= 172_800);
     }
@@ -207,7 +207,7 @@ class RedisStoreInventoryCacheIntegrationTest {
 
         // then
         assertFalse(kept);
-        Long snapshotTtl = redisTemplate.getExpire("store-inventory:v2:s1");
+        Long snapshotTtl = redisTemplate.getExpire("store-inventory:v3:s1");
         assertTrue(snapshotTtl != null && snapshotTtl <= 3600);
     }
 
