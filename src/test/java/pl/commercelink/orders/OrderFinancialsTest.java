@@ -32,6 +32,20 @@ class OrderFinancialsTest {
     }
 
     @Test
+    void aCancelledOrderWhoseItemsWereNotCancelledYetReportsNoSale() {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Cancelled);
+
+        // when
+        OrderFinancials financials = new OrderFinancials(order, List.of(item(300, 200, FulfilmentStatus.New)));
+
+        // then
+        assertThat(financials.getTotalPrice()).isZero();
+        assertThat(financials.getTotalItemsCost()).isZero();
+    }
+
+    @Test
     void aFullyCancelledOrderReportsNoSale() {
         // given
         Order order = new Order("store-1");

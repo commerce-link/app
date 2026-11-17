@@ -22,8 +22,10 @@ public class OrderFinancials {
     private double unpaidAmount;
 
     public OrderFinancials(Order order, List<OrderItem> allOrderItems) {
-        // a cancelled item keeps its price for the record but was never sold, so it is neither revenue nor cost
-        List<OrderItem> orderItems = allOrderItems.stream().filter(item -> !item.isCancelled()).toList();
+        // a cancelled item keeps its price for the record but was never sold, so it is neither revenue nor cost; the
+        // order's status is asked too, for a cancel whose items were not saved yet (OrdersManager#cancelOrder)
+        List<OrderItem> orderItems = order.hasStatus(OrderStatus.Cancelled) ? List.of()
+                : allOrderItems.stream().filter(item -> !item.isCancelled()).toList();
         this.totalItemsPrice = orderItems.stream().filter(i -> !i.isService()).mapToDouble(OrderItem::getTotalPrice).sum();
         this.totalItemsCost = orderItems.stream().filter(i -> !i.isService()).mapToDouble(OrderItem::getTotalCost).sum();
         this.totalServicesPrice = orderItems.stream().filter(i -> i.isService()).mapToDouble(OrderItem::getTotalPrice).sum();

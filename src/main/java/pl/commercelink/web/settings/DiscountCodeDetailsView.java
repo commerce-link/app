@@ -3,6 +3,7 @@ package pl.commercelink.web.settings;
 import pl.commercelink.discounts.DiscountCode;
 import pl.commercelink.discounts.TargetValue;
 import pl.commercelink.orders.DiscountedOrderEntry;
+import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.web.dtos.FormNumbers;
 import pl.commercelink.web.orders.OrderLabels;
@@ -35,8 +36,10 @@ public record DiscountCodeDetailsView(DiscountCodeView summary, List<TargetValue
     }
 
     /**
-     * The orders placed with the code and their sums; not available while the index cannot be read yet. average is
-     * null without orders. The sums count every listed order, cancelled ones too, as the code's usage counter does.
+     * The orders placed with the code and their sums; not available while the index cannot be read yet. The count and
+     * the discount cover every listed order, cancelled ones too, as the code's usage counter does. The value and the
+     * average leave cancelled orders out, since they keep their totalPrice without having sold anything; average is
+     * null when no listed order sold anything.
      */
     public record Orders(boolean available, String from, String to, String fromLabel, String toLabel, int count,
                          String discount, String value, String average, List<OrderRow> rows) {
@@ -46,9 +49,10 @@ public record DiscountCodeDetailsView(DiscountCodeView summary, List<TargetValue
                                 String ordersPath) {
             List<DiscountedOrderEntry> listed = entries.orElse(List.of());
             BigDecimal discount = sum(listed.stream().map(DiscountedOrderEntry::discountAmount).toList());
-            BigDecimal value = sum(listed.stream().map(DiscountedOrderEntry::totalPrice).toList());
-            String average = listed.isEmpty() ? null
-                    : money(value.divide(BigDecimal.valueOf(listed.size()), 2, RoundingMode.HALF_UP));
+            BigDecimal value = sum(listed.stream().map(DiscountedOrderEntry::soldValue).toList());
+            long sold = listed.stream().filter(entry -> entry.status() != OrderStatus.Cancelled).count();
+            String average = sold == 0 ? null
+                    : money(value.divide(BigDecimal.valueOf(sold), 2, RoundingMode.HALF_UP));
             return new Orders(entries.isPresent(),
                     from == null ? null : from.toString(), to == null ? null : to.toString(),
                     from == null ? null : DATE.format(from), to == null ? null : DATE.format(to),

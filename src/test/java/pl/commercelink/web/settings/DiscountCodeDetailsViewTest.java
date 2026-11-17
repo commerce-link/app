@@ -24,7 +24,7 @@ class DiscountCodeDetailsViewTest {
     }
 
     @Test
-    void theFiguresAddUpTheListedOrders() {
+    void theFiguresAddUpTheListedOrdersAndLeaveTheValueOfCancelledOnesOut() {
         // given
         List<DiscountedOrderEntry> entries = List.of(
                 entry("c381d457-0000-0000-0000-000000000001", 1800, 200, OrderStatus.New),
@@ -38,8 +38,8 @@ class DiscountCodeDetailsViewTest {
         assertThat(orders.available()).isTrue();
         assertThat(orders.count()).isEqualTo(3);
         assertThat(orders.discount()).isEqualTo(FormNumbers.format(350));
-        assertThat(orders.value()).isEqualTo(FormNumbers.format(3150));
-        assertThat(orders.average()).isEqualTo(FormNumbers.format(1050));
+        assertThat(orders.value()).isEqualTo(FormNumbers.format(2700));
+        assertThat(orders.average()).isEqualTo(FormNumbers.format(1350));
         assertThat(orders.rows()).extracting(OrderRow::shortId).containsExactly("c381d457", "b5a8331d", "9e41b7a0");
     }
 
