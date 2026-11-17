@@ -25,7 +25,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/** The read of cancelled orders behind the Payments page: filtered on the index, loaded in full only when matching. */
+/** The read of cancelled orders behind the Payments page and the orders list: filtered on the index, loaded in full only when matching. */
 @ExtendWith(MockitoExtension.class)
 class OrdersRepositoryFindByStatusTest {
 
@@ -93,6 +93,30 @@ class OrdersRepositoryFindByStatusTest {
 
         // then
         assertThat(orders).isEmpty();
+    }
+
+    @Test
+    void onlyCancelledOrdersOfTheLastNinetyDaysStillHoldingAPaymentAwaitARefund() {
+        // given: both cancelled, only one still holds the customer's money
+        Order owedBack = order("o-1", OrderStatus.Cancelled);
+        Payment payment = new Payment(PaymentSource.BankTransfer);
+        payment.setAmount(250);
+        owedBack.setPayments(new java.util.ArrayList<>(List.of(payment)));
+        when(amazonDynamoDB.query(any(QueryRequest.class)))
+                .thenReturn(new QueryResult().withItems(List.of(row("o-1"), row("o-2"))));
+        when(dynamoDBMapper.batchLoad(anyIterable())).thenReturn(Map.of("Orders",
+                List.<Object>of(owedBack, order("o-2", OrderStatus.Cancelled))));
+
+        // when
+        List<Order> orders = repository.findCancelledAwaitingRefund("store-1", TO);
+
+        // then
+        assertThat(orders).extracting(Order::getOrderId).containsExactly("o-1");
+        ArgumentCaptor<QueryRequest> request = ArgumentCaptor.forClass(QueryRequest.class);
+        verify(amazonDynamoDB).query(request.capture());
+        assertThat(request.getValue().getExpressionAttributeValues().get(":dateFrom").getS())
+                .startsWith(TO.minusDays(OrdersRepository.CANCELLED_AWAITING_REFUND_WINDOW_DAYS).toString());
+        assertThat(request.getValue().getExpressionAttributeValues().get(":status").getS()).isEqualTo("Cancelled");
     }
 
     @Test

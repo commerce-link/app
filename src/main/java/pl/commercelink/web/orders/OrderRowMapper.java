@@ -92,7 +92,8 @@ public class OrderRowMapper {
                 order.getStatus() == null ? "" : text("OrderStatus." + order.getStatus().name()),
                 statusTone(order.getStatus()),
                 money(order.getTotalPrice()),
-                unpaid > 0 ? text("orders.list.unpaid", money(unpaid)) : null,
+                unpaid > 0 ? text("orders.list.unpaid", money(unpaid))
+                        : order.awaitsRefund() ? text("orders.list.refund", money(-unpaid)) : null,
                 marks(order, false));
     }
 

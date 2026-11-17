@@ -29,6 +29,7 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OrdersRepository.class);
     static final String STORE_STATUS_INDEX = "StoreIdStatusIndex";
     static final String DISCOUNT_CODE_INDEX = V023_AddDiscountCodeIndex.INDEX;
+    public static final int CANCELLED_AWAITING_REFUND_WINDOW_DAYS = 90;
 
     public OrdersRepository(AmazonDynamoDB amazonDynamoDB) {
         super(amazonDynamoDB);
@@ -506,6 +507,18 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
         return queryResult.getItems().stream()
                 .map(item -> dynamoDBMapper.load(Order.class, item.get("storeId").getS(), item.get("orderId").getS()))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Cancelled orders still holding the customer's money (Order#awaitsRefund): the orders list and the Payments page
+     * keep showing them until the refund is recorded. Only orders placed in the last CANCELLED_AWAITING_REFUND_WINDOW_DAYS
+     * days are looked at, because a store's cancelled orders only grow and both pages are opened all day.
+     */
+    public List<Order> findCancelledAwaitingRefund(String storeId, LocalDate today) {
+        return findByStatusOrderedBetween(storeId, OrderStatus.Cancelled,
+                today.minusDays(CANCELLED_AWAITING_REFUND_WINDOW_DAYS), today).stream()
+                .filter(Order::awaitsRefund)
+                .toList();
     }
 
     /**

@@ -169,9 +169,7 @@ class PaymentsModelFactoryTest {
         // given: both cancelled with nothing left to pay for; only one still holds a payment
         Order owedBack = receivable("e0000001", 0, OrderStatus.Cancelled, PaymentSource.BankTransfer, 250, null);
         Order settled = receivable("e0000002", 0, OrderStatus.Cancelled, PaymentSource.BankTransfer, 0, null);
-        when(orders.findByStatusOrderedBetween("store-1", OrderStatus.Cancelled,
-                TODAY.minusDays(PaymentsModelFactory.CANCELLED_ORDERS_WINDOW_DAYS), TODAY))
-                .thenReturn(List.of(owedBack, settled));
+        when(orders.findCancelledAwaitingRefund("store-1", TODAY)).thenReturn(List.of(owedBack, settled));
 
         // when
         PaymentsPageModel page = page("side", "receivables");

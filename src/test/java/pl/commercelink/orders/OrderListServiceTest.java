@@ -65,12 +65,15 @@ class OrderListServiceTest {
         messages.setBasename("messages");
         messages.setDefaultEncoding("UTF-8");
         service = new OrderListService(ordersRepository, orderFilters, messages, storesRepository, pickupCandidates);
-        // the repository reads only the asked-for statuses (StoreIdStatusIndex); the stub filters the same way, so any
-        // Completed or Cancelled order below is not seen by the list, as in the database
+        // the repository reads only the asked-for statuses (StoreIdStatusIndex) and the cancelled orders still awaiting a
+        // refund; the stubs filter the same way, so any other Completed or Cancelled order below is not seen by the list,
+        // as in the database
         when(ordersRepository.findByStoreAndStatuses(eq("store-1"), any())).thenAnswer(inv -> {
             java.util.Collection<OrderStatus> wanted = inv.getArgument(1);
             return orders.stream().filter(o -> wanted.contains(o.getStatus())).collect(java.util.stream.Collectors.toList());
         });
+        when(ordersRepository.findCancelledAwaitingRefund(eq("store-1"), any())).thenAnswer(inv ->
+                orders.stream().filter(Order::awaitsRefund).collect(java.util.stream.Collectors.toList()));
         when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of()));
     }
 
@@ -194,7 +197,7 @@ class OrderListServiceTest {
     @Test
     void closedOrdersAreNotPartOfTheListAndOnlyOpenOnesAreAskedFor() {
         add("done", OrderStatus.Completed, TODAY.minusDays(1), 10, 10, null);
-        add("gone", OrderStatus.Cancelled, TODAY.minusDays(1), 10, 10, null);
+        add("gone", OrderStatus.Cancelled, TODAY.minusDays(1), 10, 0, null);
 
         OrdersPageModel model = page(query());
 
@@ -204,6 +207,37 @@ class OrderListServiceTest {
         verify(ordersRepository, atLeastOnce()).findByStoreAndStatuses("store-1", OrderListService.OPEN);
         // an old bookmark to the history lands on the open list
         assertThat(page(query("status", "Completed")).query().isOpen()).isTrue();
+    }
+
+    @Test
+    void aCancelledOrderStaysListedUntilItsRefundIsRecorded() {
+        // given
+        add("open", OrderStatus.New, TODAY, 10, 0, null);
+        add("refund", OrderStatus.Cancelled, null, 10, 10, null);
+        add("refunded", OrderStatus.Cancelled, null, 10, 0, null);
+
+        // when
+        OrdersPageModel model = page(query());
+
+        // then
+        assertThat(model.rows()).extracting(OrderListServiceTest::path)
+                .containsExactlyInAnyOrder("/dashboard/orders/open", "/dashboard/orders/refund");
+        assertThat(model.rows()).filteredOn(row -> path(row).endsWith("/refund"))
+                .extracting(OrderRow::unpaidText).containsExactly("do zwrotu 10,00 PLN");
+    }
+
+    @Test
+    void aCancelledOrderAwaitingItsRefundIsLeftOutOnceAStatusIsTickedAndOfThePickupCount() {
+        // given
+        Order open = add("open", OrderStatus.New, TODAY, 10, 0, null);
+        add("refund", OrderStatus.Cancelled, null, 10, 10, null);
+        when(pickupCandidates.count("store-1", List.of(open))).thenReturn(0);
+
+        // when
+        OrdersPageModel model = service.fullPage(ACTOR, query("status", "New"), TODAY, PL);
+
+        // then
+        assertThat(model.rows()).extracting(OrderListServiceTest::path).containsExactly("/dashboard/orders/open");
     }
 
     @Test
@@ -363,7 +397,7 @@ class OrderListServiceTest {
         add("open-1", OrderStatus.New, null, 10, 10, null).getShippingDetails().setSurname("Nowak");
         add("open-2", OrderStatus.New, null, 10, 10, null);
         add("old-1", OrderStatus.Completed, null, 10, 10, null).getShippingDetails().setSurname("Nowak");
-        add("old-2", OrderStatus.Cancelled, null, 10, 10, null).getShippingDetails().setSurname("Nowak");
+        add("old-2", OrderStatus.Cancelled, null, 10, 0, null).getShippingDetails().setSurname("Nowak");
 
         OrdersPageModel model = page(query("q", "nowak"));
 

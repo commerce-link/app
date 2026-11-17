@@ -108,6 +108,33 @@ class OrderRowMapperTest {
     }
 
     @Test
+    void cancelledOrderWithThePaymentStillOnItShowsTheRefundDue() {
+        // given
+        Order order = order();
+        order.setStatus(OrderStatus.Cancelled);
+        order.getPayments().get(0).setAmount(1249);
+
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
+        assertThat(row.unpaidText()).isEqualTo("do zwrotu 1 249,00 PLN");
+    }
+
+    @Test
+    void overpaidOpenOrderShowsNoRefund() {
+        // given: an overpayment of an open order may still be settled against it, so it is not called a refund
+        Order order = order();
+        order.getPayments().get(0).setAmount(1300);
+
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
+        assertThat(row.unpaidText()).isNull();
+    }
+
+    @Test
     void oneDayOverdueUsesTheSingularKey() {
         Order order = order();
         order.setEstimatedShippingAt(TODAY.minusDays(1));

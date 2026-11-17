@@ -44,8 +44,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Builds the orders list page from one query of the store's open orders (spec §8.2, §23): tiles from all open orders,
- * status counts within the custom filter and the search, rows within the ticked statuses, then sort and page.
+ * Builds the orders list page from one query of the store's open orders (spec §8.2, §23), plus the cancelled ones still
+ * awaiting a refund: tiles from all open orders, status counts within the custom filter and the search, rows within the
+ * ticked statuses (a cancelled order shows only while no status is ticked), then sort and page.
  */
 @Slf4j
 @Service
@@ -82,12 +83,15 @@ public class OrderListService {
     private OrdersPageModel build(FilterActor actor, OrderListQuery query, LocalDate today, Locale locale,
                                   boolean withHeader) {
         // Only open orders are read (StoreIdStatusIndex): Completed and Cancelled are not part of this list, so a store's
-        // growing history costs nothing here.
+        // growing history costs nothing here. The one exception is a cancelled order whose refund is not recorded yet:
+        // it stays listed until it is, so the money owed back is not lost in the archive.
         List<Order> open = ordersRepository.findByStoreAndStatuses(actor.storeId(), OPEN);
+        List<Order> listed = Stream.concat(open.stream(),
+                ordersRepository.findCancelledAwaitingRefund(actor.storeId(), today).stream()).toList();
         ListOrderFiltersView filters = orderFilters.list(actor);
         Optional<OrderFilter> activeFilter = query.hasFilter() ? filters.byId(query.filterId()) : Optional.empty();
 
-        List<Order> filtered = open.stream()
+        List<Order> filtered = listed.stream()
                 .filter(order -> activeFilter.map(f -> f.matchesIgnoring(OrderFilterField.Status, order, today)).orElse(true))
                 .filter(order -> query.focus() == null || query.focus().matches(order, today))
                 .filter(order -> OrderSearch.matches(order, query.q()))

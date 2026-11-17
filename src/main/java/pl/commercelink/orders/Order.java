@@ -157,6 +157,12 @@ public class Order {
         return isZero(getUnpaidAmount());
     }
 
+    /** Cancelled with a balance left: what the customer paid is owed back until the refund is recorded. */
+    @DynamoDBIgnore
+    public boolean awaitsRefund() {
+        return hasStatus(OrderStatus.Cancelled) && !isFullyPaid();
+    }
+
     private static boolean isZero(double amount) {
         return Math.abs(amount) < HALF_CENT;
     }

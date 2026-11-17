@@ -202,6 +202,34 @@ class FinancialReportGeneratorTest {
     }
 
     @Test
+    void leavesCancelledOrdersOutOfTheCountsTheSalesAndTheDays() {
+        // given: one sold order, and one cancelled in each channel, one of them with a payment fee recorded
+        order("sold", LocalDateTime.of(2026, 9, 1, 10, 0), false, 123, 80);
+        order("cancelled", LocalDateTime.of(2026, 9, 1, 11, 0), false, 123, 80);
+        order("cancelled-mp", LocalDateTime.of(2026, 9, 1, 12, 0), true, 246, 160);
+        Payment payment = new Payment(PaymentSource.OnlinePayment);
+        payment.setFee(5);
+        orders.get(1).setPayments(new ArrayList<>(List.of(payment)));
+        orders.get(1).setStatus(OrderStatus.Cancelled);
+        orders.get(2).setStatus(OrderStatus.Cancelled);
+        when(ordersRepository.findAllPastOrders(FROM, TO, STORE)).thenReturn(List.of(
+                index("sold"), index("cancelled"), index("cancelled-mp")));
+        when(deliveriesRepository.findAll(eq(STORE), any(), any())).thenReturn(List.of());
+
+        // when
+        FinancialReports reports = generator.generate(STORE, FROM, TO);
+
+        // then
+        assertThat(reports.ownSources().getTotalNumberOfOrders()).isEqualTo(1);
+        assertThat(reports.ownSources().getTotalPrice()).isCloseTo(100, within(0.01));
+        assertThat(reports.ownSources().getTotalProfit()).isCloseTo(20, within(0.01));
+        assertThat(reports.marketplace().getTotalNumberOfOrders()).isZero();
+        assertThat(reports.days().get(0).ownOrders()).isEqualTo(1);
+        assertThat(reports.days().get(0).marketplaceOrders()).isZero();
+        verify(orderItemsRepository).findByOrderIds(List.of("sold"));
+    }
+
+    @Test
     void failsTheWholeReportWhenAnItemsChunkFails() {
         // given
         order("o1", LocalDateTime.of(2026, 9, 1, 10, 0), false, 123, 80);
