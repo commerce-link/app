@@ -6,6 +6,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import org.springframework.stereotype.Repository;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.discounts.DiscountCode;
+import pl.commercelink.discounts.Promotion;
 import pl.commercelink.externaloffers.ExternalOfferLink;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.notifications.StoreNotificationRecord;
@@ -114,6 +115,12 @@ public class StoreWipeRepository {
         DiscountCode key = new DiscountCode();
         key.setStoreId(storeId);
         return query(DiscountCode.class, key);
+    }
+
+    public List<Promotion> findPromotions(String storeId) {
+        Promotion key = new Promotion();
+        key.setStoreId(storeId);
+        return query(Promotion.class, key);
     }
 
     public List<ExternalOfferLink> findExternalOfferLinks(String storeId) {

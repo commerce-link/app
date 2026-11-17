@@ -151,6 +151,88 @@ class CategoryBasicsTemplateTest {
     }
 
     @Test
+    void anAutomaticCategoryOpensWithoutItsListAndFetchesTheQuestionWhenTurnedManual() {
+        // given
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId();
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        Context context = context(gpu, true, automaticForm(), Map.of());
+        context.setVariable("automaticListHref", "/dashboard/catalogs/c1/category/k1/settings/basics/automatic-list");
+
+        // when
+        String html = render(context);
+
+        // then
+        assertThat(dynamicProductsRadios(html)).isEmpty();
+        assertThat(html).containsPattern("<div[^>]*data-cl-variant-when=\"categoryType=Managed\"[^>]*"
+                        + "data-cl-lazy-src=\"/dashboard/catalogs/c1/category/k1/settings/basics/automatic-list\"[^>]*hidden=\"hidden\"")
+                .contains("Counting the products of the automatic list")
+                .containsPattern("<template data-cl-lazy-failed[^>]*>[\\s\\S]*could not be counted just now[\\s\\S]*</template>")
+                .contains("/js/lazy-fragment.js");
+    }
+
+    @Test
+    void aListAlreadyReadIsRenderedInPlaceAndNotFetchedAgain() {
+        // when
+        String html = renderedAutomatic(12, 0, automaticForm(), Map.of());
+
+        // then
+        assertThat(html).doesNotContain("data-cl-lazy-src");
+    }
+
+    @Test
+    void aRefusedTypeChangeDoesNotOfferToFetchTheList() {
+        // given
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId();
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        Context context = context(gpu, true, automaticForm(), Map.of("type", "catalog.category.type.managed.unavailable"));
+        context.setVariable("automaticListHref", "/dashboard/catalogs/c1/category/k1/settings/basics/automatic-list");
+
+        // when
+        String html = render(context);
+
+        // then
+        assertThat(html).contains("could not be read just now").doesNotContain("data-cl-lazy-src");
+    }
+
+    @Test
+    void aSavedFormAboutToNavigateDoesNotShowTheListBeingCounted() {
+        // given
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId();
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        CategoryBasicsForm turnedManual = automaticForm();
+        turnedManual.setType(CategoryDefinitionType.Managed.name());
+        Context context = context(gpu, true, turnedManual, Map.of());
+        context.setVariable("automaticListHref", "/dashboard/catalogs/c1/category/k1/settings/basics/automatic-list");
+        context.setVariable("redirectTo", "/dashboard/catalogs/c1/category/k1/settings");
+
+        // when
+        String html = render(context);
+
+        // then
+        assertThat(html).doesNotContain("data-cl-lazy-src").doesNotContain("Counting the products of the automatic list");
+    }
+
+    @Test
+    void theFragmentAloneIsTheQuestionWithoutThePage() {
+        // given
+        Context context = new Context();
+        context.setVariable("form", new CategoryBasicsForm());
+        context.setVariable("errors", Map.of());
+        context.setVariable("dynamicListCount", 7);
+        context.setVariable("keptProductsCount", 2);
+
+        // when
+        String html = EnglishFragmentTemplateEngine.create()
+                .process("catalog/category-automatic-list", java.util.Set.of("question"), context);
+
+        // then
+        assertThat(html).contains("Products on the automatic list: 7.")
+                .contains("Products already in the category stay unchanged: 2.")
+                .doesNotContain("<form").doesNotContain("cl-page");
+        assertThat(dynamicProductsRadios(html)).hasSize(2).noneMatch(radio -> radio.contains("checked"));
+    }
+
+    @Test
     void aManualCategoryAsksNothingAboutAnAutomaticList() {
         // when
         String html = rendered();

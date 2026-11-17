@@ -1,7 +1,6 @@
 package pl.commercelink.web.settings;
 
 import pl.commercelink.discounts.DiscountCode;
-import pl.commercelink.discounts.TargetValue;
 import pl.commercelink.orders.DiscountedOrderEntry;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.starter.util.ConversionUtil;
@@ -17,9 +16,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-public record DiscountCodeDetailsView(DiscountCodeView summary, List<TargetValue> targetValues, String validFrom,
-                                      String validTo, boolean active, boolean deletable, String toggleHref,
-                                      String deleteHref, Orders orders) {
+public record DiscountCodeDetailsView(DiscountCodeView summary, String validFrom, String validTo, boolean active,
+                                      boolean deletable, String toggleHref, String deleteHref, Orders orders) {
 
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("dd.MM.yyyy, HH:mm");
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd.MM.yyyy");
@@ -28,7 +26,6 @@ public record DiscountCodeDetailsView(DiscountCodeView summary, List<TargetValue
                                              String basePath, Orders orders) {
         DiscountCodeView summary = DiscountCodeView.of(code, now, gatewayNames, basePath);
         return new DiscountCodeDetailsView(summary,
-                code.getTargetValues() == null ? List.of() : List.copyOf(code.getTargetValues()),
                 code.getValidFrom() == null ? null : DATE_TIME.format(code.getValidFrom()),
                 code.getValidTo() == null ? null : DATE_TIME.format(code.getValidTo()),
                 code.isActive(), code.getUsedCount() == 0, summary.href() + "/toggle", summary.href() + "/delete",

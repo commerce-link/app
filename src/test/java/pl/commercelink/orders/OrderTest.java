@@ -210,6 +210,39 @@ class OrderTest {
         assertThat(order.getDocuments()).hasSize(1);
     }
 
+    @Test
+    void orderWhosePricesSumToADoubleJustOffThePaidAmountIsFullyPaid() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(449.55 + 19.99 + 4.35);
+        order.addPayment(Payment.bankTransfer("ref-1", "Jan", 473.89));
+
+        // when / then
+        assertThat(order.isFullyPaid()).isTrue();
+    }
+
+    @Test
+    void orderPaidACentShortIsNotFullyPaid() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(449.55 + 19.99 + 4.35);
+        order.addPayment(Payment.bankTransfer("ref-1", "Jan", 473.88));
+
+        // when / then
+        assertThat(order.isFullyPaid()).isFalse();
+    }
+
+    @Test
+    void orderOverpaidByACentIsNotFullyPaid() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(449.55 + 19.99 + 4.35);
+        order.addPayment(Payment.bankTransfer("ref-1", "Jan", 473.90));
+
+        // when / then
+        assertThat(order.isFullyPaid()).isFalse();
+    }
+
     private Order b2bOrder() {
         Order order = new Order("store-1");
         order.setOrderId("order-1");
@@ -696,5 +729,45 @@ class OrderTest {
         item.setItemId(UUID.randomUUID().toString());
         item.setStatus(status);
         return item;
+    }
+
+    @Test
+    void paymentsRefundedInFullDoNotBlockTheCancellationWhenTheirDoubleSumIsJustOffZero() {
+        // given
+        OrderItem returned = new OrderItem("o1", "CPU", "Ryzen", 1, 4345.69, "SKU", false, 0);
+        returned.setStatus(FulfilmentStatus.Returned);
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Delivered);
+        paidAndRefundedInFull(order);
+
+        // when / then
+        assertThat(order.cancelBlockers(List.of(returned), Set.of())).isEmpty();
+    }
+
+    @Test
+    void paymentsRefundedInFullDoNotBlockTheSplitWhenTheirDoubleSumIsJustOffZero() {
+        // given
+        Order order = splittableOrder();
+        paidAndRefundedInFull(order);
+
+        // when / then
+        assertThat(order.canBeSplit()).isTrue();
+    }
+
+    @Test
+    void aCentLeftAfterTheRefundsBlocksTheSplit() {
+        // given
+        Order order = splittableOrder();
+        order.addPayment(Payment.bankTransfer("REF-1", "Jan", 181.58));
+        order.addPayment(new Payment("REF-2", "Jan", PaymentSource.BankTransfer, PaymentDirection.Outgoing, -181.57, 0, null, null));
+
+        // when / then
+        assertThat(order.canBeSplit()).isFalse();
+    }
+
+    private static void paidAndRefundedInFull(Order order) {
+        order.addPayment(Payment.bankTransfer("REF-1", "Jan", 1703.14));
+        order.addPayment(Payment.bankTransfer("REF-2", "Jan", 2642.55));
+        order.addPayment(new Payment("REF-3", "Jan", PaymentSource.BankTransfer, PaymentDirection.Outgoing, -4345.69, 0, null, null));
     }
 }

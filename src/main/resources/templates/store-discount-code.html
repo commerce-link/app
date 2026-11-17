@@ -52,16 +52,9 @@
                         </div>
                         <div>
                             <dt th:text="#{store.discounts.target}"></dt>
-                            <dd th:if="${code.target() == null}" th:text="#{store.discounts.target.basket}"></dd>
-                            <dd th:if="${code.target() != null}">
-                                <ul>
-                                    <li th:each="value : ${details.targetValues()}">
-                                        <span th:text="${value.name}"></span>
-                                        <span th:if="${code.target().name() == 'Product'}" class="cl-kv-sub"
-                                              th:text="#{store.discounts.details.productId(${value.id})}"></span>
-                                    </li>
-                                </ul>
-                                <span class="cl-kv-sub" th:text="#{${'store.discounts.target.' + code.target().name()}}"></span>
+                            <dd th:if="${code.scope().everything()}" th:text="#{store.discounts.target.basket}"></dd>
+                            <dd th:unless="${code.scope().everything()}">
+                                <th:block th:replace="~{fragments/discount-scope :: values(${code.scope()})}"></th:block>
                             </dd>
                         </div>
                         <div>

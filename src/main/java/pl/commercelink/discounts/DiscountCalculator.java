@@ -12,31 +12,32 @@ import java.util.stream.IntStream;
 
 public final class DiscountCalculator {
 
-    private static final BigDecimal ONE_GROSZ = new BigDecimal("0.01");
+    private static final BigDecimal ONE_CENT = new BigDecimal("0.01");
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
     private DiscountCalculator() {
     }
 
-    public static List<DiscountedLine> calculate(DiscountCode code, List<BasketItem> items,
-                                                 Function<String, Set<String>> productAliases) {
-        List<BasketItem> covered = items.stream().filter(i -> code.covers(i, productAliases)).filter(i -> i.getQty() > 0).toList();
-        List<BigDecimal> prices = code.getType() == DiscountType.Amount ? amount(code, covered) : percentage(code, covered);
-        return IntStream.range(0, covered.size())
+    static DiscountCalculation calculate(Discount discount, List<BasketItem> items,
+                                         Function<String, Set<String>> productAliases) {
+        List<BasketItem> covered = items.stream().filter(i -> discount.covers(i, productAliases)).filter(i -> i.getQty() > 0).toList();
+        List<BigDecimal> prices = discount.getType() == DiscountType.Amount ? amount(discount, covered) : percentage(discount, covered);
+        List<DiscountedLine> lines = IntStream.range(0, covered.size())
                 .filter(i -> prices.get(i).compareTo(price(covered.get(i))) < 0)
                 .mapToObj(i -> new DiscountedLine(covered.get(i), prices.get(i).doubleValue()))
                 .toList();
+        return DiscountCalculation.of(lines);
     }
 
-    private static List<BigDecimal> percentage(DiscountCode code, List<BasketItem> covered) {
-        BigDecimal factor = BigDecimal.ONE.subtract(BigDecimal.valueOf(code.getValue()).divide(HUNDRED));
+    private static List<BigDecimal> percentage(Discount discount, List<BasketItem> covered) {
+        BigDecimal factor = BigDecimal.ONE.subtract(BigDecimal.valueOf(discount.getValue()).divide(HUNDRED));
         return covered.stream()
-                .map(i -> price(i).multiply(factor).setScale(2, RoundingMode.HALF_UP).max(ONE_GROSZ))
+                .map(i -> price(i).multiply(factor).setScale(2, RoundingMode.HALF_UP).max(ONE_CENT))
                 .toList();
     }
 
-    private static List<BigDecimal> amount(DiscountCode code, List<BasketItem> covered) {
-        BigDecimal value = BigDecimal.valueOf(code.getValue()).setScale(2, RoundingMode.HALF_UP);
+    private static List<BigDecimal> amount(Discount discount, List<BasketItem> covered) {
+        BigDecimal value = BigDecimal.valueOf(discount.getValue()).setScale(2, RoundingMode.HALF_UP);
         BigDecimal coveredValue = covered.stream().map(DiscountCalculator::lineValue).reduce(BigDecimal.ZERO, BigDecimal::add);
         if (coveredValue.signum() <= 0) {
             return covered.stream().map(DiscountCalculator::price).toList();
@@ -75,7 +76,7 @@ public final class DiscountCalculator {
     }
 
     private static BigDecimal room(BasketItem item) {
-        return price(item).subtract(ONE_GROSZ).max(BigDecimal.ZERO);
+        return price(item).subtract(ONE_CENT).max(BigDecimal.ZERO);
     }
 
     private static BigDecimal lineValue(BasketItem item) {

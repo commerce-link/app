@@ -52,11 +52,14 @@ public class InventoryView {
                 .collect(Collectors.toList());
     }
 
-    // a listed global group without a PIM id takes the id of the store entry it covers when assembled
-    // (see InventoryIndex.covers)
+    // a listed global group without a PIM id takes, when assembled, the id of the store entry it covers (see
+    // InventoryIndex.covers) or the id of an own group linked with it: that own group is covered by the link and not
+    // listed on its own, so dropping the row would drop the product
     private boolean mayCarryPimId(InventoryKey key) {
         return key.getId() != null || ownIndex.findMatching(key).stream()
-                .anyMatch(own -> InventoryIndex.isStoreEntryKey(own.getInventoryKey(), storeEntries));
+                .map(MatchedInventory::getInventoryKey)
+                .anyMatch(own -> InventoryIndex.isStoreEntryKey(own, storeEntries)
+                        || (own.getId() != null && own.isLinkedWith(key)));
     }
 
     public Map<String, Collection<MatchedInventory>> findAllByProductCategoryIds(Collection<String> categoryIds) {
@@ -76,11 +79,26 @@ public class InventoryView {
         return new ListingInventory(globalIndex, ownIndex, storeEntries).keys();
     }
 
+    /**
+     * Runs the sources in order, each looking up with the key merged so far. A source may bring in a link (an own group
+     * linked to a global group) after earlier sources have already looked, and a later source may have looked only
+     * under the EANs known before it: then every source runs once more with the linked key, so a lookup by either EAN
+     * of a linked product gives the same row. Rerunning is safe: the result's offers are a set of value-equal records.
+     * Without a new link there is exactly one pass.
+     */
     private MatchedInventory assemble(InventoryKey lookupKey) {
         MatchedInventory result = new MatchedInventory(lookupKey.copy(), taxonomyCache, supplierRegistry);
+        Collection<String> linkedBefore = result.getInventoryKey().getLinkedEans();
+        runSources(result);
+        if (!linkedBefore.containsAll(result.getInventoryKey().getLinkedEans())) {
+            runSources(result);
+        }
+        return result;
+    }
+
+    private void runSources(MatchedInventory result) {
         for (InventorySource source : sources) {
             source.mergeInto(result, result.getInventoryKey());
         }
-        return result;
     }
 }

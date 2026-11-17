@@ -16,7 +16,7 @@ public final class StatementAmounts {
     private StatementAmounts() {
     }
 
-    /** The amount to the grosz, or null when the cell holds no number. */
+    /** The amount to the cent, or null when the cell holds no number. */
     public static BigDecimal parse(String cell, boolean decimalComma) {
         if (cell == null) {
             return null;
@@ -41,7 +41,7 @@ public final class StatementAmounts {
         return negative ? value.negate() : value;
     }
 
-    /** A stored double amount (orders keep doubles) to the grosz, so amounts from both sides compare exactly. */
+    /** A stored double amount (orders keep doubles) to the cent, so amounts from both sides compare exactly. */
     public static BigDecimal of(double amount) {
         return BigDecimal.valueOf(amount).setScale(2, RoundingMode.HALF_UP);
     }

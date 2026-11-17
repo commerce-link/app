@@ -96,7 +96,7 @@
                                     data-cl-group-count th:text="${group.rows().size()}"></span></span></th>
                         </tr>
                         <tr th:each="row : ${group.rows()}"
-                            th:attr="data-number=${row.number()}, data-amount=${row.amountGrosze()}, data-payout=${row.payout()},
+                            th:attr="data-number=${row.number()}, data-amount=${row.amountCents()}, data-payout=${row.payout()},
                                      data-channels=${row.channels()}, data-candidates=${row.candidatesJson()},
                                      data-date=${row.date()}, data-sender=${row.sender()}, data-title=${row.titleText()}">
                             <td class="cl-table-check">

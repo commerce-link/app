@@ -348,7 +348,7 @@ class RmaDetailPageFactoryTest {
     }
 
     @Test
-    void theInsuranceFieldShowsWholeGroszeWhileTheCarriedCopyStaysExact() {
+    void theInsuranceFieldShowsWholeCentsWhileTheCarriedCopyStaysExact() {
         // given: a sum of increases kept as a double (199.99 + 49.99)
         RMA rma = rma(RMAStatus.Approved);
         rma.setShippingInsurance(199.99 + 49.99);

@@ -84,7 +84,8 @@ public class WebConfig {
                                 "/dashboard/store/rma/**",
                                 "/dashboard/store/rma-centers/**",
                                 "/dashboard/store/report/**",
-                                "/dashboard/store/discounts/**"
+                                "/dashboard/store/discounts/**",
+                                "/dashboard/store/promotions/**"
                         );
             }
 

@@ -1,7 +1,7 @@
 package pl.commercelink.web.payments;
 
 /**
- * Amounts on the Payments page: a rest below half a grosz is rounding noise, not money owed (spec D2).
+ * Amounts on the Payments page: a rest below half a cent is rounding noise, not money owed (spec D2).
  */
 public final class PaymentsAmounts {
 

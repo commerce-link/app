@@ -38,12 +38,12 @@ class ItemMarginTest {
     void aSaleAtCostIsALossToo() {
         // when
         ItemMargin even = ItemMargin.of(500, 500, 1.23);
-        ItemMargin grosz = ItemMargin.of(500.01, 500, 1.23);
+        ItemMargin cent = ItemMargin.of(500.01, 500, 1.23);
 
         // then — client 2026-10-27: red at a margin of 0 or less, grey above it, no other threshold
         assertThat(even.tone()).isEqualTo(ItemMargin.Tone.LOSS);
         assertThat(even.percent()).isEqualTo("0,0");
-        assertThat(grosz.tone()).isEqualTo(ItemMargin.Tone.OK);
+        assertThat(cent.tone()).isEqualTo(ItemMargin.Tone.OK);
     }
 
     @Test

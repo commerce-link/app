@@ -20,7 +20,7 @@ import java.util.Objects;
 
 /**
  * The reconciliation page keeps the statement's operations and the operator's choices in the page itself (nothing is
- * stored on the server), as JSON in form fields and data attributes. Amounts travel in grosze, so the page's script
+ * stored on the server), as JSON in form fields and data attributes. Amounts travel in cents, so the page's script
  * adds them up exactly. Whatever comes back is checked again when booking: the operator could book any payment by hand
  * anyway, so a changed field gains nothing, but a malformed one is dropped instead of failing the page.
  */
@@ -39,7 +39,7 @@ public class StatementJson {
 
     public String operations(List<BankOperation> operations) {
         return write(operations.stream().map(operation -> new OperationJson(operation.line(), operation.date().toString(),
-                grosze(operation.amount()), operation.title(), operation.sender(), operation.senderAccount(),
+                cents(operation.amount()), operation.title(), operation.sender(), operation.senderAccount(),
                 operation.number())).toList());
     }
 
@@ -59,7 +59,7 @@ public class StatementJson {
     public String allocations(Map<String, List<Allocation>> allocations) {
         Map<String, List<AllocationJson>> json = new LinkedHashMap<>();
         allocations.forEach((number, list) -> json.put(number, list.stream()
-                .map(allocation -> new AllocationJson(allocation.orderId(), grosze(allocation.amount()), grosze(allocation.fee())))
+                .map(allocation -> new AllocationJson(allocation.orderId(), cents(allocation.amount()), cents(allocation.fee())))
                 .toList()));
         return write(json);
     }
@@ -115,12 +115,12 @@ public class StatementJson {
         }
     }
 
-    public static long grosze(BigDecimal amount) {
+    public static long cents(BigDecimal amount) {
         return amount.setScale(2, RoundingMode.HALF_UP).movePointRight(2).longValueExact();
     }
 
-    public static BigDecimal money(long grosze) {
-        return BigDecimal.valueOf(grosze, 2);
+    public static BigDecimal money(long cents) {
+        return BigDecimal.valueOf(cents, 2);
     }
 
     private static BankOperation operation(OperationJson json) {

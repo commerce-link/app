@@ -41,7 +41,7 @@ class DiscountCodesMessagesTest {
                     messages.getMessage("store.discounts.toggled.on", new Object[]{"LATO-10"}, locale),
                     messages.getMessage("store.discounts.toggled.off", new Object[]{"LATO-10"}, locale),
                     messages.getMessage("store.discounts.list.minimum", new Object[]{"500,00"}, locale),
-                    messages.getMessage("store.discounts.list.targetMore", new Object[]{"Kategorie", 2}, locale),
+                    messages.getMessage("store.discounts.list.more", new Object[]{2}, locale),
                     messages.getMessage("store.discounts.uses.limited", new Object[]{6, 100}, locale),
                     messages.getMessage("store.discounts.details.uses.limited", new Object[]{6, 100}, locale),
                     messages.getMessage("store.discounts.validity.range", new Object[]{"01.10.2026", "31.12.2026"}, locale),
@@ -62,7 +62,7 @@ class DiscountCodesMessagesTest {
             // then
             assertThat(texts).as(locale.toString()).noneMatch(text -> text.contains("{") || text.contains("}"));
             assertThat(texts.get(0)).as(locale.toString()).contains("LATO-10");
-            assertThat(texts.get(7)).as(locale.toString()).contains("Kategorie").contains("+2");
+            assertThat(texts.get(7)).as(locale.toString()).contains("+2");
             assertThat(texts.get(8)).as(locale.toString()).isEqualTo("6 / 100");
         }
     }

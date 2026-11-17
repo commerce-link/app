@@ -348,7 +348,7 @@ public class InvoiceSyncPreview {
 
     /**
      * The invoice net in the lines' currency: the sum of the converted lines, not the total times the rate, which can
-     * differ by a grosz from the lines rounded one by one. So it always equals assigned plus unassigned.
+     * differ by a cent from the lines rounded one by one. So it always equals assigned plus unassigned.
      */
     public double getInvoicePriceNetConverted() {
         return Math.round(options.stream().mapToDouble(Option::getTotalNet).sum() * 100.0) / 100.0;
@@ -471,7 +471,7 @@ public class InvoiceSyncPreview {
             this.labelKey = labelKey;
         }
 
-        // the bands of InvoicePositionMatcher: equal below half a grosz, "close" at one grosz either way
+        // the bands of InvoicePositionMatcher: equal below half a cent, "close" at one cent either way
         static MatchState compare(double invoiceAmount, double deliveryAmount) {
             double delta = Math.abs(invoiceAmount - deliveryAmount);
             if (delta < EPS) {

@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.baskets.BasketsRepository;
+import pl.commercelink.discounts.DiscountService;
 import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.payments.api.PaymentLink;
@@ -61,6 +62,8 @@ class CheckoutErrorsTest {
     private PaymentProviderFactory paymentProviderFactory;
     @Mock
     private PaymentProvider paymentProvider;
+    @Mock
+    private DiscountService discountService;
 
     @Spy
     private StorePimAliases aliases = new StorePimAliases(ScopedPimCatalog.of());

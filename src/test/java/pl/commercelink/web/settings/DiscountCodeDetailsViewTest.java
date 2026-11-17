@@ -44,7 +44,7 @@ class DiscountCodeDetailsViewTest {
     }
 
     @Test
-    void theAverageIsRoundedHalfUpToTheGrosz() {
+    void theAverageIsRoundedHalfUpToTheCent() {
         // given
         List<DiscountedOrderEntry> entries = List.of(
                 entry("a", 100, 10, OrderStatus.New),

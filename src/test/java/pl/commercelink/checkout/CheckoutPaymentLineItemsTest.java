@@ -141,16 +141,61 @@ class CheckoutPaymentLineItemsTest {
         assertThat(paymentRequest.getValue().shippingItem().amount()).isEqualTo(435);
     }
 
+    @Test
+    void onlyTheChosenVariantOfAGroupIsCharged() {
+        // given
+        BasketItem cheaper = item(500.00, 1, false);
+        cheaper.setVariantGroupId("gpu");
+        BasketItem dearer = item(700.00, 1, false);
+        dearer.setVariantGroupId("gpu");
+        Basket basket = givenBasket(List.of(cheaper, dearer, item(100.00, 1, false)), null);
+        basket.selectVariant("gpu", dearer.getPosition());
+
+        // when
+        checkout.create(STORE_ID, BASKET_ID, PROVIDER);
+
+        // then
+        verify(paymentProvider).createPaymentLink(paymentRequest.capture());
+        assertThat(paymentRequest.getValue().lineItems())
+                .extracting(PaymentLineItem::amount, PaymentLineItem::quantity)
+                .containsExactly(tuple(70000, 1), tuple(10000, 1));
+    }
+
+    @Test
+    void servicesAreChargedAndEveryLineKeepsItsQuantity() {
+        // given
+        BasketItem assembly = item(150.00, 1, false);
+        assembly.setService(true);
+        givenBasket(List.of(item(129.90, 3, false), assembly), null);
+
+        // when
+        checkout.create(STORE_ID, BASKET_ID, PROVIDER);
+
+        // then
+        verify(paymentProvider).createPaymentLink(paymentRequest.capture());
+        PaymentRequest request = paymentRequest.getValue();
+        assertThat(request.lineItems())
+                .extracting(PaymentLineItem::amount, PaymentLineItem::quantity)
+                .containsExactly(tuple(15000, 1), tuple(12990, 3));
+        assertThat(request.lineItems().stream().mapToInt(line -> line.amount() * line.quantity()).sum()).isEqualTo(53970);
+        assertThat(request.shippingItem()).isNull();
+    }
+
     private void givenBasket(BasketItem item, String deliveryOptionId) {
+        givenBasket(List.of(item), deliveryOptionId);
+    }
+
+    private Basket givenBasket(List<BasketItem> items, String deliveryOptionId) {
         BillingDetails billingDetails = new BillingDetails();
         billingDetails.setEmail("jan@example.com");
         Basket basket = new Basket.Builder(STORE_ID)
                 .withBasketId(BASKET_ID)
                 .withBillingDetails(billingDetails)
-                .withBasketItems(List.of(item))
+                .withBasketItems(items)
                 .withDeliveryOptionId(deliveryOptionId)
                 .build();
         when(basketsRepository.findById(STORE_ID, BASKET_ID)).thenReturn(Optional.of(basket));
+        return basket;
     }
 
     private BasketItem item(double unitPrice, long qty, boolean consolidated) {

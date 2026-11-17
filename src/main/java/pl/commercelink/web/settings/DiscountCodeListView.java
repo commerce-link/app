@@ -4,7 +4,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.util.UriComponentsBuilder;
 import pl.commercelink.discounts.DiscountCode;
 import pl.commercelink.discounts.DiscountCodeStatus;
-import pl.commercelink.discounts.DiscountTarget;
+import pl.commercelink.discounts.DiscountScope;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -18,6 +18,8 @@ public record DiscountCodeListView(List<DiscountCodeView> rows, List<Segment> se
                                    String target, int total) {
 
     public static final String WHOLE_BASKET = "basket";
+
+    private static final List<String> TARGET_PARAMS = List.of(WHOLE_BASKET, "category", "product", "brand");
 
     private static final List<DiscountCodeStatus> SEGMENT_ORDER = List.of(DiscountCodeStatus.Active,
             DiscountCodeStatus.Scheduled, DiscountCodeStatus.Exhausted, DiscountCodeStatus.Expired,
@@ -61,13 +63,14 @@ public record DiscountCodeListView(List<DiscountCodeView> rows, List<Segment> se
     }
 
     private static boolean matchesTarget(DiscountCode code, String targetParam) {
-        if (targetParam.isEmpty()) {
-            return true;
-        }
-        if (targetParam.equals(WHOLE_BASKET)) {
-            return code.getTarget() == null;
-        }
-        return code.getTarget() != null && param(code.getTarget()).equals(targetParam);
+        DiscountScope scope = code.getScope();
+        return switch (targetParam) {
+            case WHOLE_BASKET -> scope.isEmpty();
+            case "category" -> !scope.getCategories().isEmpty();
+            case "product" -> !scope.getProducts().isEmpty();
+            case "brand" -> !scope.getBrands().isEmpty();
+            default -> true;
+        };
     }
 
     private static DiscountCodeStatus statusOf(String status) {
@@ -80,15 +83,7 @@ public record DiscountCodeListView(List<DiscountCodeView> rows, List<Segment> se
     }
 
     private static String targetParamOf(String target) {
-        if (WHOLE_BASKET.equals(target)) {
-            return WHOLE_BASKET;
-        }
-        for (DiscountTarget candidate : DiscountTarget.values()) {
-            if (param(candidate).equals(target)) {
-                return target;
-            }
-        }
-        return "";
+        return target != null && TARGET_PARAMS.contains(target) ? target : "";
     }
 
     private static String param(Enum<?> value) {

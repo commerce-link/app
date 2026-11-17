@@ -2,6 +2,7 @@ package pl.commercelink.inventory.supplier;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import pl.commercelink.inventory.SharedManufacturerCodes;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
@@ -10,6 +11,7 @@ import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class FeedProcessing {
 
@@ -18,15 +20,29 @@ class FeedProcessing {
     private final TaxonomyCategoryEnrichment enrichment;
     private final FeedParseStats stats;
     private final int taxonomyPenalty;
+    private final boolean ignorePlaceholderEans;
+    private final List<ParsedRow> rows = new ArrayList<>();
     private final List<InventoryItem> sellableOffers = new ArrayList<>();
     private final List<InventoryItem> imported = new ArrayList<>();
     private final List<WaitingRow> waitingForCodeIndex = new ArrayList<>();
 
+    // A placeholder EAN is known only once the whole feed is read, so rows wait for finish() only while that guard is on.
     void add(ParsedRow parsed) {
-        InventoryItem item = dataCorrection.run(parsed.item());
-        if (!item.isSellable()) {
+        if (ignorePlaceholderEans) {
+            rows.add(parsed);
+        } else {
+            process(parsed, PlaceholderEans.none());
+        }
+    }
+
+    private boolean process(ParsedRow parsed, PlaceholderEans placeholderEans) {
+        InventoryItem raw = parsed.item();
+        boolean placeholder = placeholderEans.contains(raw.ean());
+        // Dropping the number lets the PIM supply the real one from the manufacturer code.
+        InventoryItem item = dataCorrection.run(placeholder ? raw.withBrandAndEan(raw.brand(), null) : raw);
+        if (!item.isSellable() || placeholderEans.contains(item.ean())) {
             stats.markInvalid();
-            return;
+            return false;
         }
         sellableOffers.add(item);
         Taxonomy corrected = dataCorrection.run(parsed.product(), item);
@@ -36,6 +52,7 @@ class FeedProcessing {
         } else {
             waitingForCodeIndex.add(new WaitingRow(item, corrected));
         }
+        return true;
     }
 
     void skipInvalid() {
@@ -43,6 +60,17 @@ class FeedProcessing {
     }
 
     List<InventoryItem> finish() {
+        PlaceholderEans placeholderEans = PlaceholderEans.of(rows.stream().map(ParsedRow::item).toList());
+        int rejectedUnderPlaceholder = 0;
+        for (ParsedRow row : rows) {
+            if (!process(row, placeholderEans) && placeholderEans.contains(row.item().ean())) {
+                rejectedUnderPlaceholder++;
+            }
+        }
+        if (placeholderEans.size() > 0) {
+            log.warn("Feed of {} has {} EANs shared by {} or more manufacturer codes; {} rows under them were skipped",
+                    stats.supplierName(), placeholderEans.size(), PlaceholderEans.MIN_CODES, rejectedUnderPlaceholder);
+        }
         SharedManufacturerCodes sharedCodes = SharedManufacturerCodes.of(sellableOffers);
         for (InventoryItem offer : sharedCodes.offersUnderSharedCode()) {
             taxonomyCache.blockCodeSource(offer.mfn(), offer.brand(), offer.ean());

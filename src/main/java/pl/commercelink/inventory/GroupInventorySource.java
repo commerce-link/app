@@ -65,7 +65,13 @@ class GroupInventorySource implements InventorySource {
         if (byPimId != null) {
             return byPimId;
         }
-        return largest(candidates, group -> group.getInventoryKey().hasAnyEan(lookupKey.getProductEans()));
+        MatchedInventory byEan = largest(candidates, group -> group.getInventoryKey().hasAnyEan(lookupKey.getProductEans()));
+        if (byEan != null) {
+            return byEan;
+        }
+        // lowest priority: a group linked with the row, the same product under other EANs (for the own source an own
+        // group linked to the row's global group, for the global source the global group an own row is linked to)
+        return largest(candidates, group -> group.getInventoryKey().isLinkedWith(lookupKey));
     }
 
     private MatchedInventory largest(List<MatchedInventory> groups, Predicate<MatchedInventory> level) {

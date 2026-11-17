@@ -2,6 +2,7 @@ package pl.commercelink.inventory.supplier;
 
 import pl.commercelink.products.brand.NoNameBrand;
 
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -84,9 +85,18 @@ public record InventoryItem(
         return supplier.equals(other);
     }
 
+    /** A brand that can tell products apart: present and not the "no name" placeholder. */
+    public boolean hasMatchableBrand() {
+        return brand != null && !brand.isBlank() && !NoNameBrand.is(brand);
+    }
+
     public boolean isOfBrand(String other) {
-        return brand != null && !brand.isBlank() && other != null && brand.trim().equalsIgnoreCase(other.trim())
-                && !NoNameBrand.is(brand);
+        return hasMatchableBrand() && other != null && brand.trim().equalsIgnoreCase(other.trim());
+    }
+
+    /** The brand as a comparison key, so spelling differences in case and surrounding spaces do not matter. */
+    public String brandKey() {
+        return brand == null ? null : brand.trim().toLowerCase(Locale.ROOT);
     }
 
     public boolean isSellable() {

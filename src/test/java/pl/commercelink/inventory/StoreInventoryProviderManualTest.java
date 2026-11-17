@@ -7,6 +7,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.StoreFeedItemLoader;
@@ -43,6 +44,8 @@ class StoreInventoryProviderManualTest {
     @Mock pl.commercelink.pim.api.PimCatalog pimCatalog;
     @Mock
     private PimView pimView;
+    @Mock GlobalMatchedInventory globalInventory;
+    @Spy InventoryMatchingProperties matchingProperties = InventoryMatchingProperties.allEnabled();
     @InjectMocks StoreInventoryProvider provider;
 
     @Captor ArgumentCaptor<SupplierProviderDescriptor> descriptorCaptor;
@@ -59,7 +62,9 @@ class StoreInventoryProviderManualTest {
 
         when(cache.get("store-1")).thenReturn(java.util.Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.run(any(), any())).thenReturn(List.of());
+        when(globalInventory.generation()).thenReturn(
+                new GlobalMatchedInventory.Generation(0, List.of(), InventoryIndex.of(List.of()), VariantCodes.none()));
+        when(autoDiscovery.group(any(), any(), any(), any())).thenReturn(new InventoryAutoDiscovery.Grouping(List.of(), VariantCodes.none()));
         when(storeFeedItemLoader.load(eq("store-1"), any(String.class), any(SupplierProviderDescriptor.class), any()))
                 .thenReturn(List.of());
 
@@ -87,7 +92,9 @@ class StoreInventoryProviderManualTest {
 
         when(cache.get("store-1")).thenReturn(java.util.Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.run(any(), any())).thenReturn(List.of());
+        when(globalInventory.generation()).thenReturn(
+                new GlobalMatchedInventory.Generation(0, List.of(), InventoryIndex.of(List.of()), VariantCodes.none()));
+        when(autoDiscovery.group(any(), any(), any(), any())).thenReturn(new InventoryAutoDiscovery.Grouping(List.of(), VariantCodes.none()));
         when(storeFeedItemLoader.load(eq("store-1"), any(String.class), any(SupplierProviderDescriptor.class), any()))
                 .thenReturn(List.of());
 

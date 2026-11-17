@@ -112,8 +112,7 @@ class DiscountCodesRepositoryDynamoDbIntegrationTest {
         DiscountCode original = code("store-1", "GPU-50", "Rabat na podzespoły");
         original.setType(DiscountType.Amount);
         original.setValue(50);
-        original.setTarget(DiscountTarget.Category);
-        original.setTargetValues(List.of(new TargetValue("Karty graficzne", "Karty graficzne")));
+        original.setScope(Scopes.categories("Karty graficzne"));
         original.setPaymentProvider("paynow");
         original.setMinOrderValue(500);
         original.setMaxUses(100);
@@ -129,8 +128,9 @@ class DiscountCodesRepositoryDynamoDbIntegrationTest {
         assertThat(stored.getName()).isEqualTo("Rabat na podzespoły");
         assertThat(stored.getType()).isEqualTo(DiscountType.Amount);
         assertThat(stored.getValue()).isEqualTo(50);
-        assertThat(stored.getTarget()).isEqualTo(DiscountTarget.Category);
-        assertThat(stored.getTargetValues()).extracting(TargetValue::getId).containsExactly("Karty graficzne");
+        assertThat(stored.getScope().getCategories()).containsExactly("Karty graficzne");
+        assertThat(stored.getScope().getBrands()).isEmpty();
+        assertThat(stored.getScope().getProducts()).isEmpty();
         assertThat(stored.getPaymentProvider()).isEqualTo("paynow");
         assertThat(stored.getMinOrderValue()).isEqualTo(500);
         assertThat(stored.getMaxUses()).isEqualTo(100);

@@ -3,8 +3,9 @@ package pl.commercelink.web.settings;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.discounts.DiscountCode;
 import pl.commercelink.discounts.DiscountCodeStatus;
-import pl.commercelink.discounts.DiscountTarget;
+import pl.commercelink.discounts.DiscountScope;
 import pl.commercelink.discounts.DiscountType;
+import pl.commercelink.discounts.Scopes;
 import pl.commercelink.discounts.TargetValue;
 
 import java.time.LocalDateTime;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 class DiscountCodeViewTest {
 
@@ -44,7 +46,7 @@ class DiscountCodeViewTest {
     }
 
     @Test
-    void amountWithoutThresholdShowsGroszeAndNoThreshold() {
+    void amountWithoutThresholdShowsCentsAndNoThreshold() {
         // when
         DiscountCodeView view = DiscountCodeView.of(code("GPU-50", DiscountType.Amount, 1250), NOW, GATEWAYS, BASE);
 
@@ -55,31 +57,48 @@ class DiscountCodeViewTest {
     }
 
     @Test
-    void showsThreeTargetsAndCountsTheRest() {
+    void showsThreeValuesOfAListAndCountsTheRest() {
         // given
         DiscountCode code = code("GPU-50", DiscountType.Amount, 50);
-        code.setTarget(DiscountTarget.Category);
-        code.setTargetValues(List.of(category("Karty graficzne"), category("Procesory"), category("Płyty główne"),
-                category("Zasilacze")));
+        code.setScope(Scopes.categories("Karty graficzne", "Procesory", "Płyty główne", "Zasilacze"));
 
         // when
         DiscountCodeView view = DiscountCodeView.of(code, NOW, GATEWAYS, BASE);
 
         // then
-        assertThat(view.target()).isEqualTo(DiscountTarget.Category);
-        assertThat(view.targetNames()).containsExactly("Karty graficzne", "Procesory", "Płyty główne");
-        assertThat(view.moreTargets()).isEqualTo(1);
+        assertThat(view.scope().everything()).isFalse();
+        assertThat(view.scope().parts()).extracting(DiscountScopeView.Part::kind, DiscountScopeView.Part::shownNames,
+                        DiscountScopeView.Part::more)
+                .containsExactly(tuple("categories", List.of("Karty graficzne", "Procesory", "Płyty główne"), 1));
+        assertThat(view.scope().parts().get(0).values()).extracting(TargetValue::getName)
+                .containsExactly("Karty graficzne", "Procesory", "Płyty główne", "Zasilacze");
     }
 
     @Test
-    void aWholeBasketCodeHasNoTargets() {
+    void everyFilledListIsAPartInTheOrderCategoriesBrandsProducts() {
+        // given
+        DiscountCode code = code("ASUS-10", DiscountType.Percentage, 10);
+        code.setScope(new DiscountScope(List.of("Monitory"), List.of("ASUS"),
+                List.of(new TargetValue("PIM-1", "Monitor ASUS 27"))));
+
+        // when
+        DiscountCodeView view = DiscountCodeView.of(code, NOW, GATEWAYS, BASE);
+
+        // then
+        assertThat(view.scope().parts()).extracting(DiscountScopeView.Part::kind, DiscountScopeView.Part::shownNames)
+                .containsExactly(tuple("categories", List.of("Monitory")), tuple("brands", List.of("ASUS")),
+                        tuple("products", List.of("Monitor ASUS 27")));
+        assertThat(view.scope().parts().get(2).values()).extracting(TargetValue::getId).containsExactly("PIM-1");
+    }
+
+    @Test
+    void aWholeBasketCodeHasNoParts() {
         // when
         DiscountCodeView view = DiscountCodeView.of(code("LATO-10", DiscountType.Percentage, 10), NOW, GATEWAYS, BASE);
 
         // then
-        assertThat(view.target()).isNull();
-        assertThat(view.targetNames()).isEmpty();
-        assertThat(view.moreTargets()).isZero();
+        assertThat(view.scope().everything()).isTrue();
+        assertThat(view.scope().parts()).isEmpty();
     }
 
     @Test
@@ -178,9 +197,5 @@ class DiscountCodeViewTest {
         discountCode.setValue(value);
         discountCode.setActive(true);
         return discountCode;
-    }
-
-    private static TargetValue category(String name) {
-        return new TargetValue(name, name);
     }
 }

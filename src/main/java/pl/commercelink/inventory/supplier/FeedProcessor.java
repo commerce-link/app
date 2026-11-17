@@ -3,6 +3,7 @@ package pl.commercelink.inventory.supplier;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import pl.commercelink.inventory.InventoryMatchingProperties;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
 
@@ -13,8 +14,10 @@ class FeedProcessor {
     private final DataCorrection dataCorrection;
     private final TaxonomyCache taxonomyCache;
     private final TaxonomyCategoryEnrichment enrichment;
+    private final InventoryMatchingProperties matching;
 
     FeedProcessing start(String supplierName, int taxonomyPenalty) {
-        return new FeedProcessing(dataCorrection, taxonomyCache, enrichment, new FeedParseStats(supplierName), taxonomyPenalty);
+        return new FeedProcessing(dataCorrection, taxonomyCache, enrichment, new FeedParseStats(supplierName), taxonomyPenalty,
+                matching.ignorePlaceholderEans());
     }
 }

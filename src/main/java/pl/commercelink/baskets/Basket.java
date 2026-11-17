@@ -342,6 +342,9 @@ public class Basket {
 
     public void setDiscountAmount(double discountAmount) { this.discountAmount = discountAmount; }
 
+    @DynamoDBIgnore
+    public boolean hasPromotions() { return !hasDiscountCode() && discountAmount > 0; }
+
     public ContactDetails getContactDetails() { return contactDetails; }
 
     public void setContactDetails(ContactDetails contactDetails) { this.contactDetails = contactDetails; }

@@ -34,6 +34,14 @@ public class AddPaymentForm {
      * versus a delivery's payout).
      */
     public String validate() {
+        return validate(false);
+    }
+
+    /**
+     * {@link #validate()}, with the amount 0 accepted when pendingAllowed: an order takes it as the payment it still
+     * waits for (Payment.isUnsettled), e.g. the financed part next to a transfer already booked.
+     */
+    public String validate(boolean pendingAllowed) {
         BigDecimal amount = AmountParser.parse(bankAmount);
         if (amount == null) {
             return "error.message.payment.amount.format";
@@ -41,7 +49,7 @@ public class AddPaymentForm {
         if (!AmountParser.inRange(amount)) {
             return "error.message.payment.range";
         }
-        if (amount.signum() == 0) {
+        if (amount.signum() == 0 && !pendingAllowed) {
             return "error.message.payment.amount.invalid";
         }
         BigDecimal fee = AmountParser.parse(processingFee);
@@ -54,12 +62,12 @@ public class AddPaymentForm {
         return null;
     }
 
-    /** The amount as typed, to the grosz. */
+    /** The amount as typed, to the cent. */
     public double amount() {
         return AmountParser.parse(bankAmount).doubleValue();
     }
 
-    /** The fee as typed, to the grosz; 0 when blank. */
+    /** The fee as typed, to the cent; 0 when blank. */
     public double fee() {
         return AmountParser.parse(processingFee).doubleValue();
     }

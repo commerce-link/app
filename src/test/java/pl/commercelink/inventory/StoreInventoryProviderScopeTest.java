@@ -63,7 +63,8 @@ class StoreInventoryProviderScopeTest {
     private Collection<MatchedInventory> inventoryOf(String storeId, PimCatalog pimCatalog) {
         InventoryAutoDiscovery autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry);
         StoreInventoryProvider provider = new StoreInventoryProvider(cache, storesRepository, supplierProviderFactory,
-                autoDiscovery, storeFeedItemLoader, exchangeRates, pimCatalog);
+                autoDiscovery, storeFeedItemLoader, exchangeRates, pimCatalog, new GlobalMatchedInventory(),
+                InventoryMatchingProperties.allEnabled());
 
         Store store = new Store();
         store.setStoreId(storeId);

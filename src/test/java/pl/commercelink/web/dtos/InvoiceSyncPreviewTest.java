@@ -101,7 +101,7 @@ class InvoiceSyncPreviewTest {
             "15.00, 15.02, DIFFERENT",
             "15.00, 0.00, DIFFERENT"
     })
-    void stateBandsAreHalfAGroszAroundEqualAndAroundOneGroszEitherWay(double invoiceAmount, double deliveryAmount, MatchState expected) {
+    void stateBandsAreHalfACentAroundEqualAndAroundOneCentEitherWay(double invoiceAmount, double deliveryAmount, MatchState expected) {
         // when / then
         assertThat(MatchState.compare(invoiceAmount, deliveryAmount)).isEqualTo(expected);
     }

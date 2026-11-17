@@ -64,6 +64,11 @@ public class MatchedInventory {
         return getInventoryItems(null);
     }
 
+    /** The offers as held, unsorted and not copied: for hot loops over a whole pool, where getInventoryItems would copy and sort every group. */
+    Collection<InventoryItem> offersView() {
+        return Collections.unmodifiableCollection(inventoryItems);
+    }
+
     public List<InventoryItem> getInventoryItems(@Nullable SupplierType supplierType) {
         return inventoryItems.stream()
                 .filter(i -> supplierType == null || supplierRegistry.get(i.supplier()).type() == supplierType)

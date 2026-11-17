@@ -1206,29 +1206,112 @@ class CatalogCategoryControllerTest {
     }
 
     @Test
-    void theBasicsOfAnAutomaticCategoryCountItsList() throws Exception {
+    void theBasicsOfAnAutomaticCategoryOpenWithoutComputingItsList() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        gpu.setPimCategoryIds(List.of("pim-gpu"));
+
+        // when / then
+        mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics"))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeDoesNotExist("dynamicListCount"))
+                .andExpect(model().attribute("automaticListHref",
+                        "/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics/automatic-list"));
+        verify(dynamicCategoryProducts, never()).candidates(any(), any());
+        verify(productRepository, never()).labelsOf(any());
+    }
+
+    @Test
+    void theAutomaticListFragmentCountsTheListAndTheProductsTheCategoryKeeps() throws Exception {
         // given
         CategoryDefinition gpu = automaticListing(twoListed());
         when(productRepository.labelsOf(gpu.getCategoryId())).thenReturn(List.of("RTX", "RTX", "GTX"));
 
         // when / then
-        mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics"))
+        mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics/automatic-list"))
                 .andExpect(status().isOk())
+                .andExpect(view().name("catalog/category-automatic-list :: question"))
                 .andExpect(model().attribute("dynamicListCount", 2))
                 .andExpect(model().attribute("keptProductsCount", 3));
     }
 
     @Test
-    void theBasicsOfAnAutomaticCategoryOpenWhenItsListCannotBeRead() throws Exception {
+    void theAutomaticListFragmentIsUnavailableWhileTheListCannotBeRead() throws Exception {
         // given
         CategoryDefinition gpu = categoryOf("GPU");
         gpu.setType(CategoryDefinitionType.Dynamic);
         when(dynamicCategoryProducts.candidates(STORE_ID, gpu)).thenThrow(new IllegalStateException("PIM unavailable"));
 
         // when / then
-        mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics"))
+        mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics/automatic-list"))
+                .andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    void aManualCategoryHasNoAutomaticListFragment() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+
+        // when / then
+        mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics/automatic-list"))
+                .andExpect(status().isNotFound());
+        verify(dynamicCategoryProducts, never()).candidates(any(), any());
+    }
+
+    @Test
+    void theAutomaticListFragmentGoesThroughTheSameAccessCheckAsThePage() throws Exception {
+        // given
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
+        when(access.requireCategory(catalog, "someone-elses"))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+        // when / then
+        mvc.perform(get("/dashboard/catalogs/c1/category/someone-elses/settings/basics/automatic-list"))
+                .andExpect(status().isNotFound());
+        verify(dynamicCategoryProducts, never()).candidates(any(), any());
+    }
+
+    @Test
+    void aSaveTurningTheCategoryManualThatKeepsLosingTheRaceKeepsTheQuestionOnThePage() throws Exception {
+        // given
+        CategoryDefinition gpu = automaticListing(twoListed());
+        doThrow(exhausted()).when(definitions).saveBasics(any(), any(), any(), any());
+
+        // when / then
+        mvc.perform(turnManual(gpu).param("dynamicProducts", "store"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(model().attribute("errors", hasEntry("category-basics-form", "catalog.conflict")))
+                .andExpect(model().attribute("dynamicListCount", 2));
+        verify(dynamicCategoryProducts, times(1)).candidates(any(), any());
+    }
+
+    @Test
+    void aRefusedSaveThatLeavesTheCategoryAutomaticDoesNotReadItsList() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        gpu.setPimCategoryIds(List.of("pim-gpu"));
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics")
+                        .param("name", "").param("type", "Dynamic").param("maxQty", "1"))
                 .andExpect(status().isOk())
+                .andExpect(model().attribute("errors", hasEntry("name", "catalog.category.name.required")))
                 .andExpect(model().attributeDoesNotExist("dynamicListCount"));
+        verify(dynamicCategoryProducts, never()).candidates(any(), any());
+    }
+
+    @Test
+    void aRefusedSaveThatTurnsTheCategoryManualCarriesTheListItRead() throws Exception {
+        // given
+        CategoryDefinition gpu = automaticListing(twoListed());
+
+        // when / then
+        mvc.perform(turnManual(gpu))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("dynamicListCount", 2));
+        verify(dynamicCategoryProducts, times(1)).candidates(any(), any());
     }
 
     @Test

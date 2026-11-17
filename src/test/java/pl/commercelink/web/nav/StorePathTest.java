@@ -19,6 +19,7 @@ class StorePathTest {
         assertThat(StorePath.storeIdIn("/dashboard/store/rma-centers")).isNull();
         assertThat(StorePath.storeIdIn("/dashboard/store/invoicing")).isNull();
         assertThat(StorePath.storeIdIn("/dashboard/store/company-details")).isNull();
+        assertThat(StorePath.storeIdIn("/dashboard/store/promotions/new")).isNull();
     }
 
     @Test

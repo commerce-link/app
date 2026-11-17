@@ -324,6 +324,23 @@ class DeliveryCardsFactoryTest {
     }
 
     @Test
+    void afterTheReceiptTheTermsAndTheCommentStayOpenForEditors() {
+        // given
+        Delivery delivery = received(warehouse());
+
+        // when
+        DeliveryPageModel.TermsCard admin = DeliveryCardsFactory.terms(delivery, ADMIN, links(ADMIN, delivery), 5084);
+        DeliveryPageModel.TermsCard user = DeliveryCardsFactory.terms(delivery, USER, links(USER, delivery), 5084);
+        DeliveryPageModel.CommentCard comment = DeliveryCardsFactory.comment(delivery, ADMIN, links(ADMIN, delivery));
+
+        // then
+        assertThat(admin.edit().visible()).isTrue();
+        assertThat(user.edit().visible()).isFalse();
+        assertThat(comment.edit().visible()).isTrue();
+        assertThat(DeliveryCardsFactory.comment(delivery, USER, links(USER, delivery)).edit().visible()).isFalse();
+    }
+
+    @Test
     void anUnsetVatShowsNeitherAPercentageNorAGrossTotal() {
         // given
         Delivery unset = warehouse();

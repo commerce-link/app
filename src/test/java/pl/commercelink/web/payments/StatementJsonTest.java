@@ -30,7 +30,7 @@ class StatementJsonTest {
     }
 
     @Test
-    void allocationsTravelInGrosze() {
+    void allocationsTravelInCents() {
         // given
         Map<String, List<Allocation>> allocations = Map.of("WB-1",
                 List.of(new Allocation("order-1", new BigDecimal("649.00"), new BigDecimal("64.90"))));

@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DeliveryCreationFormTest {
 
     @Test
-    void unitCostsAreRoundedToWholeGrosze() {
+    void unitCostsAreRoundedToWholeCents() {
         // given: the cost fields have no browser validation, so the posted costs may carry any fraction
         DeliveryCreationForm form = new DeliveryCreationForm();
         DeliveryItem item = new DeliveryItem();
@@ -96,7 +96,7 @@ class DeliveryCreationFormTest {
     }
 
     @Test
-    void costOfTheEditProductDialogIsRoundedToWholeGrosze() {
+    void costOfTheEditProductDialogIsRoundedToWholeCents() {
         // given
         DeliveryFulfilmentUpdateForm form = new DeliveryFulfilmentUpdateForm();
 

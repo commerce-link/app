@@ -127,7 +127,7 @@ class ReceiptRequestConverterTest {
     }
 
     @Test
-    void floatingPointPricesAddUpToTheGrosz() {
+    void floatingPointPricesAddUpToTheCent() {
         ReceiptRequestSnapshot snapshot = converted(b2cOrder(99.99), items(item("Kabel", 3, 33.33, 1.23)));
 
         assertThat(snapshot.toRequest(KEY).totalGross().grosze()).isEqualTo(9999);

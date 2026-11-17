@@ -153,9 +153,27 @@ class BasketViewPageFactoryTest {
         // then
         assertThat(page.summary().items()).isEqualTo("1" + NBSP + "100,00");
         assertThat(page.summary().discountCode()).isEqualTo("LATO-10");
+        assertThat(page.summary().hasPromotions()).isFalse();
         assertThat(page.summary().discount()).isEqualTo("100,00");
         assertThat(page.summary().total()).isEqualTo("1" + NBSP + "019,99");
         assertThat(page.products()).extracting(BasketViewPage.Row::unitPrice).containsExactly("900,00", "50,00");
+    }
+
+    @Test
+    void basketDiscountedWithoutCodeShowsItemsBeforeDiscountAndThePromotions() {
+        // given
+        Basket basket = basket(item("Laptop", "L-1", 1, 900.00), item("Mysz", "M-1", 2, 50.00));
+        basket.setDiscountAmount(100.00);
+
+        // when
+        BasketViewPage page = build(basket);
+
+        // then
+        assertThat(page.summary().items()).isEqualTo("1" + NBSP + "100,00");
+        assertThat(page.summary().discountCode()).isNull();
+        assertThat(page.summary().hasPromotions()).isTrue();
+        assertThat(page.summary().discount()).isEqualTo("100,00");
+        assertThat(page.summary().total()).isEqualTo("1" + NBSP + "000,00");
     }
 
     @Test
@@ -168,6 +186,8 @@ class BasketViewPageFactoryTest {
 
         // then
         assertThat(page.summary().discountCode()).isNull();
+        assertThat(page.summary().hasPromotions()).isFalse();
+        assertThat(page.summary().hasDiscount()).isFalse();
         assertThat(page.summary().items()).isEqualTo("900,00");
     }
 

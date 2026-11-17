@@ -1837,11 +1837,13 @@ public class OrdersController extends BaseController {
                     : refuse(redirectAttributes, orderId, PAYMENTS_CLOSED, locale);
         }
 
-        String invalid = form.validate();
+        String invalid = form.validate(true);
         if (invalid != null) {
             return back.isPresent() ? refuseToPayments(redirectAttributes, back.get(), invalid, locale)
                     : refuse(redirectAttributes, orderId, invalid, locale);
         }
+        // amount 0 is the payment the order still waits for, as the one made with the order: it stays 0 whatever the fee
+        boolean pending = form.amount() == 0;
         PaymentDirection direction = form.getDirection() != null ? form.getDirection() : PaymentDirection.Incoming;
         // the sign follows the direction, as in a payment's own dialog: a refund is stored negative however it was
         // typed, and money that came in cannot be negative
@@ -1851,9 +1853,8 @@ public class OrdersController extends BaseController {
         }
         double bankAmount = direction == PaymentDirection.Outgoing ? -Math.abs(form.amount()) : form.amount();
 
-        double amount = form.isFeeIncluded()
-                ? bankAmount
-                : bankAmount + form.fee();
+        double amount = pending ? 0
+                : form.isFeeIncluded() ? bankAmount : bankAmount + form.fee();
 
         Payment target = existingOrder.getPayments().stream()
                 .filter(Payment::isUnsettled)
@@ -1876,11 +1877,13 @@ public class OrdersController extends BaseController {
         savePayments(existingOrder);
         if (back.isPresent()) {
             redirectAttributes.addFlashAttribute(PaymentsReturn.NOTICE,
-                    messageSource.getMessage(direction == PaymentDirection.Outgoing ? "payments.notice.order.refund" : "payments.notice.order",
+                    messageSource.getMessage(pending ? "payments.notice.order.pending"
+                                    : direction == PaymentDirection.Outgoing ? "payments.notice.order.refund" : "payments.notice.order",
                             new Object[]{existingOrder.getShortenedOrderId()}, locale));
             return "redirect:" + back.get();
         }
-        OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.payments.added", null, locale));
+        OrderFlash.saved(redirectAttributes,
+                messageSource.getMessage(pending ? "order.payments.added.pending" : "order.payments.added", null, locale));
         return details(orderId);
     }
 

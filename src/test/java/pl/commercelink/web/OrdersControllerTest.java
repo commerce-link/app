@@ -1587,6 +1587,41 @@ class OrdersControllerTest {
         }
 
         @Test
+        void addPaymentWithAmountZeroAddsAPendingPaymentNextToTheSettledOne() {
+            // given
+            Order order = orderWith(Payment.bankTransfer("REF-1", "Jan", 2500));
+            AddPaymentForm installments = addForm("0", "", PaymentDirection.Incoming);
+            installments.setSource(PaymentSource.Installments);
+
+            // when
+            ordersController.addPayment(ORDER_ID, installments, redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(errorMessage()).isNull();
+            assertThat(order.getPayments()).extracting(Payment::getAmount).containsExactly(2500.0, 0.0);
+            assertThat(order.getPayments().get(1).getSource()).isEqualTo(PaymentSource.Installments);
+            assertThat(order.getPendingPayment()).isSameAs(order.getPayments().get(1));
+            verify(orderLifecycle).update(order);
+        }
+
+        @Test
+        void addPaymentWithAmountZeroStaysPendingWhenTheFeeIsNotIncluded() {
+            // given
+            Order order = orderWith(Payment.bankTransfer("REF-1", "Jan", 2500));
+            AddPaymentForm installments = addForm("0", "5", PaymentDirection.Incoming);
+            installments.setFeeIncluded(false);
+            installments.setReturnTo("/dashboard/payments?side=receivables");
+
+            // when
+            ordersController.addPayment(ORDER_ID, installments, redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(order.getPayments()).extracting(Payment::getAmount).containsExactly(2500.0, 0.0);
+            assertThat(order.getPayments().get(1).getFee()).isEqualTo(5.0);
+            assertThat(redirect.getFlashAttributes().get(PaymentsReturn.NOTICE)).isEqualTo("payments.notice.order.pending");
+        }
+
+        @Test
         void thePendingPaymentMayKeepTheAmountZeroAndChangeItsMethod() {
             // given
             Order order = orderWith(new Payment(PaymentSource.BankTransfer));

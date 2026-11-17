@@ -5,8 +5,6 @@ import java.util.List;
 
 public interface StockQueryService {
 
-    List<WarehouseItemView> searchAvailableByEans(String storeId, Collection<String> eans);
-
     List<WarehouseItemView> searchByEans(String storeId, Collection<String> eans);
 
     /** Items of the store whose serial-number list holds exactly this number. */

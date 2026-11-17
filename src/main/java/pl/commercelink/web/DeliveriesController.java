@@ -1085,8 +1085,11 @@ public class DeliveriesController {
         DeliveryLinks links = DeliveryLinks.of(isSuperAdmin(), storeId, existing.getDeliveryId());
         TermsDialog dialog = TermsDialog.of(existing, links);
         String fragment = "deliveries/details/dialogs :: " + (form.isComment() ? "commentForm" : "termsForm");
-        String refusal = existing.hasBeenReceived() ? "deliveries.details.terms.locked.received"
-                : existing.isAwaitingApproval() && !isSuperAdmin() ? "deliveries.edit.locked.awaitingApproval" : null;
+        boolean vatOnly = existing.hasBeenReceived() && !form.isComment();
+        if (vatOnly) {
+            form = DeliveryTermsForm.vatOnly(existing, form.getVat());
+        }
+        String refusal = existing.isAwaitingApproval() && !isSuperAdmin() ? "deliveries.edit.locked.awaitingApproval" : null;
         if (refusal != null) {
             String text = messageSource.getMessage(refusal, null, locale);
             if (async) {
@@ -1101,12 +1104,13 @@ public class DeliveriesController {
         if (form.isComment()) {
             // the stored numbers go back as they are: re-reading them from text could change or refuse a value the
             // operator never touched in this dialog
-            toSave = withComment(storeId, existing, StringUtils.isBlank(form.getComment()) ? null : form.getComment());
+            toSave = storedTerms(storeId, existing);
+            toSave.setComment(StringUtils.isBlank(form.getComment()) ? null : form.getComment());
         } else {
             // set before validating, so a page rendered with the refused terms still shows the stored comment in the
             // comment dialog, which reads the same form
             form.setComment(existing.getComment());
-            Map<String, String> errors = form.validate(!existing.isDropship());
+            Map<String, String> errors = vatOnly ? form.validateVat() : form.validate(!existing.isDropship());
             if (!errors.isEmpty()) {
                 model.addAttribute("termsDialog", dialog.withErrors(form, errors));
                 response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
@@ -1114,7 +1118,12 @@ public class DeliveriesController {
                         : showDeliveryDetails(storeId, existing.getDeliveryId(), null, "terms", null, Set.of(), model,
                         redirectAttributes, locale);
             }
-            toSave = form.toDelivery(storeId);
+            if (vatOnly) {
+                toSave = storedTerms(storeId, existing);
+                toSave.setTax(form.tax());
+            } else {
+                toSave = form.toDelivery(storeId);
+            }
         }
         deliveriesManager.updateDelivery(toSave);
         String saved = messageSource.getMessage(form.isComment()
@@ -1129,7 +1138,7 @@ public class DeliveriesController {
         return detailsRedirect(storeId, existing.getDeliveryId());
     }
 
-    private static Delivery withComment(String storeId, Delivery existing, String comment) {
+    private static Delivery storedTerms(String storeId, Delivery existing) {
         Delivery delivery = new Delivery();
         delivery.setStoreId(storeId);
         delivery.setDeliveryId(existing.getDeliveryId());
@@ -1138,7 +1147,7 @@ public class DeliveriesController {
         delivery.setShippingCost(existing.getShippingCost());
         delivery.setPaymentCost(existing.getPaymentCost());
         delivery.setTax(existing.getTax());
-        delivery.setComment(comment);
+        delivery.setComment(existing.getComment());
         return delivery;
     }
 

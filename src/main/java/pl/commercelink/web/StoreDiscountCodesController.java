@@ -57,8 +57,7 @@ public class StoreDiscountCodesController {
         model.addAttribute("codes", DiscountCodeListView.of(discountCodesRepository.findAll(storeId), q, status, target,
                 LocalDateTime.now(DiscountCode.ZONE), gatewayNames, listPath));
         model.addAttribute("listPath", listPath);
-        model.addAttribute("newCodeHref", paymentOptions.isEmpty() ? null : listPath + "/new");
-        model.addAttribute("paymentsHref", SettingsPaths.store(storeId, "/payments"));
+        model.addAttribute("newCodeHref", listPath + "/new");
         return VIEW;
     }
 

@@ -25,7 +25,7 @@ public record StatementPage(String accountId, String fileName, List<Tile> tiles,
      * dialog, the others the assignment dialog (actionLabel, or none when booked already). channels lists (JSON) the
      * indexes in channelsJson of the payer's rows; candidatesJson the orders offered first in the dialog.
      */
-    public record Row(String number, String date, String sender, List<TitlePart> title, String amount, long amountGrosze,
+    public record Row(String number, String date, String sender, List<TitlePart> title, String amount, long amountCents,
                       String group, Pill rule, List<Pill> warnings, List<OrderRef> orders, String ordersNote,
                       String paymentType, String paymentReference, boolean selectable, boolean selected,
                       boolean payout, String channels, String candidatesJson, String actionLabel) {

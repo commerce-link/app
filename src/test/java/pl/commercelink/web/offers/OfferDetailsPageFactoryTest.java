@@ -177,7 +177,7 @@ class OfferDetailsPageFactoryTest {
     }
 
     @Test
-    void theEstimateIsRoundedHalfUpToGrosze() {
+    void theEstimateIsRoundedHalfUpToCents() {
         // given
         BasketItem noCost = item("A", 1, 20, 0);
 
@@ -542,8 +542,8 @@ class OfferDetailsPageFactoryTest {
     }
 
     @Test
-    void priceAndCostFieldsHoldWholeGroszeSoATableSaveStoresThemRounded() {
-        // given: the user's decision K1 - fractional grosze from an import or a conversion are rounded on the next save
+    void priceAndCostFieldsHoldWholeCentsSoATableSaveStoresThemRounded() {
+        // given: the user's decision K1 - fractional cents from an import or a conversion are rounded on the next save
         Basket basket = basket(item("A", 1, 10.005, 3.333));
 
         // when

@@ -164,7 +164,7 @@ class OrderPaymentFormTest {
     }
 
     @Test
-    void amountsAreValidatedAndStoredToTheGrosz() {
+    void amountsAreValidatedAndStoredToTheCent() {
         // given
         Payment saved = Payment.bankTransfer("REF-1", "Jan", 100);
 
