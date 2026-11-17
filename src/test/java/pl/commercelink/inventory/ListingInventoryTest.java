@@ -172,4 +172,18 @@ class ListingInventoryTest {
         // when / then
         assertThat(listing.keys()).containsExactly(globalKey, cloneKey);
     }
+
+    @Test
+    void linkedOwnGroupIsNotListedOnItsOwn() {
+        // given
+        InventoryKey globalKey = new InventoryKey("8720689010825", "QP1324/20");
+        MatchedInventory own = group(new InventoryKey("8720689021180", "QP1324/20"));
+        InventoryKey unlinkedKey = new InventoryKey("4000000000009", "MFN-OWN");
+        InventoryIndex ownIndex = InventoryIndex.of(List.of(own, group(unlinkedKey)));
+        ownIndex.link(own, globalKey.getProductEans());
+        ListingInventory listing = new ListingInventory(InventoryIndex.of(List.of(group(globalKey))), ownIndex, STORE_ENTRY);
+
+        // when / then
+        assertThat(listing.keys()).containsExactly(globalKey, unlinkedKey);
+    }
 }

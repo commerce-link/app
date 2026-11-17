@@ -2,6 +2,7 @@ package pl.commercelink.inventory;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
@@ -19,10 +20,12 @@ import pl.commercelink.stores.StoresRepository;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class StoreInventoryProvider {
@@ -37,6 +40,7 @@ public class StoreInventoryProvider {
     private final ExchangeRates exchangeRates;
     private final PimCatalog pimCatalog;
     private final GlobalMatchedInventory globalInventory;
+    private final InventoryMatchingProperties matchingProperties;
 
     @Value("${inventory.store-cache.ttl-minutes}")
     long defaultTtlMinutes;
@@ -104,7 +108,30 @@ public class StoreInventoryProvider {
             }
         }
 
-        return new StoreInventory(InventoryIndex.of(autoDiscovery.run(ownItems, pimCatalog.withStoreData(storeId), globalInventory::allItems)), LocalDateTime.now());
+        // one reload of the global inventory for the whole build: its offers witness, its variant codes join the own
+        // ones for linking own groups to global ones
+        GlobalMatchedInventory.Generation global = globalInventory.generation();
+        InventoryAutoDiscovery.Grouping grouping = autoDiscovery.group(
+                ownItems, pimCatalog.withStoreData(storeId), global::allItems, global.variantCodes());
+        InventoryIndex index = InventoryIndex.of(grouping.groups());
+        if (matchingProperties.linkOwnToGlobalByCode() && !index.all().isEmpty()) {
+            linkToGlobal(storeId, index, global, grouping.variantCodes());
+        }
+        return new StoreInventory(index, LocalDateTime.now());
+    }
+
+    private static void linkToGlobal(String storeId, InventoryIndex index, GlobalMatchedInventory.Generation global,
+                                     VariantCodes variantCodes) {
+        int linked = 0;
+        Map<OwnToGlobalLinks.Outcome, Integer> leftOut = new EnumMap<>(OwnToGlobalLinks.Outcome.class);
+        for (OwnToGlobalLinks.Decision decision : OwnToGlobalLinks.apply(index, global, variantCodes)) {
+            if (decision.outcome() == OwnToGlobalLinks.Outcome.LINKED) {
+                linked++;
+            } else {
+                leftOut.merge(decision.outcome(), 1, Integer::sum);
+            }
+        }
+        log.info("Linked {} own groups of store {} to global groups by brand and code; left out: {}", linked, storeId, leftOut);
     }
 
     private SupplierProviderDescriptor descriptorFor(StoreSupplierConnection connection) {

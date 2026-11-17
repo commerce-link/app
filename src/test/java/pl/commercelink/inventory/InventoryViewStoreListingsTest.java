@@ -36,6 +36,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -637,5 +638,217 @@ class InventoryViewStoreListingsTest {
         // then
         assertThat(matched.getSuppliers()).containsExactly("AB Group");
         assertThat(matched.getInventoryKey().getId()).isEqualTo("st-s-c");
+    }
+
+    // Philips: the global group (MxSolution) and the store's own group (Action, Elko) carry different EANs of the same
+    // product; the own group is linked to the global one by hand, as the link computation would do
+    private static final String PHILIPS_GLOBAL_EAN = "8720689010825";
+    private static final String PHILIPS_OWN_EAN = "8720689021180";
+
+    private InventoryItem philips(String ean, String supplier, double price) {
+        return new InventoryItem("Philips", null, ean, "QP1324/20", supplier, price, "PLN", 5, 1, true, true, false);
+    }
+
+    private MatchedInventory philipsGlobal() {
+        return new MatchedInventory(new InventoryKey(PHILIPS_GLOBAL_EAN, "QP1324/20"),
+                List.of(philips(PHILIPS_GLOBAL_EAN, "MxSolution", 107.11)), taxonomyCache, supplierRegistry);
+    }
+
+    private MatchedInventory philipsOwn() {
+        return new MatchedInventory(new InventoryKey(PHILIPS_OWN_EAN, "QP1324/20"),
+                List.of(philips(PHILIPS_OWN_EAN, "Action", 75.00), philips(PHILIPS_OWN_EAN, "Elko", 65.76)),
+                taxonomyCache, supplierRegistry);
+    }
+
+    private InventoryView philipsView(java.util.function.Predicate<String> enabledGlobal, InventorySource... extra) {
+        MatchedInventory global = philipsGlobal();
+        MatchedInventory own = philipsOwn();
+        InventoryIndex globalIndex = InventoryIndex.of(List.of(global));
+        InventoryIndex ownIndex = InventoryIndex.of(List.of(own));
+        ownIndex.link(own, global.getInventoryKey().getProductEans());
+        when(taxonomyCache.find(any())).thenReturn(
+                new Taxonomy(PHILIPS_GLOBAL_EAN, "QP1324/20", "Philips", "QP1324/20", "Golarki", 1, null, null, null, "31"));
+        List<InventorySource> sources = new java.util.ArrayList<>(List.of(
+                GroupInventorySource.global(globalIndex, enabledGlobal), GroupInventorySource.own(ownIndex)));
+        sources.addAll(List.of(extra));
+        return new InventoryView(globalIndex, ownIndex, pimId -> false, taxonomyCache, supplierRegistry,
+                sources.toArray(InventorySource[]::new));
+    }
+
+    private static List<String> offers(MatchedInventory matched) {
+        return matched.getInventoryItems().stream().map(item -> item.supplier() + " " + item.netPrice()).sorted().toList();
+    }
+
+    private static final class SpySource implements InventorySource {
+        private int calls;
+
+        @Override
+        public void mergeInto(MatchedInventory result, InventoryKey lookupKey) {
+            calls++;
+        }
+    }
+
+    @Test
+    void listedRowOwnEanAndGlobalEanGiveTheSameOffers() {
+        // given
+        InventoryView view = philipsView(supplier -> true);
+
+        // when
+        Collection<MatchedInventory> listed = view.findAllByProductCategoryIds(List.of("31")).get("31");
+        MatchedInventory byOwnEan = view.findByEan(PHILIPS_OWN_EAN);
+        MatchedInventory byGlobalEan = view.findByEan(PHILIPS_GLOBAL_EAN);
+
+        // then
+        List<String> expected = List.of("Action 75.0", "Elko 65.76", "MxSolution 107.11");
+        assertThat(listed).singleElement().satisfies(row -> assertThat(offers(row)).isEqualTo(expected));
+        assertThat(offers(byOwnEan)).isEqualTo(expected);
+        assertThat(offers(byGlobalEan)).isEqualTo(expected);
+    }
+
+    @Test
+    void linkedRowWithItsGlobalSupplierDisabledShowsOwnOffersOnce() {
+        // given
+        InventoryView view = philipsView(supplier -> false);
+
+        // when
+        Collection<MatchedInventory> listed = view.findAllByProductCategoryIds(List.of("31")).get("31");
+        MatchedInventory byOwnEan = view.findByEan(PHILIPS_OWN_EAN);
+
+        // then
+        List<String> expected = List.of("Action 75.0", "Elko 65.76");
+        assertThat(listed).singleElement().satisfies(row -> assertThat(offers(row)).isEqualTo(expected));
+        assertThat(offers(byOwnEan)).isEqualTo(expected);
+    }
+
+    @Test
+    void lookupWithoutLinksRunsSourcesOnce() {
+        // given
+        InventoryIndex globalIndex = InventoryIndex.of(List.of(philipsGlobal()));
+        InventoryIndex ownIndex = InventoryIndex.of(List.of(philipsOwn()));
+        SpySource spy = new SpySource();
+        InventoryView view = new InventoryView(globalIndex, ownIndex, pimId -> false, taxonomyCache, supplierRegistry,
+                GroupInventorySource.global(globalIndex, supplier -> true), GroupInventorySource.own(ownIndex), spy);
+
+        // when
+        MatchedInventory byOwnEan = view.findByEan(PHILIPS_OWN_EAN);
+
+        // then
+        assertThat(spy.calls).isEqualTo(1);
+        assertThat(offers(byOwnEan)).containsExactly("Action 75.0", "Elko 65.76");
+    }
+
+    @Test
+    void lookupThatLearnsALinkRunsEverySourceTwice() {
+        // given
+        SpySource spy = new SpySource();
+        InventoryView view = philipsView(supplier -> true, spy);
+
+        // when
+        MatchedInventory byOwnEan = view.findByEan(PHILIPS_OWN_EAN);
+
+        // then: the own source ran twice as well, and merging the same group again added no offer
+        assertThat(spy.calls).isEqualTo(2);
+        assertThat(offers(byOwnEan)).containsExactly("Action 75.0", "Elko 65.76", "MxSolution 107.11");
+    }
+
+    // an own group carrying a global PIM id the global pool lacks (the store PIM view matched it by gtin), next to the
+    // Philips global group without an id; a global id, not a store entry (the view's StoreEntryKeys knows none)
+    private InventoryView philipsViewWithOwnPimId(boolean linked) {
+        MatchedInventory global = philipsGlobal();
+        InventoryKey ownKey = new InventoryKey("PIM-X");
+        ownKey.addEan(PHILIPS_OWN_EAN);
+        ownKey.addManufacturerCode("QP1324/20");
+        MatchedInventory own = new MatchedInventory(ownKey,
+                List.of(philips(PHILIPS_OWN_EAN, "Action", 75.00), philips(PHILIPS_OWN_EAN, "Elko", 65.76)),
+                taxonomyCache, supplierRegistry);
+        InventoryIndex globalIndex = InventoryIndex.of(List.of(global));
+        InventoryIndex ownIndex = InventoryIndex.of(List.of(own));
+        if (linked) {
+            ownIndex.link(own, global.getInventoryKey().getProductEans());
+        }
+        return new InventoryView(globalIndex, ownIndex, pimId -> false, taxonomyCache, supplierRegistry,
+                GroupInventorySource.global(globalIndex, supplier -> true), GroupInventorySource.own(ownIndex));
+    }
+
+    @Test
+    void linkedOwnGroupWithAGlobalPimIdKeepsTheProductInFindAllWithPimId() {
+        // given
+        InventoryView view = philipsViewWithOwnPimId(true);
+
+        // when
+        Collection<MatchedInventory> withPimId = view.findAllWithPimId();
+
+        // then: the own group is covered by the link, so the global row carries its id and the offers of both groups
+        assertThat(withPimId).singleElement().satisfies(row -> {
+            assertThat(row.getInventoryKey().getId()).isEqualTo("PIM-X");
+            assertThat(offers(row)).containsExactly("Action 75.0", "Elko 65.76", "MxSolution 107.11");
+        });
+    }
+
+    @Test
+    void unlinkedOwnGroupWithAGlobalPimIdIsListedAloneInFindAllWithPimId() {
+        // given
+        InventoryView view = philipsViewWithOwnPimId(false);
+
+        // when
+        Collection<MatchedInventory> withPimId = view.findAllWithPimId();
+
+        // then: as before the links, the global group without an id is left out and the own group is its own row
+        assertThat(withPimId).singleElement().satisfies(row -> {
+            assertThat(row.getInventoryKey().getId()).isEqualTo("PIM-X");
+            assertThat(offers(row)).containsExactly("Action 75.0", "Elko 65.76");
+        });
+    }
+
+    // Known limitation (spec, "Znane ograniczenia"), pinned rather than endorsed: links are computed when the own index is
+    // built. After a global reload in which the linked global group also took the EAN of another own group, the row
+    // shows that other group (an EAN match outranks a link), while the linked own group stays covered by its link
+    // and is shown nowhere until the next build of the own index recomputes the links.
+    @Test
+    void staleLinkLeavesTheOwnGroupCoveredButNotShownUntilTheNextBuild() {
+        // given
+        String otherOwnEan = "8720689021197";
+        MatchedInventory reloadedGlobal = new MatchedInventory(new InventoryKey(Set.of(PHILIPS_GLOBAL_EAN, otherOwnEan),
+                Set.of("QP1324/20")), List.of(philips(PHILIPS_GLOBAL_EAN, "MxSolution", 107.11),
+                philips(otherOwnEan, "Wave", 104.00)), taxonomyCache, supplierRegistry);
+        MatchedInventory linkedOwn = philipsOwn();
+        MatchedInventory otherOwn = new MatchedInventory(new InventoryKey(otherOwnEan, "QP1324/20"),
+                List.of(philips(otherOwnEan, "Komputronik", 99.00)), taxonomyCache, supplierRegistry);
+        InventoryIndex globalIndex = InventoryIndex.of(List.of(reloadedGlobal));
+        InventoryIndex ownIndex = InventoryIndex.of(List.of(linkedOwn, otherOwn));
+        ownIndex.link(linkedOwn, List.of(PHILIPS_GLOBAL_EAN));
+        when(taxonomyCache.find(any())).thenReturn(
+                new Taxonomy(PHILIPS_GLOBAL_EAN, "QP1324/20", "Philips", "QP1324/20", "Golarki", 1, null, null, null, "31"));
+        InventoryView view = new InventoryView(globalIndex, ownIndex, pimId -> false, taxonomyCache, supplierRegistry,
+                GroupInventorySource.global(globalIndex, supplier -> true), GroupInventorySource.own(ownIndex));
+
+        // when
+        Collection<MatchedInventory> listed = view.findAllByProductCategoryIds(List.of("31")).get("31");
+
+        // then
+        assertThat(listed).singleElement().satisfies(row ->
+                assertThat(offers(row)).containsExactly("Komputronik 99.0", "MxSolution 107.11", "Wave 104.0"));
+    }
+
+    @Test
+    void warehouseStockUnderEitherEanOfALinkedProductIsFoundByBothEans() {
+        // given
+        StockQueryService stock = org.mockito.Mockito.mock(StockQueryService.class);
+        when(stock.searchAllAvailable(STORE_ID)).thenReturn(List.of(
+                new WarehouseItemView(STORE_ID, "item-own", "Philips", PHILIPS_OWN_EAN, "QP1324/20",
+                        Price.fromNet(60.0, 0.23), 1, FulfilmentStatus.Delivered, ItemCondition.Sealed),
+                new WarehouseItemView(STORE_ID, "item-global", "Philips", PHILIPS_GLOBAL_EAN, "QP1324/20",
+                        Price.fromNet(61.0, 0.23), 2, FulfilmentStatus.Delivered, ItemCondition.Sealed)));
+        InventoryView view = philipsView(supplier -> true, new WarehouseInventorySource(STORE_ID, stock));
+
+        // when
+        MatchedInventory byOwnEan = view.findByEan(PHILIPS_OWN_EAN);
+        MatchedInventory byGlobalEan = view.findByEan(PHILIPS_GLOBAL_EAN);
+
+        // then
+        List<String> expected = List.of("Action 75.0", "Elko 65.76", "MxSolution 107.11",
+                "Warehouse 60.0", "Warehouse 61.0");
+        assertThat(offers(byOwnEan)).isEqualTo(expected);
+        assertThat(offers(byGlobalEan)).isEqualTo(expected);
     }
 }

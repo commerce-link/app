@@ -520,7 +520,7 @@ class InventoryAutoDiscoveryTest {
     void withTheSwitchOffTheConflictingOfferJoinsAsToday() {
         // given
         autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
-                new InventoryMatchingProperties(false, true, true));
+                new InventoryMatchingProperties(false, true, true, true));
         when(pimView.findAll()).thenReturn(List.of());
         InventoryItem kosatec9060 = item("4895106296381", "11350-03-20G", 2613, "Kosatec", "Sapphire");
         InventoryItem incom9060 = item("4895106296381", "11350-03-20G", 2663, "IncomGroup", "Sapphire");
@@ -574,7 +574,7 @@ class InventoryAutoDiscoveryTest {
     void witnessesAreNotFetchedWithTheSwitchOff() {
         // given
         autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
-                new InventoryMatchingProperties(false, true, true));
+                new InventoryMatchingProperties(false, true, true, true));
         when(pimView.findAll()).thenReturn(List.of());
         AtomicInteger fetches = new AtomicInteger();
         InventoryItem elko = item("4895106293618", "11350-03-20G", 3563, "Elko", "Sapphire");
@@ -666,7 +666,7 @@ class InventoryAutoDiscoveryTest {
     void withTheSwitchOffTheGroupStaysWhole() {
         // given
         autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
-                new InventoryMatchingProperties(true, true, false));
+                new InventoryMatchingProperties(true, true, false, true));
         when(pimView.findAll()).thenReturn(List.of());
 
         // when
@@ -674,6 +674,65 @@ class InventoryAutoDiscoveryTest {
 
         // then
         assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void codeWithVariantsAtOneSupplierStillJoinsOtherSuppliersByCode() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        InventoryItem firstOfX = item("EAN1", "AIR1", 100, "X", "Nike");
+        InventoryItem secondOfX = item("EAN2", "AIR1", 101, "X", "Nike");
+        InventoryItem offerOfY = item("EAN1", "AIR1", 102, "Y", "Nike");
+        InventoryItem offerOfZ = item("EAN3", "AIR1", 103, "Z", "Nike");
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery.run(List.of(firstOfX, secondOfX, offerOfY, offerOfZ));
+
+        // then: only X joins by EAN alone; Y and Z still join by code
+        assertThat(result).filteredOn(m -> m.getInventoryItems().contains(offerOfY)).singleElement()
+                .satisfies(m -> assertThat(m.getInventoryItems()).contains(offerOfZ));
+    }
+
+    @Test
+    void inheritedVariantCodesDoNotChangeTheGroups() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        InventoryItem offerOfY = item("EAN1", "AIR1", 100, "Y", "Nike");
+        InventoryItem offerOfZ = item("EAN3", "AIR1", 101, "Z", "Nike");
+        VariantCodes inherited = SharedManufacturerCodes.of(List.of(
+                item("EAN7", "AIR1", 100, "X", "Nike"),
+                item("EAN8", "AIR1", 100, "X", "Nike"))).variantCodes();
+
+        // when
+        InventoryAutoDiscovery.Grouping withoutInherited = autoDiscovery.group(List.of(offerOfY, offerOfZ), pimView, List::of, VariantCodes.none());
+        InventoryAutoDiscovery.Grouping withInherited = autoDiscovery.group(List.of(offerOfY, offerOfZ), pimView, List::of, inherited);
+
+        // then
+        assertThat(withoutInherited.groups()).singleElement()
+                .satisfies(m -> assertThat(m.getInventoryItems()).containsExactlyInAnyOrder(offerOfY, offerOfZ));
+        assertThat(withInherited.groups()).singleElement()
+                .satisfies(m -> assertThat(m.getInventoryItems()).containsExactlyInAnyOrder(offerOfY, offerOfZ));
+        assertThat(withoutInherited.variantCodes().contains("nike", "AIR1")).isFalse();
+        assertThat(withInherited.variantCodes().contains("nike", "AIR1")).isTrue();
+    }
+
+    @Test
+    void groupingReturnsTheVariantCodesOfThePoolAndTheInheritedOnes() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        InventoryItem firstOfX = item("EAN1", "AIR1", 100, "X", "Nike");
+        InventoryItem secondOfX = item("EAN2", "AIR1", 101, "X", "Nike");
+        VariantCodes inherited = SharedManufacturerCodes.of(List.of(
+                item("EAN5", "SAMBA", 100, "W", "Adidas"),
+                item("EAN6", "SAMBA", 100, "W", "Adidas"))).variantCodes();
+
+        // when
+        InventoryAutoDiscovery.Grouping grouping = autoDiscovery.group(List.of(firstOfX, secondOfX), pimView, List::of, inherited);
+
+        // then
+        assertThat(grouping.variantCodes().contains("nike", "AIR1")).isTrue();
+        assertThat(grouping.variantCodes().contains("adidas", "SAMBA")).isTrue();
+        assertThat(grouping.variantCodes().size()).isEqualTo(2);
     }
 
     private List<InventoryItem> lexmarkOffers() {
