@@ -62,7 +62,7 @@ class RedisStoreInventoryCacheTest {
     void getReturnsEmptyOnMiss() {
         // given
         RedisStoreInventoryCache cache = cache();
-        when(valueOps.get("store-inventory:v2:s1")).thenReturn(null);
+        when(valueOps.get("store-inventory:v3:s1")).thenReturn(null);
 
         // when / then
         assertTrue(cache.get("s1").isEmpty());
@@ -74,7 +74,7 @@ class RedisStoreInventoryCacheTest {
         RedisStoreInventoryCache cache = cache();
         cache.put("s1", sampleInventory(), Duration.ofMinutes(60), 1_000L);
         String stored = storedPayload();
-        when(valueOps.get("store-inventory:v2:s1")).thenReturn(stored);
+        when(valueOps.get("store-inventory:v3:s1")).thenReturn(stored);
 
         // when
         Optional<StoreInventory> result = cache.get("s1");
@@ -96,7 +96,7 @@ class RedisStoreInventoryCacheTest {
 
         // then
         verify(redisTemplate).execute(any(RedisScript.class),
-                eq(List.of("store-inventory:v2:store-1", "store-inventory:v2:store-1:build-started")),
+                eq(List.of("store-inventory:v3:store-1", "store-inventory:v3:store-1:build-started")),
                 eq("1700000000123"), anyString(), eq("172800000"), eq("172800000"));
     }
 
@@ -124,8 +124,8 @@ class RedisStoreInventoryCacheTest {
 
         // then
         InOrder order = inOrder(valueOps, redisTemplate);
-        order.verify(valueOps).set("store-inventory:v2:s1:build-started", "4242", Duration.ofHours(1));
-        order.verify(redisTemplate).delete("store-inventory:v2:s1");
+        order.verify(valueOps).set("store-inventory:v3:s1:build-started", "4242", Duration.ofHours(1));
+        order.verify(redisTemplate).delete("store-inventory:v3:s1");
     }
 
     @Test
@@ -156,7 +156,7 @@ class RedisStoreInventoryCacheTest {
     void getDegradesToMissWhenRedisFails() {
         // given
         RedisStoreInventoryCache cache = cache();
-        when(valueOps.get("store-inventory:v2:s1")).thenThrow(new RuntimeException("redis down"));
+        when(valueOps.get("store-inventory:v3:s1")).thenThrow(new RuntimeException("redis down"));
 
         // when / then
         assertTrue(cache.get("s1").isEmpty());
