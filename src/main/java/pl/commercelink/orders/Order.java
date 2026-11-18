@@ -109,6 +109,10 @@ public class Order {
     private FulfilmentType fulfilmentType;
     @DynamoDBVersionAttribute
     private Long version;
+    // Sort key of StoreIdRefundDueIndex, recomputed from the order on every save (RefundDueSortKey); the mapper reads it
+    // through the getter, so no write path can leave it behind the balance.
+    @DynamoDBAttribute(attributeName = "refundDueSortKey")
+    private String refundDueSortKey;
 
     // required by dynamodb
     public Order() {
@@ -1179,6 +1183,14 @@ public class Order {
 
     public void setVersion(Long version) {
         this.version = version;
+    }
+
+    public String getRefundDueSortKey() {
+        return RefundDueSortKey.of(this);
+    }
+
+    public void setRefundDueSortKey(String refundDueSortKey) {
+        this.refundDueSortKey = refundDueSortKey;
     }
 
     public static class Builder {
