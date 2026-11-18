@@ -119,13 +119,14 @@ public class OrderPageModelFactory {
         return new OrderPageModel(order.getOrderId(), order.getShortenedOrderId(),
                 viewer.superAdmin() ? null : OrderBackLink.sanitize(viewer.back()),
                 closed, readOnly, viewer.superAdmin(), viewer.admin(), store == null ? null : store.getName(),
-                header(order, items, store, viewer, readOnly, links, locale, dropship, receipts, receiptLock),
+                header(order, items, dropshipItemIds, store, viewer, readOnly, links, locale, dropship, receipts, receiptLock),
                 items(order, items, store, viewer, readOnly, links, hasDropshipItems, hasWarehouseDocument, dropship,
                         receiptLock, locale),
                 shipments(order, store, readOnly, locale),
                 documents(order, store, viewer, closed, readOnly,
                         documentsEnabled && hasWarehouseItems && !hasWarehouseDocument, receipts, receiptLock),
-                payments(order, readOnly, receiptLock),
+                // a cancelled order still takes payments: the refund of what the customer paid is recorded after the cancel
+                payments(order, viewer.superAdmin() || order.hasStatus(OrderStatus.Completed), receiptLock),
                 CustomerView.of(order, readOnly, receiptLock, locale),
                 settings(order, items, readOnly),
                 FinancesView.of(order, items),
@@ -137,7 +138,8 @@ public class OrderPageModelFactory {
         return OrderSettingsView.of(order, items, readOnly);
     }
 
-    private OrderPageModel.Header header(Order order, List<OrderItem> items, Store store, Viewer viewer, boolean readOnly,
+    private OrderPageModel.Header header(Order order, List<OrderItem> items, Set<String> dropshipItemIds, Store store,
+                                         Viewer viewer, boolean readOnly,
                                          OrderLinks links, Locale locale, DropshipAssessment dropship,
                                          ReceiptOrderState receipts, ReceiptLock receiptLock) {
         boolean receiptLocked = receiptLock.locks();
@@ -168,6 +170,7 @@ public class OrderPageModelFactory {
         // as OrdersController#deleteOrder refuses: an order whose e-receipt is being issued stays
         boolean canDelete = !viewer.superAdmin() && items.isEmpty() && !order.isInvoiced()
                 && !order.hasRecordedPayments() && !receiptLocked;
+        boolean canCancel = order.canBeCancelled(items, dropshipItemIds);
         // not tied to readOnly: a completed order is closed, yet a return is exactly when an RMA is reported
         String rmaHref = !viewer.superAdmin() && order.isEligibleForRMACreation()
                 ? "/dashboard/rma/new?q=" + order.getOrderId() + "&from=order" : null;
@@ -190,11 +193,11 @@ public class OrderPageModelFactory {
                 // a completed order can still be cancelled after a full return, so this follows the viewer, not readOnly;
                 // while an e-receipt is being issued OrdersController#cancelOrder refuses it, so it is greyed with that
                 // reason (only when the order could otherwise be cancelled: the general reason says more otherwise)
-                !viewer.superAdmin() && order.canBeCancelled(items) && !receiptLocked,
-                !viewer.superAdmin() && order.canBeCancelled(items) && receiptLocked
+                !viewer.superAdmin() && canCancel && !receiptLocked,
+                !viewer.superAdmin() && canCancel && receiptLocked
                         ? receiptLock.key(CANCEL_LOCKED_RECEIPT) : null,
-                cancelUnavailableKey(order, items, canDelete),
-                cancelMessage(receipts.hasFiscalisedReceipt(order), messageSource, locale),
+                cancelUnavailableKey(order, items, dropshipItemIds),
+                cancelMessage(order, receipts.hasFiscalisedReceipt(order), messageSource, locale),
                 canDelete,
                 deleteMessage(order, messageSource, locale),
                 rmaHref);
@@ -203,35 +206,37 @@ public class OrderPageModelFactory {
     private static final String CANCEL_LOCKED_RECEIPT = "order.page.cancel.locked.receipt";
 
     /**
-     * Why "Anuluj zamówienie" is greyed when Order#canBeCancelled says no (the rule stays as on main), built from
-     * Order#cancelBlockers so the reason cannot drift from the rule. Before delivery the reason suggests "Usuń
-     * zamówienie" only when the menu offers it; otherwise, and after delivery, it names what is still missing.
+     * Why "Anuluj zamówienie" is greyed when Order#canBeCancelled says no, built from Order#cancelBlockers so the
+     * reason cannot drift from the rule; one reason at a time, the one to deal with first. A cancelled order has none:
+     * its menu shows no greyed placeholders.
      */
-    static String cancelUnavailableKey(Order order, List<OrderItem> items, boolean canDelete) {
-        Set<Order.CancelBlocker> blockers = order.cancelBlockers(items);
-        if (blockers.contains(Order.CancelBlocker.NOT_DELIVERED)) {
-            return canDelete ? "order.page.cancel.unavailable.delete" : "order.page.cancel.unavailable.open";
-        }
-        boolean products = blockers.contains(Order.CancelBlocker.PRODUCTS_NOT_RETURNED);
-        boolean payments = blockers.contains(Order.CancelBlocker.PAYMENTS_NOT_REFUNDED);
-        if (products && payments) {
-            return "order.page.cancel.unavailable.itemsAndPayments";
-        }
-        if (products) {
+    static String cancelUnavailableKey(Order order, List<OrderItem> items, Set<String> dropshipItemIds) {
+        Set<Order.CancelBlocker> blockers = order.cancelBlockers(items, dropshipItemIds);
+        if (blockers.contains(Order.CancelBlocker.PRODUCTS_NOT_RETURNED)) {
             return "order.page.cancel.unavailable.items";
         }
-        return payments ? "order.page.cancel.unavailable.payments" : null;
+        if (blockers.contains(Order.CancelBlocker.DROPSHIP_ITEMS)) {
+            return "order.page.cancel.unavailable.dropship";
+        }
+        if (blockers.contains(Order.CancelBlocker.ITEMS_NOT_RELEASABLE)) {
+            return "order.page.cancel.unavailable.delivery";
+        }
+        return blockers.contains(Order.CancelBlocker.COURIER_ORDERED) ? "order.page.cancel.unavailable.courier" : null;
     }
 
     /**
-     * The cancel confirmation, in the dialog and on the no-JS page: once the e-receipt is fiscalised (or closed by
-     * hand) it says that cancelling the order does not undo the receipt and the refund is settled separately.
+     * The cancel confirmation, in the dialog and on the no-JS page. Before the goods went out it says what cancelling
+     * does to them and to the money; after a full return only the services are left to zero. No document is undone by
+     * a cancel: a fiscalised e-receipt (or one closed by hand) and an invoice each add their own warning.
      */
-    public static String cancelMessage(boolean fiscalisedReceipt, MessageSource messages, Locale locale) {
-        String message = messages.getMessage("order.page.cancel.confirm.message", null, locale);
-        return fiscalisedReceipt
-                ? message + " " + messages.getMessage("order.page.cancel.confirm.receipt", null, locale)
-                : message;
+    public static String cancelMessage(Order order, boolean fiscalisedReceipt, MessageSource messages, Locale locale) {
+        String message = messages.getMessage(order.hasGoodsOut() ? "order.page.cancel.confirm.message"
+                : "order.page.cancel.confirm.message.open", null, locale);
+        if (fiscalisedReceipt) {
+            return message + " " + messages.getMessage("order.page.cancel.confirm.receipt", null, locale);
+        }
+        boolean invoiced = order.hasClosingDocument() || order.getDocumentByType(DocumentType.InvoiceAdvance).isPresent();
+        return invoiced ? message + " " + messages.getMessage("order.page.cancel.confirm.invoice", null, locale) : message;
     }
 
     /** The client as the orders list names it (shipping first, company before person), then the billing e-mail. */
@@ -727,14 +732,16 @@ public class OrderPageModelFactory {
         String base = "/dashboard/orders/" + order.getOrderId() + "/payments/";
         List<OrderPageModel.PaymentRow> rows = new ArrayList<>();
         List<OrderPaymentForm> forms = new ArrayList<>();
+        List<OrderPageModel.PaymentSplitView> splits = new ArrayList<>();
         for (int i = 0; i < payments.size(); i++) {
             Payment p = payments.get(i);
-            OrderPaymentForm form = OrderPaymentForm.of(order.getOrderId(), i, p, methodLocked);
+            OrderPaymentForm form = OrderPaymentForm.of(order.getOrderId(), i, p, methodLocked).withRestAvailable(order);
             boolean refund = OrderPaymentForm.isRefund(p);
             // the row shows what "Wpłacono" counts: a refund saved positive by older code shows as the payment it is
             // counted as, not with a minus the totals do not have
             double shown = p.getAppliedAmount();
             String locked = removePaymentLockedKey(order, i);
+            OrderPageModel.PaymentSplitView split = readOnly || !p.isUnsettled() ? null : splitOf(order, i, form.version());
             rows.add(new OrderPageModel.PaymentRow(i + 1, Money.format(shown), refund, p.isUnsettled(),
                     OrderLabels.paymentSource(p.getSource()), p.getName(), p.getReferenceNo(),
                     p.getBankTransactionNo(), OrderFormats.date(p.getBankTransactionDate()),
@@ -742,26 +749,57 @@ public class OrderPageModelFactory {
                     form.dialogId(), readOnly ? null : base + i,
                     readOnly || locked != null ? null : base + i + "/remove?version=" + form.version(),
                     removePaymentMessageKey(order),
-                    readOnly || locked == null ? null : locked.replace(".remove.error.", ".remove.locked.")));
+                    readOnly || locked == null ? null : locked.replace(".remove.error.", ".remove.locked."),
+                    expectedOf(order, p), p.waitsForRest(), split == null ? null : split.dialogId()));
             if (!readOnly) {
                 forms.add(form);
+            }
+            if (split != null) {
+                splits.add(split);
             }
         }
         double unpaid = order.getUnpaidAmount();
         boolean overpaid = unpaid < -0.005;
+        List<Payment> pending = order.getPendingPayments();
+        double expectedTotal = pending.stream().mapToDouble(order::expectedAmountOf).sum();
         return new OrderPageModel.PaymentsCard(rows, Money.format(order.getPaidAmount()), Money.format(Math.max(0, unpaid)),
                 unpaid > 0.005, overpaid, overpaid ? Money.format(-unpaid) : null,
                 Math.max(0, unpaid),
                 order.getPendingPayment(), OrderLabels.Option.of(PaymentSource.values(), OrderLabels::paymentSource),
-                forms);
+                forms, !readOnly, PendingPaymentsJson.of(order),
+                pending.isEmpty() ? null : Money.format(expectedTotal),
+                Math.abs(expectedTotal - Math.max(0, unpaid)) < 0.005, splits);
+    }
+
+    /** The "Podziel" dialog of the pending payment at index: the last part goes by transfer, else by instalments. */
+    private static OrderPageModel.PaymentSplitView splitOf(Order order, int index, String version) {
+        Payment payment = order.getPayments().get(index);
+        double expected = order.expectedAmountOf(payment);
+        PaymentSource restSource = payment.getSource() == PaymentSource.BankTransfer ? PaymentSource.Installments
+                : PaymentSource.BankTransfer;
+        return new OrderPageModel.PaymentSplitView("payment-split-" + index,
+                "/dashboard/orders/" + order.getOrderId() + "/payments/" + index + "/split", version,
+                OrderLabels.paymentSource(payment.getSource()), payment.getSource(), restSource, Money.format(expected),
+                String.format(Locale.ROOT, "%.2f", expected), payment.waitsForRest());
+    }
+
+    /** What the pending payment waits for, formatted; null for money recorded and for a rest nothing is left of. */
+    private static String expectedOf(Order order, Payment payment) {
+        if (!payment.isUnsettled()) {
+            return null;
+        }
+        double expected = order.expectedAmountOf(payment);
+        return payment.getExpectedAmount() != null || expected > 0 ? Money.format(expected) : null;
     }
 
     /**
-     * Why the payment at index cannot be removed, or null. The pending payment (amount 0) is not money but the method
-     * the customer chose: "Dodaj wpłatę" fills it, so removing it would only lose the method.
+     * Why the payment at index cannot be removed, or null. The only pending payment (amount 0) is not money but the
+     * method the customer chose: "Dodaj wpłatę" fills it, so removing it would only lose the method. One of several
+     * pending payments goes, as one added by mistake would otherwise stay.
      */
     public static String removePaymentLockedKey(Order order, int index) {
-        return order.getPayments().get(index).isUnsettled() ? "order.payments.remove.error.pending" : null;
+        return order.getPayments().get(index).isUnsettled() && order.getPendingPayments().size() == 1
+                ? "order.payments.remove.error.pending" : null;
     }
 
     /**

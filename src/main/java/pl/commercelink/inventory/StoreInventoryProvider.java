@@ -31,6 +31,7 @@ import java.util.Optional;
 public class StoreInventoryProvider {
 
     private static final Duration MAX_AGE_OF_KEPT_SNAPSHOT = Duration.ofHours(24);
+    private static final int REFRESH_ATTEMPTS = 3;
 
     private final StoreInventoryCache cache;
     private final StoresRepository storesRepository;
@@ -46,7 +47,7 @@ public class StoreInventoryProvider {
     long defaultTtlMinutes;
 
     public StoreInventory get(String storeId) {
-        return cache.get(storeId).orElseGet(() -> buildAndCache(storesRepository.findById(storeId), storeId));
+        return cache.get(storeId).orElseGet(() -> buildAndCache(storesRepository.findById(storeId), storeId).inventory());
     }
 
     public InventoryIndex ownIndex(Store store) {
@@ -58,7 +59,7 @@ public class StoreInventoryProvider {
             return new StoreInventory(InventoryIndex.of(List.of()), null);
         }
         String storeId = store.getStoreId();
-        return cache.get(storeId).orElseGet(() -> buildAndCache(store, storeId));
+        return cache.get(storeId).orElseGet(() -> buildAndCache(store, storeId).inventory());
     }
 
     // Each feed import of a store asks for a rebuild. A build that started after a request has already read that
@@ -72,7 +73,14 @@ public class StoreInventoryProvider {
             log.warn("Inventory snapshot of store {} is not rebuilt: the store does not exist", storeId);
             return;
         }
-        buildAndCache(store, storeId);
+        // a build that met a global reload is not cached; the next one starts on the reloaded inventory
+        for (int attempt = 0; attempt < REFRESH_ATTEMPTS; attempt++) {
+            if (buildAndCache(store, storeId).cached()) {
+                return;
+            }
+        }
+        throw new IllegalStateException("The global inventory was reloaded during each of " + REFRESH_ATTEMPTS
+                + " rebuilds of the inventory of store " + storeId);
     }
 
     // For an import that found its feed unchanged: the snapshot only lives on, without a rebuild. Not past a day
@@ -82,12 +90,24 @@ public class StoreInventoryProvider {
         return cache.keepIfBuiltWithin(storeId, MAX_AGE_OF_KEPT_SNAPSHOT, resolveTtl(store));
     }
 
-    private StoreInventory buildAndCache(Store store, String storeId) {
+    private Built buildAndCache(Store store, String storeId) {
         // read before the feed files are: the cache keeps the inventory of the build that started last
         long startedAt = cache.clockMillis();
-        StoreInventory built = build(storeId, store);
-        cache.put(storeId, built, resolveTtl(store), startedAt);
-        return built;
+        Build build = build(storeId, store);
+        // a global reload during the build (new feeds, or a regroup on changed EAN-only pairs that has already evicted
+        // the stores) makes these groups stale: they serve this request, but caching them would keep them for the TTL
+        boolean current = build.globalVersion() == null || build.globalVersion() == globalInventory.version();
+        if (current) {
+            cache.put(storeId, build.inventory(), resolveTtl(store), startedAt);
+        }
+        return new Built(build.inventory(), current);
+    }
+
+    private record Built(StoreInventory inventory, boolean cached) {
+    }
+
+    /** @param globalVersion the version of the global generation the build used, null when it used none */
+    private record Build(StoreInventory inventory, Long globalVersion) {
     }
 
     private Duration resolveTtl(Store storeEntity) {
@@ -99,9 +119,9 @@ public class StoreInventoryProvider {
         return Duration.ofMinutes(Math.max(1, minutes));
     }
 
-    private StoreInventory build(String storeId, Store storeEntity) {
+    private Build build(String storeId, Store storeEntity) {
         if (storeEntity == null) {
-            return new StoreInventory(InventoryIndex.of(List.of()), LocalDateTime.now());
+            return new Build(new StoreInventory(InventoryIndex.of(List.of()), LocalDateTime.now()), null);
         }
 
         List<InventoryItem> ownItems = new ArrayList<>();
@@ -117,15 +137,16 @@ public class StoreInventoryProvider {
         }
 
         // one reload of the global inventory for the whole build: its offers witness, its variant codes join the own
-        // ones for linking own groups to global ones
+        // ones for linking own groups to global ones, and its EAN-only pairs hold here too, even where a store entry
+        // shadows the flagged global one
         GlobalMatchedInventory.Generation global = globalInventory.generation();
         InventoryAutoDiscovery.Grouping grouping = autoDiscovery.group(
-                ownItems, pimCatalog.withStoreData(storeId), global::allItems, global.variantCodes());
+                ownItems, pimCatalog.withStoreData(storeId), global::allItems, global.variantCodes(), global.eanOnlyCodes());
         InventoryIndex index = InventoryIndex.of(grouping.groups());
         if (matchingProperties.linkOwnToGlobalByCode() && !index.all().isEmpty()) {
             linkToGlobal(storeId, index, global, grouping.variantCodes());
         }
-        return new StoreInventory(index, LocalDateTime.now());
+        return new Build(new StoreInventory(index, LocalDateTime.now()), global.version());
     }
 
     private static void linkToGlobal(String storeId, InventoryIndex index, GlobalMatchedInventory.Generation global,

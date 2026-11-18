@@ -111,6 +111,21 @@ class GlobalMatchedInventoryTest {
     }
 
     @Test
+    void generationCarriesEanOnlyCodesOfItsReload() {
+        // given
+        VariantCodes eanOnly = VariantCodes.of(java.util.Set.of(new VariantCodes.BrandCode("mova", "SHINE10")));
+        inventory.replace(List.of(keyed("5901234567890", "MFN-1")), VariantCodes.none(), eanOnly);
+        GlobalMatchedInventory.Generation first = inventory.generation();
+
+        // when
+        inventory.replace(List.of(keyed("4000000000009", "MFN-2")), VariantCodes.none());
+
+        // then
+        assertThat(first.eanOnlyCodes()).isSameAs(eanOnly);
+        assertThat(inventory.generation().eanOnlyCodes()).isSameAs(VariantCodes.none());
+    }
+
+    @Test
     void replaceWithoutCodesMeansNone() {
         // given
         VariantCodes variantCodes = SharedManufacturerCodes.of(List.of(

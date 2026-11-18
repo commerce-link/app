@@ -451,6 +451,107 @@ class StatementMatcherTest {
         assertThat(StatementMatcher.senderIsClient("BUDMAX PIOTR NOWAK", company)).isTrue();
     }
 
+    private static final PayoutChannel SANTANDER_LOANS = new PayoutChannel("SANTANDER", null, PaymentSource.Installments,
+            false, null, null);
+
+    /** 20 000 zł: 5 000 zł by transfer, the rest (15 000 zł) in installments. */
+    private static Order transferAndInstallments() {
+        return order(JAN, 20000.00, expected(PaymentSource.BankTransfer, 5000.0), pending(PaymentSource.Installments));
+    }
+
+    @Test
+    void aTransferNamingTheOrderPaysItsPendingTransferNotTheWholeOrder() {
+        // given
+        Order order = transferAndInstallments();
+
+        // when
+        OperationMatch match = single(List.of(order), operation("WB-1", "5000.00", "Zaliczka " + JAN, "JAN KOWALSKI"));
+
+        // then
+        assertThat(match.kind()).isEqualTo(MatchKind.MATCHED);
+        assertThat(match.warnings()).isEmpty();
+        assertThat(match.allocations()).containsExactly(new Allocation(JAN, new BigDecimal("5000.00"), new BigDecimal("0.00")));
+    }
+
+    @Test
+    void aTransferWithoutANumberIsProposedByTheAmountOfThePendingTransfer() {
+        // given
+        Order order = billedTo(transferAndInstallments(), "Jan", "Kowalski");
+
+        // when
+        OperationMatch match = single(List.of(order), operation("WB-1", "5000.00", "Zaliczka", "JAN KOWALSKI"));
+
+        // then
+        assertThat(match.kind()).isEqualTo(MatchKind.CHECK);
+        assertThat(match.rule()).isEqualTo(MatchRule.AMOUNT_AND_SENDER);
+        assertThat(match.allocations()).extracting(Allocation::orderId).containsExactly(JAN);
+    }
+
+    @Test
+    void aTransferBelowThePendingTransferIsAnUnderpaymentOfThatPaymentOnly() {
+        // given
+        Order order = transferAndInstallments();
+
+        // when
+        OperationMatch match = single(List.of(order), operation("WB-1", "3000.00", "Zaliczka " + JAN, "JAN KOWALSKI"));
+
+        // then
+        assertThat(match.kind()).isEqualTo(MatchKind.CHECK);
+        assertThat(match.warnings()).containsExactly(MatchWarning.UNDERPAID);
+        assertThat(match.difference()).isEqualByComparingTo("2000.00");
+    }
+
+    @Test
+    void aLoanPayoutPaysTheInstallmentsWhateverIsLeftOfTheTransfer() {
+        // given
+        Order order = transferAndInstallments();
+        StatementMatcher matcher = new StatementMatcher(List.of(order), List.of(SANTANDER_LOANS), token -> List.of());
+
+        // when
+        OperationMatch match = matcher.match(List.of(operation("WB-1", "15000.00", "Wyplata kredytu", "SANTANDER"))).get(0);
+
+        // then
+        assertThat(match.kind()).isEqualTo(MatchKind.PAYOUT);
+        assertThat(match.warnings()).isEmpty();
+        assertThat(match.allocations()).containsExactly(new Allocation(JAN, new BigDecimal("15000.00"), new BigDecimal("0.00")));
+    }
+
+    @Test
+    void theTransferAndTheLoanOfOneOrderEachPayTheirOwnPaymentInEitherOrder() {
+        // given
+        BankOperation transfer = operation("WB-1", "5000.00", "Zaliczka " + JAN, "JAN KOWALSKI");
+        BankOperation loan = operation("WB-2", "15000.00", "Wyplata kredytu", "SANTANDER");
+
+        // when
+        List<OperationMatch> transferFirst = new StatementMatcher(List.of(transferAndInstallments()),
+                List.of(SANTANDER_LOANS), token -> List.of()).match(List.of(transfer, loan));
+        List<OperationMatch> loanFirst = new StatementMatcher(List.of(transferAndInstallments()),
+                List.of(SANTANDER_LOANS), token -> List.of()).match(List.of(loan, transfer));
+
+        // then
+        assertThat(transferFirst).extracting(OperationMatch::kind).containsExactly(MatchKind.MATCHED, MatchKind.PAYOUT);
+        assertThat(loanFirst).extracting(OperationMatch::kind).containsExactly(MatchKind.PAYOUT, MatchKind.MATCHED);
+        assertThat(loanFirst.get(0).allocations()).extracting(Allocation::amount).usingElementComparator(BigDecimal::compareTo)
+                .containsExactly(new BigDecimal("15000.00"));
+        assertThat(loanFirst.get(1).warnings()).isEmpty();
+    }
+
+    @Test
+    void aTransferAboveItsPaymentLowersWhatTheLoanIsExpectedToPay() {
+        // given
+        BankOperation transfer = operation("WB-1", "5500.00", "Zaliczka " + JAN, "JAN KOWALSKI");
+        BankOperation loan = operation("WB-2", "14500.00", "Wyplata kredytu", "SANTANDER");
+
+        // when
+        List<OperationMatch> matches = new StatementMatcher(List.of(transferAndInstallments()),
+                List.of(SANTANDER_LOANS), token -> List.of()).match(List.of(transfer, loan));
+
+        // then
+        assertThat(matches.get(0).warnings()).containsExactly(MatchWarning.OVERPAID);
+        assertThat(matches.get(1).allocations()).extracting(Allocation::amount).usingElementComparator(BigDecimal::compareTo)
+                .containsExactly(new BigDecimal("14500.00"));
+    }
+
     private static OperationMatch single(List<Order> orders, BankOperation operation) {
         return new StatementMatcher(orders, List.of(), token -> List.of()).match(List.of(operation)).get(0);
     }

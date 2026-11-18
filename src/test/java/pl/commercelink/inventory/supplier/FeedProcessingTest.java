@@ -5,6 +5,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.inventory.EanOnlyCodes;
+import pl.commercelink.inventory.InventoryMatchingProperties;
 import pl.commercelink.inventory.supplier.api.FeedItem;
 import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingPolicy;
@@ -86,7 +88,8 @@ class FeedProcessingTest {
     void feedRowWithNoNameBrandIsProcessableAndEntersTheInventory() {
         // given
         PimCatalog pimWithoutTheProduct = ScopedPimCatalog.of();
-        DataCorrection realCorrection = new DataCorrection(pimWithoutTheProduct, new BrandMapper(pimWithoutTheProduct));
+        DataCorrection realCorrection = new DataCorrection(pimWithoutTheProduct, new BrandMapper(pimWithoutTheProduct),
+                new EanOnlyCodes(pimWithoutTheProduct, InventoryMatchingProperties.allEnabled()));
         when(enrichment.enrichFromOwnRecord(any()))
                 .thenAnswer(invocation -> invocation.<Taxonomy>getArgument(0).withCategory("Kable", "120"));
         FeedProcessing processing = new FeedProcessing(realCorrection, taxonomyCache, enrichment, stats, 0, true);
@@ -533,7 +536,8 @@ class FeedProcessingTest {
     void offerWithoutBrandUnderAPlaceholderEanIsRejectedWithoutError() {
         // given
         PimCatalog pimWithoutTheProduct = ScopedPimCatalog.of();
-        DataCorrection realCorrection = new DataCorrection(pimWithoutTheProduct, new BrandMapper(pimWithoutTheProduct));
+        DataCorrection realCorrection = new DataCorrection(pimWithoutTheProduct, new BrandMapper(pimWithoutTheProduct),
+                new EanOnlyCodes(pimWithoutTheProduct, InventoryMatchingProperties.allEnabled()));
         FeedProcessing processing = new FeedProcessing(realCorrection, taxonomyCache, enrichment, stats, 0, true);
 
         // when

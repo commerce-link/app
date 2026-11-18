@@ -48,6 +48,30 @@ public final class VariantCodes {
         return codes.size();
     }
 
+    /** How many pairs of this set the other one lacks. */
+    public int countNotIn(VariantCodes other) {
+        if (other.codes.isEmpty()) {
+            return codes.size();
+        }
+        int missing = 0;
+        for (BrandCode code : codes) {
+            if (!other.codes.contains(code)) {
+                missing++;
+            }
+        }
+        return missing;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        return this == other || other instanceof VariantCodes that && codes.equals(that.codes);
+    }
+
+    @Override
+    public int hashCode() {
+        return codes.hashCode();
+    }
+
     record BrandCode(String brandKey, String mfn) {
     }
 }

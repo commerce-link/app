@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import pl.commercelink.inventory.EanOnlyCodes;
+import pl.commercelink.inventory.InventoryMatchingProperties;
 import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.Brand;
 import pl.commercelink.pim.api.PimCatalog;
@@ -43,7 +45,7 @@ class DataCorrectionTest {
         when(pimCatalog.withGlobalData()).thenReturn(pimView);
         when(pimCatalog.allBrands()).thenReturn(List.of(new Brand("Western Digital", List.of("SanDisk"))));
         brandMapper = spy(new BrandMapper(pimCatalog));
-        dataCorrection = new DataCorrection(pimCatalog, brandMapper);
+        dataCorrection = new DataCorrection(pimCatalog, brandMapper, eanOnlyCodes(pimCatalog));
     }
 
     @Test
@@ -223,7 +225,8 @@ class DataCorrectionTest {
                 new PimIdentifier("5900000000002", PimIdentifierType.GTIN),
                 new PimIdentifier("MFN", PimIdentifierType.MPN)),
                 "StoreBrand", "StoreName", "Monitors", null, true, 4000, 5000, null, "s1");
-        DataCorrection correction = new DataCorrection(ScopedPimCatalog.of(storeEntry), brandMapper);
+        PimCatalog storeCatalog = ScopedPimCatalog.of(storeEntry);
+        DataCorrection correction = new DataCorrection(storeCatalog, brandMapper, eanOnlyCodes(storeCatalog));
         SupplierProduct fromFeed = new SupplierProduct("", "MFN", "FeedBrand", "FeedName", 5, 100, 200);
 
         // when
@@ -474,6 +477,58 @@ class DataCorrectionTest {
         assertThat(result.name()).isEqualTo("FeedName");
     }
 
+    @Test
+    void offerWithoutEanGetsNoEanForAnEanOnlyPair() {
+        // given -- the operator flagged the entry: its code is shared by variants with different EANs
+        DataCorrection correction = correctionWith(eanOnlyEntry("Mova", "5900000000002", "SHINE10"));
+
+        // when
+        InventoryItem result = correction.run(offer("Mova", "", "SHINE10"));
+
+        // then
+        assertThat(result.ean()).isEmpty();
+        assertThat(result.isSellable()).isFalse();
+    }
+
+    @Test
+    void offerWithoutEanStillGetsThePimEanForOtherPairs() {
+        // given
+        DataCorrection correction = correctionWith(
+                eanOnlyEntry("Mova", "5900000000002", "SHINE10"),
+                entryWithBrand("Mova", true, "5900000000003", "SHINE11"));
+
+        // when
+        InventoryItem result = correction.run(offer("Mova", "", "SHINE11"));
+
+        // then
+        assertThat(result.ean()).isEqualTo("5900000000003");
+    }
+
+    @Test
+    void offerWithItsOwnEanIsUntouched() {
+        // given
+        DataCorrection correction = correctionWith(eanOnlyEntry("Mova", "5900000000002", "SHINE10"));
+        InventoryItem fromFeed = offer("Mova", "5900000000009", "SHINE10");
+
+        // when
+        InventoryItem result = correction.run(fromFeed);
+
+        // then
+        assertThat(result.ean()).isEqualTo("5900000000009");
+    }
+
+    @Test
+    void aliasBrandOfferGetsNoEanForAnEanOnlyPair() {
+        // given -- the fixture maps the alias "SanDisk" to "Western Digital"
+        DataCorrection correction = correctionWith(eanOnlyEntry("Western Digital", "5900000000002", "WDS100"));
+
+        // when
+        InventoryItem result = correction.run(offer("SanDisk", "", "WDS100"));
+
+        // then
+        assertThat(result.ean()).isEmpty();
+    }
+
     private Taxonomy taxonomyOf(SupplierProduct product) {
         return taxonomyOf(dataCorrection, product);
     }
@@ -483,7 +538,19 @@ class DataCorrectionTest {
     }
 
     private DataCorrection correctionWith(PimEntry... entries) {
-        return new DataCorrection(ScopedPimCatalog.of(entries), brandMapper);
+        PimCatalog catalog = ScopedPimCatalog.of(entries);
+        return new DataCorrection(catalog, brandMapper, eanOnlyCodes(catalog));
+    }
+
+    private static EanOnlyCodes eanOnlyCodes(PimCatalog catalog) {
+        return new EanOnlyCodes(catalog, InventoryMatchingProperties.allEnabled());
+    }
+
+    private static PimEntry eanOnlyEntry(String brand, String gtin, String mpn) {
+        return new PimEntry("pim-" + gtin, List.of(
+                new PimIdentifier(gtin, PimIdentifierType.GTIN),
+                new PimIdentifier(mpn, PimIdentifierType.MPN)),
+                brand, "PimName", null, null, true, null, null, null, null, null, true);
     }
 
     private static InventoryItem offerOf(SupplierProduct product) {

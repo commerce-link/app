@@ -9,6 +9,7 @@ import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -42,10 +43,15 @@ public class Inventory {
     private final StoreInventoryProvider storeInventoryProvider;
     private final GlobalMatchedInventory globalInventory;
     private final PimCatalog pimCatalog;
+    private final InventoryMatchingProperties matchingProperties;
 
     // Per supplier, the feed version last attempted (successful load or markSeen) — not a guarantee of
     // held inventory; drives the scheduler's "is there a newer feed to load?" check.
     private final ConcurrentHashMap<String, LocalDateTime> lastUpdateDateBySupplier = new ConcurrentHashMap<>();
+
+    // a feed reload and a regroup each read the grouped offers and replace the groups; one at a time, so neither
+    // replaces the groups with a result computed from older offers or an older set of EAN-only pairs
+    private final Object loadLock = new Object();
 
     private final Cache<StatisticsKey, InventoryStatistics> statisticsCache = Caffeine.newBuilder()
             .maximumSize(1_000)
@@ -53,11 +59,13 @@ public class Inventory {
             .build();
 
     void init(List<List<InventoryItem>> rawFeeds) {
-        load(
-                rawFeeds.stream()
-                .flatMap(Collection::stream)
-                .collect(Collectors.toList())
-        );
+        synchronized (loadLock) {
+            load(
+                    rawFeeds.stream()
+                    .flatMap(Collection::stream)
+                    .collect(Collectors.toList())
+            );
+        }
 
         for (List<InventoryItem> rawFeed : rawFeeds) {
             if (!rawFeed.isEmpty()) {
@@ -70,21 +78,32 @@ public class Inventory {
     void update(Map<String, List<InventoryItem>> rawInventoryItemsBySupplier) {
         System.out.println("Reloading inventory for suppliers: " + rawInventoryItemsBySupplier.keySet());
 
-        List<InventoryItem> inventoryItemsCopy = globalInventory.allItems();
+        synchronized (loadLock) {
+            List<InventoryItem> inventoryItemsCopy = globalInventory.allItems();
 
-        inventoryItemsCopy.removeIf(item -> rawInventoryItemsBySupplier.containsKey(item.supplier()));
-        for (Map.Entry<String, List<InventoryItem>> entry : rawInventoryItemsBySupplier.entrySet()) {
-            inventoryItemsCopy.addAll(entry.getValue());
+            inventoryItemsCopy.removeIf(item -> rawInventoryItemsBySupplier.containsKey(item.supplier()));
+            for (Map.Entry<String, List<InventoryItem>> entry : rawInventoryItemsBySupplier.entrySet()) {
+                inventoryItemsCopy.addAll(entry.getValue());
+            }
+
+            load(inventoryItemsCopy);
         }
-
-        load(inventoryItemsCopy);
 
         rawInventoryItemsBySupplier.keySet().forEach(supplierName -> lastUpdateDateBySupplier.put(supplierName, LocalDateTime.now()));
     }
 
+    /** Groups the offers already in the global pool again, with the EAN-only pairs of the current PIM index. */
+    void regroup() {
+        synchronized (loadLock) {
+            load(globalInventory.allItems());
+        }
+    }
+
     private void load(List<InventoryItem> items) {
-        InventoryAutoDiscovery.Grouping grouping = autoDiscovery.group(items, pimCatalog.withGlobalData(), List::of, VariantCodes.none());
-        globalInventory.replace(grouping.groups(), grouping.variantCodes());
+        PimView pim = pimCatalog.withGlobalData();
+        VariantCodes eanOnly = matchingProperties.pimEanOnlyFlag() ? PimEanOnlyCodes.of(pim.findAll()) : VariantCodes.none();
+        InventoryAutoDiscovery.Grouping grouping = autoDiscovery.group(items, pim, List::of, VariantCodes.none(), eanOnly);
+        globalInventory.replace(grouping.groups(), grouping.variantCodes(), eanOnly);
     }
 
     public InventoryView withGlobalData() {

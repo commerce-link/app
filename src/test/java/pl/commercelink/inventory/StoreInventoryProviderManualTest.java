@@ -64,7 +64,7 @@ class StoreInventoryProviderManualTest {
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
         when(globalInventory.generation()).thenReturn(
                 new GlobalMatchedInventory.Generation(0, List.of(), InventoryIndex.of(List.of()), VariantCodes.none()));
-        when(autoDiscovery.group(any(), any(), any(), any())).thenReturn(new InventoryAutoDiscovery.Grouping(List.of(), VariantCodes.none()));
+        when(autoDiscovery.group(any(), any(), any(), any(), any())).thenReturn(new InventoryAutoDiscovery.Grouping(List.of(), VariantCodes.none()));
         when(storeFeedItemLoader.load(eq("store-1"), any(String.class), any(SupplierProviderDescriptor.class), any()))
                 .thenReturn(List.of());
 
@@ -94,7 +94,7 @@ class StoreInventoryProviderManualTest {
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
         when(globalInventory.generation()).thenReturn(
                 new GlobalMatchedInventory.Generation(0, List.of(), InventoryIndex.of(List.of()), VariantCodes.none()));
-        when(autoDiscovery.group(any(), any(), any(), any())).thenReturn(new InventoryAutoDiscovery.Grouping(List.of(), VariantCodes.none()));
+        when(autoDiscovery.group(any(), any(), any(), any(), any())).thenReturn(new InventoryAutoDiscovery.Grouping(List.of(), VariantCodes.none()));
         when(storeFeedItemLoader.load(eq("store-1"), any(String.class), any(SupplierProviderDescriptor.class), any()))
                 .thenReturn(List.of());
 

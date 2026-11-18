@@ -210,11 +210,27 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     /**
      * unpaid never goes below zero: an order paid above its total shows overpaidAmount instead. forms: one edit form per
      * payment, in the order of rows, empty on a read-only page. expected, pending and sources feed the shared
-     * "Dodaj wpłatę" dialog.
+     * "Dodaj wpłatę" dialog. editable: payments can be added, edited and removed, which a cancelled order still allows
+     * (the refund) although the rest of its page is read-only. pendingChoices is PendingPaymentsJson of the order, the
+     * dialog's choice of payment. expectedTotal is what the pending payments wait for together, formatted, null without
+     * any; expectedMatches says it is what is unpaid. splits: one "Podziel" dialog per pending payment, empty on a
+     * read-only page.
      */
     public record PaymentsCard(List<PaymentRow> rows, String paid, String unpaid, boolean unpaidDue, boolean overpaid,
                                String overpaidAmount, double expected, Payment pending,
-                               List<OrderLabels.Option<PaymentSource>> sources, List<OrderPaymentForm> forms) {
+                               List<OrderLabels.Option<PaymentSource>> sources, List<OrderPaymentForm> forms,
+                               boolean editable, String pendingChoices, String expectedTotal, boolean expectedMatches,
+                               List<PaymentSplitView> splits) {
+    }
+
+    /**
+     * The "Podziel" dialog of a pending payment: action posts PaymentSplitForm with version. source preselects the
+     * first part and restSource the last one; expected is what the payment waits for, formatted, and expectedValue the
+     * same plain, for the script that counts what is left for the last part.
+     */
+    public record PaymentSplitView(String dialogId, String action, String version, String sourceKey,
+                                   PaymentSource source, PaymentSource restSource, String expected, String expectedValue,
+                                   boolean rest) {
     }
 
     /**
@@ -222,12 +238,14 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
      * from 1. editHref leads to the payment page (its dialog, dialogId, intercepts it) and removeHref to the removal
      * confirmation; both null on a read-only page. removeMessageKey is the confirmation's text: removing the only
      * payment says that a pending one with the same method stays. The pending payment has no removeHref and
-     * removeReasonKey says why, so "Remove" shows greyed with that reason.
+     * removeReasonKey says why, so "Remove" shows greyed with that reason. expected is what a pending payment waits for,
+     * its own amount or, when rest, what is unpaid beyond the other pending payments' amounts; null for money recorded.
+     * splitDialogId opens the payment's "Podziel" dialog; null for money recorded and on a read-only page.
      */
     public record PaymentRow(int number, String amount, boolean refund, boolean pending, String sourceKey, String name,
                              String referenceNo, String bankTransactionNo, String bankTransactionDate, String fee,
                              String dialogId, String editHref, String removeHref, String removeMessageKey,
-                             String removeReasonKey) {
+                             String removeReasonKey, String expected, boolean rest, String splitDialogId) {
     }
 
     public record HistoryCard(List<EventRow> events, OrderReview review, String reviewStatusKey, String reviewRequestedAt,

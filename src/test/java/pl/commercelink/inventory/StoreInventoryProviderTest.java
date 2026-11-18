@@ -118,7 +118,7 @@ class StoreInventoryProviderTest {
                 .thenReturn(List.of(item("Wortmann")));
         MatchedInventory matched = mock(MatchedInventory.class);
         when(matched.getInventoryKey()).thenReturn(new InventoryKey());
-        when(autoDiscovery.group(anyList(), any(), any(), any())).thenReturn(grouping(List.of(matched)));
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenReturn(grouping(List.of(matched)));
 
         // when
         StoreInventory result = provider.get("store-1");
@@ -126,7 +126,7 @@ class StoreInventoryProviderTest {
         // then
         assertEquals(List.of(matched), result.items());
         verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class), anyLong());
-        verify(autoDiscovery).group(argThat(list -> list.size() == 1), any(), any(), any());
+        verify(autoDiscovery).group(argThat(list -> list.size() == 1), any(), any(), any(), any());
     }
 
     @Test
@@ -136,7 +136,7 @@ class StoreInventoryProviderTest {
         when(storesRepository.findById("store-1")).thenReturn(storeEntity);
         when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.of(30));
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.group(anyList(), any(), any(), any())).thenReturn(grouping(List.of()));
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenReturn(grouping(List.of()));
         when(cache.builtSince("store-1", 1_000L)).thenReturn(false);
 
         // when
@@ -167,7 +167,7 @@ class StoreInventoryProviderTest {
         when(storesRepository.findById("store-1")).thenReturn(storeEntity);
         when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.group(anyList(), any(), any(), any())).thenReturn(grouping(List.of()));
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenReturn(grouping(List.of()));
 
         // when
         provider.refresh("store-1", null);
@@ -198,7 +198,7 @@ class StoreInventoryProviderTest {
         when(storesRepository.findById("store-1")).thenReturn(storeEntity);
         when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.group(anyList(), any(), any(), any())).thenReturn(grouping(List.of()));
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenReturn(grouping(List.of()));
 
         // when
         provider.get("store-1");
@@ -251,13 +251,13 @@ class StoreInventoryProviderTest {
         when(storesRepository.findById("store-1")).thenReturn(storeEntity);
         when(storeEntity.getOwnSupplierNames()).thenReturn(List.of());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of("PLN", 1.0));
-        when(autoDiscovery.group(anyList(), any(), any(), any())).thenReturn(grouping(List.of()));
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenReturn(grouping(List.of()));
 
         // when
         provider.get("store-1");
 
         // then
-        verify(autoDiscovery).group(argThat(List::isEmpty), any(), any(), any());
+        verify(autoDiscovery).group(argThat(List::isEmpty), any(), any(), any(), any());
     }
 
     @Test
@@ -269,7 +269,7 @@ class StoreInventoryProviderTest {
         when(storeEntity.getOwnSupplierNames()).thenReturn(List.of());
         when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.of(30));
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.group(anyList(), any(), any(), any())).thenReturn(grouping(List.of()));
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenReturn(grouping(List.of()));
 
         // when
         provider.get("store-1");
@@ -288,7 +288,7 @@ class StoreInventoryProviderTest {
         when(storeEntity.getOwnSupplierNames()).thenReturn(List.of());
         when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.group(anyList(), any(), any(), any())).thenReturn(grouping(List.of()));
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenReturn(grouping(List.of()));
 
         // when
         provider.get("store-1");
@@ -307,7 +307,7 @@ class StoreInventoryProviderTest {
         when(storeEntity.getOwnSupplierNames()).thenReturn(List.of());
         when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.of(0));
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.group(anyList(), any(), any(), any())).thenReturn(grouping(List.of()));
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenReturn(grouping(List.of()));
 
         // when
         provider.get("store-1");
@@ -389,7 +389,7 @@ class StoreInventoryProviderTest {
         InventoryItem ownItem = new InventoryItem("111", "AAA", 100.0, "PLN", 5, 2, "Action", true, true, false);
         when(storeFeedItemLoader.load(eq("store-1"), eq("Action"), same(descriptor), anyMap()))
                 .thenReturn(List.of(ownItem));
-        when(autoDiscovery.group(anyList(), any(), any(), any())).thenAnswer(inv -> {
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenAnswer(inv -> {
             List<InventoryItem> items = inv.getArgument(0);
             return grouping(List.of(new MatchedInventory(new InventoryKey("111", "AAA"), items, taxonomyCache, supplierRegistry)));
         });
@@ -414,15 +414,15 @@ class StoreInventoryProviderTest {
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of("PLN", 1.0));
         InventoryItem globalOffer = item("Asbis");
         MatchedInventory globalGroup = new MatchedInventory(new InventoryKey("4711111111111", "MFN"), List.of(globalOffer), taxonomyCache, supplierRegistry);
-        when(globalInventory.generation()).thenReturn(
+        currentGlobalGeneration(
                 new GlobalMatchedInventory.Generation(1, List.of(globalGroup), InventoryIndex.of(List.of(globalGroup)), VariantCodes.none()));
-        when(autoDiscovery.group(anyList(), any(), any(), any())).thenReturn(grouping(List.of()));
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenReturn(grouping(List.of()));
 
         // when
         provider.get("store-1");
 
         // then
-        verify(autoDiscovery).group(anyList(), any(), argThat(witnesses -> List.copyOf(witnesses.get()).equals(List.of(globalOffer))), any());
+        verify(autoDiscovery).group(anyList(), any(), argThat(witnesses -> List.copyOf(witnesses.get()).equals(List.of(globalOffer))), any(), any());
         verify(globalInventory, never()).allItems();
     }
 
@@ -438,15 +438,15 @@ class StoreInventoryProviderTest {
                 new InventoryItem("Nike", null, "5901234567801", "AIR1", "X", 10.0, "PLN", 1, 1, true, false, false),
                 new InventoryItem("Nike", null, "5901234567802", "AIR1", "X", 10.0, "PLN", 1, 1, true, false, false)))
                 .variantCodes();
-        when(globalInventory.generation()).thenReturn(
+        currentGlobalGeneration(
                 new GlobalMatchedInventory.Generation(3, List.of(), InventoryIndex.of(List.of()), globalCodes));
-        when(autoDiscovery.group(anyList(), any(), any(), any())).thenReturn(grouping(List.of()));
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenReturn(grouping(List.of()));
 
         // when
         provider.get("store-1");
 
         // then
-        verify(autoDiscovery).group(anyList(), any(), any(), same(globalCodes));
+        verify(autoDiscovery).group(anyList(), any(), any(), same(globalCodes), any());
         verify(globalInventory, times(1)).generation();
     }
 
@@ -459,7 +459,7 @@ class StoreInventoryProviderTest {
         MatchedInventory global = philipsGlobal();
         storeSellingOwnOffers(philipsOwnOffers());
         globalPoolOf(List.of(global));
-        when(autoDiscovery.group(anyList(), any(), any(), any())).thenAnswer(inv -> grouping(List.of(groupOf(inv.getArgument(0)))));
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenAnswer(inv -> grouping(List.of(groupOf(inv.getArgument(0)))));
 
         // when
         StoreInventory result = provider.get("store-1");
@@ -473,11 +473,11 @@ class StoreInventoryProviderTest {
     @Test
     void doesNotLinkWhenTheSwitchIsOff() {
         // given
-        StoreInventoryProvider withoutLinks = providerWith(autoDiscovery, new InventoryMatchingProperties(true, true, true, false));
+        StoreInventoryProvider withoutLinks = providerWith(autoDiscovery, new InventoryMatchingProperties(true, true, true, false, true));
         MatchedInventory global = philipsGlobal();
         storeSellingOwnOffers(philipsOwnOffers());
         globalPoolOf(List.of(global));
-        when(autoDiscovery.group(anyList(), any(), any(), any())).thenAnswer(inv -> grouping(List.of(groupOf(inv.getArgument(0)))));
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenAnswer(inv -> grouping(List.of(groupOf(inv.getArgument(0)))));
 
         // when
         StoreInventory result = withoutLinks.get("store-1");
@@ -502,7 +502,7 @@ class StoreInventoryProviderTest {
                 sapphire(ean9060, "11350-03-20G", 2613, "Kosatec"),
                 sapphire(ean9060, "11350-03-20G", 2663, "IncomGroup")), pimView, List::of, VariantCodes.none());
         List<MatchedInventory> globalGroups = List.copyOf(globalGrouping.groups());
-        when(globalInventory.generation()).thenReturn(new GlobalMatchedInventory.Generation(
+        currentGlobalGeneration(new GlobalMatchedInventory.Generation(
                 1, globalGroups, InventoryIndex.of(globalGroups), globalGrouping.variantCodes()));
         InventoryItem ownAction = sapphire("4895106299993", "11324-01-20G", 1850, "Action");
         InventoryItem ownElko = sapphire(ean9060, "11324-01-20G", 3563, "Elko");
@@ -518,13 +518,43 @@ class StoreInventoryProviderTest {
     }
 
     @Test
+    void storeBuildUsesEanOnlyCodesOfTheGlobalGeneration() {
+        // given: the store view holds an unflagged store entry that shadows the flagged global one by GTIN
+        String ean176 = "6977728943176";
+        String ean169 = "6977728943169";
+        when(pimView.findAll()).thenReturn(List.of(new pl.commercelink.pim.api.PimEntry("store-mova", List.of(
+                new pl.commercelink.pim.api.PimIdentifier(ean176, pl.commercelink.pim.api.PimIdentifierType.GTIN),
+                new pl.commercelink.pim.api.PimIdentifier("SHINE10", pl.commercelink.pim.api.PimIdentifierType.MPN)),
+                "Mova", "Name", null, null, true, null, null, null, "store-1", null, false)));
+        VariantCodes eanOnly = PimEanOnlyCodes.of(List.of(new pl.commercelink.pim.api.PimEntry("pim-mova", List.of(
+                new pl.commercelink.pim.api.PimIdentifier(ean176, pl.commercelink.pim.api.PimIdentifierType.GTIN),
+                new pl.commercelink.pim.api.PimIdentifier("SHINE10", pl.commercelink.pim.api.PimIdentifierType.MPN)),
+                "Mova", "Name", null, null, true, null, null, null, null, null, true)));
+        currentGlobalGeneration(new GlobalMatchedInventory.Generation(
+                1, List.of(), InventoryIndex.of(List.of()), VariantCodes.none(), eanOnly));
+        InventoryItem kosatec = mova(ean176, 1200, "Kosatec");
+        InventoryItem wave = mova(ean169, 1210, "Wave");
+        storeSellingOwnOffers(List.of(kosatec, wave));
+        InventoryAutoDiscovery realDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
+                InventoryMatchingProperties.allEnabled());
+
+        // when
+        StoreInventory result = providerWith(realDiscovery, InventoryMatchingProperties.allEnabled()).get("store-1");
+
+        // then
+        assertThat(result.index().all())
+                .extracting(group -> java.util.Set.copyOf(group.getInventoryItems()))
+                .containsExactlyInAnyOrder(java.util.Set.of(kosatec), java.util.Set.of(wave));
+    }
+
+    @Test
     void linkedInventorySurvivesTheSnapshotRoundTrip() {
         // given
         MatchedInventory global = philipsGlobal();
         InventoryIndex globalIndex = InventoryIndex.of(List.of(global));
         storeSellingOwnOffers(philipsOwnOffers());
         globalPoolOf(List.of(global));
-        when(autoDiscovery.group(anyList(), any(), any(), any())).thenAnswer(inv -> grouping(List.of(groupOf(inv.getArgument(0)))));
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenAnswer(inv -> grouping(List.of(groupOf(inv.getArgument(0)))));
         StoreInventory built = provider.get("store-1");
 
         // when
@@ -538,11 +568,11 @@ class StoreInventoryProviderTest {
     @Test
     void withTheLinkSwitchOffTheBuildNeverAsksForTheGlobalIndex() {
         // given
-        StoreInventoryProvider withoutLinks = providerWith(autoDiscovery, new InventoryMatchingProperties(true, true, true, false));
+        StoreInventoryProvider withoutLinks = providerWith(autoDiscovery, new InventoryMatchingProperties(true, true, true, false, true));
         AtomicInteger indexRequests = new AtomicInteger();
         globalPoolCountingIndexRequests(List.of(philipsGlobal()), indexRequests);
         storeSellingOwnOffers(philipsOwnOffers());
-        when(autoDiscovery.group(anyList(), any(), any(), any())).thenAnswer(inv -> grouping(List.of(groupOf(inv.getArgument(0)))));
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenAnswer(inv -> grouping(List.of(groupOf(inv.getArgument(0)))));
 
         // when
         withoutLinks.get("store-1");
@@ -558,7 +588,7 @@ class StoreInventoryProviderTest {
         AtomicInteger requestsWhileGrouping = new AtomicInteger(-1);
         globalPoolCountingIndexRequests(List.of(philipsGlobal()), indexRequests);
         storeSellingOwnOffers(philipsOwnOffers());
-        when(autoDiscovery.group(anyList(), any(), any(), any())).thenAnswer(inv -> {
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenAnswer(inv -> {
             requestsWhileGrouping.set(indexRequests.get());
             return grouping(List.of(groupOf(inv.getArgument(0))));
         });
@@ -571,16 +601,98 @@ class StoreInventoryProviderTest {
         assertThat(indexRequests.get()).isPositive();
     }
 
+    @Test
+    void doesNotCacheABuildWhoseGlobalGenerationWasReplaced() {
+        // given: the global inventory is regrouped while the store groups its own offers
+        GlobalMatchedInventory realGlobal = new GlobalMatchedInventory();
+        storeSellingOwnOffers(philipsOwnOffers());
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenAnswer(inv -> {
+            realGlobal.replace(List.of(philipsGlobal()));
+            return grouping(List.of(groupOf(inv.getArgument(0))));
+        });
+
+        // when
+        StoreInventory result = providerWith(autoDiscovery, InventoryMatchingProperties.allEnabled(), realGlobal).get("store-1");
+
+        // then
+        assertThat(result.index().all()).singleElement().satisfies(own ->
+                assertThat(own.getInventoryItems()).containsExactlyInAnyOrderElementsOf(philipsOwnOffers()));
+        verify(cache, never()).put(any(), any(), any(), anyLong());
+    }
+
+    @Test
+    void refreshBuildsAgainWhenTheGlobalGenerationWasReplacedDuringTheBuild() {
+        // given
+        GlobalMatchedInventory realGlobal = new GlobalMatchedInventory();
+        storeSellingOwnOffers(philipsOwnOffers());
+        AtomicInteger builds = new AtomicInteger();
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenAnswer(inv -> {
+            if (builds.incrementAndGet() == 1) {
+                realGlobal.replace(List.of(philipsGlobal()));
+            }
+            return grouping(List.of(groupOf(inv.getArgument(0))));
+        });
+
+        // when
+        providerWith(autoDiscovery, InventoryMatchingProperties.allEnabled(), realGlobal).refresh("store-1", null);
+
+        // then
+        assertThat(builds).hasValue(2);
+        verify(cache, times(1)).put(eq("store-1"), any(StoreInventory.class), any(Duration.class), anyLong());
+    }
+
+    @Test
+    void refreshFailsWhenEveryBuildMeetsAGlobalReload() {
+        // given
+        GlobalMatchedInventory realGlobal = new GlobalMatchedInventory();
+        storeSellingOwnOffers(philipsOwnOffers());
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenAnswer(inv -> {
+            realGlobal.replace(List.of(philipsGlobal()));
+            return grouping(List.of(groupOf(inv.getArgument(0))));
+        });
+        StoreInventoryProvider provider = providerWith(autoDiscovery, InventoryMatchingProperties.allEnabled(), realGlobal);
+
+        // when / then
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> provider.refresh("store-1", null));
+        verify(cache, never()).put(any(), any(), any(), anyLong());
+    }
+
+    @Test
+    void cachesABuildWhenTheGlobalGenerationIsUnchanged() {
+        // given
+        GlobalMatchedInventory realGlobal = new GlobalMatchedInventory();
+        realGlobal.replace(List.of(philipsGlobal()));
+        storeSellingOwnOffers(philipsOwnOffers());
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenAnswer(inv -> grouping(List.of(groupOf(inv.getArgument(0)))));
+
+        // when
+        StoreInventory result = providerWith(autoDiscovery, InventoryMatchingProperties.allEnabled(), realGlobal).get("store-1");
+
+        // then
+        verify(cache).put(eq("store-1"), same(result), any(Duration.class), anyLong());
+    }
+
     private void globalPoolCountingIndexRequests(List<MatchedInventory> groups, AtomicInteger indexRequests) {
-        when(globalInventory.generation()).thenReturn(new GlobalMatchedInventory.Generation(1, groups, () -> {
+        currentGlobalGeneration(new GlobalMatchedInventory.Generation(1, groups, () -> {
             indexRequests.incrementAndGet();
             return InventoryIndex.of(groups);
         }, VariantCodes.none()));
     }
 
+    // the mocked global inventory reports the version of the generation it hands out, as the real one does
+    private void currentGlobalGeneration(GlobalMatchedInventory.Generation generation) {
+        when(globalInventory.generation()).thenReturn(generation);
+        when(globalInventory.version()).thenReturn(generation.version());
+    }
+
     private StoreInventoryProvider providerWith(InventoryAutoDiscovery discovery, InventoryMatchingProperties properties) {
+        return providerWith(discovery, properties, globalInventory);
+    }
+
+    private StoreInventoryProvider providerWith(InventoryAutoDiscovery discovery, InventoryMatchingProperties properties,
+                                                GlobalMatchedInventory global) {
         return new StoreInventoryProvider(cache, storesRepository, supplierProviderFactory, discovery,
-                storeFeedItemLoader, exchangeRates, pimCatalog, globalInventory, properties);
+                storeFeedItemLoader, exchangeRates, pimCatalog, global, properties);
     }
 
     private void storeSellingOwnOffers(List<InventoryItem> offers) {
@@ -597,7 +709,7 @@ class StoreInventoryProviderTest {
     }
 
     private void globalPoolOf(List<MatchedInventory> groups) {
-        when(globalInventory.generation()).thenReturn(
+        currentGlobalGeneration(
                 new GlobalMatchedInventory.Generation(1, groups, InventoryIndex.of(groups), VariantCodes.none()));
     }
 
@@ -620,6 +732,10 @@ class StoreInventoryProviderTest {
 
     private static InventoryItem philips(String ean, double netPrice, String supplier) {
         return new InventoryItem("Philips", null, ean, "QP1324/20", supplier, netPrice, "PLN", 5, 1, true, false, false);
+    }
+
+    private static InventoryItem mova(String ean, double netPrice, String supplier) {
+        return new InventoryItem("Mova", null, ean, "SHINE10", supplier, netPrice, "PLN", 5, 1, true, false, false);
     }
 
     private static InventoryItem sapphire(String ean, String mfn, double netPrice, String supplier) {

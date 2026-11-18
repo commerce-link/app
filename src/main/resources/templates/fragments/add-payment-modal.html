@@ -4,7 +4,9 @@
 <!--/* The "register payment" dialog, shared by the order details, Payments (payments.html) and the delivery details
        (deliveries/details/payments.html). formAction may be '' when a page script sets it per row; expectedAmount is the
        unpaid amount (0 when unknown); pendingPayment (or null) pre-fills the fields; paymentSources is a list of
-       OrderLabels.Option<PaymentSource> (value + labelKey), like every other enum choice list on this page.
+       OrderLabels.Option<PaymentSource> (value + labelKey), like every other enum choice list on this page. An order's
+       dialog first asks which pending payment the money is for (AddPaymentForm.target): the script lists them from the
+       opening button's data-pendings (PendingPaymentsJson) and shows the chosen one's amount as the expected amount.
        loadMoneyJs is required (Thymeleaf's named-parameter fragment call rejects a missing declared parameter);
        every caller passes true except the order details page, which passes false because it also includes
        fragments/item-add-modal.html, which loads money.js already. */-->
@@ -12,11 +14,17 @@
     <dialog class="cl-dialog is-form" id="addPaymentModal" aria-labelledby="add-payment-title" data-mode="order"
             th:attr="data-hint=#{order.payment.hint}, data-hint-full=#{order.payment.hint.full},
                      data-hint-under=#{order.payment.hint.under}, data-hint-over=#{order.payment.hint.over},
-                     data-hint-pending=#{order.payment.hint.pending}">
+                     data-hint-waiting=#{order.payment.hint.waiting}, data-hint-new=#{order.payment.hint.new},
+                     data-text-rest=#{order.payments.pending.rest}, data-text-expected=#{order.payment.target.expected},
+                     data-text-new=#{order.payment.target.new}, data-text-new-description=#{order.payment.target.new.description}">
         <form method="post" th:action="${formAction}">
             <h2 class="cl-dialog-title" id="add-payment-title" th:text="#{order.payment.action.add.title}"></h2>
             <div class="cl-dialog-body">
                 <div class="cl-form-grid">
+                    <fieldset class="cl-choice-group" id="addPaymentTargets" data-payment-mode="order" hidden>
+                        <legend class="cl-label" th:text="#{order.payment.target}"></legend>
+                        <div class="cl-choice-group" id="addPaymentTargetList"></div>
+                    </fieldset>
                     <div class="cl-span-3 cl-field">
                         <label class="cl-label" for="addPaymentExpected" th:text="#{order.payment.expected.amount}"></label>
                         <!--/* shown, not typed: the read-only look (commercelink.css), the focus starts on the amount */-->
@@ -105,8 +113,9 @@
             </div>
         </form>
     </dialog>
-    <!--/* loadMoneyJs is false only on the order details page, where fragments/item-add-modal.html is included
-           on the same page and already loads money.js -- loading it twice would run its IIFE twice. Every other
+    <!--/* loadMoneyJs is false only on the order details page while fragments/item-add-modal.html is included on
+           the same page and already loads money.js -- loading it twice would run its IIFE twice. A read-only order
+           page that still takes payments (a cancelled order) has no such dialog and passes true. Every other
            caller passes true explicitly (Thymeleaf requires it); the "== null" half of the guard only matters
            for a test that calls this fragment directly with ${null}. */-->
     <script th:if="${loadMoneyJs == null or loadMoneyJs}" th:src="@{/js/money.js}" defer></script>

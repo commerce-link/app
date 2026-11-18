@@ -131,6 +131,18 @@ class PaymentsRowMapperTest {
     }
 
     @Test
+    void aReceivableWaitingForSeveralPaymentsShowsEachWithItsAmount() {
+        // given
+        Order o = PaymentEntriesTest.transferAndInstallments();
+
+        // when
+        ReceivableRow row = mapper.map(ReceivableEntry.of(o, TODAY).orElseThrow(), TODAY);
+
+        // then
+        assertThat(row.methodLabel()).isEqualTo("Przelew bankowy 5 000,00 PLN · Raty 15 000,00 PLN");
+    }
+
+    @Test
     void cashOnDeliveryInTransitIsCalm() {
         // given
         Order o = order(459, OrderStatus.Realization, PaymentSource.CashOnDelivery, 0);

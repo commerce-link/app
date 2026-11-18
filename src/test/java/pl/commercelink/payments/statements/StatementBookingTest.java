@@ -332,4 +332,90 @@ class StatementBookingTest {
     private static Allocation allocation(String amount, String fee) {
         return new Allocation(ORDER, new BigDecimal(amount), new BigDecimal(fee));
     }
+
+    @Test
+    void aTransferFillsThePendingTransferAndTheInstallmentsKeepWaiting() {
+        // given: 20 000 zł, 5 000 zł by transfer and the rest in installments
+        Payment installments = pending(PaymentSource.Installments);
+        Order order = order(ORDER, 20000.00, expected(PaymentSource.BankTransfer, 5000.0), installments);
+        when(ordersRepository.findById("store-1", ORDER)).thenReturn(order);
+
+        // when
+        StatementBooking.Outcome outcome = booking.book("store-1", operation("WB-1", "5000.00", "Zaliczka 3f9a2c1e", "JAN"),
+                List.of(allocation("5000.00", "0")), List.of());
+
+        // then
+        assertThat(outcome.booked()).isTrue();
+        assertThat(order.getPayments()).hasSize(2);
+        Payment transfer = order.getPayments().get(0);
+        assertThat(transfer.getAmount()).isEqualTo(5000.00);
+        assertThat(transfer.getSource()).isEqualTo(PaymentSource.BankTransfer);
+        assertThat(transfer.getBankTransactionNo()).isEqualTo("WB-1");
+        assertThat(order.getPendingPayments()).containsExactly(installments);
+        assertThat(installments.getSource()).isEqualTo(PaymentSource.Installments);
+        verify(receiptAttemptService, never()).locksOrder(any());
+    }
+
+    @Test
+    void aTransferOnTheInstallmentsTheOrderWaitsForLeavesTheRestWaitingForInstallments() {
+        // given: 20 000 zł in installments; the customer transferred 5 000 zł of it
+        Payment installments = pending(PaymentSource.Installments, "Santander", "UM/7", 0);
+        Order order = order(ORDER, 20000.00, installments);
+        when(ordersRepository.findById("store-1", ORDER)).thenReturn(order);
+        when(receiptAttemptService.locksOrder(order)).thenReturn(false);
+
+        // when
+        booking.book("store-1", operation("WB-2", "5000.00", "Zamowienie 3f9a2c1e", "JAN"),
+                List.of(allocation("5000.00", "0")), List.of());
+
+        // then
+        assertThat(installments.getAmount()).isEqualTo(5000.00);
+        assertThat(installments.getSource()).isEqualTo(PaymentSource.BankTransfer);
+        Payment rest = order.getRestPayment();
+        assertThat(rest.getSource()).isEqualTo(PaymentSource.Installments);
+        assertThat(rest.getName()).isEqualTo("Santander");
+        assertThat(rest.getReferenceNo()).isEqualTo("UM/7");
+        assertThat(order.getRestAmount()).isEqualTo(15000.00);
+    }
+
+    @Test
+    void aLoanPayoutFillsTheInstallmentsAndTheTransferKeepsWaiting() {
+        // given
+        PayoutChannel santander = new PayoutChannel("SANTANDER", null, PaymentSource.Installments, false, null, null);
+        Payment transfer = expected(PaymentSource.BankTransfer, 5000.0);
+        Order order = order(ORDER, 20000.00, transfer, pending(PaymentSource.Installments));
+        when(ordersRepository.findById("store-1", ORDER)).thenReturn(order);
+
+        // when
+        booking.book("store-1", operation("WB-SAN", "15000.00", "Wyplata kredytu", "SANTANDER"),
+                List.of(allocation("15000.00", "0")), List.of(santander));
+
+        // then
+        Payment installments = order.getPayments().get(1);
+        assertThat(installments.getAmount()).isEqualTo(15000.00);
+        assertThat(installments.getSource()).isEqualTo(PaymentSource.Installments);
+        assertThat(installments.getBankTransactionNo()).isEqualTo("WB-SAN");
+        assertThat(order.getPendingPayments()).containsExactly(transfer);
+    }
+
+    @Test
+    void aTransferBelowThePendingTransferLeavesTheDifferenceWaiting() {
+        // given
+        Payment transfer = expected(PaymentSource.BankTransfer, 5000.0);
+        transfer.setReferenceNo("PF/1/2026");
+        Order order = order(ORDER, 20000.00, transfer, pending(PaymentSource.Installments));
+        when(ordersRepository.findById("store-1", ORDER)).thenReturn(order);
+
+        // when
+        booking.book("store-1", operation("WB-1", "3000.00", "PF/1/2026", "JAN"), List.of(allocation("3000.00", "0")),
+                List.of());
+
+        // then
+        assertThat(order.getPayments()).extracting(Payment::getAmount).containsExactly(3000.00, 0.0, 0.0);
+        Payment difference = order.getPayments().get(2);
+        assertThat(difference.getSource()).isEqualTo(PaymentSource.BankTransfer);
+        assertThat(difference.getExpectedAmount()).isEqualTo(2000.0);
+        assertThat(difference.getReferenceNo()).isEqualTo("PF/1/2026");
+        assertThat(difference.getBankTransactionNo()).isNull();
+    }
 }

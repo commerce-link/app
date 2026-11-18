@@ -508,6 +508,43 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * The store's orders in this status placed between the two days. The status is filtered on StoreIdOrderedAtIndex
+     * (its projection carries it), page by page, and only the matching orders are then read in full: a page that is
+     * opened all day must not load every order of the period to keep a few.
+     */
+    public List<Order> findByStatusOrderedBetween(String storeId, OrderStatus status, LocalDate dateFrom, LocalDate dateTo) {
+        Map<String, AttributeValue> eav = new HashMap<>();
+        eav.put(":storeId", new AttributeValue().withS(storeId));
+        eav.put(":dateFrom", new AttributeValue().withS(dateFrom.atStartOfDay().toString()));
+        eav.put(":dateTo", new AttributeValue().withS(dateTo.atTime(LocalTime.MAX).toString()));
+        eav.put(":status", new AttributeValue().withS(status.name()));
+
+        Map<String, String> expressionAttributeNames = new HashMap<>();
+        expressionAttributeNames.put("#status", "status");
+        expressionAttributeNames.put("#orderedAt", "orderedAt");
+
+        List<String> orderIds = new ArrayList<>();
+        Map<String, AttributeValue> startKey = null;
+        do {
+            QueryRequest queryRequest = new QueryRequest()
+                    .withTableName("Orders")
+                    .withIndexName("StoreIdOrderedAtIndex")
+                    .withKeyConditionExpression("storeId = :storeId AND #orderedAt BETWEEN :dateFrom AND :dateTo")
+                    .withFilterExpression("#status = :status")
+                    .withExpressionAttributeValues(eav)
+                    .withExpressionAttributeNames(expressionAttributeNames);
+            if (startKey != null && !startKey.isEmpty()) {
+                queryRequest.withExclusiveStartKey(startKey);
+            }
+            QueryResult result = amazonDynamoDB.query(queryRequest);
+            result.getItems().forEach(item -> orderIds.add(item.get("orderId").getS()));
+            startKey = result.getLastEvaluatedKey();
+        } while (startKey != null && !startKey.isEmpty());
+        // the index is eventually consistent: an order that left the status since is dropped after the full read
+        return findAllByIds(storeId, orderIds).stream().filter(order -> order.hasStatus(status)).toList();
+    }
+
     public List<OrderIndexEntry> findAllPastOrders(LocalDate dateFrom, LocalDate dateTo, String storeId) {
         return findAllPastOrders(dateFrom, dateTo, storeId, null);
     }
