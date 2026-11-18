@@ -36,8 +36,11 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, OrderA
     public static final int MAX_Q = 100;
     static final int MAX_RETURN_TO = 300;
 
-    /** Completed and Cancelled orders are not part of the list: such a status in the address is ignored. */
-    private static final Set<OrderStatus> HISTORY = EnumSet.of(OrderStatus.Completed, OrderStatus.Cancelled);
+    /**
+     * Completed orders are not part of the list: such a status in the address is ignored. Cancelled ones are listed
+     * while they await a refund, so their status can be ticked.
+     */
+    private static final Set<OrderStatus> HISTORY = EnumSet.of(OrderStatus.Completed);
 
     public OrderListQuery {
         statuses = statuses == null || statuses.isEmpty() ? List.of() : List.copyOf(EnumSet.copyOf(statuses));

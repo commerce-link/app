@@ -46,7 +46,7 @@ import java.util.stream.Stream;
 /**
  * Builds the orders list page from one query of the store's open orders (spec §8.2, §23), plus the cancelled ones still
  * awaiting a refund: tiles from all open orders, status counts within the custom filter and the search, rows within the
- * ticked statuses (a cancelled order shows only while no status is ticked), then sort and page.
+ * ticked statuses (a cancelled one under its own status, Anulowane), then sort and page.
  */
 @Slf4j
 @Service
@@ -54,6 +54,9 @@ public class OrderListService {
 
     public static final List<OrderStatus> OPEN = List.of(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly,
             OrderStatus.Assembled, OrderStatus.Realization, OrderStatus.Shipping, OrderStatus.Delivered);
+
+    /** The Status menu: the open statuses, then Cancelled for the cancelled orders still awaiting a refund. */
+    static final List<OrderStatus> MENU = Stream.concat(OPEN.stream(), Stream.of(OrderStatus.Cancelled)).toList();
 
     private final OrdersRepository ordersRepository;
     private final OrderFiltersService orderFilters;
@@ -110,7 +113,7 @@ public class OrderListService {
         return new OrdersPageModel(
                 query,
                 tiles(open, query, today, locale),
-                statusOptions(filtered, OPEN, query, locale),
+                statusOptions(filtered, MENU, query, locale),
                 statusSummary(query, locale),
                 filterOptions(filters, query),
                 activeFilter,

@@ -227,6 +227,23 @@ class OrderListServiceTest {
     }
 
     @Test
+    void tickingCancelledShowsTheCancelledOrdersAwaitingARefund() {
+        // given
+        add("open", OrderStatus.New, TODAY, 10, 0, null);
+        add("refund", OrderStatus.Cancelled, null, 10, 10, null);
+
+        // when
+        OrdersPageModel model = page(query("status", "Cancelled"));
+
+        // then
+        assertThat(model.rows()).extracting(OrderListServiceTest::path).containsExactly("/dashboard/orders/refund");
+        assertThat(option(model, "Anulowane").count()).isEqualTo(1);
+        assertThat(option(model, "Anulowane").selected()).isTrue();
+        assertThat(model.statusSummary()).isEqualTo("Anulowane");
+        assertThat(model.openStatuses()).extracting(OrdersPageModel.StatusOption::status).last().isEqualTo("Cancelled");
+    }
+
+    @Test
     void aCancelledOrderAwaitingItsRefundIsLeftOutOnceAStatusIsTickedAndOfThePickupCount() {
         // given
         Order open = add("open", OrderStatus.New, TODAY, 10, 0, null);
