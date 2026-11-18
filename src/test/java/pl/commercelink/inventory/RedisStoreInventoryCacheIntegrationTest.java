@@ -178,6 +178,49 @@ class RedisStoreInventoryCacheIntegrationTest {
     }
 
     @Test
+    void snapshotBuiltAfterTheRequestAnswersIt() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        long requestedAt = cache.clockMillis();
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), requestedAt + 1);
+
+        // when / then
+        assertTrue(cache.builtSince("s1", requestedAt));
+    }
+
+    @Test
+    void snapshotBuiltBeforeTheRequestDoesNotAnswerIt() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        long builtAt = cache.clockMillis();
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), builtAt);
+
+        // when / then
+        org.junit.jupiter.api.Assertions.assertFalse(cache.builtSince("s1", builtAt + 1));
+    }
+
+    @Test
+    void evictionAfterTheRequestDoesNotAnswerIt() throws InterruptedException {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        long requestedAt = cache.clockMillis();
+        Thread.sleep(5);
+        cache.evict("s1");
+
+        // when / then
+        org.junit.jupiter.api.Assertions.assertFalse(cache.builtSince("s1", requestedAt));
+    }
+
+    @Test
+    void storeWithoutASnapshotHasNoBuild() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+
+        // when / then
+        org.junit.jupiter.api.Assertions.assertFalse(cache.builtSince("s1", 0));
+    }
+
+    @Test
     void getReturnsEmptyForUnknownStore() {
         // given
         RedisStoreInventoryCache cache = cache();

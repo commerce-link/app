@@ -18,5 +18,10 @@ public interface StoreInventoryCache {
      */
     void put(String storeId, StoreInventory inventory, Duration ttl, long buildStartedAtMillis);
 
+    /**
+     * Whether an inventory is stored whose build started at {@code sinceMillis} of {@link #clockMillis} or later.
+     */
+    boolean builtSince(String storeId, long sinceMillis);
+
     void evict(String storeId);
 }

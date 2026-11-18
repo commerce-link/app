@@ -153,6 +153,32 @@ class RedisStoreInventoryCacheTest {
     }
 
     @Test
+    void builtSinceAsksTheScriptWithTheSnapshotAndItsMark() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class))).thenReturn(1L);
+
+        // when
+        boolean built = cache.builtSince("s1", 4_242L);
+
+        // then
+        assertTrue(built);
+        verify(redisTemplate).execute(any(RedisScript.class),
+                eq(List.of("store-inventory:v3:s1", "store-inventory:v3:s1:build-started")), eq("4242"));
+    }
+
+    @Test
+    void builtSinceIsFalseWhenRedisFails() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class)))
+                .thenThrow(new RuntimeException("redis down"));
+
+        // when / then
+        org.junit.jupiter.api.Assertions.assertFalse(cache.builtSince("s1", 4_242L));
+    }
+
+    @Test
     void getDegradesToMissWhenRedisFails() {
         // given
         RedisStoreInventoryCache cache = cache();

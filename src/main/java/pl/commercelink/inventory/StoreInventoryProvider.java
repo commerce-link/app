@@ -59,8 +59,18 @@ public class StoreInventoryProvider {
         return cache.get(storeId).orElseGet(() -> buildAndCache(store, storeId));
     }
 
-    public void refresh(String storeId) {
-        buildAndCache(storesRepository.findById(storeId), storeId);
+    // Each feed import of a store asks for a rebuild. A build that started after a request has already read that
+    // import's file, so the request has nothing left to do; null rebuilds whatever is stored.
+    public void refresh(String storeId, Long requestedAtMillis) {
+        if (requestedAtMillis != null && cache.builtSince(storeId, requestedAtMillis)) {
+            return;
+        }
+        Store store = storesRepository.findById(storeId);
+        if (store == null) {
+            log.warn("Inventory snapshot of store {} is not rebuilt: the store does not exist", storeId);
+            return;
+        }
+        buildAndCache(store, storeId);
     }
 
     private StoreInventory buildAndCache(Store store, String storeId) {

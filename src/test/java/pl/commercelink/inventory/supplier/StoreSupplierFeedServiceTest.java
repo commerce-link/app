@@ -7,7 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import pl.commercelink.inventory.StoreInventoryProvider;
+import pl.commercelink.inventory.StoreInventoryRefreshPublisher;
 import pl.commercelink.inventory.supplier.api.FeedData;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
@@ -34,7 +34,7 @@ class StoreSupplierFeedServiceTest {
     @Mock
     private StoreFeedRepository storeFeedRepository;
     @Mock
-    private StoreInventoryProvider storeInventoryProvider;
+    private StoreInventoryRefreshPublisher storeInventoryRefresh;
 
     @InjectMocks
     private StoreSupplierFeedService service;
@@ -73,7 +73,7 @@ class StoreSupplierFeedServiceTest {
     }
 
     @Test
-    void rebuildsTheStoreInventoryOnceTheFeedIsStored() throws ResourceDownloadException {
+    void asksForARebuildOnceTheFeedIsStored() throws ResourceDownloadException {
         // given
         byte[] data = "rows".getBytes();
         supplierReturns("store-1", data);
@@ -82,16 +82,16 @@ class StoreSupplierFeedServiceTest {
         service.loadStoreFeed("store-1", "Wortmann");
 
         // then
-        org.mockito.InOrder order = inOrder(storeFeedRepository, storeInventoryProvider);
+        org.mockito.InOrder order = inOrder(storeFeedRepository, storeInventoryRefresh);
         order.verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
-        order.verify(storeInventoryProvider).refresh("store-1");
+        order.verify(storeInventoryRefresh).request("store-1");
     }
 
     @Test
-    void failedRebuildFailsTheImport() {
+    void requestThatCannotBeSentFailsTheImport() {
         // given
         supplierReturns("store-1", "rows".getBytes());
-        doThrow(new IllegalStateException("rates unavailable")).when(storeInventoryProvider).refresh("store-1");
+        doThrow(new IllegalStateException("queue unavailable")).when(storeInventoryRefresh).request("store-1");
 
         // when / then
         assertThrows(IllegalStateException.class, () -> service.loadStoreFeed("store-1", "Wortmann"));
@@ -109,7 +109,7 @@ class StoreSupplierFeedServiceTest {
         service.loadStoreFeed("store-1", "Wortmann");
 
         // then
-        verifyNoInteractions(storeInventoryProvider);
+        verifyNoInteractions(storeInventoryRefresh);
     }
 
     @Test
