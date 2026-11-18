@@ -8,7 +8,9 @@
 // neither this script nor the order.payment.hint.* keys spell the currency. The amount fields are text (the server
 // reads them with AmountParser), so amountOf reads "149,99" and "1 499,99" here the same way. An order's refund is
 // typed without a sign and the server stores it negative: the hint, which speaks of money that came in, stays empty
-// for it.
+// for it. An order's dialog first asks which pending payment the money is for: the opening button's data-pendings
+// (PendingPaymentsJson) lists them, the chosen one's amount becomes the expected amount and its fields are filled in,
+// and "Inna wpłata" (target "new") is money the order does not wait for.
 (function () {
     'use strict';
 
@@ -25,6 +27,9 @@
     var surplusEl = document.getElementById('addPaymentFeeFromSurplus');
     var directionEl = document.getElementById('addPaymentDirection');
     var sourceEl = document.getElementById('addPaymentSource');
+    var targetsEl = document.getElementById('addPaymentTargets');
+    var targetListEl = document.getElementById('addPaymentTargetList');
+    var targetState = { pendings: null, chosen: null };
     var hintEl = document.getElementById('addPaymentComputed');
     var directionHelpEl = document.getElementById('addPaymentDirectionHelp');
     var TEXT_FIELDS = ['name', 'referenceNo', 'bankTransactionNo', 'bankTransactionDate'];
@@ -82,14 +87,110 @@
         feeEl.value = Math.max(0, amountOf(bankEl) - expected()).toFixed(2);
     }
 
+    function textOf(name, values) {
+        var text = dialog.getAttribute('data-text-' + name) || '';
+        (values || []).forEach(function (value, index) {
+            text = text.replace('{' + index + '}', value);
+        });
+        return text;
+    }
+
+    function methodLabel(source) {
+        var option = source ? sourceEl.querySelector('option[value="' + source + '"]') : null;
+        return option ? option.textContent : '';
+    }
+
+    function setExpected(value) {
+        expectedEl.setAttribute('data-value', value === null ? '' : value);
+        expectedEl.value = value === null ? '—' : value.toFixed(2);
+    }
+
+    function choiceOf(value, title, status, description) {
+        var label = document.createElement('label');
+        label.className = 'cl-choice';
+        var input = document.createElement('input');
+        input.type = 'radio';
+        input.name = 'target';
+        input.value = value;
+        var body = document.createElement('span');
+        body.className = 'cl-choice-text';
+        var head = document.createElement('span');
+        head.className = 'cl-choice-title';
+        head.textContent = title;
+        if (status) {
+            var pill = document.createElement('span');
+            pill.className = 'cl-status is-neutral';
+            pill.textContent = status;
+            head.appendChild(pill);
+        }
+        var sub = document.createElement('span');
+        sub.className = 'cl-choice-description';
+        sub.textContent = description;
+        body.appendChild(head);
+        body.appendChild(sub);
+        label.appendChild(input);
+        label.appendChild(body);
+        return label;
+    }
+
+    // the payment the money is for: its amount is what is expected, its method and fields are filled in
+    function choose(target) {
+        targetState.chosen = target;
+        var value = target === 'new' ? 'new' : String(target.index);
+        targetListEl.querySelectorAll('input[name="target"]').forEach(function (input) {
+            input.checked = input.value === value;
+        });
+        if (target === 'new') {
+            setExpected(null);
+        } else {
+            setExpected(parseFloat(target.expected) || 0);
+            if (target.source) {
+                sourceEl.value = target.source;
+            }
+            form.querySelector('input[name="name"]').value = target.name || '';
+            form.querySelector('input[name="referenceNo"]').value = target.referenceNo || '';
+            var fee = parseFloat(target.fee) || 0;
+            feeEl.value = fee > 0 ? fee.toFixed(2) : '0';
+        }
+        if (autofillEl.checked) {
+            applyFeeAutofill();
+        }
+        renderHint();
+    }
+
+    // data-pendings of the opening button; without it (a delivery, an older page) the dialog asks nothing
+    function buildTargets(json) {
+        targetListEl.textContent = '';
+        var pendings = null;
+        try {
+            pendings = json ? JSON.parse(json) : null;
+        } catch (e) {
+            pendings = null;
+        }
+        targetState.pendings = isDeliveryMode() ? null : pendings;
+        targetState.chosen = null;
+        if (!targetState.pendings) {
+            targetsEl.hidden = true;
+            return;
+        }
+        targetsEl.hidden = false;
+        targetState.pendings.forEach(function (pending) {
+            targetListEl.appendChild(choiceOf(String(pending.index), methodLabel(pending.source) || '—',
+                pending.rest ? textOf('rest') : null,
+                textOf('expected', [window.CL_formatMoney(parseFloat(pending.expected) || 0)])));
+        });
+        targetListEl.appendChild(choiceOf('new', textOf('new'), null, textOf('new-description')));
+        choose(targetState.pendings.length ? targetState.pendings[0] : 'new');
+    }
+
+    function waitingText() {
+        var chosen = targetState.chosen;
+        return !isDeliveryMode() && chosen && chosen !== 'new' ? words('-waiting', [methodLabel(chosen.source)]) : '';
+    }
+
     function renderHint() {
         var bank = amountOf(bankEl);
         var fee = amountOf(feeEl);
-        // an order takes a typed 0 as the payment it still waits for; a delivery refuses it
-        if (!isDeliveryMode() && bank === 0 && bankEl.value.trim() !== '') {
-            hintEl.textContent = words('-pending', []);
-            return;
-        }
         if (bank <= 0 || (!isDeliveryMode() && directionEl.value === 'Outgoing')) {
             hintEl.textContent = '';
             return;
@@ -104,8 +205,10 @@
             applied = booked;
         }
         var diff = expected() - applied;
-        var state = Math.abs(diff) < 0.005 ? words('-full', [])
-            : diff > 0 ? words('-under', [window.CL_formatMoney(diff)]) : words('-over', [window.CL_formatMoney(-diff)]);
+        var state = !isDeliveryMode() && targetState.chosen === 'new' ? words('-new', [])
+            : Math.abs(diff) < 0.005 ? words('-full', [])
+            : diff > 0 ? words('-under', [window.CL_formatMoney(diff)]) + waitingText()
+            : words('-over', [window.CL_formatMoney(-diff)]);
         hintEl.textContent = words('', [window.CL_formatMoney(booked), window.CL_formatMoney(fee), state]);
     }
 
@@ -184,6 +287,7 @@
     function openPaymentModalForOrderFromButton(btn) {
         openPaymentModalForOrder(btn.dataset.orderId, btn.dataset.unpaid, pendingFrom(btn));
         applyTriggerOptions(btn);
+        buildTargets(btn.dataset.direction === 'Outgoing' ? null : btn.dataset.pendings);
     }
 
     function openPaymentModalForDelivery(deliveryId, expectedAmount, pending) {
@@ -195,6 +299,7 @@
     function openPaymentModalForDeliveryFromButton(btn) {
         openPaymentModalForDelivery(btn.dataset.deliveryId, btn.dataset.unpaid, pendingFrom(btn));
         applyTriggerOptions(btn);
+        buildTargets(null);
     }
 
     // Delegated, so it also works in the results block list-page.js swaps; without JS the link opens the record.
@@ -236,6 +341,13 @@
         }
         renderHint();
     });
+    targetListEl.addEventListener('change', function (event) {
+        var value = event.target.value;
+        var pending = (targetState.pendings || []).filter(function (candidate) {
+            return String(candidate.index) === value;
+        })[0];
+        choose(pending || 'new');
+    });
     includedEl.addEventListener('change', renderHint);
     directionEl.addEventListener('change', renderHint);
     if (surplusEl) {
@@ -252,6 +364,7 @@
     dialog.addEventListener('cl:dialog-open', function (event) {
         var trigger = event.detail && event.detail.trigger;
         setPaymentModalMode(trigger && trigger.dataset.mode ? trigger.dataset.mode : 'order');
+        buildTargets(trigger ? trigger.dataset.pendings : null);
         renderHint();
     });
     // Payments does not load dialog.js: Cancel and a click on the backdrop close the dialog here

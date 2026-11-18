@@ -79,7 +79,7 @@ class PaymentSourcesPageRenderTest {
                 "150,00 zl", "brutto", false, false, "d-1", "150.00", pending(), "Dodaj platnosc");
         ReceivableRow receivable = new ReceivableRow("/dashboard/orders/o-1", "ZAM-1", "Allegro", "Jan Kowalski",
                 "jan@example.pl", "20.10.2026", "za 19 dni", "is-neutral", "Przelew", "Do zwrotu", "is-warn",
-                "200,00 zl", "zwrot", true, true, "o-1", "200.00", pending(), "Zwroc");
+                "200,00 zl", "zwrot", true, true, "o-1", "200.00", pending(), "Zwroc", "[]");
         boolean payables = side == PaymentSide.PAYABLES;
         return new PaymentsPageModel(query, side, List.of(tile(true)),
                 List.of(new PaymentsPageModel.SideTab("Do zaplaty", 1, "/dashboard/payments?side=payables", payables),

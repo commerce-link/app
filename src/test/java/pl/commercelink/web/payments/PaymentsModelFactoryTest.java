@@ -93,6 +93,22 @@ class PaymentsModelFactoryTest {
     }
 
     @Test
+    void anOrderWaitingForATransferAndInstallmentsIsFoundByEitherMethod() {
+        // given
+        open.add(PaymentEntriesTest.transferAndInstallments());
+
+        // when
+        PaymentsPageModel installments = page("side", "receivables", "method", "Installments");
+        PaymentsPageModel transfer = page("side", "receivables", "method", "BankTransfer");
+        PaymentsPageModel card = page("side", "receivables", "method", "Card");
+
+        // then
+        assertThat(installments.receivables()).extracting(ReceivableRow::number).containsExactly("b71e0a93");
+        assertThat(transfer.receivables()).extracting(ReceivableRow::number).containsExactly("b71e0a93");
+        assertThat(card.receivables()).isEmpty();
+    }
+
+    @Test
     void defaultSideIsPayablesUnlessOnlyReceivablesHaveResults() {
         // given
         open.add(order(3499, OrderStatus.Shipping, PaymentSource.BankTransfer, 0));

@@ -51,6 +51,28 @@ class PaymentEntriesTest {
         return o;
     }
 
+    /** 20 000 zł: 5 000 zł by transfer, the rest in installments. */
+    static Order transferAndInstallments() {
+        Order o = order(20000, OrderStatus.New, PaymentSource.Installments, 0);
+        Payment transfer = new Payment(PaymentSource.BankTransfer);
+        transfer.setExpectedAmount(5000.0);
+        o.getPayments().add(0, transfer);
+        return o;
+    }
+
+    @Test
+    void aReceivableWaitsForTheMethodsOfAllItsPendingPayments() {
+        // given
+        Order several = transferAndInstallments();
+        Order paidByCard = order(100, OrderStatus.New, PaymentSource.Card, 40);
+        paidByCard.getPayments().remove(0);
+
+        // when / then
+        assertThat(ReceivableEntry.of(several, TODAY).orElseThrow().methods())
+                .containsExactly(PaymentSource.BankTransfer, PaymentSource.Installments);
+        assertThat(ReceivableEntry.of(paidByCard, TODAY).orElseThrow().methods()).containsExactly(PaymentSource.Card);
+    }
+
     @Test
     void failedAwaitingApprovalAndZeroDeliveriesAreNotPayables() {
         // given

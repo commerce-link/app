@@ -732,14 +732,16 @@ public class OrderPageModelFactory {
         String base = "/dashboard/orders/" + order.getOrderId() + "/payments/";
         List<OrderPageModel.PaymentRow> rows = new ArrayList<>();
         List<OrderPaymentForm> forms = new ArrayList<>();
+        List<OrderPageModel.PaymentSplitView> splits = new ArrayList<>();
         for (int i = 0; i < payments.size(); i++) {
             Payment p = payments.get(i);
-            OrderPaymentForm form = OrderPaymentForm.of(order.getOrderId(), i, p, methodLocked);
+            OrderPaymentForm form = OrderPaymentForm.of(order.getOrderId(), i, p, methodLocked).withRestAvailable(order);
             boolean refund = OrderPaymentForm.isRefund(p);
             // the row shows what "Wpłacono" counts: a refund saved positive by older code shows as the payment it is
             // counted as, not with a minus the totals do not have
             double shown = p.getAppliedAmount();
             String locked = removePaymentLockedKey(order, i);
+            OrderPageModel.PaymentSplitView split = readOnly || !p.isUnsettled() ? null : splitOf(order, i, form.version());
             rows.add(new OrderPageModel.PaymentRow(i + 1, Money.format(shown), refund, p.isUnsettled(),
                     OrderLabels.paymentSource(p.getSource()), p.getName(), p.getReferenceNo(),
                     p.getBankTransactionNo(), OrderFormats.date(p.getBankTransactionDate()),
@@ -747,26 +749,57 @@ public class OrderPageModelFactory {
                     form.dialogId(), readOnly ? null : base + i,
                     readOnly || locked != null ? null : base + i + "/remove?version=" + form.version(),
                     removePaymentMessageKey(order),
-                    readOnly || locked == null ? null : locked.replace(".remove.error.", ".remove.locked.")));
+                    readOnly || locked == null ? null : locked.replace(".remove.error.", ".remove.locked."),
+                    expectedOf(order, p), p.waitsForRest(), split == null ? null : split.dialogId()));
             if (!readOnly) {
                 forms.add(form);
+            }
+            if (split != null) {
+                splits.add(split);
             }
         }
         double unpaid = order.getUnpaidAmount();
         boolean overpaid = unpaid < -0.005;
+        List<Payment> pending = order.getPendingPayments();
+        double expectedTotal = pending.stream().mapToDouble(order::expectedAmountOf).sum();
         return new OrderPageModel.PaymentsCard(rows, Money.format(order.getPaidAmount()), Money.format(Math.max(0, unpaid)),
                 unpaid > 0.005, overpaid, overpaid ? Money.format(-unpaid) : null,
                 Math.max(0, unpaid),
                 order.getPendingPayment(), OrderLabels.Option.of(PaymentSource.values(), OrderLabels::paymentSource),
-                forms, !readOnly);
+                forms, !readOnly, PendingPaymentsJson.of(order),
+                pending.isEmpty() ? null : Money.format(expectedTotal),
+                Math.abs(expectedTotal - Math.max(0, unpaid)) < 0.005, splits);
+    }
+
+    /** The "Podziel" dialog of the pending payment at index: the last part goes by transfer, else by instalments. */
+    private static OrderPageModel.PaymentSplitView splitOf(Order order, int index, String version) {
+        Payment payment = order.getPayments().get(index);
+        double expected = order.expectedAmountOf(payment);
+        PaymentSource restSource = payment.getSource() == PaymentSource.BankTransfer ? PaymentSource.Installments
+                : PaymentSource.BankTransfer;
+        return new OrderPageModel.PaymentSplitView("payment-split-" + index,
+                "/dashboard/orders/" + order.getOrderId() + "/payments/" + index + "/split", version,
+                OrderLabels.paymentSource(payment.getSource()), payment.getSource(), restSource, Money.format(expected),
+                String.format(Locale.ROOT, "%.2f", expected), payment.waitsForRest());
+    }
+
+    /** What the pending payment waits for, formatted; null for money recorded and for a rest nothing is left of. */
+    private static String expectedOf(Order order, Payment payment) {
+        if (!payment.isUnsettled()) {
+            return null;
+        }
+        double expected = order.expectedAmountOf(payment);
+        return payment.getExpectedAmount() != null || expected > 0 ? Money.format(expected) : null;
     }
 
     /**
-     * Why the payment at index cannot be removed, or null. The pending payment (amount 0) is not money but the method
-     * the customer chose: "Dodaj wpłatę" fills it, so removing it would only lose the method.
+     * Why the payment at index cannot be removed, or null. The only pending payment (amount 0) is not money but the
+     * method the customer chose: "Dodaj wpłatę" fills it, so removing it would only lose the method. One of several
+     * pending payments goes, as one added by mistake would otherwise stay.
      */
     public static String removePaymentLockedKey(Order order, int index) {
-        return order.getPayments().get(index).isUnsettled() ? "order.payments.remove.error.pending" : null;
+        return order.getPayments().get(index).isUnsettled() && order.getPendingPayments().size() == 1
+                ? "order.payments.remove.error.pending" : null;
     }
 
     /**

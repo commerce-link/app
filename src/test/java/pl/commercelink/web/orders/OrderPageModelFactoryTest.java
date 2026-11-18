@@ -1156,6 +1156,41 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void eachPendingPaymentShowsWhatItWaitsForCanBeSplitAndTheRestIsAlwaysMarked() {
+        // given: 20 000 zł, 5 000 zł by transfer and the rest in installments
+        Order order = order(OrderStatus.New);
+        order.setTotalPrice(20000);
+        Payment transfer = new Payment(PaymentSource.BankTransfer);
+        transfer.setExpectedAmount(5000.0);
+        order.addPayment(transfer);
+        order.addPayment(new Payment(PaymentSource.Installments));
+        Order single = order(OrderStatus.New);
+        single.setTotalPrice(300);
+        single.addPayment(new Payment(PaymentSource.BankTransfer));
+
+        // when
+        OrderPageModel.PaymentsCard card = factory.build(order, List.of(), ADMIN, PL).payments();
+        List<OrderPageModel.PaymentRow> rows = card.rows();
+        OrderPageModel.PaymentRow only = factory.build(single, List.of(), ADMIN, PL).payments().rows().get(0);
+
+        // then
+        assertThat(rows).extracting(OrderPageModel.PaymentRow::expected).containsExactly("5 000,00", "15 000,00");
+        assertThat(rows).extracting(OrderPageModel.PaymentRow::rest).containsExactly(false, true);
+        assertThat(rows).extracting(OrderPageModel.PaymentRow::removeHref).doesNotContainNull();
+        assertThat(rows).extracting(OrderPageModel.PaymentRow::splitDialogId)
+                .containsExactly("payment-split-0", "payment-split-1");
+        assertThat(card.splits()).extracting(OrderPageModel.PaymentSplitView::action).containsExactly(
+                "/dashboard/orders/" + order.getOrderId() + "/payments/0/split",
+                "/dashboard/orders/" + order.getOrderId() + "/payments/1/split");
+        assertThat(card.splits().get(1).expectedValue()).isEqualTo("15000.00");
+        assertThat(card.expectedTotal()).isEqualTo(Money.format(20000));
+        assertThat(card.expectedMatches()).isTrue();
+        assertThat(only.expected()).isEqualTo("300,00");
+        assertThat(only.rest()).isTrue();
+        assertThat(only.removeReasonKey()).isEqualTo("order.payments.remove.locked.pending");
+    }
+
+    @Test
     void anOverpaidOrderShowsTheOverpaymentNotANegativeDue() {
         // given
         Order overpaid = order(OrderStatus.New);

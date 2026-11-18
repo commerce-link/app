@@ -757,4 +757,253 @@ class OrderTest {
         order.addPayment(Payment.bankTransfer("REF-2", "Jan", 2642.55));
         order.addPayment(new Payment("REF-3", "Jan", PaymentSource.BankTransfer, PaymentDirection.Outgoing, -4345.69, 0, null, null));
     }
+
+    private static Payment pending(PaymentSource source, Double expectedAmount) {
+        Payment payment = new Payment(source);
+        payment.setExpectedAmount(expectedAmount);
+        return payment;
+    }
+
+    @Test
+    void moneyGoesToThePendingPaymentOfItsMethodElseToTheRest() {
+        // given: 20 000 zł, 5 000 zł by transfer and the rest in installments
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        Payment transfer = pending(PaymentSource.BankTransfer, 5000.0);
+        Payment installments = pending(PaymentSource.Installments, null);
+        order.addPayment(transfer);
+        order.addPayment(installments);
+
+        // when / then
+        assertThat(order.pendingPaymentFor(PaymentSource.BankTransfer)).isSameAs(transfer);
+        assertThat(order.pendingPaymentFor(PaymentSource.Installments)).isSameAs(installments);
+        assertThat(order.pendingPaymentFor(PaymentSource.Card)).isSameAs(installments);
+        assertThat(order.pendingPaymentFor(null)).isSameAs(installments);
+    }
+
+    @Test
+    void anOwnAmountOfTheMethodComesBeforeTheRestOfTheSameMethod() {
+        // given: the rest waits by transfer, and so do 5 000 zł added later
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        Payment rest = pending(PaymentSource.BankTransfer, null);
+        Payment own = pending(PaymentSource.BankTransfer, 5000.0);
+        order.addPayment(rest);
+        order.addPayment(own);
+
+        // when / then
+        assertThat(order.pendingPaymentFor(PaymentSource.BankTransfer)).isSameAs(own);
+    }
+
+    @Test
+    void moneyOfAMethodNothingWaitsForIsAPaymentOfItsOwnWhenNoPaymentWaitsForTheRest() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        Payment transfer = pending(PaymentSource.BankTransfer, 5000.0);
+        order.addPayment(transfer);
+        order.addPayment(pending(PaymentSource.Installments, 15000.0));
+
+        // when / then
+        assertThat(order.pendingPaymentFor(PaymentSource.Card)).isNull();
+        assertThat(order.pendingPaymentFor(null)).isSameAs(transfer);
+    }
+
+    @Test
+    void theRestIsWhatIsUnpaidBeyondTheOwnAmountsOfThePendingPayments() {
+        // given: 20 000 zł, 2 000 zł paid, 5 000 zł waited for by transfer
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        order.addPayment(Payment.bankTransfer("REF-1", "Jan", 2000));
+        Payment transfer = pending(PaymentSource.BankTransfer, 5000.0);
+        Payment installments = pending(PaymentSource.Installments, null);
+        order.addPayment(transfer);
+        order.addPayment(installments);
+
+        // when / then
+        assertThat(order.expectedAmountOf(installments)).isEqualTo(13000.0);
+        assertThat(order.expectedAmountOf(transfer)).isEqualTo(5000.0);
+        assertThat(order.getPaidAmount()).isEqualTo(2000.0);
+    }
+
+    @Test
+    void theRestIsNeverBelowZero() {
+        // given: the own amounts are above what is unpaid
+        Order order = new Order("store-1");
+        order.setTotalPrice(1000);
+        order.addPayment(pending(PaymentSource.BankTransfer, 1500.0));
+        Payment rest = pending(PaymentSource.Installments, null);
+        order.addPayment(rest);
+
+        // when / then
+        assertThat(order.expectedAmountOf(rest)).isEqualTo(0.0);
+    }
+
+    @Test
+    void aPendingPaymentWithItsOwnAmountPaidInPartKeepsWaitingForTheDifference() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        Payment transfer = pending(PaymentSource.BankTransfer, 5000.0);
+        transfer.setName("Jan Kowalski");
+        transfer.setReferenceNo("PF/1/2026");
+        Payment installments = pending(PaymentSource.Installments, null);
+        order.addPayment(transfer);
+        order.addPayment(installments);
+
+        // when
+        order.fill(transfer, 3000);
+
+        // then
+        assertThat(transfer.getAmount()).isEqualTo(3000.0);
+        assertThat(transfer.getExpectedAmount()).isNull();
+        assertThat(order.getPayments()).hasSize(3);
+        Payment difference = order.getPayments().get(2);
+        assertThat(difference.isUnsettled()).isTrue();
+        assertThat(difference.getSource()).isEqualTo(PaymentSource.BankTransfer);
+        assertThat(difference.getExpectedAmount()).isEqualTo(2000.0);
+        assertThat(difference.getName()).isEqualTo("Jan Kowalski");
+        assertThat(difference.getReferenceNo()).isEqualTo("PF/1/2026");
+        assertThat(order.expectedAmountOf(installments)).isEqualTo(15000.0);
+    }
+
+    @Test
+    void aPendingPaymentPaidInFullOrAboveLeavesNothingWaitingAndTheSurplusLowersTheRest() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        Payment transfer = pending(PaymentSource.BankTransfer, 5000.0);
+        Payment installments = pending(PaymentSource.Installments, null);
+        order.addPayment(transfer);
+        order.addPayment(installments);
+
+        // when
+        order.fill(transfer, 5500);
+
+        // then
+        assertThat(order.getPayments()).hasSize(2);
+        assertThat(order.getPendingPayments()).containsExactly(installments);
+        assertThat(order.expectedAmountOf(installments)).isEqualTo(14500.0);
+    }
+
+    @Test
+    void theRestPaidInPartKeepsWaitingForWhatIsLeftWithItsMethod() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        Payment rest = pending(PaymentSource.Installments, null);
+        rest.setName("Santander");
+        order.addPayment(rest);
+
+        // when
+        order.fill(rest, 19990);
+
+        // then
+        assertThat(rest.getAmount()).isEqualTo(19990.0);
+        Payment left = order.getRestPayment();
+        assertThat(left).isNotSameAs(rest);
+        assertThat(left.getSource()).isEqualTo(PaymentSource.Installments);
+        assertThat(left.getName()).isEqualTo("Santander");
+        assertThat(order.getRestAmount()).isEqualTo(10.0);
+    }
+
+    @Test
+    void theRestPaidInFullGoesAndSoDoesTheRestNothingIsLeftOf() {
+        // given: 20 000 zł, 5 000 zł by transfer and the rest in instalments
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        Payment transfer = pending(PaymentSource.BankTransfer, 5000.0);
+        Payment rest = pending(PaymentSource.Installments, null);
+        order.addPayment(transfer);
+        order.addPayment(rest);
+        Payment paidOnly = pending(PaymentSource.BankTransfer, null);
+        Order paidByTransfer = new Order("store-1");
+        paidByTransfer.setTotalPrice(100);
+        paidByTransfer.addPayment(paidOnly);
+
+        // when
+        order.fill(rest, 15000);
+        order.fill(transfer, 6000);
+        paidByTransfer.fill(paidOnly, 100);
+
+        // then
+        assertThat(order.getPendingPayments()).isEmpty();
+        assertThat(order.getPayments()).containsExactly(transfer, rest);
+        assertThat(paidByTransfer.getPayments()).containsExactly(paidOnly);
+    }
+
+    @Test
+    void keepRestAddsATransferForWhatThePaymentsWithTheirOwnAmountsLeave() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        Payment installments = pending(PaymentSource.Installments, 15000.0);
+        order.addPayment(installments);
+
+        // when
+        order.keepRest();
+
+        // then
+        Payment rest = order.getRestPayment();
+        assertThat(rest.getSource()).isEqualTo(PaymentSource.BankTransfer);
+        assertThat(order.getRestAmount()).isEqualTo(5000.0);
+    }
+
+    @Test
+    void theOnlyPendingPaymentOfAnOrderNothingWasPaidForStays() {
+        // given: an order of 0 zł (all of it free) still says how the customer pays
+        Order order = new Order("store-1");
+        Payment only = pending(PaymentSource.Card, null);
+        order.addPayment(only);
+
+        // when
+        order.keepRest();
+
+        // then
+        assertThat(order.getPayments()).containsExactly(only);
+    }
+
+    @Test
+    void replacingAPendingPaymentWithMoneyKeepsWhatItStillWaitsForWaiting() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        Payment transfer = pending(PaymentSource.BankTransfer, 5000.0);
+        transfer.setReferenceNo("PF/1");
+        order.addPayment(transfer);
+        order.addPayment(pending(PaymentSource.Installments, null));
+
+        // when
+        order.replacePayment(0, Payment.bankTransfer("PF/1", "Jan", 3000));
+
+        // then
+        assertThat(order.getPayments()).extracting(Payment::getAmount).containsExactly(3000.0, 0.0, 0.0);
+        assertThat(order.getPayments().get(2).getExpectedAmount()).isEqualTo(2000.0);
+        assertThat(order.getPayments().get(2).getReferenceNo()).isEqualTo("PF/1");
+        assertThat(order.getRestAmount()).isEqualTo(15000.0);
+    }
+
+    @Test
+    void splitPutsThePartsAndALastPartForWhatTheyLeaveInPlaceOfThePendingPayment() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        order.addPayment(Payment.bankTransfer("R", "Jan", 1000));
+        Payment transfer = pending(PaymentSource.BankTransfer, 9000.0);
+        transfer.setReferenceNo("PF/2");
+        order.addPayment(transfer);
+        order.addPayment(pending(PaymentSource.Installments, null));
+
+        // when
+        order.split(transfer, new ArrayList<>(List.of(pending(PaymentSource.Card, 2000.0),
+                pending(PaymentSource.CashOnDelivery, 3000.0))), PaymentSource.BankTransfer);
+
+        // then
+        assertThat(order.getPayments()).extracting(Payment::getSource).containsExactly(PaymentSource.BankTransfer,
+                PaymentSource.Card, PaymentSource.CashOnDelivery, PaymentSource.BankTransfer, PaymentSource.Installments);
+        assertThat(order.getPayments()).extracting(Payment::getExpectedAmount)
+                .containsExactly(null, 2000.0, 3000.0, 4000.0, null);
+        assertThat(order.getPayments().get(1).getReferenceNo()).isEqualTo("PF/2");
+        assertThat(order.getRestAmount()).isEqualTo(10000.0);
+    }
 }
