@@ -2582,6 +2582,38 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void eachExpectedPaymentShowsItsAmountCanBeSplitAndAddPaymentAsksWhichOneTheMoneyIsFor() {
+        // given: 20 000 zł, 5 000 zł by transfer and the rest in installments
+        Order order = order(OrderStatus.New);
+        order.setTotalPrice(20000);
+        Payment transfer = new Payment(PaymentSource.BankTransfer);
+        transfer.setExpectedAmount(5000.0);
+        order.addPayment(transfer);
+        order.addPayment(new Payment(PaymentSource.Installments));
+
+        // when
+        String html = page(render(order, ADMIN));
+        String card = card(html, "platnosci");
+        String list = card.substring(card.indexOf("<ul class=\"cl-list\""), card.indexOf("</ul>"));
+
+        // then
+        assertThat(list).contains("Oczekiwana wpłata 5 000,00 PLN").contains("Oczekiwana wpłata 15 000,00 PLN")
+                .contains(">reszta<");
+        assertThat(card).contains("Oczekiwane wpłaty: 20 000,00 PLN — zgadza się z kwotą do zapłaty")
+                .contains("data-cl-dialog-open=\"payment-split-1\"").contains(">Podziel<")
+                .contains("data-pendings=\"[{&quot;index&quot;:0,&quot;source&quot;:&quot;BankTransfer&quot;");
+        String split = html.substring(html.indexOf("id=\"payment-split-1\""));
+        split = split.substring(0, split.indexOf("</dialog>"));
+        assertThat(split).contains("action=\"/dashboard/orders/" + order.getOrderId() + "/payments/1/split\"")
+                .contains("data-expected=\"15000.00\"").contains("name=\"methods\"").contains("name=\"amounts\"")
+                .contains("name=\"restMethod\"");
+        String addPayment = html.substring(html.indexOf("id=\"addPaymentModal\""));
+        addPayment = addPayment.substring(0, addPayment.indexOf("</dialog>"));
+        assertThat(addPayment).contains("id=\"addPaymentTargets\"").contains("Której płatności dotyczy wpłata?")
+                .doesNotContain("name=\"expectedAmount\"");
+    }
+
+    @Test
     void anOverpaidOrderShowsTheOverpaymentNotANegativeDue() {
         // given
         Order order = order(OrderStatus.Realization);

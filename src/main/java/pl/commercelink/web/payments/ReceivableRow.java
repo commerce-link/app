@@ -4,5 +4,6 @@ package pl.commercelink.web.payments;
 public record ReceivableRow(String href, String number, String sourceText, String clientName, String email,
                             String shipText, String shipNote, String shipTone, String methodLabel, String stateLabel,
                             String stateTone, String amountText, String subText, boolean paidOfLine, boolean refund,
-                            String orderId, String expected, PayableRow.PendingData pending, String actionLabel) {
+                            String orderId, String expected, PayableRow.PendingData pending, String actionLabel,
+                            String pendings) {
 }

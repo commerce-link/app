@@ -4,13 +4,15 @@
 <!--/* Payment rows with their own "Edytuj" and "Usuń", the paid/unpaid summary and "Dodaj wpłatę" in the head.
        "Edytuj" opens the payment's dialog (one per payment); without JavaScript it leads to the payment page. "Usuń"
        goes through the confirmation dialog, or its page without JavaScript. "Dodaj wpłatę" is the shared add-payment
-       dialog (fragments/add-payment-modal), which fills the pending payment first. */-->
+       dialog (fragments/add-payment-modal), which asks which pending payment the money is for (data-pendings).
+       "Podziel" splits a pending payment into parts and a last part for the rest of it (splitDialog). */-->
 <section th:fragment="card" class="cl-card" id="platnosci" aria-labelledby="payments-title"
          th:with="payments=${page.payments()}">
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="payments-title" th:text="#{order.card.payments}"></h2>
         <div class="cl-card-actions" th:if="${payments.editable()}">
-            <button type="button" class="cl-button" data-cl-dialog-open="addPaymentModal" data-mode="order">
+            <button type="button" class="cl-button" data-cl-dialog-open="addPaymentModal" data-mode="order"
+                    th:attr="data-pendings=${payments.pendingChoices()}">
                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
                 <span th:text="#{order.payments.add}"></span>
             </button>
@@ -21,10 +23,13 @@
             <div>
                 <p class="cl-list-title">
                     <!--/* a payment with no amount yet is the one the order waits for, not a payment of 0,00 */-->
-                    <span th:if="${p.pending()}" th:text="#{order.payments.pending}"></span>
+                    <span th:if="${p.pending() and p.expected() == null}" th:text="#{order.payments.pending}"></span>
+                    <span th:if="${p.pending() and p.expected() != null}"
+                          th:text="#{order.payments.pending.amount(${#messages.msg('general.currency.amount', p.expected())})}"></span>
                     <span th:unless="${p.pending()}" th:text="#{general.currency.amount(${p.amount()})}"></span>
                     <span th:if="${p.sourceKey() != null}" th:text="'· ' + #{${p.sourceKey()}}"></span>
                     <span th:if="${p.pending()}" class="cl-status is-neutral" th:text="#{order.payments.pending.pill}"></span>
+                    <span th:if="${p.rest()}" class="cl-status is-neutral" th:text="#{order.payments.pending.rest}"></span>
                     <span th:if="${p.refund()}" class="cl-status is-warn" th:text="#{order.payments.refund}"></span>
                 </p>
                 <p class="cl-list-desc">
@@ -41,6 +46,9 @@
                    th:text="#{${p.removeReasonKey()}}"></p>
             </div>
             <div class="cl-list-actions" th:if="${p.editHref() != null}">
+                <button th:if="${p.splitDialogId() != null}" type="button" class="cl-link-button"
+                        th:attr="data-cl-dialog-open=${p.splitDialogId()}, aria-label=#{order.payments.split.for(${p.number()})}"
+                        th:text="#{order.payments.split}"></button>
                 <a class="cl-link-button" th:href="@{${p.editHref()}}" th:attr="data-cl-dialog-open=${p.dialogId()},
                    aria-label=#{order.payments.edit.for(${p.number()})}" th:text="#{general.edit}"></a>
                 <a th:if="${p.removeHref() != null}" class="cl-link-button is-danger" data-cl-confirm th:href="@{${p.removeHref()}}"
@@ -64,6 +72,11 @@
               th:text="#{order.payments.unpaid(${#messages.msg('general.currency.amount', payments.unpaid())})}"></span>
         <span th:if="${payments.overpaid()}" class="is-warn"
               th:text="#{order.payments.overpaid(${#messages.msg('general.currency.amount', payments.overpaidAmount())})}"></span>
+        <!--/* the pending payments add up to what is unpaid (Order.keepRest); a price changed since shows here */-->
+        <span th:if="${payments.expectedTotal() != null}" th:classappend="${payments.expectedMatches()} ? '' : 'is-bad'"
+              th:text="${payments.expectedMatches()}
+                       ? #{order.payments.expected.total(${#messages.msg('general.currency.amount', payments.expectedTotal())})}
+                       : #{order.payments.expected.total.mismatch(${#messages.msg('general.currency.amount', payments.expectedTotal())})}"></span>
     </p>
 </section>
 
@@ -71,7 +84,69 @@
 <th:block th:fragment="dialogs" th:with="payments=${page.payments()}">
     <!--/* th:replace runs before th:each on one element, so it sits on its own block. */-->
     <th:block th:each="form : ${payments.forms()}"><dialog th:replace="~{orders/details/payments :: paymentDialog(${form})}"></dialog></th:block>
+    <th:block th:each="split : ${payments.splits()}"><dialog th:replace="~{orders/details/payments :: splitDialog(${split}, ${payments.sources()})}"></dialog></th:block>
+    <script th:if="${!payments.splits().isEmpty()}" th:src="@{/js/payment-split.js}" defer></script>
 </th:block>
+
+<!--/* "Podziel" of a pending payment (web.orders.PaymentSplitForm): parts with their methods and amounts, the last part
+       waiting for what they leave of the payment. payment-split.js adds and removes parts and counts the last part as
+       they are typed; without it one part is split off. A refusal comes back as the page's error flash. */-->
+<dialog th:fragment="splitDialog(split, sources)" class="cl-dialog is-form" th:id="${split.dialogId()}"
+        th:attr="aria-labelledby=|${split.dialogId()}-title|, data-expected=${split.expectedValue()},
+                 data-text-over=#{order.payments.split.error.over}"
+        data-cl-payment-split>
+    <form method="post" th:action="@{${split.action()}}">
+        <input type="hidden" name="version" th:value="${split.version()}">
+        <h2 class="cl-dialog-title" th:id="|${split.dialogId()}-title|" th:text="#{order.payments.split.title}"></h2>
+        <div class="cl-dialog-body">
+            <p class="cl-help">
+                <span th:text="#{order.payments.split.source}"></span>
+                <strong th:text="${split.sourceKey() != null ? #messages.msg(split.sourceKey()) : '—'} + ' · '
+                                 + #{general.currency.amount(${split.expected()})}"></strong>
+                <span th:if="${split.rest()}" class="cl-status is-neutral" th:text="#{order.payments.pending.rest}"></span>
+            </p>
+            <div class="cl-form-grid" data-cl-split-parts>
+                <div class="cl-span-6 cl-form-grid" data-cl-split-part>
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" th:for="|${split.dialogId()}-method-1|" th:text="#{order.payments.split.part.method}"></label>
+                        <select class="cl-select" name="methods" th:id="|${split.dialogId()}-method-1|">
+                            <option th:each="src : ${sources}" th:value="${src.value().name()}"
+                                    th:selected="${src.value() == split.source()}" th:text="#{${src.labelKey()}}"></option>
+                        </select>
+                    </div>
+                    <div class="cl-span-2 cl-field">
+                        <label class="cl-label" th:for="|${split.dialogId()}-amount-1|" th:text="#{order.payments.split.part.amount}"></label>
+                        <input class="cl-input" type="text" inputmode="decimal" autocomplete="off" name="amounts" required
+                               th:id="|${split.dialogId()}-amount-1|">
+                    </div>
+                    <div class="cl-span-1 cl-field">
+                        <button type="button" class="cl-link-button is-danger" data-cl-split-remove hidden
+                                th:text="#{general.delete}"></button>
+                    </div>
+                </div>
+                <div class="cl-span-6 cl-form-grid" data-cl-split-rest>
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" th:for="|${split.dialogId()}-rest|" th:text="#{order.payments.split.rest.method}"></label>
+                        <select class="cl-select" name="restMethod" th:id="|${split.dialogId()}-rest|">
+                            <option th:each="src : ${sources}" th:value="${src.value().name()}"
+                                    th:selected="${src.value() == split.restSource()}" th:text="#{${src.labelKey()}}"></option>
+                        </select>
+                    </div>
+                    <div class="cl-span-3 cl-field">
+                        <span class="cl-label" th:text="#{order.payments.split.rest.amount}"></span>
+                        <output class="cl-input" data-cl-split-left th:text="#{general.currency.amount(${split.expected()})}"></output>
+                    </div>
+                </div>
+            </div>
+            <p><button type="button" class="cl-link-button" data-cl-split-add hidden th:text="#{order.payments.split.add}"></button></p>
+            <p class="cl-help" data-cl-split-message aria-live="polite" th:text="#{order.payments.split.help}"></p>
+        </div>
+        <div class="cl-dialog-actions">
+            <button type="submit" class="cl-button is-primary" th:text="#{order.payments.split.save}"></button>
+            <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        </div>
+    </form>
+</dialog>
 
 <dialog th:fragment="paymentDialog(payment)" class="cl-dialog is-form" th:id="${payment.dialogId()}"
         th:attr="aria-labelledby=|${payment.dialogId()}-title|">
@@ -134,7 +209,10 @@
             <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'referenceNo', 'order.payment.reference.no', 'text', ${payment.referenceNo()})}"></div>
             <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'bankTransactionNo', 'order.payment.bank.transaction.no', 'text', ${payment.bankTransactionNo()})}"></div>
             <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'bankTransactionDate', 'order.payment.bank.transaction.date', 'date', ${payment.bankTransactionDate()})}"></div>
+            <div th:if="${payment.pending()}" class="cl-span-3"
+                 th:insert="~{orders/details/payments :: field(${payment}, 'expectedAmount', 'order.payments.expected', 'amount', ${payment.expectedAmount()})}"></div>
         </div>
+        <p th:if="${payment.pending()}" class="cl-help" th:text="#{order.payments.expected.help}"></p>
         <p th:if="${payment.pending() and payment.methodLockedKey() == null}" class="cl-help" th:text="#{order.payments.dialog.pending}"></p>
         <p th:class="${inDialog} ? 'cl-dialog-effect' : 'cl-help'" th:text="#{order.payments.edit.effect}"></p>
     </div>
@@ -154,6 +232,8 @@
     <input class="cl-input" autocomplete="off" th:type="${amount ? 'text' : type}" th:id="${id}" th:name="${property}"
            th:value="${value}" th:classappend="${error != null} ? 'is-invalid'"
            th:attr="inputmode=${amount ? 'decimal' : null},
+                    placeholder=${property == 'expectedAmount' and payment.restAvailable() != null
+                                  ? #messages.msg('order.payments.expected.placeholder', payment.restAvailable()) : null},
                     aria-invalid=${error != null ? 'true' : null}, aria-describedby=${error != null ? id + '-error' : null}">
     <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
         <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
