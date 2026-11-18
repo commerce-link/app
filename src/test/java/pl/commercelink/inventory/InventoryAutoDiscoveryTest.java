@@ -520,7 +520,7 @@ class InventoryAutoDiscoveryTest {
     void withTheSwitchOffTheConflictingOfferJoinsAsToday() {
         // given
         autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
-                new InventoryMatchingProperties(false, true, true, true));
+                new InventoryMatchingProperties(false, true, true, true, true));
         when(pimView.findAll()).thenReturn(List.of());
         InventoryItem kosatec9060 = item("4895106296381", "11350-03-20G", 2613, "Kosatec", "Sapphire");
         InventoryItem incom9060 = item("4895106296381", "11350-03-20G", 2663, "IncomGroup", "Sapphire");
@@ -574,7 +574,7 @@ class InventoryAutoDiscoveryTest {
     void witnessesAreNotFetchedWithTheSwitchOff() {
         // given
         autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
-                new InventoryMatchingProperties(false, true, true, true));
+                new InventoryMatchingProperties(false, true, true, true, true));
         when(pimView.findAll()).thenReturn(List.of());
         AtomicInteger fetches = new AtomicInteger();
         InventoryItem elko = item("4895106293618", "11350-03-20G", 3563, "Elko", "Sapphire");
@@ -666,7 +666,7 @@ class InventoryAutoDiscoveryTest {
     void withTheSwitchOffTheGroupStaysWhole() {
         // given
         autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
-                new InventoryMatchingProperties(true, true, false, true));
+                new InventoryMatchingProperties(true, true, false, true, true));
         when(pimView.findAll()).thenReturn(List.of());
 
         // when
@@ -733,6 +733,190 @@ class InventoryAutoDiscoveryTest {
         assertThat(grouping.variantCodes().contains("nike", "AIR1")).isTrue();
         assertThat(grouping.variantCodes().contains("adidas", "SAMBA")).isTrue();
         assertThat(grouping.variantCodes().size()).isEqualTo(2);
+    }
+
+    private static final String MOVA_EAN_176 = "6977728943176";
+    private static final String MOVA_EAN_169 = "6977728943169";
+    private static final String MOVA_EAN_152 = "6977728943152";
+
+    @Test
+    void eanOnlyPairKeepsDifferentEansApart() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        InventoryItem kosatec = item(MOVA_EAN_176, "SHINE10", 1200, "Kosatec", "Mova");
+        InventoryItem wave = item(MOVA_EAN_169, "SHINE10", 1210, "Wave", "Mova");
+        List<InventoryItem> offers = List.of(kosatec, wave);
+
+        // when
+        InventoryAutoDiscovery.Grouping withoutPairs = autoDiscovery.group(offers, pimView, List::of, VariantCodes.none(), VariantCodes.none());
+        InventoryAutoDiscovery.Grouping withPair = autoDiscovery.group(offers, pimView, List::of, VariantCodes.none(), movaPair());
+
+        // then
+        assertThat(offerSetsOf(withoutPairs)).containsExactlyInAnyOrder(Set.of(kosatec, wave));
+        assertThat(offerSetsOf(withPair)).containsExactlyInAnyOrder(Set.of(kosatec), Set.of(wave));
+    }
+
+    @Test
+    void eanOnlyPairStillJoinsTheSameEan() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        InventoryItem kosatec = item(MOVA_EAN_176, "SHINE10", 1200, "Kosatec", "Mova");
+        InventoryItem wave = item(MOVA_EAN_176, "SHINE10", 1210, "Wave", "Mova");
+
+        // when
+        InventoryAutoDiscovery.Grouping grouping = autoDiscovery.group(List.of(kosatec, wave), pimView, List::of, VariantCodes.none(), movaPair());
+
+        // then
+        assertThat(offerSetsOf(grouping)).containsExactlyInAnyOrder(Set.of(kosatec, wave));
+    }
+
+    @Test
+    void eanOnlyOfferIsNotPulledByAnUnmarkedNeighbour() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        InventoryItem mova = item("EAN1", "X1", 100, "A", "Mova");
+        InventoryItem dreameOfB = item("EAN2", "X1", 101, "B", "Dreame");
+        InventoryItem dreameOfC = item("EAN3", "X1", 102, "C", "Dreame");
+        VariantCodes eanOnly = PimEanOnlyCodes.of(List.of(flaggedEntry("PIM1", "Mova", true, gtin("EAN9"), mpn("X1"))));
+
+        // when
+        InventoryAutoDiscovery.Grouping grouping = autoDiscovery.group(
+                List.of(mova, dreameOfB, dreameOfC), pimView, List::of, VariantCodes.none(), eanOnly);
+
+        // then
+        assertThat(offerSetsOf(grouping)).containsExactlyInAnyOrder(Set.of(mova), Set.of(dreameOfB, dreameOfC));
+    }
+
+    @Test
+    void pimEntryDoesNotPullEanOnlyOffersByCode() {
+        // given
+        PimEntry flagged = flaggedEntry("PIM1", "Mova", true, gtin(MOVA_EAN_176), mpn("SHINE10"));
+        when(pimView.findAll()).thenReturn(List.of(flagged));
+        InventoryItem kosatec = item(MOVA_EAN_176, "SHINE10", 1200, "Kosatec", "Mova");
+        InventoryItem wave = item(MOVA_EAN_169, "SHINE10", 1210, "Wave", "Mova");
+
+        // when
+        InventoryAutoDiscovery.Grouping grouping = autoDiscovery.group(
+                List.of(kosatec, wave), pimView, List::of, VariantCodes.none(), PimEanOnlyCodes.of(List.of(flagged)));
+
+        // then
+        assertThat(grouping.groups()).filteredOn(m -> "PIM1".equals(m.getInventoryKey().getId())).singleElement()
+                .satisfies(m -> assertThat(m.getInventoryItems()).containsExactly(kosatec));
+        assertThat(grouping.groups()).filteredOn(m -> m.getInventoryItems().contains(wave)).singleElement()
+                .satisfies(m -> {
+                    assertThat(m.getInventoryKey().getId()).isNull();
+                    assertThat(m.getInventoryItems()).containsExactly(wave);
+                });
+    }
+
+    @Test
+    void pimEntryStillTakesOffersByItsEans() {
+        // given
+        PimEntry flagged = flaggedEntry("PIM1", "Mova", true, gtin(MOVA_EAN_176), gtin(MOVA_EAN_169), mpn("SHINE10"));
+        when(pimView.findAll()).thenReturn(List.of(flagged));
+        InventoryItem kosatec = item(MOVA_EAN_176, "SHINE10", 1200, "Kosatec", "Mova");
+        InventoryItem wave = item(MOVA_EAN_169, "SHINE10", 1210, "Wave", "Mova");
+
+        // when
+        InventoryAutoDiscovery.Grouping grouping = autoDiscovery.group(
+                List.of(kosatec, wave), pimView, List::of, VariantCodes.none(), PimEanOnlyCodes.of(List.of(flagged)));
+
+        // then
+        assertThat(grouping.groups()).singleElement().satisfies(m -> {
+            assertThat(m.getInventoryKey().getId()).isEqualTo("PIM1");
+            assertThat(m.getInventoryItems()).containsExactlyInAnyOrder(kosatec, wave);
+        });
+    }
+
+    @Test
+    void secondEntryWithTheSamePairDoesNotPullByCodeEither() {
+        // given
+        PimEntry flagged = flaggedEntry("PIM1", "Mova", true, gtin(MOVA_EAN_176), mpn("SHINE10"));
+        PimEntry unflagged = flaggedEntry("PIM2", "Mova", false, gtin(MOVA_EAN_169), mpn("SHINE10"));
+        when(pimView.findAll()).thenReturn(List.of(flagged, unflagged));
+        InventoryItem kosatec = item(MOVA_EAN_176, "SHINE10", 1200, "Kosatec", "Mova");
+        InventoryItem wave = item(MOVA_EAN_169, "SHINE10", 1210, "Wave", "Mova");
+        InventoryItem third = item(MOVA_EAN_152, "SHINE10", 1220, "Action", "Mova");
+
+        // when
+        InventoryAutoDiscovery.Grouping grouping = autoDiscovery.group(List.of(kosatec, wave, third), pimView, List::of,
+                VariantCodes.none(), PimEanOnlyCodes.of(List.of(flagged, unflagged)));
+
+        // then
+        assertThat(grouping.groups()).filteredOn(m -> m.getInventoryItems().contains(third)).singleElement()
+                .satisfies(m -> {
+                    assertThat(m.getInventoryKey().getId()).isNull();
+                    assertThat(m.getInventoryItems()).containsExactly(third);
+                });
+        assertThat(grouping.groups()).filteredOn(m -> "PIM1".equals(m.getInventoryKey().getId())).singleElement()
+                .satisfies(m -> assertThat(m.getInventoryItems()).containsExactly(kosatec));
+        assertThat(grouping.groups()).filteredOn(m -> "PIM2".equals(m.getInventoryKey().getId())).singleElement()
+                .satisfies(m -> assertThat(m.getInventoryItems()).containsExactly(wave));
+    }
+
+    @Test
+    void variantCodesOfTheGroupingContainEanOnlyPairs() {
+        // given
+        when(pimView.findAll()).thenReturn(List.of());
+        InventoryItem kosatec = item(MOVA_EAN_176, "SHINE10", 1200, "Kosatec", "Mova");
+        VariantCodes inherited = SharedManufacturerCodes.of(List.of(
+                item("EAN5", "SAMBA", 100, "W", "Adidas"),
+                item("EAN6", "SAMBA", 100, "W", "Adidas"))).variantCodes();
+
+        // when
+        InventoryAutoDiscovery.Grouping grouping = autoDiscovery.group(List.of(kosatec), pimView, List::of, inherited, movaPair());
+
+        // then
+        assertThat(grouping.variantCodes().contains("mova", "SHINE10")).isTrue();
+        assertThat(grouping.variantCodes().contains("adidas", "SAMBA")).isTrue();
+        assertThat(grouping.variantCodes().size()).isEqualTo(2);
+    }
+
+    @Test
+    void conflictingOffersAreJudgedTheSameWithEanOnlyPairs() {
+        // given: the Sapphire layout of rule A; gpbdsxwa19 is the RX 9060 XT entry
+        when(pimView.findAll()).thenReturn(List.of(pimEntry("gpbdsxwa19", "Sapphire",
+                gtin("4895106296381"), mpn("11350-03-20G"))));
+        InventoryItem kosatec7600 = item("4895106293618", "11324-01-20G", 1843, "Kosatec", "Sapphire");
+        InventoryItem kosatec9060 = item("4895106296381", "11350-03-20G", 2613, "Kosatec", "Sapphire");
+        InventoryItem incom9060 = item("4895106296381", "11350-03-20G", 2663, "IncomGroup", "Sapphire");
+        InventoryItem elko = item("4895106293618", "11350-03-20G", 3563, "Elko", "Sapphire");
+        List<InventoryItem> offers = List.of(kosatec7600, kosatec9060, incom9060, elko);
+        VariantCodes eanOnly = PimEanOnlyCodes.of(List.of(
+                flaggedEntry("pim-7600", "Sapphire", true, gtin("4895106293618"), mpn("11324-01-20G"))));
+
+        // when
+        InventoryAutoDiscovery.Grouping without = autoDiscovery.group(offers, pimView, this::sapphireWitnesses, VariantCodes.none(), VariantCodes.none());
+        InventoryAutoDiscovery.Grouping with = autoDiscovery.group(offers, pimView, this::sapphireWitnesses, VariantCodes.none(), eanOnly);
+
+        // then
+        assertThat(leftOut(offers, with)).isEqualTo(leftOut(offers, without)).containsExactly(elko);
+        for (InventoryAutoDiscovery.Grouping grouping : List.of(without, with)) {
+            assertThat(grouping.groups()).filteredOn(m -> "gpbdsxwa19".equals(m.getInventoryKey().getId())).singleElement()
+                    .satisfies(m -> assertThat(m.getInventoryItems()).doesNotContain(kosatec7600));
+        }
+    }
+
+    private VariantCodes movaPair() {
+        return PimEanOnlyCodes.of(List.of(flaggedEntry("PIM-MOVA", "Mova", true, gtin(MOVA_EAN_176), mpn("SHINE10"))));
+    }
+
+    private static Set<Set<InventoryItem>> offerSetsOf(InventoryAutoDiscovery.Grouping grouping) {
+        return grouping.groups().stream()
+                .map(m -> Set.copyOf(m.getInventoryItems()))
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    private static Set<InventoryItem> leftOut(List<InventoryItem> offers, InventoryAutoDiscovery.Grouping grouping) {
+        Set<InventoryItem> grouped = grouping.groups().stream()
+                .flatMap(m -> m.getInventoryItems().stream())
+                .collect(java.util.stream.Collectors.toSet());
+        return offers.stream().filter(offer -> !grouped.contains(offer)).collect(java.util.stream.Collectors.toSet());
+    }
+
+    private PimEntry flaggedEntry(String pimId, String brand, boolean eanOnly, PimIdentifier... identifiers) {
+        return new PimEntry(pimId, List.of(identifiers), brand, "Name", "Category", "Subcategory", true, null, null, null,
+                null, null, eanOnly);
     }
 
     private List<InventoryItem> lexmarkOffers() {

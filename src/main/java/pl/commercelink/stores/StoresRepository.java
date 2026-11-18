@@ -36,6 +36,10 @@ public class StoresRepository extends DynamoDbRepository<Store> {
         return dynamoDBMapper.scan(Store.class, scanExpression);
     }
 
+    public List<String> findAllStoreIds() {
+        return findAll().stream().map(Store::getStoreId).toList();
+    }
+
     public String storeLogo(String storeId, String fileName, byte[] image) {
         removeLogo(storeId);
 
