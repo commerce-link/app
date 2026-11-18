@@ -9,6 +9,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.InventoryRepository;
+import pl.commercelink.inventory.VariantCodes;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.inventory.supplier.api.XmlItem;
@@ -49,7 +50,7 @@ class XmlProductFeedLoaderTest {
         // given
         when(inventoryRepository.read("acme", "xml")).thenReturn(reader(
                 "<products><product><ean>111</ean><qty>1</qty></product><product><ean>222</ean><qty>1</qty></product></products>"));
-        when(feedProcessor.start("acme", 0)).thenReturn(processing);
+        when(feedProcessor.start("acme", 0, VariantCodes.none())).thenReturn(processing);
         when(processing.finish()).thenReturn(List.of());
         when(dataCleanup.run(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -66,7 +67,7 @@ class XmlProductFeedLoaderTest {
         // given
         when(inventoryRepository.read("acme", "xml")).thenReturn(reader(
                 "<products><product><ean>111</ean><qty>0</qty></product><product><ean>222</ean><qty>4</qty></product></products>"));
-        when(feedProcessor.start("acme", 0)).thenReturn(processing);
+        when(feedProcessor.start("acme", 0, VariantCodes.none())).thenReturn(processing);
         when(processing.finish()).thenReturn(List.of());
         when(dataCleanup.run(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -86,7 +87,7 @@ class XmlProductFeedLoaderTest {
                 + "<!DOCTYPE products [ <!ENTITY xxe SYSTEM \"file:///etc/passwd\"> ]>"
                 + "<products><product><ean>&xxe;</ean></product></products>";
         when(inventoryRepository.read("acme", "xml")).thenReturn(reader(feed));
-        lenient().when(feedProcessor.start("acme", 0)).thenReturn(processing);
+        lenient().when(feedProcessor.start("acme", 0, VariantCodes.none())).thenReturn(processing);
 
         // when
         List<InventoryItem> result = loader.load(TestProduct.class, "product", SUPPLIER);
@@ -106,7 +107,7 @@ class XmlProductFeedLoaderTest {
                 + " <!ENTITY lol3 \"&lol2;&lol2;&lol2;&lol2;&lol2;\"> ]>"
                 + "<products><product><ean>&lol3;</ean></product></products>";
         when(inventoryRepository.read("acme", "xml")).thenReturn(reader(feed));
-        lenient().when(feedProcessor.start("acme", 0)).thenReturn(processing);
+        lenient().when(feedProcessor.start("acme", 0, VariantCodes.none())).thenReturn(processing);
 
         // when
         List<InventoryItem> result = loader.load(TestProduct.class, "product", SUPPLIER);

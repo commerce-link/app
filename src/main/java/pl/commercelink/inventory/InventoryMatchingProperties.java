@@ -9,9 +9,10 @@ public record InventoryMatchingProperties(
         @DefaultValue("true") boolean ignorePlaceholderEans,
         @DefaultValue("true") boolean splitSingleCodeByPrice,
         @DefaultValue("true") boolean linkOwnToGlobalByCode,
-        @DefaultValue("true") boolean pimEanOnlyFlag) {
+        @DefaultValue("true") boolean pimEanOnlyFlag,
+        @DefaultValue("true") boolean pimStoreEanOnlyFlag) {
 
     public static InventoryMatchingProperties allEnabled() {
-        return new InventoryMatchingProperties(true, true, true, true, true);
+        return new InventoryMatchingProperties(true, true, true, true, true, true);
     }
 }

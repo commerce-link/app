@@ -5,6 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimIdentifier;
 import pl.commercelink.pim.api.PimIdentifierType;
@@ -13,6 +14,7 @@ import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -105,7 +107,7 @@ class EanOnlyCodesWatchTest {
         when(eanOnlyCodes.refresh()).thenReturn(VariantCodes.none());
 
         // when
-        watch(new InventoryMatchingProperties(true, true, true, true, false)).onPimIndexRefreshed(new PimIndexRefreshed());
+        watch(new InventoryMatchingProperties(true, true, true, true, false, true)).onPimIndexRefreshed(new PimIndexRefreshed());
 
         // then
         verifyNoInteractions(inventory, storeInventoryCache);
@@ -167,6 +169,32 @@ class EanOnlyCodesWatchTest {
         // then
         verify(inventory, times(1)).regroup();
         verify(storeInventoryCache, times(1)).evict("s1");
+    }
+
+    @Test
+    void storeFlagDoesNotRegroupTheGlobalPool() {
+        // given: the index holds the unflagged global Mova entry and a store's flagged clone of it
+        PimEntry global = new PimEntry("pim-SHINE10", List.of(
+                new PimIdentifier("5901234567801", PimIdentifierType.GTIN),
+                new PimIdentifier("SHINE10", PimIdentifierType.MPN)),
+                "Mova", "Name", null, null, true, null, null);
+        PimEntry flaggedClone = new PimEntry("clone-SHINE10", List.of(
+                new PimIdentifier("5901234567801", PimIdentifierType.GTIN),
+                new PimIdentifier("SHINE10", PimIdentifierType.MPN)),
+                "Mova", "Name", null, null, true, null, null, null, "s1", "pim-SHINE10", true);
+        EanOnlyCodes realCodes = new EanOnlyCodes(ScopedPimCatalog.of(global, flaggedClone),
+                InventoryMatchingProperties.allEnabled());
+        globalInventory.replace(List.of(), VariantCodes.none(), VariantCodes.none());
+        long version = globalInventory.version();
+
+        // when
+        new EanOnlyCodesWatch(realCodes, globalInventory, inventory, storeInventoryCache,
+                InventoryMatchingProperties.allEnabled(), storesRepository).onPimIndexRefreshed(new PimIndexRefreshed());
+
+        // then
+        assertThat(realCodes.current().size()).isZero();
+        assertThat(globalInventory.version()).isEqualTo(version);
+        verifyNoInteractions(inventory, storeInventoryCache, storesRepository);
     }
 
     // the mocked regroup does what Inventory.regroup does to the pool: groups again with the given pairs
