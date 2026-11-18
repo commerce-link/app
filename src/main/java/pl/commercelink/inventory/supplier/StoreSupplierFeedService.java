@@ -3,6 +3,7 @@ package pl.commercelink.inventory.supplier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.StoreInventoryProvider;
+import pl.commercelink.inventory.StoreInventoryRefreshPublisher;
 import pl.commercelink.inventory.supplier.api.FeedData;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
@@ -19,6 +20,7 @@ public class StoreSupplierFeedService {
     private final SupplierProviderFactory supplierProviderFactory;
     private final StoreFeedRepository storeFeedRepository;
     private final StoreInventoryProvider storeInventoryProvider;
+    private final StoreInventoryRefreshPublisher storeInventoryRefresh;
 
     public void loadStoreFeed(String storeId, String supplierName) throws ResourceDownloadException {
         Store store = storesRepository.findById(storeId);
@@ -36,14 +38,16 @@ public class StoreSupplierFeedService {
     private void storeIfChanged(String storeId, String supplierName, FeedData feed) {
         String hash = FeedHash.of(feed.data(), feed.extension());
         if (storeFeedRepository.storedHash(storeId, supplierName).filter(hash::equals).isPresent()) {
-            storeInventoryProvider.keepOrRefresh(storeId);
+            if (!storeInventoryProvider.keepIfRecent(storeId)) {
+                storeInventoryRefresh.request(storeId);
+            }
             storeFeedRepository.storeHash(storeId, supplierName, hash);
             return;
         }
         storeFeedRepository.store(storeId, supplierName, feed.data(), feed.extension());
-        // a failed rebuild fails the import, so the queue delivers it again; the previous snapshot stays until then
-        storeInventoryProvider.refresh(storeId);
-        // stored last: an import that stopped before the rebuild must not be taken for unchanged when it is delivered again
+        storeInventoryRefresh.request(storeId);
+        // stored last: an import that stopped before asking for the rebuild must not be taken for unchanged when it is
+        // delivered again
         storeFeedRepository.storeHash(storeId, supplierName, hash);
     }
 

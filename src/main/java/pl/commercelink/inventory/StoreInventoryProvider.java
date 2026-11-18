@@ -61,17 +61,25 @@ public class StoreInventoryProvider {
         return cache.get(storeId).orElseGet(() -> buildAndCache(store, storeId));
     }
 
-    public void refresh(String storeId) {
-        buildAndCache(storesRepository.findById(storeId), storeId);
+    // Each feed import of a store asks for a rebuild. A build that started after a request has already read that
+    // import's file, so the request has nothing left to do; null rebuilds whatever is stored.
+    public void refresh(String storeId, Long requestedAtMillis) {
+        if (requestedAtMillis != null && cache.builtSince(storeId, requestedAtMillis)) {
+            return;
+        }
+        Store store = storesRepository.findById(storeId);
+        if (store == null) {
+            log.warn("Inventory snapshot of store {} is not rebuilt: the store does not exist", storeId);
+            return;
+        }
+        buildAndCache(store, storeId);
     }
 
     // For an import that found its feed unchanged: the snapshot only lives on, without a rebuild. Not past a day
-    // though, since its prices carry the exchange rates of the day it was built.
-    public void keepOrRefresh(String storeId) {
+    // though, since its prices carry the exchange rates of the day it was built; false asks the caller for a rebuild.
+    public boolean keepIfRecent(String storeId) {
         Store store = storesRepository.findById(storeId);
-        if (!cache.keepIfBuiltWithin(storeId, MAX_AGE_OF_KEPT_SNAPSHOT, resolveTtl(store))) {
-            buildAndCache(store, storeId);
-        }
+        return cache.keepIfBuiltWithin(storeId, MAX_AGE_OF_KEPT_SNAPSHOT, resolveTtl(store));
     }
 
     private StoreInventory buildAndCache(Store store, String storeId) {

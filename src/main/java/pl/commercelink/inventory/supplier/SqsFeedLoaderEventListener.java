@@ -30,10 +30,7 @@ public class SqsFeedLoaderEventListener {
             value = "supplier-feed-import-queue",
             maxConcurrentMessages = "1",
             maxMessagesPerPoll = "1",
-            pollTimeoutSeconds = "20",
-            // a store import also rebuilds the store's inventory, which with the download outlasts the queue's 30 seconds;
-            // past the timeout the same message is delivered again while it is still being handled
-            messageVisibilitySeconds = "120"
+            pollTimeoutSeconds = "20"
     )
     public void handleMessage(FeedLoaderEventPayload payload) throws Exception {
         if (isNotBlank(payload.getStoreId())) {

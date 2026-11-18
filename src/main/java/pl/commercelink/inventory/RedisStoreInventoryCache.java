@@ -40,6 +40,15 @@ public class RedisStoreInventoryCache implements StoreInventoryCache {
             return 1
             """, Long.class);
 
+    // an eviction sets the mark without a snapshot, hence EXISTS
+    private static final RedisScript<Long> BUILT_SINCE = new DefaultRedisScript<>("""
+            local mark = redis.call('GET', KEYS[2])
+            if not mark or tonumber(mark) < tonumber(ARGV[1]) then
+                return 0
+            end
+            return redis.call('EXISTS', KEYS[1])
+            """, Long.class);
+
     // The age comes from the build-start mark, a few bytes, instead of the snapshot itself, megabytes for a large
     // store. PEXPIRE answers 0 for a snapshot that is gone, which is reported as not kept so the caller rebuilds it.
     private static final RedisScript<Long> KEEP_IF_RECENT = new DefaultRedisScript<>("""
@@ -104,6 +113,18 @@ public class RedisStoreInventoryCache implements StoreInventoryCache {
                     String.valueOf(ttl.toMillis()), String.valueOf(markLifetime(ttl).toMillis()));
         } catch (Exception e) {
             System.err.println("Redis store-inventory put failed for " + storeId + ": " + e.getMessage());
+        }
+    }
+
+    @Override
+    public boolean builtSince(String storeId, long sinceMillis) {
+        try {
+            Long built = redisTemplate.execute(BUILT_SINCE, List.of(key(storeId), buildStartKey(storeId)),
+                    String.valueOf(sinceMillis));
+            return built != null && built == 1;
+        } catch (Exception e) {
+            log.warn("The build time of the store inventory snapshot of {} could not be read, it is rebuilt", storeId, e);
+            return false;
         }
     }
 

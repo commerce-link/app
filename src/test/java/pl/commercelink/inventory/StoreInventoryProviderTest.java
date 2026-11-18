@@ -137,13 +137,56 @@ class StoreInventoryProviderTest {
         when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.of(30));
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
         when(autoDiscovery.group(anyList(), any(), any(), any())).thenReturn(grouping(List.of()));
+        when(cache.builtSince("store-1", 1_000L)).thenReturn(false);
 
         // when
-        provider.refresh("store-1");
+        provider.refresh("store-1", 1_000L);
 
         // then
         verify(cache, never()).get(any());
         verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(30)), anyLong());
+    }
+
+    @Test
+    void requestAnsweredByALaterBuildRebuildsNothing() {
+        // given
+        when(cache.builtSince("store-1", 1_000L)).thenReturn(true);
+
+        // when
+        provider.refresh("store-1", 1_000L);
+
+        // then
+        verify(storesRepository, never()).findById(any());
+        verify(cache, never()).put(any(), any(), any(), anyLong());
+    }
+
+    @Test
+    void requestWithoutATimeAlwaysRebuilds() {
+        // given
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        when(autoDiscovery.group(anyList(), any(), any(), any())).thenReturn(grouping(List.of()));
+
+        // when
+        provider.refresh("store-1", null);
+
+        // then
+        verify(cache, never()).builtSince(any(), anyLong());
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class), anyLong());
+    }
+
+    @Test
+    void refreshOfAStoreThatIsGoneStoresNothing() {
+        // given
+        when(storesRepository.findById("store-1")).thenReturn(null);
+
+        // when
+        provider.refresh("store-1", null);
+
+        // then
+        verify(cache, never()).put(any(), any(), any(), anyLong());
     }
 
     @Test
@@ -168,7 +211,7 @@ class StoreInventoryProviderTest {
     }
 
     @Test
-    void recentSnapshotIsKeptWithoutBeingReadOrRebuilt() {
+    void recentSnapshotIsKeptForTheStoresLifetimeWithoutBeingRead() {
         // given
         Store storeEntity = mock(Store.class);
         when(storesRepository.findById("store-1")).thenReturn(storeEntity);
@@ -176,30 +219,28 @@ class StoreInventoryProviderTest {
         when(cache.keepIfBuiltWithin("store-1", Duration.ofHours(24), Duration.ofMinutes(30))).thenReturn(true);
 
         // when
-        provider.keepOrRefresh("store-1");
+        boolean kept = provider.keepIfRecent("store-1");
 
         // then
+        assertThat(kept).isTrue();
         verify(cache, never()).get(any());
         verify(cache, never()).put(any(), any(), any(), anyLong());
-        verify(autoDiscovery, never()).group(anyList(), any(), any(), any());
     }
 
     @Test
-    void snapshotThatWasNotKeptIsRebuilt() {
+    void snapshotThatWasNotKeptIsReportedAndNotRebuiltHere() {
         // given
         Store storeEntity = mock(Store.class);
         when(storesRepository.findById("store-1")).thenReturn(storeEntity);
         when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
-        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.group(anyList(), any(), any(), any())).thenReturn(grouping(List.of()));
         when(cache.keepIfBuiltWithin(eq("store-1"), any(), any())).thenReturn(false);
 
         // when
-        provider.keepOrRefresh("store-1");
+        boolean kept = provider.keepIfRecent("store-1");
 
         // then
-        verify(cache, never()).get(any());
-        verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class), anyLong());
+        assertThat(kept).isFalse();
+        verify(cache, never()).put(any(), any(), any(), anyLong());
     }
 
     @Test
