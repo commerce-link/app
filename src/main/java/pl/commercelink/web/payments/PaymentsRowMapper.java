@@ -7,14 +7,17 @@ import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.orders.*;
 import pl.commercelink.web.orders.OrderPageModelFactory;
+import pl.commercelink.web.orders.PendingPaymentsJson;
 
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /** Builds the rows of both tabs; one instance per request, bound to the request locale (like DeliveryRowMapper). */
 public class PaymentsRowMapper {
@@ -97,20 +100,37 @@ public class PaymentsRowMapper {
                 shipText(entry, today),
                 shipNoteKey == null ? null : text(shipNoteKey),
                 entry.urgency().isBad() ? "is-bad" : entry.urgency().isWarn() ? "is-warn" : "",
-                entry.method() == null ? "" : text("PaymentSource." + entry.method().name()),
+                methodLabel(entry),
                 stateLabel(entry.standing(), "receivable"), stateTone(entry.standing()),
                 money(entry.amount()),
-                paidOf ? text("payments.row.paidOf", plain(o.getPaidAmount()), plain(o.getTotalPrice()))
+                paidOf ? text("payments.row.paidOf", plain(o.getPaidAmount()), plain(o.getAmountDue()))
                         : text("payments.row.net", money(Math.abs(o.getUnpaidAmountNet()))),
                 paidOf, refund,
                 o.getOrderId(),
                 expected(entry.amount()),
                 pending(o.getPendingPayment()),
-                text(refund ? "payments.action.refund" : "payments.action.payment"));
+                text(refund ? "payments.action.refund" : "payments.action.payment"),
+                PendingPaymentsJson.of(o));
     }
 
     public String money(double value) {
         return text("general.currency.amount", amount.format(value)).replace(' ', '\u00A0');
+    }
+
+    /**
+     * How the customer pays: the method, or, when the order waits for several payments, each of them with what it waits
+     * for ("Przelew bankowy 5 000,00 zł · Raty 15 000,00 zł").
+     */
+    private String methodLabel(ReceivableEntry entry) {
+        Order order = entry.order();
+        List<Payment> pending = order.getPendingPayments();
+        if (pending.size() > 1) {
+            return pending.stream()
+                    .map(payment -> payment.getSource() == null ? money(order.expectedAmountOf(payment))
+                            : text("PaymentSource." + payment.getSource().name()) + " " + money(order.expectedAmountOf(payment)))
+                    .collect(Collectors.joining(" · "));
+        }
+        return entry.method() == null ? "" : text("PaymentSource." + entry.method().name());
     }
 
     /** A provider without a connection was typed in by hand (the same rule as the deliveries list). */
@@ -122,6 +142,9 @@ public class PaymentsRowMapper {
     }
 
     private String shipText(ReceivableEntry entry, LocalDate today) {
+        if (entry.order().hasStatus(OrderStatus.Cancelled)) {
+            return text("payments.ship.cancelled");
+        }
         if (entry.shipped()) {
             if (entry.shipDate() == null) {
                 return text(entry.delivered() ? "payments.ship.deliveredUndated" : "payments.ship.gone");

@@ -392,9 +392,18 @@ public class Order {
         return payments.stream().anyMatch(payment -> !payment.isUnsettled());
     }
 
+    /**
+     * What the customer is to pay for the order: nothing once it is cancelled. totalPrice itself stays as the value
+     * the order had, so cancelled orders can still be added up; what was paid for one is therefore owed back.
+     */
+    @DynamoDBIgnore
+    public double getAmountDue() {
+        return hasStatus(OrderStatus.Cancelled) ? 0 : totalPrice;
+    }
+
     @DynamoDBIgnore
     public double getUnpaidAmount() {
-        return totalPrice - getPaidAmount();
+        return getAmountDue() - getPaidAmount();
     }
 
     @DynamoDBIgnore
@@ -420,38 +429,97 @@ public class Order {
     }
 
     /** What stands between the order and cancelling it; empty when it can be cancelled. */
-    public enum CancelBlocker { NOT_DELIVERED, PRODUCTS_NOT_RETURNED, PAYMENTS_NOT_REFUNDED }
+    public enum CancelBlocker { ALREADY_CANCELLED, PRODUCTS_NOT_RETURNED, DROPSHIP_ITEMS, ITEMS_NOT_RELEASABLE, COURIER_ORDERED }
 
+    // Cancelled is here for a cancel that stopped half-way (see cancelBlockers): its items are finished, not in the way
+    private static final Set<FulfilmentStatus> RELEASABLE_ON_CANCEL = EnumSet.of(
+            FulfilmentStatus.New, FulfilmentStatus.Allocation, FulfilmentStatus.Ordered, FulfilmentStatus.Delivered,
+            FulfilmentStatus.Cancelled);
+
+    /**
+     * The goods (may) have left: the order reached Shipping, a parcel went out or a goods issue was written. From here
+     * on cancelling waits for the products to come back through an RMA; before it, the goods are simply released.
+     */
     @DynamoDBIgnore
-    public boolean canBeCancelled(List<OrderItem> orderItems) {
-        return cancelBlockers(orderItems).isEmpty();
+    public boolean hasGoodsOut() {
+        return hasOneOfStatuses(OrderStatus.Shipping, OrderStatus.Delivered, OrderStatus.Completed)
+                || hasShippedShipment()
+                || getDocumentByType(DocumentType.GoodsIssue).isPresent();
     }
 
-    /** The conditions of {@link #canBeCancelled} this order does not meet yet, so a reason can name exactly those. */
     @DynamoDBIgnore
-    public Set<CancelBlocker> cancelBlockers(List<OrderItem> orderItems) {
+    public boolean canBeCancelled(List<OrderItem> orderItems, Set<String> dropshipItemIds) {
+        return cancelBlockers(orderItems, dropshipItemIds).isEmpty();
+    }
+
+    /**
+     * The conditions of {@link #canBeCancelled} this order does not meet yet, so a reason can name exactly those.
+     * dropshipItemIds: the items sitting in a dropship delivery (DropshipItemLookup), whose goods travel from the
+     * supplier to the customer and cannot be taken back into the warehouse.
+     */
+    @DynamoDBIgnore
+    public Set<CancelBlocker> cancelBlockers(List<OrderItem> orderItems, Set<String> dropshipItemIds) {
         Set<CancelBlocker> blockers = EnumSet.noneOf(CancelBlocker.class);
-        if (!hasOneOfStatuses(OrderStatus.Delivered, OrderStatus.Completed)) {
-            blockers.add(CancelBlocker.NOT_DELIVERED);
+        // A cancelled order whose items did not all follow it is one whose cancel stopped between the two saves
+        // (OrdersManager#cancelOrder): cancelling again finishes it, so only a fully cancelled order refuses.
+        if (hasStatus(OrderStatus.Cancelled)
+                && orderItems.stream().allMatch(item -> item.isCancelled() || item.isReturned())) {
+            blockers.add(CancelBlocker.ALREADY_CANCELLED);
+            return blockers;
         }
-        if (!isZero(getPaidAmount())) {
-            blockers.add(CancelBlocker.PAYMENTS_NOT_REFUNDED);
+        List<OrderItem> products = orderItems.stream().filter(OrderItem::isProduct).toList();
+        if (hasGoodsOut()) {
+            if (!products.stream().allMatch(OrderItem::isReturned)) {
+                blockers.add(CancelBlocker.PRODUCTS_NOT_RETURNED);
+            }
+            return blockers;
         }
-        if (!orderItems.stream().filter(OrderItem::isProduct).allMatch(OrderItem::isReturned)) {
-            blockers.add(CancelBlocker.PRODUCTS_NOT_RETURNED);
+        if (products.stream().anyMatch(item -> dropshipItemIds.contains(item.getItemId()))) {
+            blockers.add(CancelBlocker.DROPSHIP_ITEMS);
+        }
+        if (products.stream().anyMatch(item -> item.isClaimed() || !RELEASABLE_ON_CANCEL.contains(item.getStatus())
+                || holdsGoodsThatCannotBeReleased(item))) {
+            blockers.add(CancelBlocker.ITEMS_NOT_RELEASABLE);
+        }
+        if (courierShipmentToCancel().isPresent() || hasShipmentBeingCreated()) {
+            blockers.add(CancelBlocker.COURIER_ORDERED);
         }
         return blockers;
     }
 
+    /**
+     * Ordered or Delivered without the delivery, EAN and manufacturer code the release goes by (Item#isAllocated):
+     * the warehouse could not be given the goods back, so cancelling would lose them from stock.
+     */
+    private static boolean holdsGoodsThatCannotBeReleased(OrderItem item) {
+        return item.hasOneOfTheStatuses(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered) && !item.isAllocated();
+    }
+
+    /**
+     * After the goods went out, the products are already Returned (RMA) and the services follow them. Before that
+     * nothing left: every item becomes Cancelled, and the caller has released the allocated goods first
+     * (OrdersManager#cancelOrder), so what is still in Allocation only loses its supplier.
+     */
     @DynamoDBIgnore
     public void cancel(List<OrderItem> orderItems) {
-        orderItems.stream()
-                .filter(i -> i.isService())
-                .forEach(OrderItem::markAsReturned);
-
-        this.totalPrice = orderItems.stream()
-                .mapToDouble(OrderItem::getTotalPrice)
-                .sum();
+        if (hasGoodsOut()) {
+            orderItems.stream()
+                    .filter(i -> i.isService())
+                    .forEach(OrderItem::markAsReturned);
+            this.totalPrice = orderItems.stream()
+                    .mapToDouble(OrderItem::getTotalPrice)
+                    .sum();
+        } else {
+            // prices and totalPrice stay: the order keeps the value it was cancelled with (see getAmountDue)
+            orderItems.forEach(item -> {
+                if (item.isProduct() && !item.isNew()) {
+                    item.removeFulfilment();
+                }
+                // also a supplier assigned to an item not yet sent to allocation, and a service's warehouse marker
+                item.setDeliveryId(null);
+                item.markAsCancelled();
+            });
+        }
 
         this.status = OrderStatus.Cancelled;
 
@@ -523,6 +591,155 @@ public class Order {
     @DynamoDBIgnore
     public Payment getPendingPayment() {
         return payments.stream().filter(Payment::isUnsettled).findFirst().orElse(null);
+    }
+
+    @DynamoDBIgnore
+    public List<Payment> getPendingPayments() {
+        return payments.stream().filter(Payment::isUnsettled).toList();
+    }
+
+    @DynamoDBIgnore
+    public Payment getRestPayment() {
+        return payments.stream().filter(Payment::waitsForRest).findFirst().orElse(null);
+    }
+
+    /**
+     * The pending payment money paid by method goes to: one of that method with its own amount, else the one waiting for
+     * the rest; null when neither waits, so the money is a payment of its own. Without a method (a payer paying any
+     * kind of payment) the rest, else the first pending payment.
+     */
+    @DynamoDBIgnore
+    public Payment pendingPaymentFor(PaymentSource method) {
+        Optional<Payment> own = payments.stream()
+                .filter(payment -> payment.isUnsettled() && payment.getExpectedAmount() != null)
+                .filter(payment -> method != null && payment.getSource() == method)
+                .findFirst();
+        if (own.isPresent()) {
+            return own.get();
+        }
+        Payment rest = getRestPayment();
+        return rest != null || method != null ? rest : getPendingPayment();
+    }
+
+    /** What the pending payment waits for: its own amount, or for the rest what no other pending payment waits for. */
+    @DynamoDBIgnore
+    public double expectedAmountOf(Payment pending) {
+        return pending.getExpectedAmount() != null ? pending.getExpectedAmount() : getRestAmount();
+    }
+
+    /** The unpaid amount beyond what the pending payments with their own amounts wait for, never below 0. */
+    @DynamoDBIgnore
+    public double getRestAmount() {
+        double own = payments.stream()
+                .filter(payment -> payment.isUnsettled() && payment.getExpectedAmount() != null)
+                .mapToDouble(Payment::getExpectedAmount)
+                .sum();
+        double rest = getUnpaidAmount() - own;
+        return rest < HALF_CENT ? 0 : Math.round(rest * 100) / 100.0;
+    }
+
+    /** What the pending payment may wait for at most: the unpaid amount less what the others with their own amounts wait for. */
+    @DynamoDBIgnore
+    public double amountAvailableTo(Payment pending) {
+        double others = payments.stream()
+                .filter(payment -> payment != pending && payment.isUnsettled() && payment.getExpectedAmount() != null)
+                .mapToDouble(Payment::getExpectedAmount)
+                .sum();
+        double available = getUnpaidAmount() - others;
+        return available < HALF_CENT ? 0 : Math.round(available * 100) / 100.0;
+    }
+
+    /**
+     * Books amount on the pending payment. What it still waits for keeps waiting: a new pending payment of the same
+     * method, name and reference, with the difference of its own amount or, for the rest, as the rest, so the next
+     * transfer of the difference finds it.
+     */
+    @DynamoDBIgnore
+    public void fill(Payment pending, double amount) {
+        Double expected = pending.getExpectedAmount();
+        boolean rest = pending.waitsForRest();
+        pending.setAmount(amount);
+        pending.setExpectedAmount(null);
+        keepWaiting(pending, expected, rest, amount);
+        keepRest();
+    }
+
+    /**
+     * Puts replacement in place of the payment at index. A pending payment given an amount is money booked on it, as
+     * {@link #fill} books it: what it still waits for keeps waiting.
+     */
+    @DynamoDBIgnore
+    public void replacePayment(int index, Payment replacement) {
+        Payment replaced = payments.set(index, replacement);
+        if (replaced.isUnsettled() && !replacement.isUnsettled()) {
+            keepWaiting(replaced, replaced.getExpectedAmount(), replaced.waitsForRest(), replacement.getAmount());
+        }
+        keepRest();
+    }
+
+    /**
+     * Splits the pending payment into parts with their own amounts and a last part of restSource for the remainder: the
+     * rest when the split payment waited for the rest, else the amount it waited for less the parts. The first part
+     * keeps its name and reference.
+     */
+    @DynamoDBIgnore
+    public void split(Payment pending, List<Payment> parts, PaymentSource restSource) {
+        double remainder = expectedAmountOf(pending) - parts.stream().mapToDouble(Payment::getExpectedAmount).sum();
+        Payment last = new Payment(restSource);
+        if (!pending.waitsForRest()) {
+            last.setExpectedAmount(Math.round(remainder * 100) / 100.0);
+        }
+        parts.get(0).setName(pending.getName());
+        parts.get(0).setReferenceNo(pending.getReferenceNo());
+        List<Payment> replacement = new ArrayList<>(parts);
+        replacement.add(last);
+        int index = payments.indexOf(pending);
+        payments.remove(index);
+        payments.addAll(index, replacement);
+        keepRest();
+    }
+
+    /**
+     * The pending payments add up to what is unpaid: the rest takes what the payments with their own amounts leave, a
+     * bank transfer when no payment waits for it, and goes once nothing is left of it while another payment waits or
+     * money paid the order. The only pending payment of an order nothing was paid for stays: it says how the customer
+     * pays.
+     */
+    @DynamoDBIgnore
+    public void keepRest() {
+        Payment rest = getRestPayment();
+        double left = getRestAmount();
+        if (rest == null && left > 0) {
+            payments.add(new Payment(PaymentSource.BankTransfer));
+        } else if (rest != null && left == 0
+                && (getPendingPayments().size() > 1 || (getUnpaidAmount() < HALF_CENT && hasRecordedPayments()))) {
+            payments.remove(rest);
+        }
+    }
+
+    /**
+     * What the payment booked waited for and amount did not pay keeps waiting with its method, name and reference: the
+     * difference of its own amount, or for the rest whatever is still unpaid beyond the other pending payments.
+     */
+    private void keepWaiting(Payment booked, Double expected, boolean rest, double amount) {
+        if (amount <= 0) {
+            return;
+        }
+        if (rest) {
+            if (getRestPayment() == null && getRestAmount() > 0) {
+                payments.add(stillWaiting(booked, null));
+            }
+        } else if (expected != null && expected - amount >= HALF_CENT) {
+            payments.add(stillWaiting(booked, Math.round((expected - amount) * 100) / 100.0));
+        }
+    }
+
+    private static Payment stillWaiting(Payment booked, Double expected) {
+        Payment waiting = new Payment(booked.getSource());
+        waiting.setName(booked.getName());
+        waiting.setReferenceNo(booked.getReferenceNo());
+        waiting.setExpectedAmount(expected);
+        return waiting;
     }
 
     @DynamoDBIgnore

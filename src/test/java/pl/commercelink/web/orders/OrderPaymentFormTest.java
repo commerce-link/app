@@ -22,7 +22,7 @@ class OrderPaymentFormTest {
 
     private static OrderPaymentForm posted(boolean pending, boolean refund, String amount, String fee, String date) {
         return new OrderPaymentForm("o-1", 1, "v", pending, refund, PaymentSource.BankTransfer, " Jan ", amount, fee, "",
-                " OP-1 ", date, null, null, null, null);
+                " OP-1 ", date, null, null, null, null, null, null);
     }
 
     private static Payment refund(double amount) {
@@ -100,7 +100,7 @@ class OrderPaymentFormTest {
     void aPaymentWithoutAMethodIsRefused() {
         // given
         OrderPaymentForm form = new OrderPaymentForm("o-1", 0, "v", true, false, null, null, "0", null, null, null,
-                null, null, null, null, null);
+                null, null, null, null, null, null, null);
 
         // then
         assertThat(form.validate()).containsEntry("payment-0-source", "order.payments.error.source");
@@ -208,6 +208,43 @@ class OrderPaymentFormTest {
                 .containsEntry("payment-1-amount", "order.payments.error.amount");
     }
 
+    private static OrderPaymentForm pendingPosted(String amount, String expectedAmount) {
+        return new OrderPaymentForm("o-1", 0, "v", true, false, PaymentSource.BankTransfer, null, amount, null, null,
+                null, null, null, null, null, null, expectedAmount, null);
+    }
+
+    @Test
+    void aPendingPaymentKeepsTheAmountItWaitsForOrWaitsForTheRestWhenBlank() {
+        // given
+        Payment saved = new Payment(PaymentSource.BankTransfer);
+        saved.setExpectedAmount(5000.0);
+
+        // when
+        OrderPaymentForm shown = OrderPaymentForm.of("o-1", 0, saved);
+        Payment changed = pendingPosted("0", "6 000,50").toPayment(saved);
+        Payment rest = pendingPosted("0", " ").toPayment(saved);
+        Payment filled = pendingPosted("6000", "6000").toPayment(saved);
+
+        // then
+        assertThat(shown.expectedAmount()).isEqualTo("5000.00");
+        assertThat(changed.getExpectedAmount()).isEqualTo(6000.5);
+        assertThat(rest.getExpectedAmount()).isNull();
+        assertThat(filled.getAmount()).isEqualTo(6000.0);
+        assertThat(filled.getExpectedAmount()).isNull();
+    }
+
+    @Test
+    void anExpectedAmountIsAboveZeroAndCheckedOnlyWhileThePaymentStaysPending() {
+        // then
+        assertThat(pendingPosted("0", "0").validate())
+                .containsEntry("payment-0-expectedAmount", "order.payments.error.expected");
+        assertThat(pendingPosted("0", "-5").validate())
+                .containsEntry("payment-0-expectedAmount", "order.payments.error.expected");
+        assertThat(pendingPosted("0", "1e400").validate())
+                .containsEntry("payment-0-expectedAmount", "order.payments.error.range");
+        assertThat(pendingPosted("100", "abc").validate()).isEmpty();
+    }
+
     @Test
     void thePendingPaymentShowsAsPending() {
         // when
@@ -228,9 +265,9 @@ class OrderPaymentFormTest {
         Payment saved = Payment.bankTransfer("REF-1", "Jan", 100);
         String locked = OrderPaymentForm.methodLockedKey(withReceipt, ReceiptLock.NONE);
         OrderPaymentForm card = new OrderPaymentForm("o-1", 0, "v", false, false, PaymentSource.Card, "Jan", "120", null,
-                null, null, null, null, null, locked, null);
+                null, null, null, null, null, locked, null, null, null);
         OrderPaymentForm sameMethod = new OrderPaymentForm("o-1", 0, "v", false, false, PaymentSource.BankTransfer, "Jan",
-                "120", null, null, null, null, null, null, locked, null);
+                "120", null, null, null, null, null, null, locked, null, null, null);
 
         // when
         Map<String, String> refused = card.validate(saved);
@@ -267,7 +304,7 @@ class OrderPaymentFormTest {
         // given: an old payment without a method on an order that has its receipt
         Payment saved = new Payment("REF-1", "Jan", null, 100, 0);
         OrderPaymentForm posted = new OrderPaymentForm("o-1", 0, "v", false, false, null, "Jan", "120", null, null,
-                null, null, null, null, "order.payments.method.locked", null);
+                null, null, null, null, "order.payments.method.locked", null, null, null);
 
         // when
         Map<String, String> found = posted.validate(saved);

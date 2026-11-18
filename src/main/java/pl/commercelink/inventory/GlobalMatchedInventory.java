@@ -19,6 +19,7 @@ public class GlobalMatchedInventory {
     private volatile LazyIndex index = LazyIndex.of(matched);
     private volatile long version;
     private volatile VariantCodes variantCodes = VariantCodes.none();
+    private volatile VariantCodes eanOnlyCodes = VariantCodes.none();
 
     public synchronized void replace(Collection<MatchedInventory> matched) {
         replace(matched, VariantCodes.none());
@@ -26,8 +27,17 @@ public class GlobalMatchedInventory {
 
     /** @param variantCodes the variant codes of the global pool; a store inherits them to link its own groups */
     public synchronized void replace(Collection<MatchedInventory> matched, VariantCodes variantCodes) {
+        replace(matched, variantCodes, VariantCodes.none());
+    }
+
+    /**
+     * @param eanOnlyCodes the pairs of the PIM entries flagged to join by EAN only that this reload was grouped with;
+     *                     a store groups its own offers with the same ones
+     */
+    public synchronized void replace(Collection<MatchedInventory> matched, VariantCodes variantCodes, VariantCodes eanOnlyCodes) {
         this.matched = matched;
         this.variantCodes = variantCodes;
+        this.eanOnlyCodes = eanOnlyCodes;
         this.index = LazyIndex.of(matched);
         this.version++;
     }
@@ -37,13 +47,13 @@ public class GlobalMatchedInventory {
     }
 
     /**
-     * The groups, variant codes and version of one reload, read together so they always belong to each other. Taking a
+     * The groups, variant codes, EAN-only pairs and version of one reload, read together so they always belong to each other. Taking a
      * generation does not build the index: the store build takes one before grouping its own offers and must not hold
      * the global index through that peak. The generation's index is the one of its reload, shared with every other
      * user of that reload and built outside this object's lock.
      */
     synchronized Generation generation() {
-        return new Generation(version, matched, index, variantCodes);
+        return new Generation(version, matched, index, variantCodes, eanOnlyCodes);
     }
 
     static final class Generation {
@@ -51,22 +61,30 @@ public class GlobalMatchedInventory {
         private final long version;
         private final Collection<MatchedInventory> all;
         private final VariantCodes variantCodes;
+        private final VariantCodes eanOnlyCodes;
         private final LazyIndex index;
 
         Generation(long version, Collection<MatchedInventory> all, InventoryIndex index, VariantCodes variantCodes) {
-            this(version, all, LazyIndex.built(index), variantCodes);
+            this(version, all, index, variantCodes, VariantCodes.none());
+        }
+
+        Generation(long version, Collection<MatchedInventory> all, InventoryIndex index, VariantCodes variantCodes,
+                   VariantCodes eanOnlyCodes) {
+            this(version, all, LazyIndex.built(index), variantCodes, eanOnlyCodes);
         }
 
         /** @param indexSource called on {@link #index()} until it first returns an index, never after */
         Generation(long version, Collection<MatchedInventory> all, Supplier<InventoryIndex> indexSource, VariantCodes variantCodes) {
-            this(version, all, new LazyIndex(indexSource), variantCodes);
+            this(version, all, new LazyIndex(indexSource), variantCodes, VariantCodes.none());
         }
 
-        private Generation(long version, Collection<MatchedInventory> all, LazyIndex index, VariantCodes variantCodes) {
+        private Generation(long version, Collection<MatchedInventory> all, LazyIndex index, VariantCodes variantCodes,
+                           VariantCodes eanOnlyCodes) {
             this.version = version;
             this.all = all;
             this.index = index;
             this.variantCodes = variantCodes;
+            this.eanOnlyCodes = eanOnlyCodes;
         }
 
         long version() {
@@ -79,6 +97,11 @@ public class GlobalMatchedInventory {
 
         VariantCodes variantCodes() {
             return variantCodes;
+        }
+
+        /** The pairs flagged in PIM to join by EAN only that this reload was grouped with. */
+        VariantCodes eanOnlyCodes() {
+            return eanOnlyCodes;
         }
 
         /** The index of this generation's groups, built on first use and shared with the other users of its reload. */

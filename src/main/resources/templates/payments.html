@@ -250,6 +250,7 @@
                         <td class="cl-table-actions" th:attr="data-label=#{payments.column.actions}">
                             <a class="cl-link-button" th:href="@{${row.href()}}" data-cl-payment-open
                                th:attr="data-order-id=${row.orderId()}, data-unpaid=${row.expected()}, data-return-to=${page.returnTo()},
+                                        data-pendings=${row.pendings()},
                                         data-direction=${row.refund()} ? 'Outgoing' : null,
                                         data-pending-source=${row.pending().source()}, data-pending-name=${row.pending().name()},
                                         data-pending-ref=${row.pending().referenceNo()}, data-pending-fee=${row.pending().fee()},

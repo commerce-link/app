@@ -152,8 +152,9 @@ class StoreDiscountCodeTemplateTest {
         assertThat(html).contains(">Zamówienia z tym kodem<")
                 .contains(">Zamówienia<").contains(">2<")
                 .contains(">Udzielony rabat<").contains(">100,00 zł<")
-                .contains(">Wartość zamówień<").contains(">" + FormNumbers.format(6938) + " zł<")
-                .contains(">Średnia wartość zamówienia<").contains(">" + FormNumbers.format(3469) + " zł<");
+                // the cancelled order keeps its value in its row but adds nothing to the sums
+                .contains(">Wartość zamówień<").contains(">" + FormNumbers.format(4289) + " zł<")
+                .contains(">Średnia wartość zamówienia<").contains(">" + FormNumbers.format(2649) + " zł<");
         assertThat(html).contains("href=\"/dashboard/orders/" + FIRST_ORDER + "\"").contains(">c381d457<")
                 .contains(">22.10.2026, 14:32<").contains(">anna.nowak@example.com<")
                 .contains(">" + FormNumbers.format(4289) + " zł<").contains(">50,00 zł<")

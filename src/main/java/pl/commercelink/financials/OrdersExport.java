@@ -28,7 +28,7 @@ public class OrdersExport {
     public String run(String storeId, LocalDate dateFrom, LocalDate dateTo) {
         List<Order> orders = ordersRepository.findAllOrders(storeId, dateFrom, dateTo)
                 .stream()
-                .filter(o -> o.getTotalPrice() > 0) // filter out RMAs
+                .filter(o -> o.getAmountDue() > 0) // filter out RMAs and cancelled orders, which keep their value
                 .sorted(Comparator.comparing(Order::getOrderedAt))
                 .collect(Collectors.toList());
 

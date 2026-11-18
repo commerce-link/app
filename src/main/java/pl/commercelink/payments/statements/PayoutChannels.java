@@ -41,11 +41,10 @@ public final class PayoutChannels {
     }
 
     /**
-     * Whether the row describes the order: its source (the shop or a marketplace) and the method its payment waits
-     * for. A criterion left empty takes any order.
+     * Whether the row describes the order: its source (the shop or a marketplace) and a method one of its pending
+     * payments waits for, or without any the method of its latest payment. A criterion left empty takes any order.
      */
     public static boolean pays(PayoutChannel row, Order order) {
-        Payment payment = paymentOf(order);
         boolean marketplace = order.getSource() != null && order.getSource().getType() == OrderSourceType.Marketplace;
         String source = StringUtils.trimToNull(row.getOrderSource());
         if (source != null) {
@@ -55,7 +54,15 @@ public final class PayoutChannels {
                 return false;
             }
         }
-        return row.getMethod() == null || (payment != null && payment.getSource() == row.getMethod());
+        if (row.getMethod() == null) {
+            return true;
+        }
+        List<Payment> pending = order.getPendingPayments();
+        if (!pending.isEmpty()) {
+            return pending.stream().anyMatch(payment -> payment.getSource() == row.getMethod());
+        }
+        Payment latest = order.getLatestPayment();
+        return latest != null && latest.getSource() == row.getMethod();
     }
 
     /**
@@ -88,10 +95,9 @@ public final class PayoutChannels {
         return row != null && row.getMethod() != null ? row.getMethod() : PaymentSource.OnlinePayment;
     }
 
-    /** The payment the order waits for, else its latest one: what the customer chose to pay with. */
-    static Payment paymentOf(Order order) {
-        Payment pending = order.getPendingPayment();
-        return pending != null ? pending : order.getLatestPayment();
+    /** The method of the row the order is paid by among the payer's rows, null when no row has one or none describes it. */
+    public static PaymentSource methodOf(List<PayoutChannel> payer, Order order) {
+        return rowOf(payer, order).map(PayoutChannel::getMethod).orElse(null);
     }
 
     /** Upper case Latin letters and digits only: "PayPro S.A." and "PAYPRO SA" are the same payer. */

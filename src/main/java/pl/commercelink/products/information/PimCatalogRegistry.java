@@ -5,6 +5,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
@@ -17,7 +18,6 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.provider.EventBindingRegistrar;
 import pl.commercelink.starter.secrets.SecretsManager;
-import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
@@ -52,6 +52,7 @@ public class PimCatalogRegistry {
     private final AtomicBoolean refreshPending = new AtomicBoolean(false);
     private final Supplier<List<String>> storeIds;
     private final StoreEntryCodeHistory codeHistory;
+    private final ApplicationEventPublisher events;
 
     /** Test seam: wires the entry handlers onto an already built catalog, with no stores and no code history. */
     PimCatalogRegistry(PimCatalog catalog, ProductRepository productRepository,
@@ -63,9 +64,17 @@ public class PimCatalogRegistry {
     PimCatalogRegistry(PimCatalog catalog, ProductRepository productRepository,
                        ProductCatalogRepository productCatalogRepository, Supplier<List<String>> storeIds,
                        StoreEntryCodeHistory codeHistory) {
+        this(catalog, productRepository, productCatalogRepository, storeIds, codeHistory, event -> { });
+    }
+
+    /** Test seam: as above, publishing {@link PimIndexRefreshed} to the given publisher. */
+    PimCatalogRegistry(PimCatalog catalog, ProductRepository productRepository,
+                       ProductCatalogRepository productCatalogRepository, Supplier<List<String>> storeIds,
+                       StoreEntryCodeHistory codeHistory, ApplicationEventPublisher events) {
         this.catalog = catalog;
         this.storeIds = storeIds;
         this.codeHistory = codeHistory;
+        this.events = events;
         registerEntryHandlers(productRepository, productCatalogRepository);
     }
 
@@ -74,7 +83,7 @@ public class PimCatalogRegistry {
     PimCatalogRegistry(SqsAsyncClient sqsAsyncClient, ProductRepository productRepository,
                        ProductCatalogRepository productCatalogRepository,
                        SecretsManager secretsManager, @Lazy TaxonomyCategoryEnrichment taxonomyCategoryEnrichment,
-                       StoresRepository storesRepository) {
+                       StoresRepository storesRepository, ApplicationEventPublisher events) {
 
         PimCatalogDescriptor descriptor = resolveDescriptor(
                 ServiceLoader.load(PimCatalogDescriptor.class).stream().map(ServiceLoader.Provider::get).toList());
@@ -85,8 +94,9 @@ public class PimCatalogRegistry {
         }
 
         this.catalog = descriptor.create(configuration, Map.of("sqsAsyncClient", sqsAsyncClient));
-        this.storeIds = () -> storesRepository.findAll().stream().map(Store::getStoreId).toList();
+        this.storeIds = storesRepository::findAllStoreIds;
         this.codeHistory = new StoreEntryCodeHistory(Clock.systemUTC());
+        this.events = events;
 
         registerEntryHandlers(productRepository, productCatalogRepository);
 
@@ -144,19 +154,41 @@ public class PimCatalogRegistry {
                 try {
                     catalog.refresh();
                 } catch (Exception e) {
-                    if (Thread.currentThread().isInterrupted() || refreshExecutor.isShutdown()) {
+                    if (shuttingDown()) {
                         // shutdownNow() on deploy interrupts a running refresh; that is not a failure
                         log.info("PIM index refresh interrupted by shutdown: {}", e.toString());
                     } else {
                         log.error("PIM index refresh failed", e);
                     }
+                    return;
                 }
+                publishRefreshed();
             });
         } catch (RuntimeException e) {
             // executor already shut down
             refreshPending.set(false);
             log.warn("PIM index refresh not scheduled: {}", e.getMessage());
         }
+    }
+
+    // the listeners run on this refresh thread; one that fails must not stop the later refreshes
+    private void publishRefreshed() {
+        if (shuttingDown()) {
+            return;
+        }
+        try {
+            events.publishEvent(new PimIndexRefreshed());
+        } catch (RuntimeException e) {
+            if (shuttingDown()) {
+                log.info("Handling of the PIM index refresh interrupted by shutdown: {}", e.toString());
+            } else {
+                log.error("Handling of the PIM index refresh failed", e);
+            }
+        }
+    }
+
+    private boolean shuttingDown() {
+        return Thread.currentThread().isInterrupted() || refreshExecutor.isShutdown();
     }
 
     // before the copy is replaced: an event handled after this refresh still finds the codes its edit removed

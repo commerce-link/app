@@ -27,12 +27,15 @@ public class Payment {
     private double amount;
     @DynamoDBAttribute(attributeName = "fee")
     private double fee;
+    @DynamoDBAttribute(attributeName = "expectedAmount")
+    private Double expectedAmount;
     @DynamoDBAttribute(attributeName = "bankTransactionNo")
     private String bankTransactionNo;
     @DynamoDBAttribute(attributeName = "bankTransactionDate")
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateConverter.class)
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate bankTransactionDate;
+
 
     public Payment() {
     }
@@ -134,9 +137,23 @@ public class Payment {
         this.bankTransactionDate = bankTransactionDate;
     }
 
+    /** What a pending payment waits for; null for the one waiting for the rest of the order. */
+    public Double getExpectedAmount() {
+        return expectedAmount;
+    }
+
+    public void setExpectedAmount(Double expectedAmount) {
+        this.expectedAmount = expectedAmount;
+    }
+
     @DynamoDBIgnore
     public boolean isUnsettled() {
         return amount == 0;
+    }
+
+    @DynamoDBIgnore
+    public boolean waitsForRest() {
+        return isUnsettled() && expectedAmount == null;
     }
 
     @DynamoDBIgnore

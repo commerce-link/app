@@ -21,6 +21,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.config.BeanExpressionContext;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.expression.StandardBeanExpressionResolver;
 import org.springframework.scheduling.annotation.Scheduled;
 
@@ -36,6 +37,7 @@ import java.util.function.Consumer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -438,6 +440,75 @@ class PimCatalogRegistryTest {
 
         // then
         verify(catalogMock, timeout(2000)).refresh();
+    }
+
+    private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+
+    private PimCatalogRegistry registryPublishingTo(ApplicationEventPublisher publisher) {
+        return new PimCatalogRegistry(catalogMock, productRepository, productCatalogRepository, List::of,
+                new StoreEntryCodeHistory(Clock.systemUTC()), publisher);
+    }
+
+    @Test
+    void successfulRefreshPublishesPimIndexRefreshed() {
+        // given
+        registry = registryPublishingTo(events);
+
+        // when
+        registry.requestRefresh();
+
+        // then
+        var order = inOrder(catalogMock, events);
+        order.verify(catalogMock, timeout(2000)).refresh();
+        order.verify(events, timeout(2000)).publishEvent(isA(PimIndexRefreshed.class));
+    }
+
+    @Test
+    void failedRefreshPublishesNothing() {
+        // given
+        doThrow(new IllegalStateException("index unreachable")).when(catalogMock).refresh();
+        registry = registryPublishingTo(events);
+
+        // when -- the second refresh starts only after the first one finished, on the single refresh thread
+        registry.requestRefresh();
+        verify(catalogMock, timeout(2000)).refresh();
+        registry.requestRefresh();
+
+        // then
+        verify(catalogMock, timeout(2000).times(2)).refresh();
+        verify(events, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void failingListenerIsLoggedAndLaterRefreshesStillRun() {
+        // given
+        doThrow(new IllegalStateException("regroup failed")).doNothing().when(events).publishEvent(any(Object.class));
+        registry = registryPublishingTo(events);
+
+        try (CapturedLogs logs = CapturedLogs.of(PimCatalogRegistry.class)) {
+            // when
+            registry.requestRefresh();
+            verify(events, timeout(2000)).publishEvent(isA(PimIndexRefreshed.class));
+            registry.requestRefresh();
+
+            // then -- the second publication follows the first one's logging, and logs nothing itself
+            verify(catalogMock, timeout(2000).times(2)).refresh();
+            verify(events, timeout(2000).times(2)).publishEvent(isA(PimIndexRefreshed.class));
+            assertThat(logs.errors()).containsExactly("Handling of the PIM index refresh failed");
+        }
+    }
+
+    @Test
+    void startupRefreshPublishesNothing() {
+        // given
+        registry = registryPublishingTo(events);
+
+        // when
+        registry.start();
+
+        // then
+        verify(catalogMock).refresh();
+        verify(events, never()).publishEvent(any(Object.class));
     }
 
     private static PimEntry pimEntry(String pimId, String gtin, String ownerStoreId) {

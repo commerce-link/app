@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.IntStream;
 
 /**
  * One payment of an order as its edit form shows it: in the payment's own dialog of the payments card and on the
@@ -41,11 +42,16 @@ import java.util.Objects;
  * positiveRefundShift is set for a refund stored with a positive amount by older code, which the order counted as a
  * payment: saving the dialog stores it negative, so "Wpłacono" goes down by twice its amount. The dialog says so, with
  * that amount formatted; the stored data is not corrected any other way (review 2, controller ruling).
+ * <p>
+ * expectedAmount is what a pending payment waits for (Payment.expectedAmount); blank for the one waiting for the rest
+ * of the order, which one pending payment at most does. It is kept only while the amount stays 0. restAvailable is
+ * what a pending payment can wait for at most, formatted (the field's hint for the rest); null for money recorded.
  */
 public record OrderPaymentForm(String orderId, int index, String version, boolean pending, boolean refund,
                                PaymentSource source, String name, String amount, String fee, String referenceNo,
                                String bankTransactionNo, String bankTransactionDate, Map<String, String> errors,
-                               String refusal, String methodLockedKey, String positiveRefundShift) {
+                               String refusal, String methodLockedKey, String positiveRefundShift,
+                               String expectedAmount, String restAvailable) {
 
     private static final String METHOD_LOCKED = "order.payments.method.locked";
 
@@ -65,7 +71,34 @@ public record OrderPaymentForm(String orderId, int index, String version, boolea
                 payment.getFee() == 0 ? null : plain(payment.getFee()),
                 payment.getReferenceNo(), payment.getBankTransactionNo(),
                 payment.getBankTransactionDate() == null ? null : payment.getBankTransactionDate().toString(),
-                Map.of(), null, methodLockedKey, positiveRefundShift(payment));
+                Map.of(), null, methodLockedKey, positiveRefundShift(payment),
+                payment.getExpectedAmount() == null ? null : plain(payment.getExpectedAmount()), null);
+    }
+
+    /** The form with restAvailable of the order's payment at index, when that one is pending. */
+    public OrderPaymentForm withRestAvailable(Order order) {
+        Payment payment = order.getPayments().get(index);
+        String available = payment.isUnsettled() ? Money.format(order.amountAvailableTo(payment)) : null;
+        return new OrderPaymentForm(orderId, index, version, pending, refund, source, name, amount, fee, referenceNo,
+                bankTransactionNo, bankTransactionDate, errors, refusal, methodLockedKey, positiveRefundShift,
+                expectedAmount, available);
+    }
+
+    /** Why a typed expected amount cannot be saved, as a message key, or null: blank, or above 0 within the limit. */
+    public static String expectedAmountError(String expectedAmount) {
+        if (StringUtils.isBlank(expectedAmount)) {
+            return null;
+        }
+        BigDecimal typed = AmountParser.parse(expectedAmount);
+        if (typed == null || typed.signum() <= 0) {
+            return "order.payments.error.expected";
+        }
+        return AmountParser.inRange(typed) ? null : "order.payments.error.range";
+    }
+
+    /** The typed expected amount, or null for the rest; call only after {@link #expectedAmountError} found nothing. */
+    public static Double expectedAmountOf(String expectedAmount) {
+        return StringUtils.isBlank(expectedAmount) ? null : AmountParser.parse(expectedAmount).doubleValue();
     }
 
     /** Twice the amount of a refund stored positive (see positiveRefundShift), formatted; null for any other payment. */
@@ -105,7 +138,8 @@ public record OrderPaymentForm(String orderId, int index, String version, boolea
                 Objects.toString(StringUtils.trimToNull(payment.getName()), ""), Double.toString(payment.getAmount()),
                 Double.toString(payment.getFee()), Objects.toString(StringUtils.trimToNull(payment.getReferenceNo()), ""),
                 Objects.toString(StringUtils.trimToNull(payment.getBankTransactionNo()), ""),
-                Objects.toString(payment.getBankTransactionDate(), ""));
+                Objects.toString(payment.getBankTransactionDate(), ""),
+                Objects.toString(payment.getExpectedAmount(), ""));
         return Integer.toHexString(fields.hashCode());
     }
 
@@ -166,7 +200,39 @@ public record OrderPaymentForm(String orderId, int index, String version, boolea
         if (StringUtils.isNotBlank(bankTransactionDate) && parseDate(bankTransactionDate) == null) {
             found.put(field("bankTransactionDate"), "order.payments.error.date");
         }
+        if (staysPending()) {
+            String expectedError = expectedAmountError(expectedAmount);
+            if (expectedError != null) {
+                found.put(field("expectedAmount"), expectedError);
+            }
+        }
         return found;
+    }
+
+    /**
+     * {@link #validate(Payment)} of the order's payment at index, plus the rest: a pending payment left without an
+     * amount waits for the rest of the order, which another pending payment may do already, and one with an amount waits
+     * for no more than the other pending payments leave of what is unpaid.
+     */
+    public Map<String, String> validate(Order order, int index) {
+        Map<String, String> found = validate(order.getPayments().get(index));
+        List<Payment> payments = order.getPayments();
+        boolean restTaken = IntStream.range(0, payments.size())
+                .anyMatch(other -> other != index && payments.get(other).waitsForRest());
+        if (staysPending() && StringUtils.isBlank(expectedAmount) && restTaken) {
+            found.putIfAbsent(field("expectedAmount"), "order.payments.error.rest");
+        }
+        if (staysPending() && expectedAmountError(expectedAmount) == null && StringUtils.isNotBlank(expectedAmount)
+                && expectedAmountOf(expectedAmount) - order.amountAvailableTo(payments.get(index)) >= 0.005) {
+            found.putIfAbsent(field("expectedAmount"), "order.payments.error.expected.over");
+        }
+        return found;
+    }
+
+    /** The stored payment is pending and its amount is left at 0. */
+    private boolean staysPending() {
+        BigDecimal typedAmount = AmountParser.parse(amount);
+        return pending && typedAmount != null && typedAmount.signum() == 0;
     }
 
     /**
@@ -196,20 +262,26 @@ public record OrderPaymentForm(String orderId, int index, String version, boolea
         double stored = direction == PaymentDirection.Outgoing ? typedAmount.abs().negate().doubleValue()
                 : typedAmount.doubleValue();
         PaymentSource method = methodLockedKey != null ? saved.getSource() : source;
-        return new Payment(StringUtils.trimToNull(referenceNo), StringUtils.trimToNull(name), method, direction,
+        Payment payment = new Payment(StringUtils.trimToNull(referenceNo), StringUtils.trimToNull(name), method, direction,
                 stored, AmountParser.parse(fee).doubleValue(),
                 StringUtils.trimToNull(bankTransactionNo), parseDate(bankTransactionDate));
+        if (payment.isUnsettled()) {
+            payment.setExpectedAmount(expectedAmountOf(expectedAmount));
+        }
+        return payment;
     }
 
     public OrderPaymentForm withErrors(Map<String, String> found) {
         return new OrderPaymentForm(orderId, index, version, pending, refund, source, name, amount, fee, referenceNo,
-                bankTransactionNo, bankTransactionDate, found, refusal, methodLockedKey, positiveRefundShift);
+                bankTransactionNo, bankTransactionDate, found, refusal, methodLockedKey, positiveRefundShift,
+                expectedAmount, restAvailable);
     }
 
     /** A reason the whole form was refused (a cancelled order, a payment changed meanwhile), already translated. */
     public OrderPaymentForm withRefusal(String text) {
         return new OrderPaymentForm(orderId, index, version, pending, refund, source, name, amount, fee, referenceNo,
-                bankTransactionNo, bankTransactionDate, errors, text, methodLockedKey, positiveRefundShift);
+                bankTransactionNo, bankTransactionDate, errors, text, methodLockedKey, positiveRefundShift,
+                expectedAmount, restAvailable);
     }
 
     private static LocalDate parseDate(String value) {

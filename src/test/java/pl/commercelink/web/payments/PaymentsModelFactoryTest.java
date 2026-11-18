@@ -93,6 +93,22 @@ class PaymentsModelFactoryTest {
     }
 
     @Test
+    void anOrderWaitingForATransferAndInstallmentsIsFoundByEitherMethod() {
+        // given
+        open.add(PaymentEntriesTest.transferAndInstallments());
+
+        // when
+        PaymentsPageModel installments = page("side", "receivables", "method", "Installments");
+        PaymentsPageModel transfer = page("side", "receivables", "method", "BankTransfer");
+        PaymentsPageModel card = page("side", "receivables", "method", "Card");
+
+        // then
+        assertThat(installments.receivables()).extracting(ReceivableRow::number).containsExactly("b71e0a93");
+        assertThat(transfer.receivables()).extracting(ReceivableRow::number).containsExactly("b71e0a93");
+        assertThat(card.receivables()).isEmpty();
+    }
+
+    @Test
     void defaultSideIsPayablesUnlessOnlyReceivablesHaveResults() {
         // given
         open.add(order(3499, OrderStatus.Shipping, PaymentSource.BankTransfer, 0));
@@ -162,6 +178,24 @@ class PaymentsModelFactoryTest {
         o.setOrderId(id + "-0000-0000-0000-000000000000");
         o.setEstimatedShippingAt(ship);
         return o;
+    }
+
+    @Test
+    void anOrderCancelledWithTheCustomersMoneyOnItWaitsForItsRefund() {
+        // given: both cancelled with nothing left to pay for; only one still holds a payment
+        Order owedBack = receivable("e0000001", 0, OrderStatus.Cancelled, PaymentSource.BankTransfer, 250, null);
+        Order settled = receivable("e0000002", 0, OrderStatus.Cancelled, PaymentSource.BankTransfer, 0, null);
+        when(orders.findByStatusOrderedBetween("store-1", OrderStatus.Cancelled,
+                TODAY.minusDays(PaymentsModelFactory.CANCELLED_ORDERS_WINDOW_DAYS), TODAY))
+                .thenReturn(List.of(owedBack, settled));
+
+        // when
+        PaymentsPageModel page = page("side", "receivables");
+
+        // then
+        assertThat(page.receivables()).extracting(ReceivableRow::number).containsExactly("e0000001");
+        assertThat(page.receivables().get(0).refund()).isTrue();
+        assertThat(page.receivables().get(0).shipText()).isEqualTo("anulowane");
     }
 
     @Test

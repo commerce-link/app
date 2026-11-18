@@ -177,6 +177,21 @@ public class OrderItem extends Item {
         this.setCost(0);
     }
 
+    /**
+     * The goods never left: the order was cancelled before shipping. Returned is for goods that came back (RMA) and
+     * zeroes the price; a cancelled item keeps it, so the value of what was cancelled can still be added up, and
+     * everything that counts sales leaves the status out instead (OrderFinancials, Order#getAmountDue).
+     */
+    @DynamoDBIgnore
+    public void markAsCancelled() {
+        this.setStatus(FulfilmentStatus.Cancelled);
+    }
+
+    @DynamoDBIgnore
+    public boolean isCancelled() {
+        return this.getStatus() == FulfilmentStatus.Cancelled;
+    }
+
     @DynamoDBIgnore
     public boolean isReturned() {
         return this.getStatus() == FulfilmentStatus.Returned;

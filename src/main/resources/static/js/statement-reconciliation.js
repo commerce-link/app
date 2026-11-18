@@ -530,10 +530,21 @@
         return payout.querySelector('[data-cl-payout-auto-fee]');
     }
 
-    // what a payer that deducts its fee keeps from the order, as recorded on the order's pending payment
+    // what the order owes the payout and how its payment reads: the pending payment of the method of its first row of
+    // the payer, else the one any payer pays (#statement-receivables "payouts"), as on the server
+    function owedTo(order) {
+        var payouts = order.payouts || {};
+        return payouts[payerRow(order)] || payouts.any || order;
+    }
+
+    function owed(id) {
+        return owedTo(byId[id]).unpaid;
+    }
+
+    // what a payer that deducts its fee keeps from the order, as recorded on the payment the payout goes to
     function recordedFee(order) {
         var index = payerRow(order);
-        return index >= 0 && channels[index] && channels[index].net ? (order.fee || 0) : 0;
+        return index >= 0 && channels[index] && channels[index].net ? (owedTo(order).fee || 0) : 0;
     }
 
     function feeOf(id) {
@@ -554,18 +565,18 @@
     // largest order, so the fees add up to the difference exactly.
     function spreadFee() {
         var picked = pickedIds();
-        var owed = picked.reduce(function (sum, id) { return sum + byId[id].unpaid; }, 0);
-        var kept = owed - payoutState.amount;
-        if (!picked.length || kept < 0 || owed === 0) {
+        var total = picked.reduce(function (sum, id) { return sum + owed(id); }, 0);
+        var kept = total - payoutState.amount;
+        if (!picked.length || kept < 0 || total === 0) {
             return;
         }
         var given = 0;
         var largest = picked[0];
         picked.forEach(function (id) {
-            var share = Math.floor(kept * byId[id].unpaid / owed);
+            var share = Math.floor(kept * owed(id) / total);
             payoutState.fees[id] = share;
             given += share;
-            if (byId[id].unpaid > byId[largest].unpaid) {
+            if (owed(id) > owed(largest)) {
                 largest = id;
             }
         });
@@ -581,7 +592,7 @@
                 input.value = fieldValue(ticked ? feeOf(id) : recordedFee(byId[id]));
                 input.classList.remove('is-invalid');
             }
-            payoutState.netCells[id].textContent = money(byId[id].unpaid - (ticked ? feeOf(id) : recordedFee(byId[id])));
+            payoutState.netCells[id].textContent = money(owed(id) - (ticked ? feeOf(id) : recordedFee(byId[id])));
         });
     }
 
@@ -628,10 +639,10 @@
             line.appendChild(who);
             line.appendChild(element('td', 'cl-nowrap', order.ordered));
             var payment = element('td');
-            payment.appendChild(element('span', null, order.type));
-            payment.appendChild(element('span', 'cl-table-sub', order.reference));
+            payment.appendChild(element('span', null, owedTo(order).type));
+            payment.appendChild(element('span', 'cl-table-sub', owedTo(order).reference));
             line.appendChild(payment);
-            line.appendChild(element('td', 'is-numeric cl-nowrap', money(order.unpaid)));
+            line.appendChild(element('td', 'is-numeric cl-nowrap', money(owed(id))));
             var feeCell = element('td', 'is-numeric');
             var input = element('input', 'cl-input is-qty');
             input.type = 'text';
@@ -639,12 +650,12 @@
             input.setAttribute('aria-label', format(payout.getAttribute('data-text-fee'), [order.shortId]));
             input.addEventListener('input', function () {
                 var value = toCents(input.value);
-                var valid = value !== null && value <= order.unpaid;
+                var valid = value !== null && value <= owed(id);
                 input.classList.toggle('is-invalid', !valid);
                 payoutState.fees[id] = valid ? value : NaN;
                 // the operator took over: the difference is no longer shared out by itself
                 autoFee().checked = false;
-                payoutState.netCells[id].textContent = valid ? money(order.unpaid - value) : '';
+                payoutState.netCells[id].textContent = valid ? money(owed(id) - value) : '';
                 updatePayout();
             });
             feeCell.appendChild(input);
@@ -665,7 +676,7 @@
         var fee = 0;
         var valid = true;
         pickedIds().forEach(function (id) {
-            gross += byId[id].unpaid;
+            gross += owed(id);
             var kept = feeOf(id);
             if (isNaN(kept)) {
                 valid = false;
@@ -716,7 +727,7 @@
     payout.querySelector('[data-cl-payout-apply]').addEventListener('click', function () {
         var sums = payoutSums();
         var chosen = pickedIds().map(function (id) {
-            return {orderId: id, amount: byId[id].unpaid, fee: feeOf(id)};
+            return {orderId: id, amount: owed(id), fee: feeOf(id)};
         });
         var refs = chosen.map(function (allocation) {
             return {orderId: allocation.orderId, detail: allocation.fee > 0

@@ -3,6 +3,8 @@ package pl.commercelink.inventory.supplier;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
+import pl.commercelink.inventory.EanOnlyCodes;
+import pl.commercelink.inventory.VariantCodes;
 import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.products.brand.NoNameBrand;
 import pl.commercelink.pim.api.PimCatalog;
@@ -20,6 +22,7 @@ class DataCorrection {
 
     private final PimCatalog pimCatalog;
     private final BrandMapper brandMapper;
+    private final EanOnlyCodes eanOnlyCodes;
 
     InventoryItem run(InventoryItem item) {
         String brand = item.requiresBrandCorrection() ? correctBrand(item) : item.brand();
@@ -58,6 +61,12 @@ class DataCorrection {
     }
 
     private String correctEan(InventoryItem item, String brand) {
+        // the operator marked this code as shared by variants with different EANs, so it names no single EAN
+        // checked for emptiness first, so without flagged pairs no brand key is built per offer
+        VariantCodes eanOnly = eanOnlyCodes.current();
+        if (eanOnly.size() > 0 && eanOnly.contains(InventoryItem.brandKeyOf(brand), item.mfn())) {
+            return item.ean();
+        }
         return pimCatalog.withGlobalData().findByMpnAndBrand(item.mfn(), brand)
                 .flatMap(PimEntry::primaryGtin)
                 .map(UnifiedProductIdentifiers::unifyEan)
