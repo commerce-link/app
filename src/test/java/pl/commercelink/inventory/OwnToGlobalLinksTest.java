@@ -9,6 +9,9 @@ import pl.commercelink.inventory.OwnToGlobalLinks.Outcome;
 import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.pim.api.PimIdentifier;
+import pl.commercelink.pim.api.PimIdentifierType;
 import pl.commercelink.pim.api.PimView;
 import pl.commercelink.products.brand.NoNameBrand;
 import pl.commercelink.taxonomy.TaxonomyCache;
@@ -328,6 +331,34 @@ class OwnToGlobalLinksTest {
             assertThat(decision.global().getEans()).containsExactly(ean7600);
         });
         assertThat(own.getInventoryKey().getLinkedEans()).containsExactly(ean7600).doesNotContain(ean9060);
+    }
+
+    @Test
+    void eanOnlyPairBlocksTheLinkAsVariantCode() {
+        // given: Kosatec lists the Mova SHINE10 globally under one EAN, the store's Wave under another
+        when(pimView.findAll()).thenReturn(List.of());
+        VariantCodes eanOnly = PimEanOnlyCodes.of(List.of(new PimEntry("pim-mova", List.of(
+                new PimIdentifier("6977728943176", PimIdentifierType.GTIN), new PimIdentifier("SHINE10", PimIdentifierType.MPN)),
+                "Mova", "Name", null, null, true, null, null, null, null, null, true)));
+        InventoryAutoDiscovery autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
+                InventoryMatchingProperties.allEnabled());
+        InventoryAutoDiscovery.Grouping globalGrouping = autoDiscovery.group(
+                List.of(offer("6977728943176", "SHINE10", 1200, "Kosatec", "Mova")), pimView, List::of, VariantCodes.none(), eanOnly);
+        InventoryAutoDiscovery.Grouping ownGrouping = autoDiscovery.group(
+                List.of(offer("6977728943169", "SHINE10", 1210, "Wave", "Mova")), pimView, List::of,
+                globalGrouping.variantCodes(), eanOnly);
+        MatchedInventory own = ownGrouping.groups().iterator().next();
+
+        // when
+        List<Decision> decisions = OwnToGlobalLinks.apply(InventoryIndex.of(List.copyOf(ownGrouping.groups())),
+                generation(globalGrouping.groups()), ownGrouping.variantCodes());
+
+        // then
+        assertThat(decisions).singleElement().satisfies(decision -> {
+            assertThat(decision.outcome()).isEqualTo(Outcome.VARIANT_CODE);
+            assertThat(decision.global()).isNull();
+        });
+        assertThat(own.getInventoryKey().getLinkedEans()).isEmpty();
     }
 
     @Test

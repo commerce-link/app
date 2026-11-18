@@ -29,7 +29,12 @@ public record InventoryItem(
 
     public InventoryItem {
         ean = unifyEan(ean);
-        mfn = unifyMfn(mfn);
+        mfn = codeOf(mfn);
+    }
+
+    /** A manufacturer code as an offer holds it. */
+    public static String codeOf(String mfn) {
+        return unifyMfn(mfn);
     }
 
     public InventoryItem(String ean, String mfn, double netPrice, String currency, int qty, int leadTimeDays, String supplier) {
@@ -87,6 +92,10 @@ public record InventoryItem(
 
     /** A brand that can tell products apart: present and not the "no name" placeholder. */
     public boolean hasMatchableBrand() {
+        return isMatchableBrand(brand);
+    }
+
+    public static boolean isMatchableBrand(String brand) {
         return brand != null && !brand.isBlank() && !NoNameBrand.is(brand);
     }
 
@@ -96,6 +105,10 @@ public record InventoryItem(
 
     /** The brand as a comparison key, so spelling differences in case and surrounding spaces do not matter. */
     public String brandKey() {
+        return brandKeyOf(brand);
+    }
+
+    public static String brandKeyOf(String brand) {
         return brand == null ? null : brand.trim().toLowerCase(Locale.ROOT);
     }
 
