@@ -117,6 +117,7 @@ import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.payments.PaymentsReturn;
 import pl.commercelink.web.orders.OrderPaymentForm;
 import pl.commercelink.web.orders.OrderShipmentForm;
+import pl.commercelink.web.orders.PaymentSplitForm;
 import pl.commercelink.web.settings.ConfirmAction;
 
 import org.springframework.test.util.ReflectionTestUtils;
@@ -1375,7 +1376,7 @@ class OrdersControllerTest {
         private String save(int index, String version, PaymentSource source, String amount, String fee, String date,
                             String requestedWith, MockHttpServletResponse response, ExtendedModelMap model) {
             return ordersController.savePayment(ORDER_ID, index, version, source, "Jan Kowalski", amount, fee, "REF-9",
-                    "OP-9", date, requestedWith, new MockHttpServletRequest(), response, model, redirect, Locale.ENGLISH);
+                    "OP-9", date, null, requestedWith, new MockHttpServletRequest(), response, model, redirect, Locale.ENGLISH);
         }
 
         private String save(int index, String version, String amount) {
@@ -1423,10 +1424,11 @@ class OrdersControllerTest {
             save(0, OrderPaymentForm.version(typedNegative), "-120");
             save(1, OrderPaymentForm.version(storedPositive), "120");
 
-            // then
-            assertThat(order.getPayments()).extracting(Payment::getDirection)
+            // then: the 240 zł refunded beyond the order's 0 zł is what the order now waits for (Order.keepRest)
+            assertThat(order.getPayments().subList(0, 2)).extracting(Payment::getDirection)
                     .containsExactly(PaymentDirection.Outgoing, PaymentDirection.Outgoing);
-            assertThat(order.getPayments()).extracting(Payment::getAmount).containsExactly(-120.0, -120.0);
+            assertThat(order.getPayments().subList(0, 2)).extracting(Payment::getAmount).containsExactly(-120.0, -120.0);
+            assertThat(order.getRestAmount()).isEqualTo(240.0);
         }
 
         @Test
@@ -1587,7 +1589,7 @@ class OrdersControllerTest {
         }
 
         @Test
-        void addPaymentWithAmountZeroAddsAPendingPaymentNextToTheSettledOne() {
+        void addPaymentRefusesTheAmountZeroAsPendingPaymentsAreAddedBySplitting() {
             // given
             Order order = orderWith(Payment.bankTransfer("REF-1", "Jan", 2500));
             AddPaymentForm installments = addForm("0", "", PaymentDirection.Incoming);
@@ -1597,28 +1599,284 @@ class OrdersControllerTest {
             ordersController.addPayment(ORDER_ID, installments, redirect, Locale.ENGLISH);
 
             // then
+            assertThat(errorMessage()).isEqualTo("error.message.payment.amount.invalid");
+            assertThat(order.getPayments()).extracting(Payment::getAmount).containsExactly(2500.0);
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        private Payment waitingFor(PaymentSource source, Double expectedAmount) {
+            Payment payment = new Payment(source);
+            payment.setExpectedAmount(expectedAmount);
+            return payment;
+        }
+
+        /** 20 000 zł: 5 000 zł by transfer, the rest in instalments. */
+        private Order transferAndInstallments() {
+            Payment transfer = waitingFor(PaymentSource.BankTransfer, 5000.0);
+            transfer.setReferenceNo("PF/1/2026");
+            Payment installments = waitingFor(PaymentSource.Installments, null);
+            installments.setName("Santander");
+            Order order = orderWith(transfer, installments);
+            order.setTotalPrice(20000);
+            return order;
+        }
+
+        private AddPaymentForm paymentFor(String target, String amount, PaymentSource source) {
+            AddPaymentForm form = addForm(amount, "", PaymentDirection.Incoming);
+            form.setTarget(target);
+            form.setSource(source);
+            return form;
+        }
+
+        @Test
+        void addPaymentFillsTheChosenPendingPaymentAndTheDifferenceKeepsWaiting() {
+            // given
+            Order order = transferAndInstallments();
+            Payment installments = order.getPayments().get(1);
+
+            // when
+            ordersController.addPayment(ORDER_ID, paymentFor("0", "3000", PaymentSource.BankTransfer), redirect,
+                    Locale.ENGLISH);
+
+            // then
             assertThat(errorMessage()).isNull();
-            assertThat(order.getPayments()).extracting(Payment::getAmount).containsExactly(2500.0, 0.0);
-            assertThat(order.getPayments().get(1).getSource()).isEqualTo(PaymentSource.Installments);
-            assertThat(order.getPendingPayment()).isSameAs(order.getPayments().get(1));
+            assertThat(order.getPayments()).extracting(Payment::getAmount).containsExactly(3000.0, 0.0, 0.0);
+            assertThat(order.getPayments().get(1)).isSameAs(installments);
+            Payment difference = order.getPayments().get(2);
+            assertThat(difference.getSource()).isEqualTo(PaymentSource.BankTransfer);
+            assertThat(difference.getExpectedAmount()).isEqualTo(2000.0);
+            assertThat(difference.getReferenceNo()).isEqualTo("PF/1/2026");
+            assertThat(order.getRestAmount()).isEqualTo(15000.0);
             verify(orderLifecycle).update(order);
         }
 
         @Test
-        void addPaymentWithAmountZeroStaysPendingWhenTheFeeIsNotIncluded() {
+        void moneyOnTheRestLeavesWhatIsStillUnpaidWaitingWithItsMethod() {
             // given
-            Order order = orderWith(Payment.bankTransfer("REF-1", "Jan", 2500));
-            AddPaymentForm installments = addForm("0", "5", PaymentDirection.Incoming);
-            installments.setFeeIncluded(false);
-            installments.setReturnTo("/dashboard/payments?side=receivables");
+            Order order = transferAndInstallments();
 
             // when
-            ordersController.addPayment(ORDER_ID, installments, redirect, Locale.ENGLISH);
+            ordersController.addPayment(ORDER_ID, paymentFor("1", "10000", PaymentSource.Installments), redirect,
+                    Locale.ENGLISH);
 
             // then
-            assertThat(order.getPayments()).extracting(Payment::getAmount).containsExactly(2500.0, 0.0);
-            assertThat(order.getPayments().get(1).getFee()).isEqualTo(5.0);
-            assertThat(redirect.getFlashAttributes().get(PaymentsReturn.NOTICE)).isEqualTo("payments.notice.order.pending");
+            assertThat(order.getPayments().get(1).getAmount()).isEqualTo(10000.0);
+            Payment rest = order.getRestPayment();
+            assertThat(rest).isSameAs(order.getPayments().get(2));
+            assertThat(rest.getSource()).isEqualTo(PaymentSource.Installments);
+            assertThat(rest.getName()).isEqualTo("Santander");
+            assertThat(order.getRestAmount()).isEqualTo(5000.0);
+        }
+
+        @Test
+        void moneyTheOrderDoesNotWaitForIsAPaymentOfItsOwnAndTheRestGoesDown() {
+            // given
+            Order order = transferAndInstallments();
+            Payment installments = order.getPayments().get(1);
+
+            // when
+            ordersController.addPayment(ORDER_ID, paymentFor(AddPaymentForm.NEW_PAYMENT, "1000", PaymentSource.Card),
+                    redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(order.getPayments()).hasSize(3);
+            assertThat(order.getPayments().get(2).getSource()).isEqualTo(PaymentSource.Card);
+            assertThat(order.getRestPayment()).isSameAs(installments);
+            assertThat(order.getRestAmount()).isEqualTo(14000.0);
+        }
+
+        @Test
+        void aRefundIsAPaymentOfItsOwnEvenWithAPendingPaymentChosen() {
+            // given
+            Order order = transferAndInstallments();
+            order.getPayments().get(0).setAmount(6000);
+            AddPaymentForm refund = paymentFor("1", "1000", PaymentSource.BankTransfer);
+            refund.setDirection(PaymentDirection.Outgoing);
+
+            // when
+            ordersController.addPayment(ORDER_ID, refund, redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(order.getPayments()).extracting(Payment::getAmount).containsExactly(6000.0, 0.0, -1000.0);
+            assertThat(order.getRestAmount()).isEqualTo(15000.0);
+        }
+
+        @Test
+        void aChoiceOfAPaymentNoLongerWaitingIsRefused() {
+            // given
+            Order order = transferAndInstallments();
+            order.getPayments().get(0).setAmount(5000);
+
+            // when
+            ordersController.addPayment(ORDER_ID, paymentFor("0", "3000", PaymentSource.BankTransfer), redirect,
+                    Locale.ENGLISH);
+
+            // then
+            assertThat(errorMessage()).isEqualTo("order.payments.error.stale");
+            assertThat(order.getPayments()).hasSize(2);
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        private PaymentSplitForm split(Payment pending, String amount) {
+            PaymentSplitForm form = new PaymentSplitForm();
+            form.setVersion(OrderPaymentForm.version(pending));
+            form.setMethods(new ArrayList<>(List.of(PaymentSource.Installments)));
+            form.setAmounts(new ArrayList<>(List.of(amount)));
+            form.setRestMethod(PaymentSource.BankTransfer);
+            return form;
+        }
+
+        @Test
+        void splitPaymentPutsItsPartsAndTheRestInPlaceOfThePendingPayment() {
+            // given
+            Payment installments = waitingFor(PaymentSource.Installments, null);
+            installments.setReferenceNo("UM/7");
+            Order order = orderWith(installments);
+            order.setTotalPrice(20000);
+
+            // when
+            String view = ordersController.splitPayment(ORDER_ID, 0, split(installments, "15 000,00"), redirect,
+                    Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(errorMessage()).isNull();
+            assertThat(order.getPayments()).extracting(Payment::getSource)
+                    .containsExactly(PaymentSource.Installments, PaymentSource.BankTransfer);
+            assertThat(order.getPayments().get(0).getExpectedAmount()).isEqualTo(15000.0);
+            assertThat(order.getPayments().get(0).getReferenceNo()).isEqualTo("UM/7");
+            assertThat(order.getRestPayment()).isSameAs(order.getPayments().get(1));
+            assertThat(order.getRestAmount()).isEqualTo(5000.0);
+            verify(orderLifecycle).update(order);
+        }
+
+        @Test
+        void splitPaymentRefusesPartsLeavingNothingForTheRest() {
+            // given
+            Payment installments = waitingFor(PaymentSource.Installments, null);
+            Order order = orderWith(installments);
+            order.setTotalPrice(20000);
+
+            // when
+            ordersController.splitPayment(ORDER_ID, 0, split(installments, "20000"), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(errorMessage()).isEqualTo("order.payments.split.error.over");
+            assertThat(order.getPayments()).containsExactly(installments);
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void anAmountTypedOnAPendingPaymentIsMoneyAndTheDifferenceKeepsWaiting() {
+            // given
+            Order order = transferAndInstallments();
+            Payment transfer = order.getPayments().get(0);
+
+            // when
+            ordersController.savePayment(ORDER_ID, 0, OrderPaymentForm.version(transfer), PaymentSource.BankTransfer,
+                    null, "3000", "", "PF/1/2026", null, null, "5000", null, new MockHttpServletRequest(),
+                    new MockHttpServletResponse(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(order.getPayments()).extracting(Payment::getAmount).containsExactly(3000.0, 0.0, 0.0);
+            assertThat(order.getPayments().get(2).getExpectedAmount()).isEqualTo(2000.0);
+            assertThat(order.getRestAmount()).isEqualTo(15000.0);
+        }
+
+        @Test
+        void aSmallerAmountForTheRestLeavesARestByTransfer() {
+            // given
+            Payment installments = waitingFor(PaymentSource.Installments, null);
+            Order order = orderWith(installments);
+            order.setTotalPrice(20000);
+
+            // when
+            ordersController.savePayment(ORDER_ID, 0, OrderPaymentForm.version(installments), PaymentSource.Installments,
+                    null, "0", "", null, null, null, "15000", null, new MockHttpServletRequest(),
+                    new MockHttpServletResponse(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(order.getPayments()).extracting(Payment::getSource)
+                    .containsExactly(PaymentSource.Installments, PaymentSource.BankTransfer);
+            assertThat(order.getPayments().get(0).getExpectedAmount()).isEqualTo(15000.0);
+            assertThat(order.getRestAmount()).isEqualTo(5000.0);
+        }
+
+        @Test
+        void anExpectedAmountAboveWhatIsLeftToShareIsRefused() {
+            // given
+            Order order = transferAndInstallments();
+            Payment transfer = order.getPayments().get(0);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            ordersController.savePayment(ORDER_ID, 0, OrderPaymentForm.version(transfer), PaymentSource.BankTransfer,
+                    null, "0", "", null, null, null, "20000,01", "fetch", new MockHttpServletRequest(), response, model,
+                    redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(422);
+            assertThat(((OrderPaymentForm) model.getAttribute("payment")).errors())
+                    .containsEntry("payment-0-expectedAmount", "order.payments.error.expected.over");
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void aPendingPaymentLeftWithoutAnAmountIsRefusedWhileAnotherWaitsForTheRest() {
+            // given
+            Payment transfer = waitingFor(PaymentSource.BankTransfer, 5000.0);
+            orderWith(transfer, waitingFor(PaymentSource.Installments, null));
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            ordersController.savePayment(ORDER_ID, 0, OrderPaymentForm.version(transfer), PaymentSource.BankTransfer,
+                    null, "0", "", null, null, null, "", "fetch", new MockHttpServletRequest(), response, model,
+                    redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(422);
+            assertThat(((OrderPaymentForm) model.getAttribute("payment")).errors())
+                    .containsEntry("payment-0-expectedAmount", "order.payments.error.rest");
+            assertThat(transfer.getExpectedAmount()).isEqualTo(5000.0);
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void thePendingPaymentsDialogChangesTheAmountItWaitsFor() {
+            // given
+            Payment transfer = waitingFor(PaymentSource.BankTransfer, 5000.0);
+            Order order = orderWith(transfer, waitingFor(PaymentSource.Installments, null));
+            order.setTotalPrice(20000);
+
+            // when
+            ordersController.savePayment(ORDER_ID, 0, OrderPaymentForm.version(transfer), PaymentSource.BankTransfer,
+                    null, "0", "", null, null, null, "6000", null, new MockHttpServletRequest(),
+                    new MockHttpServletResponse(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(order.getPayments().get(0).isUnsettled()).isTrue();
+            assertThat(order.getPayments().get(0).getExpectedAmount()).isEqualTo(6000.0);
+            verify(orderLifecycle).update(order);
+        }
+
+        @Test
+        void oneOfSeveralPendingPaymentsIsRemovedButTheOnlyOneIsNot() {
+            // given
+            Payment transfer = waitingFor(PaymentSource.BankTransfer, 5000.0);
+            Payment installments = waitingFor(PaymentSource.Installments, null);
+            Order order = orderWith(transfer, installments);
+            RedirectAttributesModelMap last = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.removePayment(ORDER_ID, 0, OrderPaymentForm.version(transfer), redirect, Locale.ENGLISH);
+            ordersController.removePayment(ORDER_ID, 0, OrderPaymentForm.version(installments), last, Locale.ENGLISH);
+
+            // then
+            assertThat(errorMessage()).isNull();
+            assertThat(last.getFlashAttributes().get("errorMessage")).isEqualTo("order.payments.remove.error.pending");
+            assertThat(order.getPayments()).containsExactly(installments);
         }
 
         @Test
@@ -1672,7 +1930,7 @@ class OrdersControllerTest {
 
             // when
             String view = ordersController.savePayment(ORDER_ID, 0, OrderPaymentForm.version(paid), PaymentSource.BankTransfer,
-                    "Jan", "90", "", "REF-1", null, null, "fetch", request, response, new ExtendedModelMap(), redirect,
+                    "Jan", "90", "", "REF-1", null, null, null, "fetch", request, response, new ExtendedModelMap(), redirect,
                     Locale.ENGLISH);
 
             // then: 200 with the form lets the dialog close and reload; the notice waits for the order page

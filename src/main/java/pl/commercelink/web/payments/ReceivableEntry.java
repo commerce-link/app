@@ -7,10 +7,12 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * An open order whose customer still owes money or is owed a refund (spec §5.2), or an order cancelled with the
@@ -57,6 +59,15 @@ public record ReceivableEntry(Order order, double unpaid, PaymentsAmounts.Standi
 
     public boolean owes() {
         return unpaid > 0;
+    }
+
+    /** Every method the order waits for: those of its pending payments, else {@link #method}. */
+    public Set<PaymentSource> methods() {
+        Set<PaymentSource> waited = order.getPendingPayments().stream()
+                .map(Payment::getSource)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        return waited.isEmpty() && method != null ? Set.of(method) : waited;
     }
 
     public double amount() {

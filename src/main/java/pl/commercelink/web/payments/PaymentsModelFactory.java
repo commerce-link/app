@@ -20,6 +20,7 @@ import pl.commercelink.web.payments.PaymentsPageModel.*;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -59,7 +60,7 @@ public class PaymentsModelFactory {
                 .filter(e -> query.providers().isEmpty() || query.providers().contains(e.delivery().getProvider()))
                 .sorted(payableOrder(mapper)).toList();
         List<ReceivableEntry> shownReceivables = receivableBaseList.stream()
-                .filter(e -> query.methods().isEmpty() || query.methods().contains(e.method()))
+                .filter(e -> query.methods().isEmpty() || e.methods().stream().anyMatch(query.methods()::contains))
                 .sorted(receivableOrder()).toList();
 
         PaymentSide side = query.side() != null ? query.side()
@@ -178,8 +179,8 @@ public class PaymentsModelFactory {
     }
 
     private List<Option> methodOptions(List<ReceivableEntry> base, PaymentsQuery query, Locale locale) {
-        Map<PaymentSource, Long> counts = base.stream().filter(e -> e.method() != null)
-                .collect(Collectors.groupingBy(ReceivableEntry::method, Collectors.counting()));
+        Map<PaymentSource, Long> counts = base.stream().flatMap(e -> e.methods().stream())
+                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
         return Arrays.stream(PaymentSource.values())
                 .filter(m -> counts.containsKey(m) || query.methods().contains(m))
                 .map(m -> new Option(m.name(), text(locale, "PaymentSource." + m.name()), counts.getOrDefault(m, 0L), query.methods().contains(m)))

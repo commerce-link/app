@@ -58,6 +58,12 @@ final class StatementOrders {
         return payment;
     }
 
+    static Payment expected(PaymentSource source, double expectedAmount) {
+        Payment payment = new Payment(source);
+        payment.setExpectedAmount(expectedAmount);
+        return payment;
+    }
+
     static Payment booked(double amount, String bankTransactionNo) {
         Payment payment = Payment.bankTransfer("title", null, amount);
         payment.setBankTransactionNo(bankTransactionNo);
