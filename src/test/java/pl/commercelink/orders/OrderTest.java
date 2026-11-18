@@ -10,6 +10,8 @@ import pl.commercelink.documents.DocumentType;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -579,44 +581,154 @@ class OrderTest {
     }
 
     @Test
-    void cancelBlockersNameExactlyWhatCanBeCancelledMisses() {
+    void anOrderBeforeShippingIsCancelledWhateverItsItemsAndPayments() {
         // given
-        OrderItem delivered = new OrderItem("o1", "CPU", "Ryzen", 1, 100, "SKU", false, 0);
-        delivered.setStatus(FulfilmentStatus.Delivered);
-        OrderItem returned = new OrderItem("o1", "CPU", "Ryzen", 1, 100, "SKU", false, 0);
-        returned.setStatus(FulfilmentStatus.Returned);
-        Order open = new Order("store-1");
-        open.setStatus(OrderStatus.Assembly);
+        OrderItem fresh = product(FulfilmentStatus.New);
+        OrderItem reserved = reservedProduct();
         Order paid = new Order("store-1");
-        paid.setStatus(OrderStatus.Delivered);
+        paid.setStatus(OrderStatus.Assembled);
         paid.addPayment(new Payment("REF", "Jan", PaymentSource.BankTransfer, 100, 0));
-        Order settled = new Order("store-1");
-        settled.setStatus(OrderStatus.Delivered);
 
-        // when / then: the reason on the page is built from these, canBeCancelled is "none of them"
-        assertThat(open.cancelBlockers(List.of(returned))).containsExactly(Order.CancelBlocker.NOT_DELIVERED);
-        assertThat(paid.cancelBlockers(List.of(delivered))).containsExactlyInAnyOrder(
-                Order.CancelBlocker.PRODUCTS_NOT_RETURNED, Order.CancelBlocker.PAYMENTS_NOT_REFUNDED);
-        assertThat(paid.cancelBlockers(List.of(returned))).containsExactly(Order.CancelBlocker.PAYMENTS_NOT_REFUNDED);
-        assertThat(settled.cancelBlockers(List.of(returned))).isEmpty();
-        for (Order order : List.of(open, paid, settled)) {
-            for (List<OrderItem> items : List.of(List.of(delivered), List.of(returned), List.<OrderItem>of())) {
-                assertThat(order.canBeCancelled(items)).isEqualTo(order.cancelBlockers(items).isEmpty());
-            }
-        }
+        // when
+        Set<Order.CancelBlocker> blockers = paid.cancelBlockers(List.of(fresh, reserved), Set.of());
+
+        // then
+        assertThat(blockers).isEmpty();
+        assertThat(paid.canBeCancelled(List.of(fresh, reserved), Set.of())).isTrue();
     }
 
     @Test
-    void paymentsRefundedInFullDoNotBlockTheCancellationWhenTheirDoubleSumIsJustOffZero() {
+    void anOrderBeforeShippingNamesWhatHasToBeReleasedByHandFirst() {
         // given
-        OrderItem returned = new OrderItem("o1", "CPU", "Ryzen", 1, 4345.69, "SKU", false, 0);
-        returned.setStatus(FulfilmentStatus.Returned);
-        Order order = new Order("store-1");
-        order.setStatus(OrderStatus.Delivered);
-        paidAndRefundedInFull(order);
+        OrderItem dropshipped = reservedProduct();
+        dropshipped.setStatus(FulfilmentStatus.Ordered);
+        OrderItem claimed = product(FulfilmentStatus.Allocation);
+        claimed.setClaimedDeliveryId("delivery-being-created");
+        OrderItem inClaim = product(FulfilmentStatus.InRMA);
+        Order booked = new Order("store-1");
+        booked.setStatus(OrderStatus.Realization);
+        Shipment courier = new Shipment(ShipmentType.Courier);
+        courier.setExternalId("courier-order-1");
+        booked.setShipments(new ArrayList<>(List.of(courier)));
+        Order open = new Order("store-1");
+        open.setStatus(OrderStatus.Assembly);
 
         // when / then
-        assertThat(order.cancelBlockers(List.of(returned))).isEmpty();
+        assertThat(open.cancelBlockers(List.of(dropshipped), Set.of(dropshipped.getItemId())))
+                .containsExactly(Order.CancelBlocker.DROPSHIP_ITEMS);
+        assertThat(open.cancelBlockers(List.of(claimed), Set.of())).containsExactly(Order.CancelBlocker.ITEMS_NOT_RELEASABLE);
+        assertThat(open.cancelBlockers(List.of(inClaim), Set.of())).containsExactly(Order.CancelBlocker.ITEMS_NOT_RELEASABLE);
+        assertThat(booked.cancelBlockers(List.of(), Set.of())).containsExactly(Order.CancelBlocker.COURIER_ORDERED);
+    }
+
+    @Test
+    void onceTheGoodsWentOutCancellingWaitsForEveryProductToComeBack() {
+        // given
+        OrderItem delivered = product(FulfilmentStatus.Delivered);
+        OrderItem returned = product(FulfilmentStatus.Returned);
+        Order paid = new Order("store-1");
+        paid.setStatus(OrderStatus.Delivered);
+        paid.addPayment(new Payment("REF", "Jan", PaymentSource.BankTransfer, 100, 0));
+        Order shippedParcel = new Order("store-1");
+        shippedParcel.setStatus(OrderStatus.Realization);
+        Shipment gone = new Shipment(ShipmentType.Courier);
+        gone.setShippedAt(LocalDateTime.now());
+        shippedParcel.setShipments(new ArrayList<>(List.of(gone)));
+
+        // when / then: the money still on the order no longer stands in the way, the refund is recorded afterwards
+        assertThat(paid.cancelBlockers(List.of(delivered), Set.of())).containsExactly(Order.CancelBlocker.PRODUCTS_NOT_RETURNED);
+        assertThat(paid.cancelBlockers(List.of(returned), Set.of())).isEmpty();
+        assertThat(shippedParcel.cancelBlockers(List.of(delivered), Set.of()))
+                .containsExactly(Order.CancelBlocker.PRODUCTS_NOT_RETURNED);
+    }
+
+    @Test
+    void aCancelledOrderIsNotCancelledAgain() {
+        // given
+        Order cancelled = new Order("store-1");
+        cancelled.setStatus(OrderStatus.Cancelled);
+
+        // when
+        Set<Order.CancelBlocker> blockers = cancelled.cancelBlockers(List.of(product(FulfilmentStatus.Cancelled)), Set.of());
+
+        // then
+        assertThat(blockers).containsExactly(Order.CancelBlocker.ALREADY_CANCELLED);
+    }
+
+    @Test
+    void cancellingBeforeShippingMarksEveryItemCancelledAndLeavesNothingToPay() {
+        // given
+        OrderItem fresh = product(FulfilmentStatus.New);
+        fresh.setEan("5901234123457");
+        OrderItem supplierAssigned = product(FulfilmentStatus.New);
+        supplierAssigned.setDeliveryId("Acme");
+        OrderItem waitingForSupplier = product(FulfilmentStatus.Allocation);
+        waitingForSupplier.setDeliveryId("Acme");
+        OrderItem service = new OrderItem("o1", "Dostawa", "Kurier", 1, 20, null, false, 0);
+        service.setService(true);
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Assembly);
+        order.setTotalPrice(220);
+        order.addPayment(new Payment("REF", "Jan", PaymentSource.BankTransfer, 220, 0));
+
+        // when
+        order.cancel(List.of(fresh, supplierAssigned, waitingForSupplier, service));
+
+        // then: the items and the order keep their value, nothing is left to pay, so the payment is owed back
+        assertThat(List.of(fresh, supplierAssigned, waitingForSupplier, service)).allMatch(OrderItem::isCancelled);
+        assertThat(fresh.getPrice()).isEqualTo(100);
+        assertThat(service.getPrice()).isEqualTo(20);
+        assertThat(fresh.getEan()).isEqualTo("5901234123457");
+        assertThat(supplierAssigned.getDeliveryId()).isNull();
+        assertThat(service.getDeliveryId()).isNull();
+        assertThat(waitingForSupplier.getDeliveryId()).isNull();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Cancelled);
+        assertThat(order.getTotalPrice()).isEqualTo(220);
+        assertThat(order.getAmountDue()).isZero();
+        assertThat(order.getUnpaidAmount()).isEqualTo(-220);
+    }
+
+    @Test
+    void goodsTheWarehouseCouldNotTakeBackRefuseTheCancel() {
+        // given: reserved, but without the manufacturer code the release goes by (older data)
+        OrderItem reserved = reservedProduct();
+        reserved.setManufacturerCode(null);
+        Order open = new Order("store-1");
+        open.setStatus(OrderStatus.Assembled);
+
+        // when
+        Set<Order.CancelBlocker> blockers = open.cancelBlockers(List.of(reserved), Set.of());
+
+        // then
+        assertThat(blockers).containsExactly(Order.CancelBlocker.ITEMS_NOT_RELEASABLE);
+    }
+
+    @Test
+    void aCancelThatStoppedHalfWayIsFinishedByCancellingAgain() {
+        // given: the order was saved as Cancelled and its items were not, or the other way round
+        Order cancelled = new Order("store-1");
+        cancelled.setStatus(OrderStatus.Cancelled);
+        Order open = new Order("store-1");
+        open.setStatus(OrderStatus.New);
+
+        // when / then
+        assertThat(cancelled.cancelBlockers(List.of(product(FulfilmentStatus.New)), Set.of())).isEmpty();
+        assertThat(open.cancelBlockers(List.of(product(FulfilmentStatus.Cancelled)), Set.of())).isEmpty();
+    }
+
+    private static OrderItem reservedProduct() {
+        OrderItem item = product(FulfilmentStatus.Delivered);
+        item.setEan("5901234123457");
+        item.setManufacturerCode("MFN-1");
+        item.setDeliveryId("delivery-1");
+        return item;
+    }
+
+    private static OrderItem product(FulfilmentStatus status) {
+        OrderItem item = new OrderItem("o1", "CPU", "Ryzen", 1, 100, "SKU", false, 0);
+        item.setItemId(UUID.randomUUID().toString());
+        item.setStatus(status);
+        return item;
     }
 
     @Test
@@ -644,5 +756,254 @@ class OrderTest {
         order.addPayment(Payment.bankTransfer("REF-1", "Jan", 1703.14));
         order.addPayment(Payment.bankTransfer("REF-2", "Jan", 2642.55));
         order.addPayment(new Payment("REF-3", "Jan", PaymentSource.BankTransfer, PaymentDirection.Outgoing, -4345.69, 0, null, null));
+    }
+
+    private static Payment pending(PaymentSource source, Double expectedAmount) {
+        Payment payment = new Payment(source);
+        payment.setExpectedAmount(expectedAmount);
+        return payment;
+    }
+
+    @Test
+    void moneyGoesToThePendingPaymentOfItsMethodElseToTheRest() {
+        // given: 20 000 zł, 5 000 zł by transfer and the rest in installments
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        Payment transfer = pending(PaymentSource.BankTransfer, 5000.0);
+        Payment installments = pending(PaymentSource.Installments, null);
+        order.addPayment(transfer);
+        order.addPayment(installments);
+
+        // when / then
+        assertThat(order.pendingPaymentFor(PaymentSource.BankTransfer)).isSameAs(transfer);
+        assertThat(order.pendingPaymentFor(PaymentSource.Installments)).isSameAs(installments);
+        assertThat(order.pendingPaymentFor(PaymentSource.Card)).isSameAs(installments);
+        assertThat(order.pendingPaymentFor(null)).isSameAs(installments);
+    }
+
+    @Test
+    void anOwnAmountOfTheMethodComesBeforeTheRestOfTheSameMethod() {
+        // given: the rest waits by transfer, and so do 5 000 zł added later
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        Payment rest = pending(PaymentSource.BankTransfer, null);
+        Payment own = pending(PaymentSource.BankTransfer, 5000.0);
+        order.addPayment(rest);
+        order.addPayment(own);
+
+        // when / then
+        assertThat(order.pendingPaymentFor(PaymentSource.BankTransfer)).isSameAs(own);
+    }
+
+    @Test
+    void moneyOfAMethodNothingWaitsForIsAPaymentOfItsOwnWhenNoPaymentWaitsForTheRest() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        Payment transfer = pending(PaymentSource.BankTransfer, 5000.0);
+        order.addPayment(transfer);
+        order.addPayment(pending(PaymentSource.Installments, 15000.0));
+
+        // when / then
+        assertThat(order.pendingPaymentFor(PaymentSource.Card)).isNull();
+        assertThat(order.pendingPaymentFor(null)).isSameAs(transfer);
+    }
+
+    @Test
+    void theRestIsWhatIsUnpaidBeyondTheOwnAmountsOfThePendingPayments() {
+        // given: 20 000 zł, 2 000 zł paid, 5 000 zł waited for by transfer
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        order.addPayment(Payment.bankTransfer("REF-1", "Jan", 2000));
+        Payment transfer = pending(PaymentSource.BankTransfer, 5000.0);
+        Payment installments = pending(PaymentSource.Installments, null);
+        order.addPayment(transfer);
+        order.addPayment(installments);
+
+        // when / then
+        assertThat(order.expectedAmountOf(installments)).isEqualTo(13000.0);
+        assertThat(order.expectedAmountOf(transfer)).isEqualTo(5000.0);
+        assertThat(order.getPaidAmount()).isEqualTo(2000.0);
+    }
+
+    @Test
+    void theRestIsNeverBelowZero() {
+        // given: the own amounts are above what is unpaid
+        Order order = new Order("store-1");
+        order.setTotalPrice(1000);
+        order.addPayment(pending(PaymentSource.BankTransfer, 1500.0));
+        Payment rest = pending(PaymentSource.Installments, null);
+        order.addPayment(rest);
+
+        // when / then
+        assertThat(order.expectedAmountOf(rest)).isEqualTo(0.0);
+    }
+
+    @Test
+    void aPendingPaymentWithItsOwnAmountPaidInPartKeepsWaitingForTheDifference() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        Payment transfer = pending(PaymentSource.BankTransfer, 5000.0);
+        transfer.setName("Jan Kowalski");
+        transfer.setReferenceNo("PF/1/2026");
+        Payment installments = pending(PaymentSource.Installments, null);
+        order.addPayment(transfer);
+        order.addPayment(installments);
+
+        // when
+        order.fill(transfer, 3000);
+
+        // then
+        assertThat(transfer.getAmount()).isEqualTo(3000.0);
+        assertThat(transfer.getExpectedAmount()).isNull();
+        assertThat(order.getPayments()).hasSize(3);
+        Payment difference = order.getPayments().get(2);
+        assertThat(difference.isUnsettled()).isTrue();
+        assertThat(difference.getSource()).isEqualTo(PaymentSource.BankTransfer);
+        assertThat(difference.getExpectedAmount()).isEqualTo(2000.0);
+        assertThat(difference.getName()).isEqualTo("Jan Kowalski");
+        assertThat(difference.getReferenceNo()).isEqualTo("PF/1/2026");
+        assertThat(order.expectedAmountOf(installments)).isEqualTo(15000.0);
+    }
+
+    @Test
+    void aPendingPaymentPaidInFullOrAboveLeavesNothingWaitingAndTheSurplusLowersTheRest() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        Payment transfer = pending(PaymentSource.BankTransfer, 5000.0);
+        Payment installments = pending(PaymentSource.Installments, null);
+        order.addPayment(transfer);
+        order.addPayment(installments);
+
+        // when
+        order.fill(transfer, 5500);
+
+        // then
+        assertThat(order.getPayments()).hasSize(2);
+        assertThat(order.getPendingPayments()).containsExactly(installments);
+        assertThat(order.expectedAmountOf(installments)).isEqualTo(14500.0);
+    }
+
+    @Test
+    void theRestPaidInPartKeepsWaitingForWhatIsLeftWithItsMethod() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        Payment rest = pending(PaymentSource.Installments, null);
+        rest.setName("Santander");
+        order.addPayment(rest);
+
+        // when
+        order.fill(rest, 19990);
+
+        // then
+        assertThat(rest.getAmount()).isEqualTo(19990.0);
+        Payment left = order.getRestPayment();
+        assertThat(left).isNotSameAs(rest);
+        assertThat(left.getSource()).isEqualTo(PaymentSource.Installments);
+        assertThat(left.getName()).isEqualTo("Santander");
+        assertThat(order.getRestAmount()).isEqualTo(10.0);
+    }
+
+    @Test
+    void theRestPaidInFullGoesAndSoDoesTheRestNothingIsLeftOf() {
+        // given: 20 000 zł, 5 000 zł by transfer and the rest in instalments
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        Payment transfer = pending(PaymentSource.BankTransfer, 5000.0);
+        Payment rest = pending(PaymentSource.Installments, null);
+        order.addPayment(transfer);
+        order.addPayment(rest);
+        Payment paidOnly = pending(PaymentSource.BankTransfer, null);
+        Order paidByTransfer = new Order("store-1");
+        paidByTransfer.setTotalPrice(100);
+        paidByTransfer.addPayment(paidOnly);
+
+        // when
+        order.fill(rest, 15000);
+        order.fill(transfer, 6000);
+        paidByTransfer.fill(paidOnly, 100);
+
+        // then
+        assertThat(order.getPendingPayments()).isEmpty();
+        assertThat(order.getPayments()).containsExactly(transfer, rest);
+        assertThat(paidByTransfer.getPayments()).containsExactly(paidOnly);
+    }
+
+    @Test
+    void keepRestAddsATransferForWhatThePaymentsWithTheirOwnAmountsLeave() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        Payment installments = pending(PaymentSource.Installments, 15000.0);
+        order.addPayment(installments);
+
+        // when
+        order.keepRest();
+
+        // then
+        Payment rest = order.getRestPayment();
+        assertThat(rest.getSource()).isEqualTo(PaymentSource.BankTransfer);
+        assertThat(order.getRestAmount()).isEqualTo(5000.0);
+    }
+
+    @Test
+    void theOnlyPendingPaymentOfAnOrderNothingWasPaidForStays() {
+        // given: an order of 0 zł (all of it free) still says how the customer pays
+        Order order = new Order("store-1");
+        Payment only = pending(PaymentSource.Card, null);
+        order.addPayment(only);
+
+        // when
+        order.keepRest();
+
+        // then
+        assertThat(order.getPayments()).containsExactly(only);
+    }
+
+    @Test
+    void replacingAPendingPaymentWithMoneyKeepsWhatItStillWaitsForWaiting() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        Payment transfer = pending(PaymentSource.BankTransfer, 5000.0);
+        transfer.setReferenceNo("PF/1");
+        order.addPayment(transfer);
+        order.addPayment(pending(PaymentSource.Installments, null));
+
+        // when
+        order.replacePayment(0, Payment.bankTransfer("PF/1", "Jan", 3000));
+
+        // then
+        assertThat(order.getPayments()).extracting(Payment::getAmount).containsExactly(3000.0, 0.0, 0.0);
+        assertThat(order.getPayments().get(2).getExpectedAmount()).isEqualTo(2000.0);
+        assertThat(order.getPayments().get(2).getReferenceNo()).isEqualTo("PF/1");
+        assertThat(order.getRestAmount()).isEqualTo(15000.0);
+    }
+
+    @Test
+    void splitPutsThePartsAndALastPartForWhatTheyLeaveInPlaceOfThePendingPayment() {
+        // given
+        Order order = new Order("store-1");
+        order.setTotalPrice(20000);
+        order.addPayment(Payment.bankTransfer("R", "Jan", 1000));
+        Payment transfer = pending(PaymentSource.BankTransfer, 9000.0);
+        transfer.setReferenceNo("PF/2");
+        order.addPayment(transfer);
+        order.addPayment(pending(PaymentSource.Installments, null));
+
+        // when
+        order.split(transfer, new ArrayList<>(List.of(pending(PaymentSource.Card, 2000.0),
+                pending(PaymentSource.CashOnDelivery, 3000.0))), PaymentSource.BankTransfer);
+
+        // then
+        assertThat(order.getPayments()).extracting(Payment::getSource).containsExactly(PaymentSource.BankTransfer,
+                PaymentSource.Card, PaymentSource.CashOnDelivery, PaymentSource.BankTransfer, PaymentSource.Installments);
+        assertThat(order.getPayments()).extracting(Payment::getExpectedAmount)
+                .containsExactly(null, 2000.0, 3000.0, 4000.0, null);
+        assertThat(order.getPayments().get(1).getReferenceNo()).isEqualTo("PF/2");
+        assertThat(order.getRestAmount()).isEqualTo(10000.0);
     }
 }

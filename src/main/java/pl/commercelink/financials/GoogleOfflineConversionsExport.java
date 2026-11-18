@@ -40,7 +40,7 @@ public class GoogleOfflineConversionsExport {
                     .append(CONVERSION_NAME).append(",")
                     .append(order.getOrderedAt().format(DATE_TIME_FORMATTER)).append(",");
 
-            csvWriter.append(String.valueOf(order.getTotalPrice()));
+            csvWriter.append(String.valueOf(order.getAmountDue()));
             csvWriter.append(",");
 
             // Conversion Currency (opcjonalnie)

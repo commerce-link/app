@@ -23,6 +23,11 @@ import java.util.stream.Stream;
  * no longer owed for the next, so two transfers never settle the same debt twice. Only numbers found in the title for
  * exactly what is owed are {@link MatchKind#MATCHED}; everything else waits for the operator.
  * <p>
+ * What an order owes an operation is what the payment the money goes to waits for ({@link Order#pendingPaymentFor}): a
+ * customer's transfer goes to the pending transfer, a payout to the pending payment of its payer row's method, either
+ * of them else to the one waiting for the rest of the order. So 5 000 zł by transfer and the rest in installments are two debts,
+ * each settled by its own operation in either order.
+ * <p>
  * An order named in the title that is not open any more (Completed is not among the orders read) is read by its number
  * through shortIdLookup, so a repeated upload of an operation booked on it is recognised.
  */
@@ -36,7 +41,7 @@ public class StatementMatcher {
     private final List<Order> openOrders;
     private final List<PayoutChannel> channels;
     private final Function<String, List<Order>> shortIdLookup;
-    private final Map<String, Receivable> receivables = new LinkedHashMap<>();
+    private final Map<String, Debt> debts = new LinkedHashMap<>();
     private final Map<String, List<String>> bookedNumbers = new HashMap<>();
 
     public StatementMatcher(List<Order> openOrders, List<PayoutChannel> channels,
@@ -49,7 +54,7 @@ public class StatementMatcher {
                 .forEach(order -> {
                     BigDecimal unpaid = StatementAmounts.of(order.getUnpaidAmount());
                     if (unpaid.signum() > 0) {
-                        receivables.put(order.getOrderId(), new Receivable(order, order.getPendingPayment(), unpaid));
+                        debts.put(order.getOrderId(), new Debt(order, unpaid));
                     }
                     order.getPayments().stream()
                             .map(Payment::getBankTransactionNo)
@@ -81,7 +86,8 @@ public class StatementMatcher {
             return payout(operation, payer);
         }
         List<String> texts = new ArrayList<>();
-        List<Receivable> named = byOrderNumber(operation, texts);
+        List<Receivable> transfers = transfers();
+        List<Receivable> named = byOrderNumber(operation, transfers, texts);
         if (!named.isEmpty()) {
             return allocate(operation, MatchRule.ORDER_NUMBER, named, texts);
         }
@@ -89,23 +95,23 @@ public class StatementMatcher {
         if (closed != null) {
             return closed;
         }
-        named = byDocumentNumber(operation, texts);
+        named = byDocumentNumber(operation, transfers, texts);
         if (!named.isEmpty()) {
             return allocate(operation, MatchRule.DOCUMENT_NUMBER, named, texts);
         }
-        named = byReferenceNumber(operation, texts);
+        named = byReferenceNumber(operation, transfers, texts);
         if (!named.isEmpty()) {
             return allocate(operation, MatchRule.REFERENCE_NUMBER, named, texts);
         }
-        return byAmount(operation);
+        return byAmount(operation, transfers);
     }
 
-    private List<Receivable> byOrderNumber(BankOperation operation, List<String> texts) {
+    private List<Receivable> byOrderNumber(BankOperation operation, List<Receivable> candidates, List<String> texts) {
         String title = StringUtils.defaultString(operation.title());
         String lower = title.toLowerCase(Locale.ROOT);
         String compact = lower.replaceAll("[^0-9a-z]", "");
         List<Receivable> found = new ArrayList<>();
-        for (Receivable receivable : open()) {
+        for (Receivable receivable : candidates) {
             Order order = receivable.order();
             String id = order.getOrderId().toLowerCase(Locale.ROOT);
             String shortId = StringUtils.defaultString(order.getShortenedOrderId()).toLowerCase(Locale.ROOT);
@@ -169,11 +175,11 @@ public class StatementMatcher {
                 EnumSet.of(MatchWarning.ORDER_ALREADY_PAID), null, texts);
     }
 
-    private List<Receivable> byDocumentNumber(BankOperation operation, List<String> texts) {
+    private List<Receivable> byDocumentNumber(BankOperation operation, List<Receivable> candidates, List<String> texts) {
         String title = StringUtils.defaultString(operation.title());
         String compact = title.toUpperCase(Locale.ROOT).replaceAll("\\s", "");
         List<Receivable> found = new ArrayList<>();
-        for (Receivable receivable : open()) {
+        for (Receivable receivable : candidates) {
             List<Document> documents = receivable.order().getDocuments() == null ? List.of() : receivable.order().getDocuments();
             documents.stream()
                     .map(Document::getNumber)
@@ -188,11 +194,11 @@ public class StatementMatcher {
         return found;
     }
 
-    private List<Receivable> byReferenceNumber(BankOperation operation, List<String> texts) {
+    private List<Receivable> byReferenceNumber(BankOperation operation, List<Receivable> candidates, List<String> texts) {
         String title = StringUtils.defaultString(operation.title());
         String compact = title.toUpperCase(Locale.ROOT).replaceAll("\\s", "");
         List<Receivable> found = new ArrayList<>();
-        for (Receivable receivable : open()) {
+        for (Receivable receivable : candidates) {
             String reference = receivable.pending() == null ? null : StringUtils.trimToNull(receivable.pending().getReferenceNo());
             if (reference != null && reference.replaceAll("\\s", "").length() >= MIN_NUMBER_LENGTH
                     && compact.contains(reference.toUpperCase(Locale.ROOT).replaceAll("\\s", ""))) {
@@ -225,10 +231,10 @@ public class StatementMatcher {
             warnings.add(MatchWarning.OVERPAID);
             difference = operation.amount().subtract(owed);
         }
-        if (allocations.stream().anyMatch(allocation -> waitsForAnotherMethod(receivables.get(allocation.orderId())))) {
+        if (allocations.stream().anyMatch(allocation -> waitsForAnotherMethod(of(named, allocation.orderId())))) {
             warnings.add(MatchWarning.METHOD_MISMATCH);
         }
-        settle(allocations);
+        settle(named, allocations);
         MatchKind kind = warnings.isEmpty() ? MatchKind.MATCHED : MatchKind.CHECK;
         return result(operation, kind, rule, allocations, List.of(), List.of(), warnings, difference, texts);
     }
@@ -243,10 +249,13 @@ public class StatementMatcher {
     private OperationMatch payout(BankOperation operation, List<PayoutChannel> payer) {
         Map<String, PayoutChannel> rowOf = new LinkedHashMap<>();
         List<Receivable> orders = new ArrayList<>();
-        for (Receivable receivable : open()) {
-            PayoutChannels.rowOf(payer, receivable.order()).ifPresent(row -> {
-                rowOf.put(receivable.order().getOrderId(), row);
-                orders.add(receivable);
+        for (Debt debt : debts.values()) {
+            PayoutChannels.rowOf(payer, debt.order()).ifPresent(row -> {
+                Receivable receivable = debt.toward(row.getMethod());
+                if (receivable.remaining().signum() > 0) {
+                    rowOf.put(debt.order().getOrderId(), row);
+                    orders.add(receivable);
+                }
             });
         }
         Set<List<Allocation>> proposals = new LinkedHashSet<>();
@@ -268,7 +277,7 @@ public class StatementMatcher {
                     EnumSet.of(MatchWarning.NO_PAYOUT_PROPOSAL), null, List.of());
         }
         List<Allocation> allocations = proposals.iterator().next();
-        settle(allocations);
+        settle(orders, allocations);
         return result(operation, MatchKind.PAYOUT, MatchRule.PAYOUT, allocations, candidates, payer,
                 EnumSet.noneOf(MatchWarning.class), null, List.of());
     }
@@ -283,16 +292,20 @@ public class StatementMatcher {
      */
     private OperationMatch namedPayout(BankOperation operation, List<PayoutChannel> payer, Map<String, PayoutChannel> rowOf,
                                        List<String> payerOrders) {
+        List<Receivable> owed = debts.values().stream()
+                .map(debt -> debt.toward(PayoutChannels.methodOf(payer, debt.order())))
+                .filter(receivable -> receivable.remaining().signum() > 0)
+                .toList();
         List<String> texts = new ArrayList<>();
         MatchRule rule = MatchRule.ORDER_NUMBER;
-        List<Receivable> named = byOrderNumber(operation, texts);
+        List<Receivable> named = byOrderNumber(operation, owed, texts);
         if (named.isEmpty()) {
             rule = MatchRule.DOCUMENT_NUMBER;
-            named = byDocumentNumber(operation, texts);
+            named = byDocumentNumber(operation, owed, texts);
         }
         if (named.isEmpty()) {
             rule = MatchRule.REFERENCE_NUMBER;
-            named = byReferenceNumber(operation, texts);
+            named = byReferenceNumber(operation, owed, texts);
         }
         if (named.isEmpty()) {
             return null;
@@ -326,7 +339,7 @@ public class StatementMatcher {
                 difference = paidOut.subtract(operation.amount()).abs();
             }
         }
-        settle(allocations);
+        settle(named, allocations);
         List<String> candidates = new ArrayList<>(payerOrders);
         named.stream().map(receivable -> receivable.order().getOrderId())
                 .filter(id -> !candidates.contains(id)).forEach(candidates::add);
@@ -370,8 +383,8 @@ public class StatementMatcher {
         return PayoutChannels.fees(row, receivable.remaining(), receivable.pending());
     }
 
-    private OperationMatch byAmount(BankOperation operation) {
-        List<Receivable> same = open().stream()
+    private OperationMatch byAmount(BankOperation operation, List<Receivable> transfers) {
+        List<Receivable> same = transfers.stream()
                 .filter(receivable -> receivable.remaining().compareTo(operation.amount()) == 0)
                 .toList();
         List<Receivable> fromClient = same.stream()
@@ -392,7 +405,7 @@ public class StatementMatcher {
                 warnings.add(MatchWarning.AMBIGUOUS);
             }
             List<Allocation> allocations = List.of(new Allocation(chosen.order().getOrderId(), operation.amount(), ZERO));
-            settle(allocations);
+            settle(List.of(chosen), allocations);
             return result(operation, MatchKind.CHECK, rule, allocations, ids(same, fromClient), List.of(), warnings, null, List.of());
         }
         return result(operation, MatchKind.CHECK, MatchRule.AMOUNT, List.of(), ids(same, fromClient), List.of(),
@@ -407,13 +420,28 @@ public class StatementMatcher {
                 .toList();
     }
 
-    private void settle(List<Allocation> allocations) {
-        allocations.forEach(allocation -> receivables.computeIfPresent(allocation.orderId(),
-                (id, receivable) -> receivable.less(allocation.amount())));
+    /** The proposed amounts are no longer owed: each went to the payment its receivable waits with. */
+    private void settle(List<Receivable> receivables, List<Allocation> allocations) {
+        allocations.forEach(allocation -> {
+            Receivable receivable = of(receivables, allocation.orderId());
+            Debt debt = debts.get(allocation.orderId());
+            if (receivable != null && debt != null) {
+                debt.book(receivable.pending(), allocation.amount());
+            }
+        });
     }
 
-    private List<Receivable> open() {
-        return receivables.values().stream().filter(receivable -> receivable.remaining().signum() > 0).toList();
+    /** What the orders owe a customer's transfer. */
+    private List<Receivable> transfers() {
+        return debts.values().stream()
+                .map(debt -> debt.toward(PaymentSource.BankTransfer))
+                .filter(receivable -> receivable.remaining().signum() > 0)
+                .toList();
+    }
+
+    private static Receivable of(List<Receivable> receivables, String orderId) {
+        return receivables.stream().filter(receivable -> receivable.order().getOrderId().equals(orderId))
+                .findFirst().orElse(null);
     }
 
     private static boolean waitsForAnotherMethod(Receivable receivable) {
@@ -528,10 +556,59 @@ public class StatementMatcher {
                 Collections.unmodifiableSet(warnings), difference, List.copyOf(texts));
     }
 
+    /** What the order owes the payment pending, which the money goes to (null: a payment of its own). */
     private record Receivable(Order order, Payment pending, BigDecimal remaining) {
+    }
 
-        Receivable less(BigDecimal amount) {
-            return new Receivable(order, pending, remaining.subtract(amount).max(ZERO));
+    /**
+     * An order that owes money, with what the proposals so far have put on it. A pending payment with its own amount
+     * owes that amount less what was put on it; the rest (and money that goes to no pending payment) owes what is
+     * unpaid less everything put on the order and less what the payments with their own amounts still wait for, so a
+     * transfer above its own amount lowers the rest.
+     */
+    private static final class Debt {
+
+        private final Order order;
+        private final BigDecimal unpaid;
+        private final Map<Payment, BigDecimal> bookedOn = new IdentityHashMap<>();
+        private BigDecimal booked = ZERO;
+
+        Debt(Order order, BigDecimal unpaid) {
+            this.order = order;
+            this.unpaid = unpaid;
+        }
+
+        Order order() {
+            return order;
+        }
+
+        /** What the order owes money paid by method, which booking puts on the same payment. */
+        Receivable toward(PaymentSource method) {
+            Payment pending = order.pendingPaymentFor(method);
+            return new Receivable(order, pending, remaining(pending));
+        }
+
+        void book(Payment pending, BigDecimal amount) {
+            booked = booked.add(amount);
+            if (pending != null && pending.getExpectedAmount() != null) {
+                bookedOn.merge(pending, amount, BigDecimal::add);
+            }
+        }
+
+        private BigDecimal remaining(Payment pending) {
+            if (pending != null && pending.getExpectedAmount() != null) {
+                return waitedFor(pending);
+            }
+            BigDecimal own = order.getPendingPayments().stream()
+                    .filter(payment -> payment.getExpectedAmount() != null)
+                    .map(this::waitedFor)
+                    .reduce(ZERO, BigDecimal::add);
+            return unpaid.subtract(booked).subtract(own).max(ZERO);
+        }
+
+        private BigDecimal waitedFor(Payment pending) {
+            return StatementAmounts.of(pending.getExpectedAmount())
+                    .subtract(bookedOn.getOrDefault(pending, ZERO)).max(ZERO);
         }
     }
 }

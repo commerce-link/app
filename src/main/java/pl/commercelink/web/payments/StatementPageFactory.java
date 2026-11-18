@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Payment;
+import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.payments.statements.Allocation;
 import pl.commercelink.payments.statements.BankOperation;
 import pl.commercelink.payments.statements.MatchKind;
@@ -196,16 +197,39 @@ public class StatementPageFactory {
                 : text(locale, "payments.statement.orders.owed", money(locale, allocation.amount()));
     }
 
+    /**
+     * What the payment a customer's transfer goes to waits for, and what is left of it after the transfer. Paid in full
+     * while the order waits for other payments too, the order's own remainder is named, so the payment is not taken for
+     * the whole order.
+     */
     private String debtDetail(Order order, Allocation allocation, Locale locale) {
         if (order == null) {
             return null;
         }
-        BigDecimal owed = StatementAmounts.of(order.getUnpaidAmount());
+        BigDecimal owed = StatementAmounts.of(owedTo(order, transferTarget(order)));
         BigDecimal left = owed.subtract(allocation.amount());
-        String after = left.signum() == 0 ? text(locale, "payments.statement.orders.after.paid")
+        BigDecimal orderLeft = StatementAmounts.of(order.getUnpaidAmount()).subtract(allocation.amount());
+        String after = left.signum() == 0 && orderLeft.signum() > 0
+                ? text(locale, "payments.statement.orders.after.paidPart", money(locale, orderLeft))
+                : left.signum() == 0 ? text(locale, "payments.statement.orders.after.paid")
                 : left.signum() > 0 ? text(locale, "payments.statement.orders.after.underpaid", money(locale, left))
                 : text(locale, "payments.statement.orders.after.overpaid", money(locale, left.negate()));
         return text(locale, "payments.statement.orders.owed", money(locale, owed)) + " · " + after;
+    }
+
+    /** The pending payment a customer's transfer goes to, as booking fills it; null when none waits. */
+    private static Payment transferTarget(Order order) {
+        return order.pendingPaymentFor(PaymentSource.BankTransfer);
+    }
+
+    /** The pending payment a payout of the payer's rows goes to for the order; null when none waits. */
+    private static Payment payoutTarget(Order order, List<PayoutChannel> payer) {
+        return order.pendingPaymentFor(PayoutChannels.methodOf(payer, order));
+    }
+
+    /** What the order owes the pending payment, or, with none, what no pending payment with its own amount waits for. */
+    private static double owedTo(Order order, Payment target) {
+        return target != null ? order.expectedAmountOf(target) : order.getRestAmount();
     }
 
     private String bookedDetail(Order order, BankOperation operation, Locale locale) {
@@ -228,7 +252,9 @@ public class StatementPageFactory {
             if (allocations.isEmpty()) {
                 return new String[]{none, null};
             }
-            List<Payment> payments = allocations.stream().map(allocation -> pending(orders.get(allocation.orderId())))
+            List<Payment> payments = allocations.stream().map(allocation -> orders.get(allocation.orderId()))
+                    .filter(Objects::nonNull)
+                    .map(order -> payoutTarget(order, match.payout()))
                     .filter(Objects::nonNull).toList();
             String types = payments.stream().map(payment -> type(payment, locale)).distinct().collect(Collectors.joining(", "));
             long references = payments.stream().filter(payment -> StringUtils.isNotBlank(payment.getReferenceNo())).count();
@@ -244,7 +270,8 @@ public class StatementPageFactory {
         if (allocations.isEmpty()) {
             return new String[]{none, null};
         }
-        Payment pending = pending(orders.get(allocations.get(0).orderId()));
+        Order first = orders.get(allocations.get(0).orderId());
+        Payment pending = first == null ? null : transferTarget(first);
         if (pending == null) {
             return new String[]{text(locale, "payments.statement.payment.new"), null};
         }
@@ -253,10 +280,6 @@ public class StatementPageFactory {
             reference = reference + " · " + text(locale, "payments.statement.payment.orders", allocations.size());
         }
         return new String[]{type(pending, locale), reference};
-    }
-
-    private static Payment pending(Order order) {
-        return order == null ? null : order.getPendingPayment();
     }
 
     private String type(Payment payment, Locale locale) {
@@ -386,31 +409,48 @@ public class StatementPageFactory {
         return notices;
     }
 
-    /** The orders that still owe money, for the dialogs' search and the payout lists. */
+    /**
+     * The orders that still owe money, for the dialogs' search and the payout lists. unpaid, fee, type and reference
+     * describe the payment a customer's transfer goes to (the assignment dialog); payouts the payment a payout goes to,
+     * keyed by the index of each channel row that pays the order, and "any" for a payout of a payer none of whose rows
+     * describes it (the payout dialog), as the matcher and the booking count them.
+     */
     private String receivables(List<Order> openOrders, List<PayoutChannel> channels, Locale locale) {
         List<Map<String, Object>> list = openOrders.stream()
                 .filter(order -> StatementAmounts.of(order.getUnpaidAmount()).signum() > 0)
                 .sorted(Comparator.comparing(Order::getOrderedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(order -> {
-                    Payment pending = order.getPendingPayment();
                     Map<String, Object> item = new LinkedHashMap<>();
                     item.put("id", order.getOrderId());
                     item.put("shortId", order.getShortenedOrderId());
                     item.put("client", StringUtils.defaultString(OrderPageModelFactory.clientName(order)));
                     item.put("email", StringUtils.defaultString(order.getEmail()));
                     item.put("ordered", order.getOrderedAt() == null ? "" : order.getOrderedAt().format(FULL_DAY));
-                    item.put("unpaid", StatementJson.cents(StatementAmounts.of(order.getUnpaidAmount())));
-                    item.put("fee", pending == null ? 0 : StatementJson.cents(StatementAmounts.of(pending.getFee())));
-                    item.put("type", pending == null ? text(locale, "payments.statement.payment.new") : type(pending, locale));
-                    item.put("reference", pending == null ? text(locale, "payments.statement.payment.noReference") : reference(pending, locale));
-                    item.put("channels", channels.stream()
+                    item.putAll(owed(order, transferTarget(order), locale));
+                    List<Integer> paying = channels.stream()
                             .filter(channel -> PayoutChannels.pays(channel, order))
                             .map(channels::indexOf)
-                            .collect(Collectors.toList()));
+                            .collect(Collectors.toList());
+                    item.put("channels", paying);
+                    Map<String, Object> payouts = new LinkedHashMap<>();
+                    paying.forEach(index -> payouts.put(String.valueOf(index),
+                            owed(order, order.pendingPaymentFor(channels.get(index).getMethod()), locale)));
+                    payouts.put("any", owed(order, order.pendingPaymentFor(null), locale));
+                    item.put("payouts", payouts);
                     return item;
                 })
                 .toList();
         return json.write(list);
+    }
+
+    /** What the order owes the payment target (null: money that is a payment of its own), and how the payment reads. */
+    private Map<String, Object> owed(Order order, Payment target, Locale locale) {
+        Map<String, Object> owed = new LinkedHashMap<>();
+        owed.put("unpaid", StatementJson.cents(StatementAmounts.of(owedTo(order, target))));
+        owed.put("fee", target == null ? 0 : StatementJson.cents(StatementAmounts.of(target.getFee())));
+        owed.put("type", target == null ? text(locale, "payments.statement.payment.new") : type(target, locale));
+        owed.put("reference", target == null ? text(locale, "payments.statement.payment.noReference") : reference(target, locale));
+        return owed;
     }
 
     private String channels(List<PayoutChannel> channels, Locale locale) {

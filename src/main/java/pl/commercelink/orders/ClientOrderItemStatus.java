@@ -10,7 +10,8 @@ public enum ClientOrderItemStatus {
     AwaitingDelivery,
     Assembled,
     InClaim,
-    Returned;
+    Returned,
+    Cancelled;
 
     public static ClientOrderItemStatus from(FulfilmentStatus status) {
         return switch (status) {
@@ -19,6 +20,7 @@ public enum ClientOrderItemStatus {
             case Reserved, Delivered -> Assembled;
             case InRMA, InExternalService -> InClaim;
             case Returned, Replaced, Destroyed -> Returned;
+            case Cancelled -> Cancelled;
         };
     }
 }

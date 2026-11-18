@@ -13,7 +13,8 @@ import java.util.Set;
 public record OrderLine(Order order, OrderItem item) {
 
     private static final Set<FulfilmentStatus> LEFT_THE_ORDER =
-            EnumSet.of(FulfilmentStatus.Returned, FulfilmentStatus.Replaced, FulfilmentStatus.Destroyed);
+            EnumSet.of(FulfilmentStatus.Returned, FulfilmentStatus.Replaced, FulfilmentStatus.Destroyed,
+                    FulfilmentStatus.Cancelled);
 
     public LocalDateTime placedAt() {
         return order.getOrderedAt() != null ? order.getOrderedAt() : order.getLastEventDate();

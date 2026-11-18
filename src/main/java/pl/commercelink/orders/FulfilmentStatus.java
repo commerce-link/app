@@ -10,5 +10,6 @@ public enum FulfilmentStatus {
     InExternalService,
     Returned,
     Replaced,
-    Destroyed;
+    Destroyed,
+    Cancelled;
 }

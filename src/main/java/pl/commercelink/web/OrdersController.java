@@ -97,6 +97,7 @@ import pl.commercelink.web.orders.OrderConfirmPages;
 import pl.commercelink.web.orders.OrderFlash;
 import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.web.orders.OrderPaymentForm;
+import pl.commercelink.web.orders.PaymentSplitForm;
 import pl.commercelink.web.orders.OrderShipmentForm;
 import pl.commercelink.web.orders.OrderLinks;
 import pl.commercelink.web.orders.OrderPrintView;
@@ -785,10 +786,11 @@ public class OrdersController extends BaseController {
             return refuse(redirectAttributes, orderId, receiptLock.key(CANCEL_LOCKED_RECEIPT), locale);
         }
         return confirmPage(model, order, "order.page.cancel", new Object[]{order.getShortenedOrderId()},
-                OrderPageModelFactory.cancelMessage(receiptAttemptService.hasFiscalisedReceipt(order), messageSource, locale),
+                OrderPageModelFactory.cancelMessage(order, receiptAttemptService.hasFiscalisedReceipt(order), messageSource, locale),
                 "/dashboard/orders/" + orderId + "/cancel", true, locale);
     }
 
+    private static final String INVOICING_CANCELLED = "order.documents.issue.error.cancelled";
     private static final String CANCEL_LOCKED_RECEIPT = "order.page.cancel.locked.receipt";
     private static final String DELETE_LOCKED_RECEIPT = "order.page.delete.locked.receipt";
 
@@ -966,6 +968,9 @@ public class OrdersController extends BaseController {
     public String confirmInvoice(@PathVariable String orderId, @RequestParam DocumentType documentType, Model model,
                                  Locale locale, RedirectAttributes redirectAttributes) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        if (order.hasStatus(OrderStatus.Cancelled)) {
+            return refuse(redirectAttributes, orderId, INVOICING_CANCELLED, locale);
+        }
         if (!issuable(order, documentType)) {
             return refuse(redirectAttributes, orderId, "error.message.no.eligible.invoice.to.create", locale);
         }
@@ -980,6 +985,11 @@ public class OrdersController extends BaseController {
     public String createInvoice(@PathVariable String orderId, @RequestParam DocumentType documentType, @RequestParam(defaultValue = "false") boolean send, Locale locale, RedirectAttributes redirectAttributes) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
 
+        // the cancelled page offers no "Wystaw"; a stale page or a hand-made request would invoice goods that were never sold
+        // (cancelled items keep their prices)
+        if (order.hasStatus(OrderStatus.Cancelled)) {
+            return refuse(redirectAttributes, orderId, INVOICING_CANCELLED, locale);
+        }
         if (!issuable(order, documentType)) {
             return refuse(redirectAttributes, orderId, "error.message.no.eligible.invoice.to.create", locale);
         }
@@ -1822,19 +1832,17 @@ public class OrdersController extends BaseController {
                              Locale locale) {
         Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
         Optional<String> back = PaymentsReturn.target(form.getReturnTo());
-        // the closed page offers no "Dodaj wpłatę"; a cancelled order would drop the payment while saying it was added
-        if (existingOrder.isClosed()) {
-            return back.isPresent() ? refuseToPayments(redirectAttributes, back.get(), closedPaymentsKey(existingOrder), locale)
-                    : refuse(redirectAttributes, orderId, closedPaymentsKey(existingOrder), locale);
+        // the completed page offers no "Dodaj wpłatę"
+        if (paymentsClosed(existingOrder)) {
+            return back.isPresent() ? refuseToPayments(redirectAttributes, back.get(), PAYMENTS_CLOSED, locale)
+                    : refuse(redirectAttributes, orderId, PAYMENTS_CLOSED, locale);
         }
 
-        String invalid = form.validate(true);
+        String invalid = form.validate();
         if (invalid != null) {
             return back.isPresent() ? refuseToPayments(redirectAttributes, back.get(), invalid, locale)
                     : refuse(redirectAttributes, orderId, invalid, locale);
         }
-        // amount 0 is the payment the order still waits for, as the one made with the order: it stays 0 whatever the fee
-        boolean pending = form.amount() == 0;
         PaymentDirection direction = form.getDirection() != null ? form.getDirection() : PaymentDirection.Incoming;
         // the sign follows the direction, as in a payment's own dialog: a refund is stored negative however it was
         // typed, and money that came in cannot be negative
@@ -1843,38 +1851,69 @@ public class OrdersController extends BaseController {
                     : refuse(redirectAttributes, orderId, "order.payments.error.negative", locale);
         }
         double bankAmount = direction == PaymentDirection.Outgoing ? -Math.abs(form.amount()) : form.amount();
+        double amount = form.isFeeIncluded() ? bankAmount : bankAmount + form.fee();
 
-        double amount = pending ? 0
-                : form.isFeeIncluded() ? bankAmount : bankAmount + form.fee();
-
-        Payment target = existingOrder.getPayments().stream()
-                .filter(Payment::isUnsettled)
-                .findFirst()
-                .orElseGet(() -> {
-                    Payment p = new Payment();
-                    existingOrder.addPayment(p);
-                    return p;
-                });
+        // a refund is money going back, never one of the payments the order waits for
+        Payment pending = null;
+        if (direction == PaymentDirection.Incoming && !form.isNewPayment()) {
+            pending = form.hasTarget() ? form.chosenPending(existingOrder) : existingOrder.pendingPaymentFor(form.getSource());
+            if (form.hasTarget() && pending == null) {
+                return back.isPresent() ? refuseToPayments(redirectAttributes, back.get(), "order.payments.error.stale", locale)
+                        : refuse(redirectAttributes, orderId, "order.payments.error.stale", locale);
+            }
+        }
+        Payment target;
+        if (pending != null) {
+            target = pending;
+            // before the form's fields: the difference still waited for keeps the name and reference it was waited for with
+            existingOrder.fill(target, amount);
+        } else {
+            target = new Payment();
+            target.setAmount(amount);
+            existingOrder.addPayment(target);
+            existingOrder.keepRest();
+        }
 
         target.setSource(form.getSource());
         target.setDirection(direction);
         target.setReferenceNo(form.getReferenceNo());
         target.setName(form.getName());
-        target.setAmount(amount);
         target.setFee(form.fee());
         target.setBankTransactionNo(form.getBankTransactionNo());
         target.setBankTransactionDate(form.getBankTransactionDate());
 
-        orderLifecycle.update(existingOrder);
+        savePayments(existingOrder);
         if (back.isPresent()) {
             redirectAttributes.addFlashAttribute(PaymentsReturn.NOTICE,
-                    messageSource.getMessage(pending ? "payments.notice.order.pending"
-                                    : direction == PaymentDirection.Outgoing ? "payments.notice.order.refund" : "payments.notice.order",
+                    messageSource.getMessage(direction == PaymentDirection.Outgoing ? "payments.notice.order.refund"
+                                    : "payments.notice.order",
                             new Object[]{existingOrder.getShortenedOrderId()}, locale));
             return "redirect:" + back.get();
         }
-        OrderFlash.saved(redirectAttributes,
-                messageSource.getMessage(pending ? "order.payments.added.pending" : "order.payments.added", null, locale));
+        OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.payments.added", null, locale));
+        return details(orderId);
+    }
+
+    /** "Podziel": the pending payment at index becomes the parts and a last part waiting for what they leave of it. */
+    @PostMapping("/dashboard/orders/{orderId}/payments/{index}/split")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String splitPayment(@PathVariable String orderId, @PathVariable int index,
+                               @ModelAttribute PaymentSplitForm form, RedirectAttributes redirectAttributes,
+                               Locale locale) {
+        Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
+        List<Payment> payments = existingOrder.getPayments();
+        boolean known = index >= 0 && index < payments.size() && payments.get(index).isUnsettled()
+                && OrderPaymentForm.version(payments.get(index)).equals(form.getVersion());
+        String refusal = paymentsClosed(existingOrder) ? PAYMENTS_CLOSED
+                : !known ? "order.payments.error.stale"
+                : form.validate(existingOrder, payments.get(index));
+        if (refusal != null) {
+            return refuse(redirectAttributes, orderId, refusal, locale);
+        }
+        existingOrder.setPayments(new ArrayList<>(payments));
+        existingOrder.split(existingOrder.getPayments().get(index), form.parts(), form.getRestMethod());
+        savePayments(existingOrder);
+        OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.payments.split.saved", null, locale));
         return details(orderId);
     }
 
@@ -1885,12 +1924,13 @@ public class OrdersController extends BaseController {
                               RedirectAttributes redirectAttributes, Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
         int index = paymentIndex(order, key);
-        // the card offers no "Edit" on a closed order
-        if (order.isClosed()) {
-            return refuse(redirectAttributes, orderId, closedPaymentsKey(order), locale);
+        // the card offers no "Edit" on a completed order
+        if (paymentsClosed(order)) {
+            return refuse(redirectAttributes, orderId, PAYMENTS_CLOSED, locale);
         }
         String methodLocked = OrderPaymentForm.methodLockedKey(order, receiptAttemptService.receiptLock(order));
-        return paymentPage(order, OrderPaymentForm.of(orderId, index, order.getPayments().get(index), methodLocked), model);
+        return paymentPage(order, OrderPaymentForm.of(orderId, index, order.getPayments().get(index), methodLocked)
+                .withRestAvailable(order), model);
     }
 
     /**
@@ -1910,6 +1950,7 @@ public class OrdersController extends BaseController {
                               @RequestParam(required = false) String referenceNo,
                               @RequestParam(required = false) String bankTransactionNo,
                               @RequestParam(required = false) String bankTransactionDate,
+                              @RequestParam(required = false) String expectedAmount,
                               @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
                               HttpServletRequest request, HttpServletResponse response, Model model,
                               RedirectAttributes redirectAttributes, Locale locale) {
@@ -1923,8 +1964,11 @@ public class OrdersController extends BaseController {
         OrderPaymentForm posted = new OrderPaymentForm(orderId, index, version, known && current.get(index).isUnsettled(),
                 known && OrderPaymentForm.isRefund(current.get(index)), source, name, amount, fee, referenceNo,
                 bankTransactionNo, bankTransactionDate, null, null, methodLocked,
-                known ? OrderPaymentForm.positiveRefundShift(current.get(index)) : null);
-        String refusal = existingOrder.isClosed() ? closedPaymentsKey(existingOrder)
+                known ? OrderPaymentForm.positiveRefundShift(current.get(index)) : null, expectedAmount, null);
+        if (known) {
+            posted = posted.withRestAvailable(existingOrder);
+        }
+        String refusal = paymentsClosed(existingOrder) ? PAYMENTS_CLOSED
                 : !known || !OrderPaymentForm.version(current.get(index)).equals(version) ? "order.payments.error.stale"
                 : null;
         if (refusal != null) {
@@ -1935,7 +1979,7 @@ public class OrdersController extends BaseController {
             }
             return refuse(redirectAttributes, orderId, refusal, locale);
         }
-        Map<String, String> errors = posted.validate(current.get(index));
+        Map<String, String> errors = posted.validate(existingOrder, index);
         if (!errors.isEmpty()) {
             if (async) {
                 response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
@@ -1945,10 +1989,9 @@ public class OrdersController extends BaseController {
             return paymentPage(existingOrder, posted.withErrors(errors), model);
         }
 
-        List<Payment> payments = new ArrayList<>(current);
-        payments.set(index, posted.toPayment(current.get(index)));
-        existingOrder.setPayments(payments);
-        orderLifecycle.update(existingOrder);
+        existingOrder.setPayments(new ArrayList<>(current));
+        existingOrder.replacePayment(index, posted.toPayment(current.get(index)));
+        savePayments(existingOrder);
 
         String notice = messageSource.getMessage("order.payments.saved", new Object[]{index + 1}, locale);
         if (async) {
@@ -1978,8 +2021,9 @@ public class OrdersController extends BaseController {
     }
 
     /**
-     * Removes one payment. Removing the only one leaves a pending payment with its method, as the whole-list save did
-     * when every row was cleared: the order never loses how the customer pays, and "Dodaj wpłatę" fills it again.
+     * Removes one payment. When no pending payment is left, one with its method waits for the rest, as the whole-list
+     * save did when every row was cleared: the order never loses how the customer pays, and "Dodaj wpłatę" fills it
+     * again. The pending payments then add up to what is unpaid again (Order.keepRest).
      */
     @PostMapping("/dashboard/orders/{orderId}/payments/{index}/remove")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -1993,11 +2037,12 @@ public class OrdersController extends BaseController {
         }
         List<Payment> payments = new ArrayList<>(existingOrder.getPayments());
         Payment removed = payments.remove(index);
-        if (payments.isEmpty()) {
+        if (payments.stream().noneMatch(Payment::isUnsettled)) {
             payments.add(new Payment(removed.getSource()));
         }
         existingOrder.setPayments(payments);
-        orderLifecycle.update(existingOrder);
+        existingOrder.keepRest();
+        savePayments(existingOrder);
         OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.payments.removed", new Object[]{index + 1}, locale));
         return details(orderId);
     }
@@ -2015,20 +2060,30 @@ public class OrdersController extends BaseController {
         throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     }
 
+    private static final String PAYMENTS_CLOSED = "order.payments.error.closed";
+
     /**
-     * Payments of a closed order are not added, edited or removed, as its shipments are not: the card offers none of
-     * these actions, and a cancelled order would lose the save anyway (OrderLifecycle.update does not persist it). This
-     * replaces the decision of 2026-09-27 that let a completed order take the change (review 2, R-27).
+     * Payments of a completed order are not added, edited or removed, as its shipments are not (review 2, R-27). A
+     * cancelled order keeps them open: it is cancelled with the customer's money still on it, and the refund is
+     * recorded afterwards.
      */
-    private static String closedPaymentsKey(Order order) {
-        return order.getStatus() == OrderStatus.Cancelled ? "order.payments.error.cancelled"
-                : "order.payments.error.closed";
+    private static boolean paymentsClosed(Order order) {
+        return order.hasStatus(OrderStatus.Completed);
     }
 
-    /** A closed order refuses the removal (see closedPaymentsKey), and so does a payment changed meanwhile. */
+    /** OrderLifecycle.update does not persist a cancelled order, and nothing of its lifecycle is left to run. */
+    private void savePayments(Order order) {
+        if (order.hasStatus(OrderStatus.Cancelled)) {
+            ordersRepository.save(order);
+        } else {
+            orderLifecycle.update(order);
+        }
+    }
+
+    /** A completed order refuses the removal (see paymentsClosed), and so does a payment changed meanwhile. */
     private static String removePaymentRefusal(Order order, int index, String version) {
-        if (order.isClosed()) {
-            return closedPaymentsKey(order);
+        if (paymentsClosed(order)) {
+            return PAYMENTS_CLOSED;
         }
         List<Payment> payments = order.getPayments() == null ? List.of() : order.getPayments();
         if (index < 0 || index >= payments.size() || !OrderPaymentForm.version(payments.get(index)).equals(version)) {

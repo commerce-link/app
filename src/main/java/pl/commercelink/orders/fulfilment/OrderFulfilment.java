@@ -55,6 +55,10 @@ abstract class OrderFulfilment {
 
     private List<OrderItem> commit(String storeId, String orderId, List<OrderItem> orderItems) {
         Order order = ordersRepository.findById(storeId, orderId);
+        // a request queued before the order was cancelled: its items look unallocated, but nothing is fulfilled any more
+        if (order.hasStatus(OrderStatus.Cancelled)) {
+            return List.of();
+        }
 
         List<OrderItem> acceptedProducts = orderItems.stream()
                 .filter(i -> !i.isInAllocation())

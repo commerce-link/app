@@ -23,7 +23,9 @@ import java.util.Set;
 /**
  * Books one statement operation on the orders the operator chose: a payment per order carrying the operation's number
  * and date. Each order is saved on its own through {@link OrderLifecycle#update}, as the payment dialog does, so it may
- * be completed or get its e-receipt; one order that cannot be booked does not hold the others back.
+ * be completed or get its e-receipt; one order that cannot be booked does not hold the others back. The money fills the
+ * pending payment {@link StatementMatcher} counted it against ({@link Order#pendingPaymentFor}); what that payment
+ * still waits for keeps waiting with its method ({@link Order#fill}), also when the transfer turns it into a transfer.
  * <p>
  * The operation's number on an order's payments is what makes a repeated booking (a re-uploaded statement, a retried
  * request) a no-op instead of a second payment; it is checked again on the order as read for the save.
@@ -147,29 +149,40 @@ public class StatementBooking {
                 && number.equals(payment.getBankTransactionNo().trim().toUpperCase(Locale.ROOT)))) {
             throw new Refusal(Result.ALREADY_BOOKED, "statement.book.order.already");
         }
-        Payment pending = order.getPendingPayment();
-        Payment target;
+        Payment pending;
+        PaymentSource source;
+        boolean converted = false;
         if (!payer.isEmpty()) {
-            target = pending != null ? pending
-                    : added(order, PayoutChannels.sourceOf(PayoutChannels.rowOf(payer, order).orElse(null)));
+            pending = order.pendingPaymentFor(PayoutChannels.methodOf(payer, order));
+            source = PayoutChannels.sourceOf(PayoutChannels.rowOf(payer, order).orElse(null));
         } else {
-            if (pending != null && pending.getSource() != null && pending.getSource() != PaymentSource.BankTransfer) {
-                // the customer paid by transfer instead of the method the order waited for (an online payment that
-                // failed): the payment becomes a transfer, which an issued invoice or e-receipt no longer allows
-                if (order.isInvoiced() || receiptAttemptService.locksOrder(order)) {
-                    throw new Refusal(Result.FAILED, "statement.book.order.methodLocked");
-                }
-                pending.setSource(PaymentSource.BankTransfer);
-                pending.setName(null);
-                pending.setReferenceNo(null);
-            }
-            target = pending != null ? pending : added(order, PaymentSource.BankTransfer);
-            if (target.getSource() == null) {
-                target.setSource(PaymentSource.BankTransfer);
+            pending = order.pendingPaymentFor(PaymentSource.BankTransfer);
+            source = PaymentSource.BankTransfer;
+            converted = pending != null && pending.getSource() != null && pending.getSource() != PaymentSource.BankTransfer;
+            // the customer paid by transfer instead of the method the order waited for (an online payment that
+            // failed): the payment becomes a transfer, which an issued invoice or e-receipt no longer allows
+            if (converted && (order.isInvoiced() || receiptAttemptService.locksOrder(order))) {
+                throw new Refusal(Result.FAILED, "statement.book.order.methodLocked");
             }
         }
+        Payment target = pending != null ? pending : new Payment(source);
         target.setDirection(PaymentDirection.Incoming);
-        target.setAmount(allocation.amount().doubleValue());
+        if (pending != null) {
+            // before the conversion: what the order still waits for keeps the method the customer chose
+            order.fill(target, allocation.amount().doubleValue());
+        } else {
+            target.setAmount(allocation.amount().doubleValue());
+            order.addPayment(target);
+            order.keepRest();
+        }
+        if (converted) {
+            target.setSource(PaymentSource.BankTransfer);
+            target.setName(null);
+            target.setReferenceNo(null);
+        }
+        if (target.getSource() == null) {
+            target.setSource(PaymentSource.BankTransfer);
+        }
         if (allocation.fee().signum() > 0) {
             target.setFee(allocation.fee().doubleValue());
         }
@@ -179,12 +192,6 @@ public class StatementBooking {
         target.setBankTransactionNo(operation.number());
         target.setBankTransactionDate(operation.date());
         return Result.BOOKED;
-    }
-
-    private static Payment added(Order order, PaymentSource source) {
-        Payment payment = new Payment(source);
-        order.addPayment(payment);
-        return payment;
     }
 
     private static final class Refusal extends RuntimeException {

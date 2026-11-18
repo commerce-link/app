@@ -233,6 +233,40 @@ public class StatementPageFactoryTest {
     }
 
     @Test
+    void aTransferForThePendingTransferSaysWhatIsLeftOfItAndOfTheOrder() {
+        // given: 20 000 zł, 5 000 zł by transfer and the rest in installments paid out by the bank
+        Store store = store();
+        List<PayoutChannel> rows = store.getBankAccounts().get(0).getStatementFormat().getPayoutChannels();
+        int loans = rows.size();
+        rows.add(new PayoutChannel("SANTANDER", null, PaymentSource.Installments, false, null, null));
+        Order order = new Order("store-1");
+        order.setOrderId("e04b3d19-0000-4000-8000-000000000009");
+        order.setTotalPrice(20000.00);
+        Payment transfer = new Payment(PaymentSource.BankTransfer);
+        transfer.setExpectedAmount(5000.0);
+        order.setPayments(new ArrayList<>(List.of(transfer, new Payment(PaymentSource.Installments))));
+        List<Order> orders = new ArrayList<>(openOrders());
+        orders.add(order);
+        stub(ordersRepository, orders);
+        BankOperation operation = operation(20, "WB-ZALICZKA", "5000.00", "Zaliczka e04b3d19", "JAN KOWALSKI");
+        StatementPageFactory.Statement statement = new StatementPageFactory.Statement(store.getBankAccounts().get(0),
+                "zaliczka.csv", List.of(operation), 0, 0, List.of());
+
+        // when
+        StatementPage page = factory.page(store, statement, Map.of(), List.of(), PL);
+
+        // then
+        StatementPage.Row row = row(page, "WB-ZALICZKA");
+        assertThat(row.group()).isEqualTo("MATCHED");
+        assertThat(row.paymentType()).isEqualTo("Przelew bankowy");
+        assertThat(row.orders()).singleElement().satisfies(ref -> assertThat(ref.detail()).isEqualTo(
+                "do zapłaty 5 000,00 PLN · po wpłacie rozliczona, zamówienie czeka jeszcze na 15 000,00 PLN"));
+        assertThat(page.receivablesJson())
+                .contains("\"unpaid\":500000,\"fee\":0,\"type\":\"Przelew bankowy\"")
+                .contains("\"" + loans + "\":{\"unpaid\":1500000,\"fee\":0,\"type\":\"Raty\"");
+    }
+
+    @Test
     void cutsTheTitleAroundEveryHit() {
         // when
         List<StatementPage.TitlePart> parts = StatementPageFactory.titleParts("FV 1, fv 2 i FV 1", List.of("FV 1", "FV 2"));
