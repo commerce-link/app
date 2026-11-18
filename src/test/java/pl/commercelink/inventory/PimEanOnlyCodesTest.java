@@ -128,6 +128,60 @@ class PimEanOnlyCodesTest {
         assertThat(codes.contains("mova", "SHINE10")).isTrue();
     }
 
+    @Test
+    void ofStoreTakesOnlyThisStoresFlaggedEntries() {
+        // given
+        List<PimEntry> entries = List.of(
+                entry("Mova", true, "s1", true, "SHINE10"),
+                entry("Mova", true, "s2", true, "SHINE11"),
+                entry("Mova", true, null, true, "SHINE12"),
+                entry("Mova", false, "s1", true, "SHINE13"));
+
+        // when
+        VariantCodes codes = PimEanOnlyCodes.ofStore("s1", entries);
+
+        // then
+        assertThat(codes.contains("mova", "SHINE10")).isTrue();
+        assertThat(codes.size()).isEqualTo(1);
+    }
+
+    @Test
+    void ofStoreTakesClones() {
+        // given
+        PimEntry clone = new PimEntry("pim-1", List.of(new PimIdentifier("SHINE10", PimIdentifierType.MPN)),
+                "Mova", "Name", null, null, true, null, null, null, "s1", "pim-global", true);
+
+        // when
+        VariantCodes codes = PimEanOnlyCodes.ofStore("s1", List.of(clone));
+
+        // then
+        assertThat(codes.contains("mova", "SHINE10")).isTrue();
+    }
+
+    @Test
+    void ofStoreSkipsUnmatchableBrandAndBlankCode() {
+        // when
+        VariantCodes codes = PimEanOnlyCodes.ofStore("s1", List.of(
+                entry(null, true, "s1", true, "SHINE10"),
+                entry(" noname ", true, "s1", true, "SHINE11"),
+                entry("Mova", true, "s1", true, " ")));
+
+        // then
+        assertThat(codes.size()).isZero();
+    }
+
+    @Test
+    void ofStoreNormalizesBrandAndCode() {
+        // given
+        InventoryItem offer = offer("Mova", "SHINE10");
+
+        // when
+        VariantCodes codes = PimEanOnlyCodes.ofStore("s1", List.of(entry(" MOVA ", true, "s1", false, "shine 10")));
+
+        // then
+        assertThat(codes.contains(offer.brandKey(), offer.mfn())).isTrue();
+    }
+
     private static PimEntry entry(String brand, boolean eanOnly, String ownerStoreId, boolean approved,
                                   String... mpns) {
         List<PimIdentifier> identifiers = new ArrayList<>();

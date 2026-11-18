@@ -4,6 +4,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.InventoryMatchingProperties;
+import pl.commercelink.inventory.VariantCodes;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
 
@@ -16,8 +17,8 @@ class FeedProcessor {
     private final TaxonomyCategoryEnrichment enrichment;
     private final InventoryMatchingProperties matching;
 
-    FeedProcessing start(String supplierName, int taxonomyPenalty) {
+    FeedProcessing start(String supplierName, int taxonomyPenalty, VariantCodes extraEanOnly) {
         return new FeedProcessing(dataCorrection, taxonomyCache, enrichment, new FeedParseStats(supplierName), taxonomyPenalty,
-                matching.ignorePlaceholderEans());
+                matching.ignorePlaceholderEans(), extraEanOnly);
     }
 }

@@ -62,7 +62,7 @@ class InventoryLoadTest {
     @Test
     void switchOffIgnoresFlaggedEntries() {
         // given
-        Inventory inventory = inventoryWith(new InventoryMatchingProperties(true, true, true, true, false),
+        Inventory inventory = inventoryWith(new InventoryMatchingProperties(true, true, true, true, false, true),
                 ScopedPimCatalog.of(flaggedMova()));
         InventoryItem kosatec = mova(EAN_176, 1200, "Kosatec");
         InventoryItem wave = mova(EAN_169, 1210, "Wave");

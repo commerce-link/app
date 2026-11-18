@@ -225,7 +225,7 @@ class EanOnlyCodesTest {
     }
 
     private static InventoryMatchingProperties switchedOff() {
-        return new InventoryMatchingProperties(true, true, true, true, false);
+        return new InventoryMatchingProperties(true, true, true, true, false, true);
     }
 
     private static PimEntryIndex indexOf(PimEntry... entries) {

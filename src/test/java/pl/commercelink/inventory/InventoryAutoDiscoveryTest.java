@@ -520,7 +520,7 @@ class InventoryAutoDiscoveryTest {
     void withTheSwitchOffTheConflictingOfferJoinsAsToday() {
         // given
         autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
-                new InventoryMatchingProperties(false, true, true, true, true));
+                new InventoryMatchingProperties(false, true, true, true, true, true));
         when(pimView.findAll()).thenReturn(List.of());
         InventoryItem kosatec9060 = item("4895106296381", "11350-03-20G", 2613, "Kosatec", "Sapphire");
         InventoryItem incom9060 = item("4895106296381", "11350-03-20G", 2663, "IncomGroup", "Sapphire");
@@ -574,7 +574,7 @@ class InventoryAutoDiscoveryTest {
     void witnessesAreNotFetchedWithTheSwitchOff() {
         // given
         autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
-                new InventoryMatchingProperties(false, true, true, true, true));
+                new InventoryMatchingProperties(false, true, true, true, true, true));
         when(pimView.findAll()).thenReturn(List.of());
         AtomicInteger fetches = new AtomicInteger();
         InventoryItem elko = item("4895106293618", "11350-03-20G", 3563, "Elko", "Sapphire");
@@ -666,7 +666,7 @@ class InventoryAutoDiscoveryTest {
     void withTheSwitchOffTheGroupStaysWhole() {
         // given
         autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
-                new InventoryMatchingProperties(true, true, false, true, true));
+                new InventoryMatchingProperties(true, true, false, true, true, true));
         when(pimView.findAll()).thenReturn(List.of());
 
         // when
