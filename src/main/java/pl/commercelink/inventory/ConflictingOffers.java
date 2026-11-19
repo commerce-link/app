@@ -17,7 +17,7 @@ import java.util.Set;
  * and joining it by either key would merge two products, so it is left out of every group.
  * Witnesses (offers of another scope) only confirm; they are never judged.
  */
-public final class ConflictingOffers {
+public final class ConflictingOffers implements OfferFilter.Rejected {
 
     static final int MIN_CONFIRMATIONS = 2;
 
@@ -49,6 +49,12 @@ public final class ConflictingOffers {
         return conflicting.isEmpty() ? NONE : new ConflictingOffers(conflicting);
     }
 
+    @Override
+    public boolean isEmpty() {
+        return size() == 0;
+    }
+
+    @Override
     public boolean contains(InventoryItem offer) {
         return conflicting.contains(offer);
     }
