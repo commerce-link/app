@@ -7,6 +7,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.InventoryKey;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -93,10 +94,26 @@ public class TaxonomyCache {
     }
 
     public Taxonomy find(InventoryKey inventoryKey) {
+        return bestOf(recordsOf(inventoryKey.getProductEans()));
+    }
+
+    /**
+     * One record per key, in the keys' order; a key without records gives {@link Taxonomy#EMPTY}. A whole listing is
+     * asked in one call, so a cache that is not in this process can answer it with one read instead of one per product.
+     */
+    public List<Taxonomy> findAll(Collection<InventoryKey> inventoryKeys) {
+        List<Taxonomy> found = new ArrayList<>(inventoryKeys.size());
+        for (InventoryKey inventoryKey : inventoryKeys) {
+            found.add(find(inventoryKey));
+        }
+        return found;
+    }
+
+    private static Taxonomy bestOf(List<Taxonomy> records) {
         Taxonomy taxonomy = Taxonomy.EMPTY;
         Taxonomy branded = null;
 
-        for (Taxonomy t : recordsOf(inventoryKey.getProductEans())) {
+        for (Taxonomy t : records) {
             if (t.isPreferredOver(taxonomy)) {
                 taxonomy = t;
             }

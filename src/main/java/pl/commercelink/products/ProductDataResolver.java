@@ -9,6 +9,8 @@ import pl.commercelink.pim.api.PimView;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -23,7 +25,28 @@ public class ProductDataResolver {
     }
 
     public Optional<ProductData> ofGroup(String storeId, InventoryKey group) {
-        return resolve(pim(storeId).findByPimIdOrGtins(group.getId(), group.getProductEans()), taxonomyCache.find(group));
+        return resolve(entryOf(pim(storeId), group), taxonomyCache.find(group));
+    }
+
+    /**
+     * One answer per group, in the groups' order, with the taxonomy read once for all of them. A group nothing is
+     * known about gives {@link ResolvedProduct#UNKNOWN}.
+     */
+    public List<ResolvedProduct> ofGroups(String storeId, List<InventoryKey> groups) {
+        PimView pim = pim(storeId);
+        List<Taxonomy> taxonomies = taxonomyCache.findAll(groups);
+        List<ResolvedProduct> resolved = new ArrayList<>(groups.size());
+        for (int i = 0; i < groups.size(); i++) {
+            Taxonomy taxonomy = taxonomies.get(i);
+            resolved.add(resolve(entryOf(pim, groups.get(i)), taxonomy)
+                    .map(data -> new ResolvedProduct(data, taxonomy))
+                    .orElse(ResolvedProduct.UNKNOWN));
+        }
+        return resolved;
+    }
+
+    private static Optional<PimEntry> entryOf(PimView pim, InventoryKey group) {
+        return pim.findByPimIdOrGtins(group.getId(), group.getProductEans());
     }
 
     public Optional<ProductData> ofPimId(String storeId, String pimId) {

@@ -8,10 +8,14 @@ import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.TaxonomyRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 import static pl.commercelink.pim.ScopedPimCatalog.globalEntry;
 import static pl.commercelink.pim.ScopedPimCatalog.storeEntry;
 
@@ -248,6 +252,72 @@ class ProductDataResolverTest {
 
         // then
         assertThat(product).map(ProductData::mfn).isEmpty();
+    }
+
+    @Test
+    void groupsAreAnsweredInTheirOrderLikeEachGroupAlone() {
+        // given
+        taxonomy.add(record(EAN));
+        taxonomy.add(record(OTHER_EAN));
+        ProductDataResolver resolver = resolver(globalEntry("g1", EAN, "M-1", "GPU"),
+                storeEntry("s1-1", STORE_ID, EAN, "M-1", "GPU"));
+        InventoryKey inPim = InventoryKey.fromPimIdAndEan("g1", EAN);
+        InventoryKey inTaxonomy = InventoryKey.fromEan(OTHER_EAN);
+        InventoryKey nowhere = InventoryKey.fromEan("5900000000613");
+
+        // when
+        List<ResolvedProduct> products = resolver.ofGroups(STORE_ID, List.of(nowhere, inTaxonomy, inPim));
+
+        // then
+        assertThat(products).extracting(ResolvedProduct::data).containsExactly(
+                ProductData.UNKNOWN,
+                resolver.ofGroup(STORE_ID, inTaxonomy).orElseThrow(),
+                resolver.ofGroup(STORE_ID, inPim).orElseThrow());
+        assertThat(products.get(2).data().name()).isEqualTo("Store s1-1");
+    }
+
+    @Test
+    void groupsOfTheGlobalScopeDoNotSeeStoreEntries() {
+        // given
+        ProductDataResolver resolver = resolver(globalEntry("g1", EAN, "M-1", "GPU"),
+                storeEntry("s1-1", STORE_ID, EAN, "M-1", "GPU"));
+
+        // when
+        List<ResolvedProduct> products = resolver.ofGroups(null, List.of(InventoryKey.fromEan(EAN)));
+
+        // then
+        assertThat(products).extracting(product -> product.data().name()).containsExactly("Global g1");
+    }
+
+    @Test
+    void groupComesWithTheTaxonomyRecordReadForIt() {
+        // given
+        taxonomy.add(record(EAN));
+        ProductDataResolver resolver = resolver(globalEntry("g1", EAN, "M-1", "GPU"));
+
+        // when
+        List<ResolvedProduct> products = resolver.ofGroups(STORE_ID,
+                List.of(InventoryKey.fromEan(EAN), InventoryKey.fromEan(OTHER_EAN)));
+
+        // then
+        assertThat(products).extracting(ResolvedProduct::taxonomy).containsExactly(record(EAN), Taxonomy.EMPTY);
+    }
+
+    @Test
+    void allGroupsAreReadFromTheTaxonomyInOneCall() {
+        // given
+        TaxonomyCache counted = mock(TaxonomyCache.class);
+        List<InventoryKey> groups = List.of(InventoryKey.fromEan(EAN), InventoryKey.fromEan(OTHER_EAN));
+        when(counted.findAll(groups)).thenReturn(List.of(record(EAN), Taxonomy.EMPTY));
+        ProductDataResolver resolver = new ProductDataResolver(ScopedPimCatalog.of(), counted);
+
+        // when
+        List<ResolvedProduct> products = resolver.ofGroups(STORE_ID, groups);
+
+        // then
+        assertThat(products).extracting(product -> product.data().name()).containsExactly("Taxonomy name", "N/A");
+        verify(counted).findAll(groups);
+        verifyNoMoreInteractions(counted);
     }
 
     private static PimEntry entryWithNameOnly(String pimId, String gtin) {
