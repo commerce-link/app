@@ -202,6 +202,24 @@ class FinancialReportGeneratorTest {
     }
 
     @Test
+    void anOrderTheIndexAlreadyKnowsAsCancelledIsNotReadAtAll() {
+        // given
+        order("sold", LocalDateTime.of(2026, 9, 1, 10, 0), false, 123, 80);
+        order("cancelled", LocalDateTime.of(2026, 9, 1, 11, 0), false, 123, 80);
+        orders.get(1).setStatus(OrderStatus.Cancelled);
+        when(ordersRepository.findAllPastOrders(FROM, TO, STORE)).thenReturn(List.of(
+                index("sold"), index("cancelled", OrderStatus.Cancelled)));
+        when(deliveriesRepository.findAll(eq(STORE), any(), any())).thenReturn(List.of());
+
+        // when
+        FinancialReports reports = generator.generate(STORE, FROM, TO);
+
+        // then
+        assertThat(reports.ownSources().getTotalNumberOfOrders()).isEqualTo(1);
+        verify(ordersRepository).findByIds(STORE, List.of("sold"));
+    }
+
+    @Test
     void leavesCancelledOrdersOutOfTheCountsTheSalesAndTheDays() {
         // given: one sold order, and one cancelled in each channel, one of them with a payment fee recorded
         order("sold", LocalDateTime.of(2026, 9, 1, 10, 0), false, 123, 80);
@@ -271,7 +289,11 @@ class FinancialReportGeneratorTest {
     }
 
     private OrderIndexEntry index(String id) {
-        return new OrderIndexEntry(STORE, id, "a@b.pl", LocalDateTime.of(2026, 9, 1, 0, 0), OrderStatus.Completed, null);
+        return index(id, OrderStatus.Completed);
+    }
+
+    private OrderIndexEntry index(String id, OrderStatus status) {
+        return new OrderIndexEntry(STORE, id, "a@b.pl", LocalDateTime.of(2026, 9, 1, 0, 0), status, null);
     }
 
     private Delivery delivery(String provider, double shipping, double payment) {

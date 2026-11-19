@@ -152,7 +152,7 @@ public class OrderLifecycle {
                 log.debug("Order {} of store {} has every item returned; cancelling waits for its e-receipt",
                         order.getOrderId(), order.getStoreId());
             } else if (hasAllOrderItemsReturned) {
-                order.setStatus(OrderStatus.Cancelled);
+                order.markCancelled();
 
                 if (order.getReview() != null && order.getReview().getStatus() == OrderReviewStatus.ToBeCollected) {
                     order.getReview().setStatus(OrderReviewStatus.NotApplicable);

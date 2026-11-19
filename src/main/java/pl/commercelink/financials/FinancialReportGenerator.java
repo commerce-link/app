@@ -50,6 +50,9 @@ public class FinancialReportGenerator {
 
     public FinancialReports generate(String storeId, LocalDate dateFrom, LocalDate dateTo) {
         List<String> orderIds = ordersRepository.findAllPastOrders(dateFrom, dateTo, storeId).stream()
+                // the index carries the status, so an order it already knows as cancelled is not read at all; one
+                // cancelled since the index was written is dropped after the read (loadEntries)
+                .filter(entry -> entry.getStatus() != OrderStatus.Cancelled)
                 .map(OrderIndexEntry::getOrderId)
                 .toList();
         List<Entry> entries = loadEntries(storeId, orderIds);

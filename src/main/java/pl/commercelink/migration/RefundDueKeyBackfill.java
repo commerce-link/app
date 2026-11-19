@@ -79,7 +79,16 @@ final class RefundDueKeyBackfill {
             if (item == null) {
                 return;
             }
-            String wanted = mapper.marshallIntoObject(Order.class, item).getRefundDueSortKey();
+            String wanted;
+            try {
+                wanted = mapper.marshallIntoObject(Order.class, item).getRefundDueSortKey();
+            } catch (RuntimeException unreadable) {
+                // nothing in here talks to DynamoDB, so it is the record itself: a single order the mapper cannot read
+                // must not keep the application of every store from starting
+                log.error("Order {} of store {} cannot be read and is skipped by the refund key backfill: it may be "
+                        + "missing from the orders awaiting a refund", orderId, storeId, unreadable);
+                return;
+            }
             String stored = item.containsKey(ATTRIBUTE) ? item.get(ATTRIBUTE).getS() : null;
             if (Objects.equals(wanted, stored) || write(key, item.get("version"), wanted)) {
                 return;

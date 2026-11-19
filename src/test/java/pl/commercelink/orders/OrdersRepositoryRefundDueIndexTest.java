@@ -15,11 +15,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyIterable;
 import static org.mockito.Mockito.times;
@@ -105,6 +106,28 @@ class OrdersRepositoryRefundDueIndexTest {
     }
 
     @Test
+    void theRefundsWaitingLongestComeFirstWhateverOrderTheFullReadAnswersIn() {
+        // given: one cancelled before the date was recorded (keyed by its order date), two cancelled since
+        Order beforeTheDate = cancelledHolding("o-old", 100);
+        beforeTheDate.setOrderedAt(LocalDateTime.of(2026, 9, 1, 12, 0));
+        Order cancelledFirst = cancelledHolding("o-first", 100);
+        cancelledFirst.setCancelledAt(LocalDateTime.of(2026, 10, 20, 9, 0));
+        Order cancelledLast = cancelledHolding("o-last", 100);
+        cancelledLast.setOrderedAt(LocalDateTime.of(2026, 8, 1, 12, 0));
+        cancelledLast.setCancelledAt(LocalDateTime.of(2026, 10, 28, 9, 0));
+        when(amazonDynamoDB.query(any(QueryRequest.class)))
+                .thenReturn(new QueryResult().withItems(List.of(row("o-old"), row("o-first"), row("o-last"))));
+        when(dynamoDBMapper.batchLoad(anyIterable())).thenReturn(Map.of("Orders",
+                List.<Object>of(cancelledLast, beforeTheDate, cancelledFirst)));
+
+        // when
+        List<Order> orders = repository.findCancelledAwaitingRefund("store-1", TODAY);
+
+        // then
+        assertThat(orders).extracting(Order::getOrderId).containsExactly("o-old", "o-first", "o-last");
+    }
+
+    @Test
     void noRefundDueMeansNoFullRead() {
         // given
         when(amazonDynamoDB.query(any(QueryRequest.class))).thenReturn(new QueryResult().withItems(List.of()));
@@ -146,9 +169,11 @@ class OrdersRepositoryRefundDueIndexTest {
         when(amazonDynamoDB.query(any(QueryRequest.class)))
                 .thenThrow(new AmazonDynamoDBException("Throughput exceeds the current capacity of your table"));
 
-        // when / then
-        assertThatThrownBy(() -> repository.findCancelledAwaitingRefund("store-1", TODAY))
-                .isInstanceOf(AmazonDynamoDBException.class);
+        // when
+        Throwable thrown = catchThrowable(() -> repository.findCancelledAwaitingRefund("store-1", TODAY));
+
+        // then
+        assertThat(thrown).isInstanceOf(AmazonDynamoDBException.class);
         verify(amazonDynamoDB).query(any(QueryRequest.class));
     }
 }

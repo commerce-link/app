@@ -114,6 +114,31 @@ class RefundDueKeyBackfillTest {
     }
 
     @Test
+    void anOrderTheMapperCannotReadIsSkippedAndTheOthersAreStillKeyed() {
+        // given: the first record carries a status this version does not know
+        Map<String, AttributeValue> unreadable = storedWithoutKey(1);
+        unreadable.put("orderId", new AttributeValue("o-bad"));
+        unreadable.put("status", new AttributeValue("NotAStatus"));
+        when(dynamoDB.scan(any(ScanRequest.class))).thenReturn(new ScanResult().withItems(List.of(
+                Map.of("storeId", new AttributeValue("store-1"), "orderId", new AttributeValue("o-bad")),
+                Map.of("storeId", new AttributeValue("store-1"), "orderId", new AttributeValue("o-1")))));
+        when(dynamoDB.getItem(any(GetItemRequest.class))).thenAnswer(call -> {
+            GetItemRequest request = call.getArgument(0);
+            boolean bad = "o-bad".equals(request.getKey().get("orderId").getS());
+            return new GetItemResult().withItem(bad ? unreadable : storedWithoutKey(1));
+        });
+        when(dynamoDB.updateItem(any(UpdateItemRequest.class))).thenReturn(new UpdateItemResult());
+
+        // when
+        new RefundDueKeyBackfill(dynamoDB).run(TODAY);
+
+        // then
+        ArgumentCaptor<UpdateItemRequest> writes = ArgumentCaptor.forClass(UpdateItemRequest.class);
+        verify(dynamoDB).updateItem(writes.capture());
+        assertThat(writes.getValue().getKey().get("orderId").getS()).isEqualTo("o-1");
+    }
+
+    @Test
     void anOrderDeletedSinceTheScanIsLeftAlone() {
         // given
         theIndexListsTheOrder();

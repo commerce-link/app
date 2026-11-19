@@ -689,6 +689,48 @@ class OrderTest {
     }
 
     @Test
+    void cancellingRecordsWhenItHappened() {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Assembly);
+        LocalDateTime before = LocalDateTime.now();
+
+        // when
+        order.cancel(List.of(product(FulfilmentStatus.New)));
+
+        // then
+        assertThat(order.getCancelledAt()).isBetween(before, LocalDateTime.now());
+    }
+
+    @Test
+    void finishingTheItemsOfACancelledOrderKeepsItsCancellationDate() {
+        // given: cancelled a week ago, an item was left behind by a failed save
+        LocalDateTime aWeekAgo = LocalDateTime.now().minusDays(7);
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Cancelled);
+        order.setCancelledAt(aWeekAgo);
+
+        // when
+        order.cancel(List.of(product(FulfilmentStatus.New)));
+
+        // then
+        assertThat(order.getCancelledAt()).isEqualTo(aWeekAgo);
+    }
+
+    @Test
+    void anOrderCancelledBeforeTheDateWasRecordedIsNotGivenOneAfterwards() {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Cancelled);
+
+        // when
+        order.cancel(List.of(product(FulfilmentStatus.New)));
+
+        // then
+        assertThat(order.getCancelledAt()).isNull();
+    }
+
+    @Test
     void goodsTheWarehouseCouldNotTakeBackRefuseTheCancel() {
         // given: reserved, but without the manufacturer code the release goes by (older data)
         OrderItem reserved = reservedProduct();

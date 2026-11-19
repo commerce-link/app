@@ -152,13 +152,14 @@ class V029AddRefundDueIndexDynamoDbIntegrationTest {
         migration().execute();
         await(this::indexesActive, "the new index");
         OrdersRepository repository = new OrdersRepository(client);
-        Order order = cancelled(3, 1249);
+        Order order = order(OrderStatus.Assembly, 3, 1249);
 
         // when: cancelled while holding the customer's payment
+        order.markCancelled();
         repository.save(order);
 
-        // then
-        assertThat(storedKey(order)).isEqualTo(order.getRefundDueSortKey()).isNotNull();
+        // then: keyed by when it was cancelled
+        assertThat(storedKey(order)).isEqualTo(stored(order).get("cancelledAt").getS()).isNotNull();
         await(() -> indexedOrderIds().contains(order.getOrderId()), "the order to enter the index");
         assertThat(repository.findCancelledAwaitingRefund("store-1", TODAY))
                 .extracting(Order::getOrderId).containsExactly(order.getOrderId());
@@ -167,8 +168,8 @@ class V029AddRefundDueIndexDynamoDbIntegrationTest {
         order.addPayment(refund(1249));
         repository.save(order);
 
-        // then: the attribute is gone from the record, and with it the order from the index
-        assertThat(stored(order)).doesNotContainKey("refundDueSortKey");
+        // then: the key is gone from the record, and with it the order from the index; the cancellation date stays
+        assertThat(stored(order)).doesNotContainKey("refundDueSortKey").containsKey("cancelledAt");
         await(() -> indexedOrderIds().isEmpty(), "the order to leave the index");
         assertThat(repository.findCancelledAwaitingRefund("store-1", TODAY)).isEmpty();
     }

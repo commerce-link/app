@@ -8,6 +8,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Payment;
+import pl.commercelink.orders.PaymentDirection;
+import pl.commercelink.orders.PaymentSource;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -39,6 +42,35 @@ class GoogleOfflineConversionsExportTest {
 
         // then
         assertThat(csv).contains("gclid-1,Zakupy offline,2026-09-10 12:30:00,1249.0,PLN,Granted,Granted");
+    }
+
+    @Test
+    void anOrderCancelledAfterItsGoodsCameBackIsWorthWhatTheCustomerPaidIn() {
+        // given: the returns took everything out of totalPrice, and the refund is already recorded
+        Order returned = order("gclid-2", OrderStatus.Cancelled, 0);
+        returned.addPayment(Payment.bankTransfer("REF-IN", "Jan", 1249));
+        returned.addPayment(new Payment("REF-OUT", "Jan", PaymentSource.BankTransfer, PaymentDirection.Outgoing, -1249, 0, null, null));
+        when(ordersRepository.findAllOrders("store-1", FROM, TO)).thenReturn(List.of(returned));
+
+        // when
+        String csv = export.run("store-1", FROM, TO);
+
+        // then
+        assertThat(csv).contains("gclid-2,Zakupy offline,2026-09-10 12:30:00,1249.0,PLN,Granted,Granted");
+    }
+
+    @Test
+    void anOrderThatIsNotCancelledIsWorthItsTotalWhateverWasPaidIn() {
+        // given: part of it came back, the refund for that part is still to be recorded
+        Order partlyReturned = order("gclid-3", OrderStatus.Delivered, 500);
+        partlyReturned.addPayment(Payment.bankTransfer("REF-IN", "Jan", 800));
+        when(ordersRepository.findAllOrders("store-1", FROM, TO)).thenReturn(List.of(partlyReturned));
+
+        // when
+        String csv = export.run("store-1", FROM, TO);
+
+        // then
+        assertThat(csv).contains("gclid-3,Zakupy offline,2026-09-10 12:30:00,500.0,PLN,Granted,Granted");
     }
 
     @Test

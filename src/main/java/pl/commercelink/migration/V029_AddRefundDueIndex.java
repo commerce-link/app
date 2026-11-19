@@ -13,10 +13,11 @@ import java.time.LocalDate;
 import java.util.function.LongConsumer;
 
 /**
- * Cancelled orders still awaiting a refund, by store and order day, keys only: the orders list and the Payments page
- * read just those instead of every cancelled order of the last months. Sparse: only an order awaiting a refund carries
- * refundDueSortKey, which the application writes on every save (RefundDueSortKey). Orders cancelled before this unit
- * get the key from the backfill, which runs first so that DynamoDB builds the index over keyed items; until the index
+ * Cancelled orders still awaiting a refund, by store and the day they were cancelled, keys only: the orders list and
+ * the Payments page read just those instead of every cancelled order of the last months. Sparse: only an order
+ * awaiting a refund carries refundDueSortKey, which the application writes on every save (RefundDueSortKey). Orders
+ * cancelled before this unit have no cancellation date and get a key of their order date from the backfill, which runs
+ * first so that DynamoDB builds the index over keyed items; until the index
  * is ACTIVE the repository reads the way it did before (OrdersRepository.findCancelledAwaitingRefund). On a new
  * environment an earlier unit may still be building its index on Orders, so the unit waits for the table to be idle; a
  * timeout fails the start-up and the next start runs the unit again, both steps being idempotent.

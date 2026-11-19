@@ -3,7 +3,10 @@ package pl.commercelink.financials;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Payment;
+import pl.commercelink.orders.PaymentDirection;
 
 import java.io.StringWriter;
 import java.time.LocalDate;
@@ -40,8 +43,7 @@ public class GoogleOfflineConversionsExport {
                     .append(CONVERSION_NAME).append(",")
                     .append(order.getOrderedAt().format(DATE_TIME_FORMATTER)).append(",");
 
-            // the order's value even when cancelled: for an ad campaign a placed order is the conversion
-            csvWriter.append(String.valueOf(order.getTotalPrice()));
+            csvWriter.append(String.valueOf(conversionValue(order)));
             csvWriter.append(",");
 
             // Conversion Currency (opcjonalnie)
@@ -52,5 +54,23 @@ public class GoogleOfflineConversionsExport {
         }
 
         return csvWriter.toString();
+    }
+
+    /**
+     * The order's value even when cancelled: for an ad campaign a placed order is the conversion. After the goods came
+     * back totalPrice no longer says it, since every return takes the returned goods out of it, down to 0 for an order
+     * returned whole; what the customer paid in then stands for the value. An order returned without ever being paid
+     * leaves nothing to go by.
+     */
+    private static double conversionValue(Order order) {
+        if (!order.hasStatus(OrderStatus.Cancelled)) {
+            return order.getTotalPrice();
+        }
+        double paidIn = order.getPayments().stream()
+                .filter(payment -> payment.getDirection() != PaymentDirection.Outgoing)
+                .mapToDouble(Payment::getAmount)
+                .filter(amount -> amount > 0)
+                .sum();
+        return Math.max(order.getTotalPrice(), paidIn);
     }
 }

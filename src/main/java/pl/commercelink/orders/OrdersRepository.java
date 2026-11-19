@@ -514,10 +514,11 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
 
     /**
      * Cancelled orders still holding the customer's money (Order#awaitsRefund): the orders list and the Payments page
-     * keep showing them until the refund is recorded. Read from StoreIdRefundDueIndex, which holds only such orders
-     * (RefundDueSortKey), so the read grows with the refunds still due and not with the store's cancellations, and both
-     * pages are opened all day. While the index cannot be read yet (DynamoDB still builds it after V029) the orders
-     * placed in the last CANCELLED_AWAITING_REFUND_WINDOW_DAYS days are read instead, as before the index.
+     * keep showing them until the refund is recorded, here in the order they were cancelled. Read from
+     * StoreIdRefundDueIndex, which holds only such orders (RefundDueSortKey), so the read grows with the refunds still
+     * due and not with the store's cancellations, and both pages are opened all day. While the index cannot be read
+     * yet (DynamoDB still builds it after V029) the orders placed in the last CANCELLED_AWAITING_REFUND_WINDOW_DAYS
+     * days are read instead, as before the index.
      */
     public List<Order> findCancelledAwaitingRefund(String storeId, LocalDate today) {
         List<String> orderIds = new ArrayList<>();
@@ -539,13 +540,21 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
             }
             log.warn("{} is not available yet ({}); reading the cancelled orders of the last {} days for the refunds due",
                     REFUND_DUE_INDEX, e.getErrorMessage(), CANCELLED_AWAITING_REFUND_WINDOW_DAYS);
-            return findByStatusOrderedBetween(storeId, OrderStatus.Cancelled,
-                    today.minusDays(CANCELLED_AWAITING_REFUND_WINDOW_DAYS), today).stream()
-                    .filter(Order::awaitsRefund)
-                    .toList();
+            return longestWaitingFirst(findByStatusOrderedBetween(storeId, OrderStatus.Cancelled,
+                    today.minusDays(CANCELLED_AWAITING_REFUND_WINDOW_DAYS), today));
         }
-        // the index is eventually consistent: an order whose refund was recorded since is dropped after the full read
-        return findAllByIds(storeId, orderIds).stream().filter(Order::awaitsRefund).toList();
+        return longestWaitingFirst(findAllByIds(storeId, orderIds));
+    }
+
+    /**
+     * The index is eventually consistent, so an order whose refund was recorded since is dropped after the full read,
+     * which also loses the order of the index: it is put back from the key the orders now carry.
+     */
+    private static List<Order> longestWaitingFirst(List<Order> cancelled) {
+        return cancelled.stream()
+                .filter(Order::awaitsRefund)
+                .sorted(Comparator.comparing(Order::getRefundDueSortKey))
+                .toList();
     }
 
     /**

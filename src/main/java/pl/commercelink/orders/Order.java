@@ -109,9 +109,16 @@ public class Order {
     private FulfilmentType fulfilmentType;
     @DynamoDBVersionAttribute
     private Long version;
+    // When the order became Cancelled (markCancelled); an order cancelled before the date was recorded has none.
+    @DynamoDBAttribute(attributeName = "cancelledAt")
+    @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
+    @Getter
+    @Setter
+    private LocalDateTime cancelledAt;
     // Sort key of StoreIdRefundDueIndex, recomputed from the order on every save (RefundDueSortKey); the mapper reads it
     // through the getter, so no write path can leave it behind the balance.
     @DynamoDBAttribute(attributeName = "refundDueSortKey")
+    @Setter
     private String refundDueSortKey;
 
     // required by dynamodb
@@ -161,10 +168,13 @@ public class Order {
         return isZero(getUnpaidAmount());
     }
 
-    /** Cancelled with a balance left: what the customer paid is owed back until the refund is recorded. */
+    /**
+     * Cancelled while still holding the customer's money: it is owed back until the refund is recorded. A balance the
+     * other way (a refund recorded above what was paid in, e.g. with its fee on top) leaves no refund to make.
+     */
     @DynamoDBIgnore
     public boolean awaitsRefund() {
-        return hasStatus(OrderStatus.Cancelled) && !isFullyPaid();
+        return hasStatus(OrderStatus.Cancelled) && getUnpaidAmount() <= -HALF_CENT;
     }
 
     private static boolean isZero(double amount) {
@@ -531,11 +541,22 @@ public class Order {
             });
         }
 
-        this.status = OrderStatus.Cancelled;
+        markCancelled();
 
         if (review != null && review.getStatus() == OrderReviewStatus.ToBeCollected) {
             review.setStatus(OrderReviewStatus.NotApplicable);
         }
+    }
+
+    /**
+     * Cancelled is final, so the date is that of the first time only: finishing the items of an order that is already
+     * cancelled must neither move it nor invent one for an order cancelled before the date was recorded.
+     */
+    public void markCancelled() {
+        if (status != OrderStatus.Cancelled) {
+            cancelledAt = LocalDateTime.now();
+        }
+        status = OrderStatus.Cancelled;
     }
 
     @DynamoDBIgnore
@@ -1187,10 +1208,6 @@ public class Order {
 
     public String getRefundDueSortKey() {
         return RefundDueSortKey.of(this);
-    }
-
-    public void setRefundDueSortKey(String refundDueSortKey) {
-        this.refundDueSortKey = refundDueSortKey;
     }
 
     public static class Builder {
