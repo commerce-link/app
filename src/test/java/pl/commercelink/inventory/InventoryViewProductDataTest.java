@@ -152,6 +152,28 @@ class InventoryViewProductDataTest {
     }
 
     @Test
+    void storeListingFilesAndDescribesARowByTheStoreEntryAndTheGlobalListingByTheGlobalOne() {
+        // given
+        PimEntry global = new PimEntry("g1", ScopedPimCatalog.identifiers(CPU_EAN, null), "Brand", "Global g1",
+                "Procesory", null, true, null, null, "989");
+        PimEntry store = new PimEntry("st-1", ScopedPimCatalog.identifiers(CPU_EAN, null), "Brand", "Store st-1",
+                "Karty graficzne", null, true, null, null, "170", STORE_ID);
+        ProductDataResolver resolver = new ProductDataResolver(ScopedPimCatalog.of(global, store), taxonomy);
+
+        // when
+        Map<String, Collection<MatchedInventory>> inStore = view(STORE_ID, resolver, group(CPU_EAN))
+                .findAllByProductCategoryIds(List.of("989", "170"));
+        Map<String, Collection<MatchedInventory>> inGlobal = view(null, resolver, group(CPU_EAN))
+                .findAllByProductCategoryIds(List.of("989", "170"));
+
+        // then
+        assertThat(inStore.get("989")).isEmpty();
+        assertThat(inStore.get("170")).extracting(row -> row.getProductData().categoryId()).containsExactly("170");
+        assertThat(inGlobal.get("170")).isEmpty();
+        assertThat(inGlobal.get("989")).extracting(row -> row.getProductData().categoryId()).containsExactly("989");
+    }
+
+    @Test
     void rowWithoutAnyDataIsDescribedAsUnknown() {
         // given
         InventoryView view = view(STORE_ID, new ProductDataResolver(ScopedPimCatalog.of(), taxonomy), group(CPU_EAN));

@@ -20,6 +20,8 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyRepository;
+import pl.commercelink.pim.ScopedPimCatalog;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -39,6 +41,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
+import static pl.commercelink.pim.ScopedPimCatalog.globalEntry;
+import static pl.commercelink.pim.ScopedPimCatalog.storeEntry;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -148,6 +153,27 @@ class InventoryBrowseTest {
         // then
         verify(productDataResolver, times(1)).ofGroups(isNull(), any());
         verify(productDataResolver, times(1)).ofGroups(eq(STORE_ID), any());
+    }
+
+    @Test
+    void storesOwnProductIsNamedByTheStoreEntryAndASharedOneByTheGlobalEntry() {
+        // given
+        String shared = "5901000000001";
+        String ownOnly = "5901000000009";
+        ProductDataResolver resolver = new ProductDataResolver(ScopedPimCatalog.of(
+                globalEntry("g1", shared, "GPU-1", "Karty graficzne"), storeEntry("st-1", STORE_ID, shared, "GPU-1", "Karty graficzne"),
+                globalEntry("g9", ownOnly, "OWN-9", "Kable"), storeEntry("st-9", STORE_ID, ownOnly, "OWN-9", "Kable")),
+                new TaxonomyCache(mock(TaxonomyRepository.class)));
+        InventoryBrowse described = new InventoryBrowse(new BrowseIndexHolder(global, GroupProducts.of(resolver, null), Runnable::run),
+                storesRepository, storeInventoryProvider, supplierRegistry, resolver);
+        global.replace(List.of(product(shared, "GPU-1", "RTX 4060", "11", item(shared, "GPU-1", "AB", 100, 5))));
+        own.add(product(ownOnly, "OWN-9", "Kabel HDMI", "30", item(ownOnly, "OWN-9", "MyFeed", 10, 40)));
+
+        // when
+        BrowseResult result = described.browse(STORE_ID, BrowseCriteria.all());
+
+        // then
+        assertThat(result.rows()).extracting(BrowseRow::name).containsExactlyInAnyOrder("Global g1", "Store st-9");
     }
 
     @Test
