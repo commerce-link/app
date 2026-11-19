@@ -116,17 +116,18 @@ public class StoreInventoryProvider {
         InventoryAutoDiscovery.Grouping grouping = autoDiscovery.group(
                 ownItems, pimCatalog.withStoreData(storeId), global::allItems, global.variantCodes(), eanOnly);
         InventoryIndex index = InventoryIndex.of(grouping.groups());
-        if (matchingProperties.linkOwnToGlobalByCode() && !index.all().isEmpty()) {
-            linkToGlobal(storeId, index, global, grouping.variantCodes());
+        MatchingRules rules = MatchingRules.of(matchingProperties);
+        if (rules.linksOwnToGlobal() && !index.all().isEmpty()) {
+            linkToGlobal(storeId, index, global, grouping.variantCodes(), rules.linkVetos());
         }
         return new Build(new StoreInventory(index, LocalDateTime.now()), global.version(), storePairs);
     }
 
     private static void linkToGlobal(String storeId, InventoryIndex index, GlobalMatchedInventory.Generation global,
-                                     VariantCodes variantCodes) {
+                                     VariantCodes variantCodes, List<LinkVeto> vetos) {
         int linked = 0;
         Map<OwnToGlobalLinks.Outcome, Integer> leftOut = new EnumMap<>(OwnToGlobalLinks.Outcome.class);
-        for (OwnToGlobalLinks.Decision decision : OwnToGlobalLinks.apply(index, global, variantCodes)) {
+        for (OwnToGlobalLinks.Decision decision : OwnToGlobalLinks.apply(index, global, variantCodes, vetos)) {
             if (decision.outcome() == OwnToGlobalLinks.Outcome.LINKED) {
                 linked++;
             } else {
