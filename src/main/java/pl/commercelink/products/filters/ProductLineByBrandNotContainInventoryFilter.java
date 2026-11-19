@@ -3,7 +3,7 @@ package pl.commercelink.products.filters;
 import pl.commercelink.starter.dynamodb.Metadata;
 import pl.commercelink.starter.dynamodb.MetadataField;
 import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.taxonomy.Taxonomy;
+import pl.commercelink.products.ProductData;
 
 import java.util.Collection;
 import java.util.LinkedList;
@@ -25,16 +25,16 @@ public class ProductLineByBrandNotContainInventoryFilter extends InventoryFilter
 
     @Override
     public boolean run(MatchedInventory matchedInventory, List<Metadata> metadata) {
-        Taxonomy taxonomy = matchedInventory.getTaxonomy();
+        ProductData product = matchedInventory.getProductData();
 
-        if (metadata.stream().noneMatch(m -> m.hasKey(taxonomy.brand()))) {
+        if (metadata.stream().noneMatch(m -> m.hasKey(product.brand()))) {
             return true;
         }
 
-        Metadata meta = getMetadataByKey(metadata, taxonomy.brand());
+        Metadata meta = getMetadataByKey(metadata, product.brand());
         Collection<String> keywords = asDistinctCollectionFromCommaSeparateText(meta.getValue());
 
-        return !containsKeyword(taxonomy.name(), keywords);
+        return !containsKeyword(product.name(), keywords);
     }
 
     private boolean containsKeyword(String name, Collection<String> keywords) {

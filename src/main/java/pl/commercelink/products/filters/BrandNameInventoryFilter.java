@@ -27,7 +27,7 @@ class BrandNameInventoryFilter extends InventoryFilter {
     @Override
     public boolean run(MatchedInventory matchedInventory, List<Metadata> metadata) {
         Collection<String> brands =  asDistinctCollectionFromCommaSeparateText(getMetadataByKey(metadata, BRAND_FIELD_NAME).getValue());
-        return brands.contains(matchedInventory.getTaxonomy().brand().toLowerCase());
+        return brands.contains(matchedInventory.getProductData().brand().toLowerCase());
     }
 
 }
