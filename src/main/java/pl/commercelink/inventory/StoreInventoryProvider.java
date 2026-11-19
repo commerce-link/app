@@ -48,7 +48,7 @@ public class StoreInventoryProvider {
     long defaultTtlMinutes;
 
     public StoreInventory get(String storeId) {
-        return cache.get(storeId).orElseGet(() -> buildAndCache(storesRepository.findById(storeId), storeId).inventory());
+        return cache.get(storeId).orElseGet(() -> buildAndCache(storesRepository.findById(storeId), storeId, UnstoredSnapshot.IS_REPORTED).inventory());
     }
 
     public InventoryIndex ownIndex(Store store) {
@@ -60,7 +60,7 @@ public class StoreInventoryProvider {
             return new StoreInventory(InventoryIndex.of(List.of()), null);
         }
         String storeId = store.getStoreId();
-        return cache.get(storeId).orElseGet(() -> buildAndCache(store, storeId).inventory());
+        return cache.get(storeId).orElseGet(() -> buildAndCache(store, storeId, UnstoredSnapshot.IS_REPORTED).inventory());
     }
 
     // Each feed import of a store asks for a rebuild. A build that started after a request has already read that
@@ -77,7 +77,7 @@ public class StoreInventoryProvider {
         // a build that met a global reload or a change of the store's EAN-only pairs is not cached; the next one starts
         // on the current ones
         for (int attempt = 0; attempt < REFRESH_ATTEMPTS; attempt++) {
-            if (buildAndCache(store, storeId).cached()) {
+            if (buildAndCache(store, storeId, UnstoredSnapshot.FAILS_THE_BUILD).cached()) {
                 return;
             }
         }
@@ -92,7 +92,11 @@ public class StoreInventoryProvider {
         return cache.keepIfBuiltWithin(storeId, MAX_AGE_OF_KEPT_SNAPSHOT, resolveTtl(store));
     }
 
-    private Built buildAndCache(Store store, String storeId) {
+    // A request is served with what it built either way. A rebuild exists only to store the snapshot, so it fails and
+    // is delivered again.
+    private enum UnstoredSnapshot { IS_REPORTED, FAILS_THE_BUILD }
+
+    private Built buildAndCache(Store store, String storeId, UnstoredSnapshot unstored) {
         // read before the feed files are: the cache keeps the inventory of the build that started last
         long startedAt = cache.clockMillis();
         Build build = build(storeId, store);
@@ -102,10 +106,20 @@ public class StoreInventoryProvider {
         boolean sameGlobal = build.globalVersion() == null || build.globalVersion() == globalInventory.version();
         boolean sameStorePairs = build.storePairs() == null || build.storePairs().equals(storeEanOnlyCodes.of(storeId));
         boolean current = sameGlobal && sameStorePairs;
-        if (current) {
-            cache.put(storeId, build.inventory(), resolveTtl(store), startedAt);
+        if (!current) {
+            return new Built(build.inventory(), false);
         }
-        return new Built(build.inventory(), current);
+        try {
+            cache.put(storeId, build.inventory(), resolveTtl(store), startedAt);
+        } catch (StoreInventoryCacheException e) {
+            if (unstored == UnstoredSnapshot.FAILS_THE_BUILD) {
+                throw e;
+            }
+            // without a snapshot every read of this store builds it again, in the request
+            log.error("Inventory snapshot of store {} was built for a request but not stored", storeId, e);
+            return new Built(build.inventory(), false);
+        }
+        return new Built(build.inventory(), true);
     }
 
     private record Built(StoreInventory inventory, boolean cached) {

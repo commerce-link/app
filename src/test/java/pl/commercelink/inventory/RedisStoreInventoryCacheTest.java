@@ -228,11 +228,22 @@ class RedisStoreInventoryCacheTest {
     }
 
     @Test
-    void putSwallowsRedisFailure() {
+    void putReportsARedisFailureToTheCaller() {
         // given
         RedisStoreInventoryCache cache = cache();
         when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class)))
                 .thenThrow(new RuntimeException("redis down"));
+
+        // when / then
+        org.junit.jupiter.api.Assertions.assertThrows(StoreInventoryCacheException.class,
+                () -> cache.put("s1", sampleInventory(), Duration.ofMinutes(60), 1L));
+    }
+
+    @Test
+    void putRefusedForANewerBuildIsNotAFailure() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class))).thenReturn(0L);
 
         // when / then
         assertDoesNotThrow(() -> cache.put("s1", sampleInventory(), Duration.ofMinutes(60), 1L));
