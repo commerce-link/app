@@ -98,7 +98,7 @@ public class RedisStoreInventoryCache implements StoreInventoryCache {
                     String.valueOf(buildStartedAtMillis), compress(json),
                     String.valueOf(ttl.toMillis()), String.valueOf(markLifetime(ttl).toMillis()));
         } catch (Exception e) {
-            System.err.println("Redis store-inventory put failed for " + storeId + ": " + e.getMessage());
+            throw new StoreInventoryCacheException("Inventory snapshot of store " + storeId + " was not stored", e);
         }
     }
 

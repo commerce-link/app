@@ -189,6 +189,41 @@ class StoreInventoryProviderTest {
     }
 
     @Test
+    void rebuildWhoseSnapshotCouldNotBeStoredFails() {
+        // given
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenReturn(grouping(List.of()));
+        org.mockito.Mockito.doThrow(new StoreInventoryCacheException("not stored", new RuntimeException("redis down")))
+                .when(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class), anyLong());
+
+        // when / then
+        org.junit.jupiter.api.Assertions.assertThrows(StoreInventoryCacheException.class,
+                () -> provider.refresh("store-1", null));
+    }
+
+    @Test
+    void requestIsServedWhenItsSnapshotCouldNotBeStored() {
+        // given
+        when(cache.get("store-1")).thenReturn(Optional.empty());
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenReturn(grouping(List.of()));
+        org.mockito.Mockito.doThrow(new StoreInventoryCacheException("not stored", new RuntimeException("redis down")))
+                .when(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class), anyLong());
+
+        // when
+        StoreInventory result = provider.get("store-1");
+
+        // then
+        assertThat(result.items()).isEmpty();
+    }
+
+    @Test
     void refreshOfAStoreThatIsGoneStoresNothing() {
         // given
         when(storesRepository.findById("store-1")).thenReturn(null);

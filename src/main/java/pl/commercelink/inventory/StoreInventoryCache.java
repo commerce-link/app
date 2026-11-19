@@ -14,7 +14,10 @@ public interface StoreInventoryCache {
 
     /**
      * Stores the inventory unless one whose build started later is already stored, or the store's inventory was
-     * evicted after this build started.
+     * evicted after this build started. Neither is a failure.
+     *
+     * @throws StoreInventoryCacheException when the inventory could not be written; unlike a failed read or eviction
+     *                                      this is not swallowed, since the caller decides whether to build again
      */
     void put(String storeId, StoreInventory inventory, Duration ttl, long buildStartedAtMillis);
 
