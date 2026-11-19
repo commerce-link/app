@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.inventory.VariantCodes;
 import pl.commercelink.inventory.supplier.api.CsvRowParser;
 import pl.commercelink.inventory.supplier.api.FeedFormat;
 import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
@@ -72,15 +73,15 @@ class StoreFeedItemLoaderTest {
         // given
         SupplierProviderDescriptor descriptor = csvDescriptor("Action");
         InventoryItem eurItem = new InventoryItem("4711111111111", "MFN1", 100.0, "EUR", 5, 2, "Action", true, true, false);
-        when(csvLoader.fetch(any(), eq(';'), eq("store-1"), named("Action"), eq(1000))).thenReturn(List.of(eurItem));
+        when(csvLoader.fetch(any(), eq(';'), eq("store-1"), named("Action"), eq(1000), eq(VariantCodes.none()))).thenReturn(List.of(eurItem));
 
         // when
-        List<InventoryItem> result = loader.load("store-1", "Action", descriptor, Map.of("EUR", 4.0));
+        List<InventoryItem> result = loader.load("store-1", "Action", descriptor, Map.of("EUR", 4.0), VariantCodes.none());
 
         // then
         assertEquals(1, result.size());
         assertEquals("PLN", result.get(0).currency());
-        verify(csvLoader).fetch(any(), eq(';'), eq("store-1"), named("Action"), eq(1000));
+        verify(csvLoader).fetch(any(), eq(';'), eq("store-1"), named("Action"), eq(1000), eq(VariantCodes.none()));
     }
 
     @Test
@@ -88,16 +89,16 @@ class StoreFeedItemLoaderTest {
         // given
         SupplierProviderDescriptor descriptor = xmlDescriptor("Action");
         InventoryItem eurItem = new InventoryItem("4711111111111", "MFN1", 100.0, "EUR", 5, 2, "Action", true, true, false);
-        when(xmlLoader.load(any(), eq("Item"), any(), eq("store-1"), eq(1000))).thenReturn(List.of(eurItem));
+        when(xmlLoader.load(any(), eq("Item"), any(), eq("store-1"), eq(1000), eq(VariantCodes.none()))).thenReturn(List.of(eurItem));
 
         // when
-        List<InventoryItem> result = loader.load("store-1", "Action-k7f3a9c2", descriptor, Map.of("EUR", 4.0));
+        List<InventoryItem> result = loader.load("store-1", "Action-k7f3a9c2", descriptor, Map.of("EUR", 4.0), VariantCodes.none());
 
         // then
         assertEquals(1, result.size());
         assertEquals("PLN", result.get(0).currency());
         verify(xmlLoader).load(any(), eq("Item"),
-                argThat((SupplierInfo info) -> info.name().equals("Action-k7f3a9c2")), eq("store-1"), eq(1000));
+                argThat((SupplierInfo info) -> info.name().equals("Action-k7f3a9c2")), eq("store-1"), eq(1000), eq(VariantCodes.none()));
     }
 
     @Test
@@ -105,10 +106,10 @@ class StoreFeedItemLoaderTest {
         // given
         SupplierProviderDescriptor descriptor = csvDescriptor("Action");
         InventoryItem eurItem = new InventoryItem("4711111111111", "MFN1", 100.0, "EUR", 5, 2, "Action", true, true, false);
-        when(csvLoader.fetch(any(), eq(';'), eq("store-1"), named("Action"), anyInt())).thenReturn(List.of(eurItem));
+        when(csvLoader.fetch(any(), eq(';'), eq("store-1"), named("Action"), anyInt(), any())).thenReturn(List.of(eurItem));
 
         // when
-        List<InventoryItem> result = loader.load("store-1", "Action", descriptor, Map.of());
+        List<InventoryItem> result = loader.load("store-1", "Action", descriptor, Map.of(), VariantCodes.none());
 
         // then
         assertTrue(result.isEmpty());
@@ -120,12 +121,12 @@ class StoreFeedItemLoaderTest {
         SupplierProviderDescriptor descriptor = csvDescriptor("Kosatec");
 
         // when
-        loader.load("store-1", "Kosatec-k7f3a9c2", descriptor, Map.of("PLN", 1.0));
+        loader.load("store-1", "Kosatec-k7f3a9c2", descriptor, Map.of("PLN", 1.0), VariantCodes.none());
 
         // then
         verify(csvLoader).fetch(any(), eq(';'), eq("store-1"),
                 argThat((SupplierInfo info) -> info.name().equals("Kosatec-k7f3a9c2") && info.accuracyScore() == 1),
-                eq(1000));
+                eq(1000), eq(VariantCodes.none()));
     }
 
     @Test
@@ -134,13 +135,13 @@ class StoreFeedItemLoaderTest {
         SupplierProviderDescriptor descriptor = ManualSupplierDescriptor.forIdentity("manual-k7f3a9c2");
 
         // when
-        loader.load("store-1", "manual-k7f3a9c2", descriptor, Map.of("PLN", 1.0));
+        loader.load("store-1", "manual-k7f3a9c2", descriptor, Map.of("PLN", 1.0), VariantCodes.none());
 
         // then
         verify(csvLoader).fetch(any(), eq(';'), eq("store-1"),
                 argThat((SupplierInfo info) -> info.name().equals("manual-k7f3a9c2")
                         && info.accuracyScore() == ManualSupplierInfos.ACCURACY_SCORE),
-                eq(1000));
+                eq(1000), eq(VariantCodes.none()));
     }
 
     private static SupplierInfo named(String name) {

@@ -64,7 +64,8 @@ class StoreInventoryProviderScopeTest {
         InventoryAutoDiscovery autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry);
         StoreInventoryProvider provider = new StoreInventoryProvider(cache, storesRepository, supplierProviderFactory,
                 autoDiscovery, storeFeedItemLoader, exchangeRates, pimCatalog, new GlobalMatchedInventory(),
-                InventoryMatchingProperties.allEnabled());
+                InventoryMatchingProperties.allEnabled(),
+                new StoreEanOnlyCodes(pimCatalog, InventoryMatchingProperties.allEnabled()));
 
         Store store = new Store();
         store.setStoreId(storeId);
@@ -73,7 +74,7 @@ class StoreInventoryProviderScopeTest {
         store.setFulfilmentConfiguration(config);
         when(cache.get(storeId)).thenReturn(Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(storeFeedItemLoader.load(eq(storeId), eq("manual:H1"), any(SupplierProviderDescriptor.class), any()))
+        when(storeFeedItemLoader.load(eq(storeId), eq("manual:H1"), any(SupplierProviderDescriptor.class), any(), any()))
                 .thenReturn(List.of(new InventoryItem(FEED_EAN, MPN, 10.0, "PLN", 1, 1, "manual:H1", true, true, false)));
         return provider.ownInventory(store).items();
     }

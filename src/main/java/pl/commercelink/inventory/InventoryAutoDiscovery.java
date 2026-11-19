@@ -1,6 +1,5 @@
 package pl.commercelink.inventory;
 
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -14,14 +13,13 @@ import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Component
 class InventoryAutoDiscovery {
 
     private PimCatalog pimCatalog;
     private TaxonomyCache taxonomyCache;
     private SupplierRegistry supplierRegistry;
-    private InventoryMatchingProperties matchingProperties;
+    private final MatchingRules rules;
 
     public InventoryAutoDiscovery(PimCatalog pimCatalog, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
         this(pimCatalog, taxonomyCache, supplierRegistry, InventoryMatchingProperties.allEnabled());
@@ -33,12 +31,9 @@ class InventoryAutoDiscovery {
         this.pimCatalog = pimCatalog;
         this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
-        this.matchingProperties = matchingProperties;
+        this.rules = MatchingRules.of(matchingProperties);
     }
 
-    /*
-        This method uses maps and various other tricks to improve performance of the auto-discovery process. Do not modify unless you are confident in your changes.
-     */
     /** Matches against the global PIM view: the shared inventory belongs to no store. */
     Collection<MatchedInventory> run(List<InventoryItem> inventoryItems) {
         return run(inventoryItems, pimCatalog.withGlobalData());
@@ -84,27 +79,38 @@ class InventoryAutoDiscovery {
     Grouping group(List<InventoryItem> allOffers, PimView pim,
                    Supplier<? extends Collection<InventoryItem>> witnesses, VariantCodes inherited, VariantCodes eanOnly) {
         SharedManufacturerCodes sharedCodes = SharedManufacturerCodes.of(allOffers);
-        VariantCodes variantCodes = sharedCodes.variantCodes().plus(inherited).plus(eanOnly);
+        CodeJoinGuard guard = rules.codeJoinGuard(sharedCodes, inherited, eanOnly);
+        VariantCodes variantCodes = guard.variantCodes();
 
-        ConflictingOffers conflicting = matchingProperties.excludeConflictingOffers() && !allOffers.isEmpty()
-                ? ConflictingOffers.of(allOffers, witnesses.get(), sharedCodes)
-                : ConflictingOffers.none();
-        List<InventoryItem> inventoryItems = allOffers;
-        if (conflicting.size() > 0) {
-            log.warn("Left {} offers out of grouping: their EAN and their brand with manufacturer code point to different products", conflicting.size());
-            inventoryItems = allOffers.stream().filter(offer -> !conflicting.contains(offer)).toList();
+        OfferPool pool = new OfferPool(allOffers, witnesses, sharedCodes);
+        if (!allOffers.isEmpty()) {
+            for (OfferFilter filter : rules.offerFilters()) {
+                pool = pool.without(filter.reject(pool));
+            }
         }
+        List<InventoryItem> inventoryItems = pool.offers();
 
         // Build a mapping of EANs and product codes to inventory items for quick lookup
         Map<String, List<InventoryItem>> mappedByEan = new HashMap<>();
         Map<String, List<InventoryItem>> mappedByProductCode = new HashMap<>();
         for (InventoryItem inventoryItem : inventoryItems) {
             mappedByEan.computeIfAbsent(inventoryItem.ean(), k -> new LinkedList<>()).add(inventoryItem);
-            if (!sharedCodes.isShared(inventoryItem) && !isEanOnly(inventoryItem, eanOnly)) {
+            if (!guard.joinsOnlyByEan(inventoryItem)) {
                 mappedByProductCode.computeIfAbsent(inventoryItem.mfn(), k -> new LinkedList<>()).add(inventoryItem);
             }
         }
 
+        Map<String, MatchedInventory> keyToMatchedInventory = joinKnownEntries(pim, mappedByEan, mappedByProductCode);
+        joinRemainingOffers(mappedByEan, mappedByProductCode, guard, keyToMatchedInventory);
+
+        return new Grouping(processMatchedInventoryCandidates(keyToMatchedInventory.values()), variantCodes);
+    }
+
+    /*
+        joinKnownEntries and joinRemainingOffers use maps and various other tricks to improve performance of the auto-discovery process. Do not modify unless you are confident in your changes.
+     */
+    private Map<String, MatchedInventory> joinKnownEntries(PimView pim, Map<String, List<InventoryItem>> mappedByEan,
+                                                           Map<String, List<InventoryItem>> mappedByProductCode) {
         // Resolve already known mappings based on the PIM index
         Map<String, MatchedInventory> keyToMatchedInventory = new HashMap<>();
         for (PimEntry pimEntry : pim.findAll()) {
@@ -120,14 +126,18 @@ class InventoryAutoDiscovery {
                 keyToMatchedInventory.put(ean, matchedInventory);
             }
         }
+        return keyToMatchedInventory;
+    }
 
+    private void joinRemainingOffers(Map<String, List<InventoryItem>> mappedByEan, Map<String, List<InventoryItem>> mappedByProductCode,
+                                     CodeJoinGuard guard, Map<String, MatchedInventory> keyToMatchedInventory) {
         // Resolve remaining and unknown items through auto-discovery
         for (List<InventoryItem> items : mappedByEan.values()) {
             Set<InventoryItem> matchingItems = new HashSet<>();
 
             for (InventoryItem itemByEan : items) {
                 matchingItems.add(itemByEan);
-                if (sharedCodes.isShared(itemByEan) || isEanOnly(itemByEan, eanOnly)) {
+                if (guard.joinsOnlyByEan(itemByEan)) {
                     continue;
                 }
                 mappedByProductCode.getOrDefault(itemByEan.mfn(), Collections.emptyList()).stream()
@@ -157,13 +167,6 @@ class InventoryAutoDiscovery {
                 }
             }
         }
-
-        return new Grouping(processMatchedInventoryCandidates(keyToMatchedInventory.values()), variantCodes);
-    }
-
-    private static boolean isEanOnly(InventoryItem offer, VariantCodes eanOnly) {
-        // checked before the brand key is built, so a pool without flagged pairs does no extra work per offer
-        return eanOnly.size() > 0 && eanOnly.contains(offer.brandKey(), offer.mfn());
     }
 
     private static Collection<InventoryItem> findItemsByKeysModifyingCollection(Collection<String> keys, Map<String, List<InventoryItem>> col) {
@@ -218,103 +221,14 @@ class InventoryAutoDiscovery {
 
         List<InventoryItem> inventoryItems = matchedInventory.getInventoryItems();
 
-        if (matchingProperties.splitSingleCodeByPrice() && hasSingleCode(inventoryItems)) {
-            List<List<InventoryItem>> parts = SingleCodePriceSplit.byEan(inventoryItems);
-            if (parts.size() > 1) {
-                return parts.stream().map(this::createMatchedInventoryOf).toList();
+        for (GroupRefiner refiner : rules.groupRefiners()) {
+            Optional<List<List<InventoryItem>>> refined = refiner.refine(inventoryItems);
+            if (refined.isPresent()) {
+                return refined.get().stream().map(this::createMatchedInventoryOf).toList();
             }
         }
 
-        // uniform groups does not require further analysis
-        if (isUniformGroupOfItems(inventoryItems)) {
-            return Collections.singletonList(matchedInventory);
-        }
-
-        var splitPrice = calculateSplitPrice(inventoryItems);
-
-        // price is too small to be considered a valid discriminator
-        if (PriceSplitThresholds.isTooLowToSplit(splitPrice)) {
-            return Collections.singletonList(matchedInventory);
-        }
-
-        Map<Boolean, List<InventoryItem>> priceGroupedItems = inventoryItems.stream()
-                .collect(Collectors.groupingBy(i -> i.netPrice() > splitPrice));
-
-        List<InventoryItem> lowestPricedGroup = priceGroupedItems.getOrDefault(false, Collections.emptyList());
-        List<InventoryItem> highestPricedGroup = priceGroupedItems.getOrDefault(true, Collections.emptyList());
-
-        boolean lowestUsable = lowestPricedGroup.size() > 1;
-        boolean highestUsable = highestPricedGroup.size() > 1;
-
-        if (!lowestUsable && !highestUsable) {
-            return Collections.singletonList(matchedInventory);
-        }
-
-        if (lowestUsable && !highestUsable) {
-            return Collections.singletonList(createMatchedInventoryFromPriceGroup(lowestPricedGroup));
-        }
-
-        if (!lowestUsable) {
-            return Collections.singletonList(createMatchedInventoryFromPriceGroup(highestPricedGroup));
-        }
-
-        return processPriceGroups(lowestPricedGroup, highestPricedGroup);
-    }
-
-    private List<MatchedInventory> processPriceGroups(List<InventoryItem> lowestPricedGroup, List<InventoryItem> highestPricedGroup) {
-        List<MatchedInventory> matchedInventories = new LinkedList<>();
-
-        // analyse price groups
-        var lowestPricedGroupMfns = lowestPricedGroup.stream().map(InventoryItem::mfn).distinct().toList();
-        if (lowestPricedGroupMfns.size() == 1) {
-            String mfn = lowestPricedGroupMfns.getFirst();
-
-            if (doesNotHaveItemsWithMfn(mfn, highestPricedGroup)) {
-                // if we have a distinct mfns in price groups we can process them separately
-                matchedInventories.add(createMatchedInventoryFromPriceGroup(lowestPricedGroup));
-            } else {
-
-                // otherwise if we have an exact match in the lowest priced group, we can try to rebalance the highest priced group to find a uniform group of items
-                var lowestPricedGroupEans = lowestPricedGroup.stream().map(InventoryItem::ean).distinct().toList();
-                if (lowestPricedGroupEans.size() == 1) {
-                    String ean = lowestPricedGroupEans.getFirst();
-
-                    // rebalance perfectly matched items to see if we can find a uniform group
-                    List<InventoryItem> perfectlyMatchedItems = highestPricedGroup.stream()
-                            .filter(i -> i.ean().equalsIgnoreCase(ean))
-                            .filter(i -> i.mfn().equalsIgnoreCase(mfn))
-                            .toList();
-
-                    lowestPricedGroup.addAll(perfectlyMatchedItems);
-                    highestPricedGroup.removeAll(perfectlyMatchedItems);
-
-                    if (doesNotHaveItemsWithMfn(mfn, highestPricedGroup)) {
-                        matchedInventories.add(createMatchedInventoryFromPriceGroup(lowestPricedGroup));
-                    }
-                }
-            }
-        }
-
-        matchedInventories.add(createMatchedInventoryFromPriceGroup(highestPricedGroup));
-        return matchedInventories;
-    }
-
-    // last defence against oddly priced items
-    private MatchedInventory createMatchedInventoryFromPriceGroup(List<InventoryItem> inventoryItems) {
-        double avg = inventoryItems.stream()
-                .mapToDouble(InventoryItem::netPrice)
-                .average()
-                .getAsDouble();
-
-        List<InventoryItem> approvedItems = inventoryItems.stream().filter(
-                i -> i.netPrice() > avg * 0.5 && i.netPrice() < avg * 1.5
-        ).toList();
-
-        return createMatchedInventoryOf(approvedItems);
-    }
-
-    private boolean hasSingleCode(List<InventoryItem> inventoryItems) {
-        return inventoryItems.stream().map(InventoryItem::mfn).distinct().count() == 1;
+        return Collections.singletonList(matchedInventory);
     }
 
     // The group is keyed by the EANs and codes of its own offers, so associations from the PIM index are lost.
@@ -323,34 +237,6 @@ class InventoryAutoDiscovery {
         Set<String> eans = inventoryItems.stream().map(InventoryItem::ean).collect(Collectors.toSet());
         Set<String> productCodes = inventoryItems.stream().map(InventoryItem::mfn).collect(Collectors.toSet());
         return new MatchedInventory(new InventoryKey(eans, productCodes), inventoryItems, taxonomyCache, supplierRegistry);
-    }
-
-    private boolean isUniformGroupOfItems(List<InventoryItem> inventoryItems) {
-        var eanToOccurrencesQty = new HashMap<String, Integer>();
-        for (InventoryItem inventoryItem : inventoryItems) {
-            eanToOccurrencesQty.compute(inventoryItem.ean(), (k, v) -> v == null ? 1 : v + 1);
-        }
-
-        var mfnToOccurrencesQty = new HashMap<String, Integer>();
-        for (InventoryItem inventoryItem : inventoryItems) {
-            mfnToOccurrencesQty.compute(inventoryItem.mfn(), (k, v) -> v == null ? 1 : v + 1);
-        }
-
-        return mfnToOccurrencesQty.size() == 1 || eanToOccurrencesQty.size() == 1;
-    }
-
-    // this is to avoid extreme situations when providers misassign ean or mfn keys and we end up with too big price distribution
-    private double calculateSplitPrice(List<InventoryItem> inventoryItems) {
-        var mfnToPriceAvg = new HashMap<String, Double>();
-        for (InventoryItem inventoryItem : inventoryItems) {
-            mfnToPriceAvg.compute(inventoryItem.mfn(), (k, v) -> v == null ?
-                    inventoryItem.netPrice() : (v + inventoryItem.netPrice()) / 2);
-        }
-        return PriceSplitThresholds.splitPriceOf(mfnToPriceAvg.values().stream().max(Double::compareTo).orElse(0.0));
-    }
-
-    private boolean doesNotHaveItemsWithMfn(String mfn, List<InventoryItem> inventoryItems) {
-        return inventoryItems.stream().noneMatch(i -> i.mfn().equalsIgnoreCase(mfn));
     }
 
 }
