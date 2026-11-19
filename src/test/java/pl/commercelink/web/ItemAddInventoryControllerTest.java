@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.Inventory;
+import pl.commercelink.products.ProductDataFixture;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.invoicing.api.Price;
@@ -56,8 +57,8 @@ class ItemAddInventoryControllerTest {
     void listsTheProductOfTheEanWithWhatTheItemWillGet() {
         // given
         when(matched.hasAnyOffers()).thenReturn(true);
-        when(matched.getTaxonomy()).thenReturn(new Taxonomy(EAN, "CW2288-111", "Nike", "Air Force 1, rozm. 41", "Buty",
-                1, null, null));
+        when(matched.getProductData()).thenReturn(ProductDataFixture.from(new Taxonomy(EAN, "CW2288-111", "Nike", "Air Force 1, rozm. 41", "Buty",
+                1, null, null)));
         when(matched.getMedianPrice()).thenReturn(Price.fromNet(200));
         when(matched.getTotalAvailableQty()).thenReturn(3L);
         when(matched.getEstimatedDeliveryDays()).thenReturn(2);

@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.products.ProductDataFixture;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.api.Price;
@@ -237,7 +238,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         Taxonomy taxonomy = new Taxonomy("EAN-1", "MFN-1", "TestBrand", "test-product", "Laptops", 1, null, null);
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
-        when(matchedInventory.getTaxonomy()).thenReturn(taxonomy);
+        when(matchedInventory.getProductData()).thenReturn(ProductDataFixture.from(taxonomy));
         when(matchedInventory.getMedianPrice()).thenReturn(Price.fromGross(150.0));
         when(matchedInventory.getEstimatedDeliveryDays()).thenReturn(3);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
@@ -266,7 +267,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         Taxonomy taxonomy = new Taxonomy("EAN-N", "MFN-N", "TestBrand", "no-category-product", null, 1, null, null);
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
-        when(matchedInventory.getTaxonomy()).thenReturn(taxonomy);
+        when(matchedInventory.getProductData()).thenReturn(ProductDataFixture.from(taxonomy));
         when(matchedInventory.getMedianPrice()).thenReturn(Price.fromGross(80.0));
         when(matchedInventory.getEstimatedDeliveryDays()).thenReturn(2);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
@@ -328,7 +329,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(0.0);
         Taxonomy taxonomy = new Taxonomy("EAN-S", "MFN-S", "TestBrand", "assembly-service", "Services", 1, null, null);
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
-        when(matchedInventory.getTaxonomy()).thenReturn(taxonomy);
+        when(matchedInventory.getProductData()).thenReturn(ProductDataFixture.from(taxonomy));
         when(matchedInventory.getMedianPrice()).thenReturn(Price.fromGross(30.0));
         when(matchedInventory.getEstimatedDeliveryDays()).thenReturn(0);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);

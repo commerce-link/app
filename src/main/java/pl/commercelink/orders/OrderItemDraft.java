@@ -4,7 +4,7 @@ import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.taxonomy.Categories;
-import pl.commercelink.taxonomy.Taxonomy;
+import pl.commercelink.products.ProductData;
 
 /**
  * An order item resolved from its source (pricelist row or matched inventory) but not yet placed
@@ -30,10 +30,10 @@ public record OrderItemDraft(String category, String name, int qty, double price
             return new OrderItemDraft(Categories.UNCATEGORIZED, "Brak produktu", qty, 0, ean, false,
                     matchedInventory.getEstimatedDeliveryDays());
         }
-        Taxonomy taxonomy = matchedInventory.getTaxonomy();
+        ProductData product = matchedInventory.getProductData();
         return new OrderItemDraft(
-                StringUtils.isNotBlank(taxonomy.category()) ? taxonomy.category() : Categories.UNCATEGORIZED,
-                taxonomy.name(),
+                StringUtils.isNotBlank(product.category()) ? product.category() : Categories.UNCATEGORIZED,
+                product.name(),
                 qty,
                 matchedInventory.getMedianPrice().grossValue(),
                 ean,

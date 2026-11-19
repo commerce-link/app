@@ -2,6 +2,7 @@ package pl.commercelink.web;
 
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import pl.commercelink.pim.api.PimView;
+import pl.commercelink.products.ProductDataFixture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -580,7 +581,7 @@ class CatalogProductsControllerTest {
         MatchedInventory found = mock(MatchedInventory.class);
         when(found.isEmpty()).thenReturn(false);
         when(found.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
-        when(found.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
+        when(found.getProductData()).thenReturn(ProductDataFixture.from(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null)));
         when(found.getLowestPrice()).thenReturn(Price.fromGross(2749));
         MatchedInventory missing = mock(MatchedInventory.class);
         when(missing.isEmpty()).thenReturn(true);
@@ -650,7 +651,7 @@ class CatalogProductsControllerTest {
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
         when(foundInventory.isEmpty()).thenReturn(false);
         when(foundInventory.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
-        when(foundInventory.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
+        when(foundInventory.getProductData()).thenReturn(ProductDataFixture.from(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null)));
         when(foundInventory.getLowestPrice()).thenReturn(Price.fromGross(2749));
         when(inventoryView.findByEan("1")).thenReturn(foundInventory);
         when(pimView.findByPimIdOrGtins(any(), any())).thenReturn(Optional.empty());
@@ -1134,7 +1135,7 @@ class CatalogProductsControllerTest {
         when(foundInventory.isEmpty()).thenReturn(false);
         InventoryKey key = new InventoryKey("1", "MFN-1");
         when(foundInventory.getInventoryKey()).thenReturn(key);
-        when(foundInventory.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
+        when(foundInventory.getProductData()).thenReturn(ProductDataFixture.from(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null)));
         when(foundInventory.getLowestPrice()).thenReturn(Price.fromGross(2749));
         when(inventoryView.findByEan("1")).thenReturn(foundInventory);
         when(pimView.findByPimIdOrGtins(key.getId(), key.getProductEans())).thenReturn(Optional.empty());

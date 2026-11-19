@@ -5,6 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.InventoryKey;
+import pl.commercelink.inventory.MatchedInventoryFixture;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.InventoryItem;
@@ -79,7 +80,8 @@ class ProductRecommendationTest {
 
     private MatchedInventory group(InventoryItem... offers) {
         when(taxonomyCache.find(any(InventoryKey.class))).thenReturn(TAXONOMY);
-        return new MatchedInventory(new InventoryKey(), List.of(offers), taxonomyCache, supplierRegistry);
+        return MatchedInventoryFixture.readingFrom(taxonomyCache,
+                new MatchedInventory(new InventoryKey(), List.of(offers), taxonomyCache, supplierRegistry));
     }
 
     private static InventoryItem offer(String ean, String mfn) {

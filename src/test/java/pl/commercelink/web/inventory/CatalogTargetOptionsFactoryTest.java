@@ -8,6 +8,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.Inventory;
+import pl.commercelink.inventory.MatchedInventoryFixture;
+import pl.commercelink.products.ProductDataFixture;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
@@ -204,14 +206,14 @@ class CatalogTargetOptionsFactoryTest {
         group.addManufacturerCode("GLOBAL-98");
         when(merged.isEmpty()).thenReturn(false);
         when(merged.getInventoryKey()).thenReturn(group);
-        when(merged.getTaxonomy()).thenReturn(new Taxonomy(ownEan, ownMfn, "Brand", "Merged", "x", 1, null, null, null, "11"));
+        when(merged.getProductData()).thenReturn(ProductDataFixture.from(new Taxonomy(ownEan, ownMfn, "Brand", "Merged", "x", 1, null, null, null, "11")));
         when(view.findByEan(ownEan)).thenReturn(merged);
     }
 
     private void product(String ean, String name, String categoryId) {
         InventoryKey key = InventoryKey.fromEan(ean);
-        MatchedInventory matched = new MatchedInventory(key,
-                new InventoryItem(ean, "M-" + ean, 100.0, "PLN", 1, 1, "AB"), taxonomyCache, null);
+        MatchedInventory matched = MatchedInventoryFixture.readingFrom(taxonomyCache, new MatchedInventory(key,
+                new InventoryItem(ean, "M-" + ean, 100.0, "PLN", 1, 1, "AB"), taxonomyCache, null));
         when(taxonomyCache.find(same(key)))
                 .thenReturn(new Taxonomy(ean, "M-" + ean, "Brand", name, "x", 1, null, null, null, categoryId));
         when(view.findByEan(ean)).thenReturn(matched);

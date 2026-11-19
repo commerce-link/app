@@ -17,6 +17,8 @@ import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.ProductDataFixture;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.products.ProductRecommendation;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
@@ -78,8 +80,16 @@ class InventoryViewStoreListingsTest {
     @Mock
     private ProductRepository productRepository;
 
+    @Mock
+    private ProductDataResolver productDataResolver;
+
     @InjectMocks
     private Inventory inventory;
+
+    @BeforeEach
+    void productDataComesFromTheTaxonomy() {
+        ProductDataFixture.answerFromTaxonomy(productDataResolver, taxonomyCache);
+    }
 
     // the global catalog knows PIM-1, so it is a global entry; any other id (st-s-…) is a store entry (spec 4.3)
     @BeforeEach
@@ -477,8 +487,8 @@ class InventoryViewStoreListingsTest {
                 realCache, supplierRegistry);
         InventoryIndex mergingIndex = InventoryIndex.of(List.of(groupB));
 
-        InventoryView view = new InventoryView(globalIndex, InventoryIndex.of(List.of()), pimId -> false,
-                realCache, supplierRegistry,
+        InventoryView view = new InventoryView(null, ProductDataFixture.resolverOver(realCache), globalIndex, InventoryIndex.of(List.of()),
+                pimId -> false, realCache, supplierRegistry,
                 GroupInventorySource.global(globalIndex, supplier -> true),
                 GroupInventorySource.global(mergingIndex, supplier -> true));
 
@@ -671,7 +681,8 @@ class InventoryViewStoreListingsTest {
         List<InventorySource> sources = new java.util.ArrayList<>(List.of(
                 GroupInventorySource.global(globalIndex, enabledGlobal), GroupInventorySource.own(ownIndex)));
         sources.addAll(List.of(extra));
-        return new InventoryView(globalIndex, ownIndex, pimId -> false, taxonomyCache, supplierRegistry,
+        return new InventoryView(STORE_ID, productDataResolver, globalIndex, ownIndex, pimId -> false, taxonomyCache,
+                supplierRegistry,
                 sources.toArray(InventorySource[]::new));
     }
 
@@ -726,7 +737,8 @@ class InventoryViewStoreListingsTest {
         InventoryIndex globalIndex = InventoryIndex.of(List.of(philipsGlobal()));
         InventoryIndex ownIndex = InventoryIndex.of(List.of(philipsOwn()));
         SpySource spy = new SpySource();
-        InventoryView view = new InventoryView(globalIndex, ownIndex, pimId -> false, taxonomyCache, supplierRegistry,
+        InventoryView view = new InventoryView(STORE_ID, productDataResolver, globalIndex, ownIndex, pimId -> false, taxonomyCache,
+                supplierRegistry,
                 GroupInventorySource.global(globalIndex, supplier -> true), GroupInventorySource.own(ownIndex), spy);
 
         // when
@@ -766,7 +778,8 @@ class InventoryViewStoreListingsTest {
         if (linked) {
             ownIndex.link(own, global.getInventoryKey().getProductEans());
         }
-        return new InventoryView(globalIndex, ownIndex, pimId -> false, taxonomyCache, supplierRegistry,
+        return new InventoryView(STORE_ID, productDataResolver, globalIndex, ownIndex, pimId -> false, taxonomyCache,
+                supplierRegistry,
                 GroupInventorySource.global(globalIndex, supplier -> true), GroupInventorySource.own(ownIndex));
     }
 
@@ -819,7 +832,8 @@ class InventoryViewStoreListingsTest {
         ownIndex.link(linkedOwn, List.of(PHILIPS_GLOBAL_EAN));
         when(taxonomyCache.find(any())).thenReturn(
                 new Taxonomy(PHILIPS_GLOBAL_EAN, "QP1324/20", "Philips", "QP1324/20", "Golarki", 1, null, null, null, "31"));
-        InventoryView view = new InventoryView(globalIndex, ownIndex, pimId -> false, taxonomyCache, supplierRegistry,
+        InventoryView view = new InventoryView(STORE_ID, productDataResolver, globalIndex, ownIndex, pimId -> false, taxonomyCache,
+                supplierRegistry,
                 GroupInventorySource.global(globalIndex, supplier -> true), GroupInventorySource.own(ownIndex));
 
         // when

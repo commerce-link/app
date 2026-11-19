@@ -5,6 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.InventoryKey;
+import pl.commercelink.products.ProductDataFixture;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.taxonomy.Taxonomy;
@@ -22,8 +23,8 @@ class OrderItemDraftTest {
     void anInventoryItemGetsTheChosenEanAndTheNameOfItsTaxonomy() {
         // given
         when(matched.hasAnyOffers()).thenReturn(true);
-        when(matched.getTaxonomy()).thenReturn(new Taxonomy("5901234123457", "MZ-V9P1T0BW", "Samsung", "Dysk",
-                "Dyski", 0, null, null));
+        when(matched.getProductData()).thenReturn(ProductDataFixture.from(new Taxonomy("5901234123457", "MZ-V9P1T0BW", "Samsung", "Dysk",
+                "Dyski", 0, null, null)));
         when(matched.getMedianPrice()).thenReturn(Price.fromNet(200));
 
         // when

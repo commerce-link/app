@@ -16,6 +16,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import pl.commercelink.externaloffers.ExternalOfferLinkRepository;
+import pl.commercelink.products.ProductDataFixture;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
@@ -869,7 +870,7 @@ class CategoryTypeSwitchingDynamoDbIntegrationTest {
         when(group.hasAnyOffers()).thenReturn(true);
         when(group.getInventoryKey()).thenReturn(InventoryKey.fromEan(ean));
         when(group.getLowestPrice()).thenReturn(Price.fromNet(netPrice));
-        when(group.getTaxonomy()).thenReturn(new Taxonomy(ean, null, "MSI", name, "GPU", 1, null, null, null, PIM_CATEGORY));
+        when(group.getProductData()).thenReturn(ProductDataFixture.from(new Taxonomy(ean, null, "MSI", name, "GPU", 1, null, null, null, PIM_CATEGORY)));
         return group;
     }
 }

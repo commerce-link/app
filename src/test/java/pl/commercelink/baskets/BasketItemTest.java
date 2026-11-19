@@ -2,6 +2,8 @@ package pl.commercelink.baskets;
 
 import org.junit.jupiter.api.Test;
 import pl.commercelink.inventory.InventoryKey;
+import pl.commercelink.products.ProductData;
+import pl.commercelink.products.ProductDataFixture;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
@@ -126,7 +128,7 @@ class BasketItemTest {
         // given — net 100 and 200: gross 123,00 and 246,00
         MatchedInventory matched = mock(MatchedInventory.class);
         when(matched.hasAnyOffers()).thenReturn(true);
-        when(matched.getTaxonomy()).thenReturn(mock(Taxonomy.class));
+        when(matched.getProductData()).thenReturn(ProductData.UNKNOWN);
         when(matched.getLowestPrice()).thenReturn(Price.fromNet(100));
         when(matched.getMedianPrice()).thenReturn(Price.fromNet(200));
 
@@ -179,7 +181,7 @@ class BasketItemTest {
     private static MatchedInventory offeredProduct(Taxonomy taxonomy) {
         MatchedInventory matched = mock(MatchedInventory.class);
         when(matched.hasAnyOffers()).thenReturn(true);
-        when(matched.getTaxonomy()).thenReturn(taxonomy);
+        when(matched.getProductData()).thenReturn(ProductDataFixture.from(taxonomy));
         when(matched.getLowestPrice()).thenReturn(Price.fromNet(100));
         when(matched.getMedianPrice()).thenReturn(Price.fromNet(200));
         return matched;

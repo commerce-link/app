@@ -2,8 +2,11 @@ package pl.commercelink.inventory;
 
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.products.Product;
+import pl.commercelink.products.ProductDataResolver;
+import pl.commercelink.products.ResolvedProduct;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -15,6 +18,9 @@ import java.util.stream.Stream;
 
 public class InventoryView {
 
+    // null in the global view: product data then comes from global PIM entries only
+    private final String storeId;
+    private final ProductDataResolver products;
     private final InventoryIndex globalIndex;
     private final InventoryIndex ownIndex;
     private final StoreEntryKeys storeEntries;
@@ -22,8 +28,11 @@ public class InventoryView {
     private final SupplierRegistry supplierRegistry;
     private final List<InventorySource> sources;
 
-    InventoryView(InventoryIndex globalIndex, InventoryIndex ownIndex, StoreEntryKeys storeEntries,
-                  TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry, InventorySource... sources) {
+    InventoryView(String storeId, ProductDataResolver products, InventoryIndex globalIndex, InventoryIndex ownIndex,
+                  StoreEntryKeys storeEntries, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry,
+                  InventorySource... sources) {
+        this.storeId = storeId;
+        this.products = products;
         this.globalIndex = globalIndex;
         this.ownIndex = ownIndex;
         this.storeEntries = storeEntries;
@@ -65,14 +74,38 @@ public class InventoryView {
     public Map<String, Collection<MatchedInventory>> findAllByProductCategoryIds(Collection<String> categoryIds) {
         Map<String, Collection<MatchedInventory>> matchesByCategoryId = new LinkedHashMap<>();
         categoryIds.forEach(categoryId -> matchesByCategoryId.put(categoryId, new LinkedList<>()));
-        listedKeys().forEach(key -> {
-            String categoryId = taxonomyCache.find(key).categoryId();
+        List<InventoryKey> listed = listedKeys().toList();
+        List<ResolvedProduct> listedProducts = products.ofGroups(storeId, listed);
+        List<MatchedInventory> rows = new ArrayList<>();
+        for (int i = 0; i < listed.size(); i++) {
+            String categoryId = listedProducts.get(i).data().categoryId();
             Collection<MatchedInventory> matches = categoryId == null ? null : matchesByCategoryId.get(categoryId);
             if (matches != null) {
-                matches.add(assemble(key));
+                MatchedInventory row = assemble(listed.get(i));
+                matches.add(row);
+                rows.add(row);
             }
-        });
+        }
+        // read again for the rows: an assembled row can carry more EANs than its listed key (a linked own group, a
+        // store entry), and its product is the one of all of them
+        loadProductData(rows);
         return matchesByCategoryId;
+    }
+
+    /**
+     * Reads the product data of rows found one by one, all in one call. Without it each row reads its own data the
+     * first time it is asked, which is right for a single lookup and wasteful in a loop over many.
+     */
+    public void loadProductData(Collection<MatchedInventory> rows) {
+        List<MatchedInventory> missing = rows.stream().filter(row -> !row.isDescribed()).toList();
+        if (missing.isEmpty()) {
+            return;
+        }
+        List<ResolvedProduct> found = products.ofGroups(storeId,
+                missing.stream().map(MatchedInventory::getInventoryKey).toList());
+        for (int i = 0; i < missing.size(); i++) {
+            missing.get(i).describeAs(found.get(i));
+        }
     }
 
     private Stream<InventoryKey> listedKeys() {
@@ -88,6 +121,7 @@ public class InventoryView {
      */
     private MatchedInventory assemble(InventoryKey lookupKey) {
         MatchedInventory result = new MatchedInventory(lookupKey.copy(), taxonomyCache, supplierRegistry);
+        result.readProductFrom(key -> products.ofGroups(storeId, List.of(key)).get(0));
         Collection<String> linkedBefore = result.getInventoryKey().getLinkedEans();
         runSources(result);
         if (!linkedBefore.containsAll(result.getInventoryKey().getLinkedEans())) {

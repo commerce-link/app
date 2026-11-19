@@ -4,7 +4,6 @@ import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pim.api.PimEntry;
-import pl.commercelink.taxonomy.Taxonomy;
 
 import java.util.Collection;
 import java.util.List;
@@ -32,7 +31,7 @@ public class ProductRecommendation {
     public ProductRecommendation(CategoryDefinition categoryDefinition, MatchedInventory matchedInventory, Optional<PimEntry> pimEntry) {
         this.catagoryId = categoryDefinition.getCategoryId();
 
-        Taxonomy taxonomy = matchedInventory.getTaxonomy();
+        ProductData product = matchedInventory.getProductData();
 
         if (pimEntry.isPresent()) {
             PimEntry entry = pimEntry.get();
@@ -42,15 +41,15 @@ public class ProductRecommendation {
             this.brand = entry.brand();
             this.name = entry.name();
             this.label = StringUtils.isNotBlank(entry.subcategory()) ? entry.subcategory() : entry.name();
-            this.ean = entry.primaryGtin().orElse(taxonomy.ean());
-            this.manufacturerCode = entry.primaryMpn().orElse(taxonomy.mfn());
+            this.ean = entry.primaryGtin().orElse(product.ean());
+            this.manufacturerCode = entry.primaryMpn().orElse(product.mfn());
         } else {
             this.pimId = null;
-            this.brand = taxonomy.brand();
-            this.name = taxonomy.name();
-            this.label = taxonomy.name();
-            this.ean = taxonomy.ean();
-            this.manufacturerCode = taxonomy.mfn();
+            this.brand = product.brand();
+            this.name = product.name();
+            this.label = product.name();
+            this.ean = product.ean();
+            this.manufacturerCode = product.mfn();
         }
 
         this.lowestGrossPrice = matchedInventory.getLowestPrice().grossValue();
