@@ -22,6 +22,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -84,6 +85,17 @@ class BrowseIndexTest {
         assertThat(entry.brand()).isEqualTo("GIGABYTE");
         assertThat(entry.category()).isEqualTo("Karty graficzne");
         assertThat(index.inCategories(Set.of("11"))).isEmpty();
+    }
+
+    @Test
+    void productDataThatDoesNotAnswerEveryGroupOnceIsRefused() {
+        // given
+        MatchedInventory gpu = group("5901000000001", "GPU-1", "Gigabyte RTX 4060", "Gigabyte", "11");
+        GroupProducts oneTooMany = keys -> List.of(ProductData.UNKNOWN, ProductData.UNKNOWN);
+
+        // when / then
+        assertThatThrownBy(() -> BrowseIndex.build(1, List.of(gpu), oneTooMany))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test

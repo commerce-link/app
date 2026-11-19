@@ -446,22 +446,30 @@ class InventoryViewStoreListingsTest {
     }
 
     @Test
-    void taxonomyLookupCountIsIndependentOfSelectionSize() {
+    void productDataReadCountIsIndependentOfSelectionSize() {
         // given
         storeWithGlobalAbGroupAndOwnAction();
 
         // when
-        inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategoryIds(List.of("989"));
-        Collection<org.mockito.invocation.Invocation> afterSingle =
-                org.mockito.Mockito.mockingDetails(taxonomyCache).getInvocations();
-        long singleRunFinds = afterSingle.stream().filter(i -> i.getMethod().getName().equals("find")).count();
-        org.mockito.Mockito.clearInvocations(taxonomyCache);
-        inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategoryIds(List.of("989", "170"));
-        long doubleRunFinds = org.mockito.Mockito.mockingDetails(taxonomyCache).getInvocations().stream()
-                .filter(i -> i.getMethod().getName().equals("find")).count();
+        Collection<MatchedInventory> oneCategory = inventory.withEnabledSuppliersOnly(STORE_ID)
+                .findAllByProductCategoryIds(List.of("989")).get("989");
+        long oneCategoryReads = productDataReads();
+        org.mockito.Mockito.clearInvocations(productDataResolver);
+        Collection<MatchedInventory> twoCategories = inventory.withEnabledSuppliersOnly(STORE_ID)
+                .findAllByProductCategoryIds(List.of("989", "170")).get("989");
+        long twoCategoriesReads = productDataReads();
 
         // then
-        assertThat(doubleRunFinds).isEqualTo(singleRunFinds);
+        assertThat(oneCategory).hasSize(1);
+        assertThat(twoCategories).hasSize(1);
+        assertThat(oneCategoryReads).isEqualTo(2);
+        assertThat(twoCategoriesReads).isEqualTo(2);
+    }
+
+    private long productDataReads() {
+        return org.mockito.Mockito.mockingDetails(productDataResolver).getInvocations().stream()
+                .filter(invocation -> invocation.getMethod().getName().equals("ofGroups"))
+                .count();
     }
 
     @Test

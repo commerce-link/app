@@ -1,6 +1,7 @@
 package pl.commercelink.inventory;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.pim.ScopedPimCatalog;
@@ -16,9 +17,11 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -225,6 +228,56 @@ class InventoryViewProductDataTest {
         // then
         assertThat(atPricePoint.name()).isEqualTo("CPU one");
         verify(resolver, times(1)).ofGroups(eq(STORE_ID), any());
+    }
+
+    @Test
+    void rowCutToAPricePointBeforeItsDataWasReadStillReadsIt() {
+        // given
+        taxonomy.add(record(CPU_EAN, "CPU one", "989"));
+        MatchedInventory row = view(STORE_ID, new ProductDataResolver(ScopedPimCatalog.of(), taxonomy), group(CPU_EAN))
+                .findByEan(CPU_EAN);
+
+        // when
+        MatchedInventory atPricePoint = row.atPricePoint(10_000);
+
+        // then
+        assertThatCode(atPricePoint::getProductData).doesNotThrowAnyException();
+        assertThat(atPricePoint.getProductData().name()).isEqualTo("CPU one");
+    }
+
+    @Test
+    void loadingNoRowsAsksNothing() {
+        // given
+        ProductDataResolver resolver = spy(new ProductDataResolver(ScopedPimCatalog.of(), taxonomy));
+        InventoryView view = view(STORE_ID, resolver, group(CPU_EAN));
+
+        // when
+        view.loadProductData(List.of());
+
+        // then
+        verifyNoInteractions(resolver);
+    }
+
+    @Test
+    void loadingAsksOnlyAboutRowsNotDescribedYet() {
+        // given
+        taxonomy.add(record(CPU_EAN, "CPU one", "989"));
+        taxonomy.add(record(GPU_EAN, "GPU", "170"));
+        ProductDataResolver resolver = spy(new ProductDataResolver(ScopedPimCatalog.of(), taxonomy));
+        InventoryView view = view(STORE_ID, resolver, group(CPU_EAN), group(GPU_EAN));
+        MatchedInventory described = view.findByEan(CPU_EAN);
+        described.getProductData();
+        MatchedInventory notDescribed = view.findByEan(GPU_EAN);
+        clearInvocations(resolver);
+
+        // when
+        view.loadProductData(List.of(described, notDescribed));
+
+        // then
+        ArgumentCaptor<List<InventoryKey>> asked = ArgumentCaptor.captor();
+        verify(resolver).ofGroups(eq(STORE_ID), asked.capture());
+        assertThat(asked.getValue()).containsExactly(notDescribed.getInventoryKey());
+        assertThat(notDescribed.getProductData().name()).isEqualTo("GPU");
     }
 
     @Test
