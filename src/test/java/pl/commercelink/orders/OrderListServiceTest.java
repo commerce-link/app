@@ -273,24 +273,30 @@ class OrderListServiceTest {
 
         // then
         assertThat(longestWaitingFirst.rows()).extracting(r -> path(r).substring(18)).containsExactly("undated", "first", "later");
-        assertThat(longestWaitingFirst.rows()).extracting(OrderRow::dueText).containsExactly("anulowane", "22.09", "24.09");
+        assertThat(longestWaitingFirst.rows()).extracting(OrderRow::cancelledText).containsExactly(null, "22.09.2026", "24.09.2026");
+        assertThat(longestWaitingFirst.rows()).extracting(OrderRow::dueText).containsOnly("—");
         assertThat(latestFirst.rows()).extracting(r -> path(r).substring(18)).containsExactly("later", "first", "undated");
         assertThat(byStatus.rows()).extracting(r -> path(r).substring(18)).containsExactly("open", "undated", "first", "later");
     }
 
     @Test
-    void amongTheOpenOrdersACancelledOneStandsByTheDayItWasCancelled() {
-        // given
+    void sortedByTheShippingDateTheCancelledOrdersFollowTheOpenOnesWhicheverWayTheDatesRun() {
+        // given: a cancelled order has no shipping date left, whatever its old one was
+        add("cancelled-later", OrderStatus.Cancelled, TODAY.minusDays(9), 10, 10, null).setCancelledAt(TODAY.atTime(8, 0));
         add("due-yesterday", OrderStatus.New, TODAY.minusDays(1), 10, 10, null);
-        add("cancelled-today", OrderStatus.Cancelled, TODAY.minusDays(9), 10, 10, null).setCancelledAt(TODAY.atTime(8, 0));
+        add("cancelled-first", OrderStatus.Cancelled, TODAY.minusDays(9), 10, 10, null).setCancelledAt(TODAY.minusDays(2).atTime(8, 0));
+        add("undated", OrderStatus.New, null, 10, 10, null);
         add("due-tomorrow", OrderStatus.New, TODAY.plusDays(1), 10, 10, null);
 
         // when
-        OrdersPageModel model = page(query());
+        OrdersPageModel soonestFirst = page(query());
+        OrdersPageModel latestFirst = page(query("sort", "due", "dir", "desc"));
 
         // then
-        assertThat(model.rows()).extracting(r -> path(r).substring(18))
-                .containsExactly("due-yesterday", "cancelled-today", "due-tomorrow");
+        assertThat(soonestFirst.rows()).extracting(r -> path(r).substring(18))
+                .containsExactly("due-yesterday", "due-tomorrow", "undated", "cancelled-first", "cancelled-later");
+        assertThat(latestFirst.rows()).extracting(r -> path(r).substring(18))
+                .containsExactly("due-tomorrow", "due-yesterday", "undated", "cancelled-later", "cancelled-first");
     }
 
     @Test

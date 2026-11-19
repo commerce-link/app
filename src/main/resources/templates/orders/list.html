@@ -270,6 +270,8 @@
                         </td>
                         <td th:attr="data-label=#{orders.list.column.status}">
                             <span class="cl-status" th:classappend="${row.statusTone()}" th:text="${row.statusLabel()}"></span>
+                            <!--/* the word is for the phone card, which has no column to say what the date is */-->
+                            <span class="cl-table-sub cl-cancelled-note" th:if="${row.cancelledText() != null}"><span class="cl-cards-only" th:text="#{orders.list.cancelled.on}"></span> <span th:text="${row.cancelledText()}"></span></span>
                             <ul class="cl-doc-marks" th:unless="${row.marks().isEmpty()}" th:classappend="${row.hasTodo()} ? 'has-todo'"
                                 th:attr="aria-label=#{orders.list.marks.label}">
                                 <li th:each="mark : ${row.marks()}" class="cl-doc-mark" th:classappend="${mark.state()}">

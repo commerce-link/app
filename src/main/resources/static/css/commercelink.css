@@ -6096,6 +6096,19 @@ a.cl-link-button:hover {
     color: var(--cl-bad);
 }
 
+/* The day a cancelled order was cancelled, under its status pill: muted like every second line, in the weight of the
+   "do zwrotu" line of the same row. The phone card has no column headers, so there the line also says what the date
+   is ("anulowano 17.11.2026") and stands where the shipping date would. */
+.cl-page .cl-table.is-orders .cl-cancelled-note {
+    font-weight: 500;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-page .cl-table.is-orders .cl-cards-only {
+    display: none;
+}
+
 .cl-page .cl-table.is-orders .cl-due-note.is-warn {
     color: var(--cl-warn);
 }
@@ -6372,6 +6385,20 @@ a.cl-link-button:hover {
         grid-column: 1;
         margin-top: 0;
         order: 5;
+    }
+
+    .cl-page .cl-table.is-orders .cl-cards-only {
+        display: inline;
+    }
+
+    .cl-page .cl-table.is-orders .cl-cancelled-note {
+        grid-column: 1;
+        margin-top: 0;
+        order: 3;
+    }
+
+    .cl-page .cl-table.is-orders tr:has(.cl-cancelled-note) .cl-cell-date {
+        display: none;
     }
 
     .cl-page .cl-table.is-orders .cl-unpaid {

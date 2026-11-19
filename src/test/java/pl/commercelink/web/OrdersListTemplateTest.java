@@ -147,6 +147,22 @@ class OrdersListTemplateTest {
     }
 
     @Test
+    void theDayAnOrderWasCancelledSitsBetweenTheStatusPillAndTheDocumentMarks() throws Exception {
+        // given
+        String html = page();
+
+        // when
+        int status = html.indexOf("th:text=\"${row.statusLabel()}\"");
+        int cancelled = html.indexOf("th:if=\"${row.cancelledText() != null}\"");
+        int marks = html.indexOf("<ul class=\"cl-doc-marks\"");
+
+        // then: the word naming the date is printed for the phone card only, which has no column headers
+        assertThat(cancelled).isGreaterThan(status).isLessThan(marks);
+        assertThat(html).contains("<span class=\"cl-cards-only\" th:text=\"#{orders.list.cancelled.on}\"></span>")
+                .contains("th:text=\"${row.cancelledText()}\"");
+    }
+
+    @Test
     void noBulmaWidgetsNoInlineStylesNoHardcodedText() throws Exception {
         String html = page();
         assertThat(html).doesNotContain("style=").doesNotContain("onclick=").doesNotContain("class=\"button")

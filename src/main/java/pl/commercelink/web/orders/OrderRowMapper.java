@@ -30,10 +30,9 @@ import java.util.stream.Stream;
 /** Turns an order into the texts of its list row (spec §6). One instance per request, bound to the request locale. */
 public class OrderRowMapper {
 
-    private static final DateTimeFormatter SAME_YEAR = DateTimeFormatter.ofPattern("dd.MM");
-    private static final DateTimeFormatter OTHER_YEAR = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private static final DateTimeFormatter FULL_DATE = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
+    private static final String NO_SHIPPING_DATE = "—";
 
     private final MessageSource messages;
     private final Locale locale;
@@ -74,13 +73,14 @@ public class OrderRowMapper {
             dueNote = text("orders.list.due.today");
             dueTone = "is-warn";
         }
-        String dueText = due == null ? text("orders.list.due.none") : day(due, today);
+        String dueText = due == null ? text("orders.list.due.none") : FULL_DATE.format(due);
+        String cancelledText = null;
         if (order.hasStatus(OrderStatus.Cancelled)) {
-            // nothing of a cancelled order is left to ship: the column says when it was cancelled, the date the list
-            // sorts it by; an order cancelled before the date was recorded has none to show
+            // nothing of a cancelled order is left to ship, so it has no shipping date here; when it was cancelled
+            // stands under its status instead (an order cancelled before the date was recorded has none to show)
+            dueText = NO_SHIPPING_DATE;
             LocalDateTime cancelledAt = order.getCancelledAt();
-            dueText = cancelledAt == null ? text("orders.list.due.cancelled.undated") : day(cancelledAt.toLocalDate(), today);
-            dueNote = cancelledAt == null ? null : text("orders.list.due.cancelled");
+            cancelledText = cancelledAt == null ? null : FULL_DATE.format(cancelledAt);
         }
         double unpaid = order.getUnpaidAmount();
         return new OrderRow(
@@ -98,6 +98,7 @@ public class OrderRowMapper {
                 dueTone,
                 order.getStatus() == null ? "" : text("OrderStatus." + order.getStatus().name()),
                 statusTone(order.getStatus()),
+                cancelledText,
                 money(order.getTotalPrice()),
                 unpaid > 0 ? text("orders.list.unpaid", money(unpaid))
                         : order.awaitsRefund() ? text("orders.list.refund", money(-unpaid)) : null,
@@ -127,6 +128,7 @@ public class OrderRowMapper {
                 "",
                 order.getStatus() == null ? "" : text("OrderStatus." + order.getStatus().name()),
                 statusTone(order.getStatus()),
+                null,
                 money(order.getTotalPrice()),
                 null,
                 marks(order, true));
@@ -233,10 +235,6 @@ public class OrderRowMapper {
             return marketplace;
         }
         return text("order.source.type." + type.name());
-    }
-
-    private static String day(LocalDate date, LocalDate today) {
-        return (date.getYear() == today.getYear() ? SAME_YEAR : OTHER_YEAR).format(date);
     }
 
     private String money(double value) {

@@ -142,7 +142,8 @@ public class OrderListService {
 
     private static Comparator<Order> comparator(Sort sort, Direction dir) {
         Comparator<Order> base = switch (sort) {
-            case DUE -> Comparator.comparing(OrderListService::dueOrCancelled, Comparator.nullsLast(Comparator.naturalOrder()))
+            case DUE -> cancelledLast()
+                    .thenComparing(OrderListService::dueOrCancelled, Comparator.nullsLast(Comparator.naturalOrder()))
                     .thenComparing(Order::getOrderedAt, Comparator.nullsLast(Comparator.naturalOrder()));
             case AMOUNT -> Comparator.comparingDouble(Order::getTotalPrice);
             case NUMBER -> Comparator.comparing(Order::getOrderId, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
@@ -157,7 +158,8 @@ public class OrderListService {
         }
         // "no date" stays last whichever way the dates run
         if (sort == Sort.DUE) {
-            return Comparator.comparing((Order o) -> dueOrCancelled(o) == null ? 1 : 0)
+            return cancelledLast()
+                    .thenComparing((Order o) -> dueOrCancelled(o) == null ? 1 : 0)
                     .thenComparing(Comparator.comparing(OrderListService::dueOrCancelled, Comparator.nullsLast(Comparator.<LocalDateTime>reverseOrder())))
                     .thenComparing(Order::getOrderedAt, Comparator.nullsLast(Comparator.reverseOrder()));
         }
@@ -165,8 +167,16 @@ public class OrderListService {
     }
 
     /**
-     * What the date column sorts a row by: the shipping due date, or for a cancelled order, which has nothing left to
-     * ship, when it was cancelled (the date OrderRowMapper prints in that column), so among the cancelled orders the
+     * A cancelled order has no shipping date left to be sorted by, so by that column it follows the orders that have
+     * one or may still get one, whichever way the dates run.
+     */
+    private static Comparator<Order> cancelledLast() {
+        return Comparator.comparing(order -> order.hasStatus(OrderStatus.Cancelled));
+    }
+
+    /**
+     * The date a row is put in order by among the rows of its kind: the shipping due date, or for a cancelled order
+     * when it was cancelled (the date OrderRowMapper prints under its status), so among the cancelled orders the
      * refund waiting longest comes first.
      */
     private static LocalDateTime dueOrCancelled(Order order) {

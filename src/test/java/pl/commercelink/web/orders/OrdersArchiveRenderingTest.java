@@ -19,7 +19,7 @@ class OrdersArchiveRenderingTest {
 
     private static OrderRow row() {
         return new OrderRow("o1", "/dashboard/orders/o1?returnTo=%2Fdashboard%2Forders%2Farchive", "8C1D02", "Sklep", null,
-                "Anna Nowak", "Kraków", "anna@x.pl", "08.10.2026", "18:42", "", "Zakończone", "is-ok", "1 249,00 zł", null,
+                "Anna Nowak", "Kraków", "anna@x.pl", "08.10.2026", "18:42", "", "Zakończone", "is-ok", null, "1 249,00 zł", null,
                 List.of(new OrderRow.DocMark("invoice", "PAR", "is-done", "Paragon: PAR/1")));
     }
 

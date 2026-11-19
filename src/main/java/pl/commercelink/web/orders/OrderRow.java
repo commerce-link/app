@@ -4,12 +4,14 @@ import java.util.List;
 
 /**
  * One row of the orders list with every text already resolved, so the template only prints (spec §8.1). orderId is the
- * value of the row's checkbox (printing several order cards); href carries the list's returnTo as well.
+ * value of the row's checkbox (printing several order cards); href carries the list's returnTo as well. cancelledText
+ * is the day a cancelled order was cancelled, printed under its status; null for any other order and for one cancelled
+ * before the date was recorded.
  */
 public record OrderRow(String orderId, String href, String number, String sourceText, String externalId,
                        String clientName, String clientCity, String email,
                        String dueText, String dueNote, String dueTone,
-                       String statusLabel, String statusTone,
+                       String statusLabel, String statusTone, String cancelledText,
                        String totalText, String unpaidText,
                        List<DocMark> marks) {
 

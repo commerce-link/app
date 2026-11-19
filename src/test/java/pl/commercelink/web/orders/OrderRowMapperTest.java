@@ -79,7 +79,7 @@ class OrderRowMapperTest {
         assertThat(row.clientName()).isEqualTo("Anna Nowak");
         assertThat(row.clientCity()).isEqualTo("Kraków");
         assertThat(row.email()).isEqualTo("anna.nowak74@test.com");
-        assertThat(row.dueText()).isEqualTo("23.09");
+        assertThat(row.dueText()).isEqualTo("23.09.2026");
         assertThat(row.dueNote()).isEqualTo("po terminie: 2 dni");
         assertThat(row.dueTone()).isEqualTo("is-bad");
         assertThat(row.statusLabel()).isEqualTo("Zablokowane");
@@ -122,7 +122,7 @@ class OrderRowMapperTest {
     }
 
     @Test
-    void aCancelledOrderShowsWhenItWasCancelledInPlaceOfItsShippingDate() {
+    void aCancelledOrderShowsWhenItWasCancelledUnderItsStatusAndNoShippingDate() {
         // given: its shipping date passed two days ago
         Order order = order();
         order.setStatus(OrderStatus.Cancelled);
@@ -132,23 +132,25 @@ class OrderRowMapperTest {
         OrderRow row = mapper.map(order, TODAY);
 
         // then
-        assertThat(row.dueText()).isEqualTo("24.09");
-        assertThat(row.dueNote()).isEqualTo("anulowano");
+        assertThat(row.statusLabel()).isEqualTo("Anulowane");
+        assertThat(row.cancelledText()).isEqualTo("24.09.2026");
+        assertThat(row.dueText()).isEqualTo("—");
+        assertThat(row.dueNote()).isNull();
         assertThat(row.dueTone()).isEmpty();
     }
 
     @Test
-    void aCancellationOfAnotherYearShowsItsYear() {
-        // given
+    void anOrderThatIsNotCancelledHasNoCancellationDay() {
+        // given: a date left on a record that is not cancelled says nothing
         Order order = order();
-        order.setStatus(OrderStatus.Cancelled);
-        order.setCancelledAt(LocalDateTime.of(2025, 12, 30, 15, 30));
+        order.setCancelledAt(LocalDateTime.of(2026, 9, 24, 15, 30));
 
         // when
         OrderRow row = mapper.map(order, TODAY);
 
         // then
-        assertThat(row.dueText()).isEqualTo("30.12.2025");
+        assertThat(row.cancelledText()).isNull();
+        assertThat(row.dueText()).isEqualTo("23.09.2026");
     }
 
     @Test
@@ -161,7 +163,8 @@ class OrderRowMapperTest {
         OrderRow row = mapper.map(order, TODAY);
 
         // then: neither the shipping date nor the order date stands in for the day it was cancelled
-        assertThat(row.dueText()).isEqualTo("anulowane");
+        assertThat(row.cancelledText()).isNull();
+        assertThat(row.dueText()).isEqualTo("—");
         assertThat(row.dueNote()).isNull();
     }
 
