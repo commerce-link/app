@@ -1,6 +1,7 @@
 package pl.commercelink.products;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.pim.api.PimCatalog;
@@ -14,11 +15,23 @@ import java.util.List;
 import java.util.Optional;
 
 @Component
-@RequiredArgsConstructor
 public class ProductDataResolver {
 
     private final PimCatalog pimCatalog;
     private final TaxonomyCache taxonomyCache;
+    private final boolean skipUnapprovedGlobalEntries;
+
+    public ProductDataResolver(PimCatalog pimCatalog, TaxonomyCache taxonomyCache) {
+        this(pimCatalog, taxonomyCache, true);
+    }
+
+    @Autowired
+    public ProductDataResolver(PimCatalog pimCatalog, TaxonomyCache taxonomyCache,
+                               @Value("${product-data.skip-unapproved-global-entries:true}") boolean skipUnapprovedGlobalEntries) {
+        this.pimCatalog = pimCatalog;
+        this.taxonomyCache = taxonomyCache;
+        this.skipUnapprovedGlobalEntries = skipUnapprovedGlobalEntries;
+    }
 
     public Optional<ProductData> ofEan(String storeId, String ean) {
         return resolve(pim(storeId).findByGtin(ean), taxonomyCache.findByEan(ean));
@@ -45,26 +58,34 @@ public class ProductDataResolver {
         return resolved;
     }
 
-    private static Optional<PimEntry> entryOf(PimView pim, InventoryKey group) {
-        return pim.findByPimIdOrGtins(group.getId(), group.getProductEans());
-    }
-
     public Optional<ProductData> ofPimId(String storeId, String pimId) {
         return pim(storeId).findByPimId(pimId)
                 .flatMap(entry -> resolve(Optional.of(entry), taxonomyCache.find(InventoryKey.fromPimEntry(entry))));
+    }
+
+    private static Optional<PimEntry> entryOf(PimView pim, InventoryKey group) {
+        return pim.findByPimIdOrGtins(group.getId(), group.getProductEans());
     }
 
     private PimView pim(String storeId) {
         return storeId == null ? pimCatalog.withGlobalData() : pimCatalog.withStoreData(storeId);
     }
 
-    private static Optional<ProductData> resolve(Optional<PimEntry> entry, Taxonomy taxonomy) {
+    private Optional<ProductData> resolve(Optional<PimEntry> entry, Taxonomy taxonomy) {
         Optional<ProductData> fromTaxonomy = Optional.ofNullable(taxonomy)
                 .filter(found -> found != Taxonomy.EMPTY)
                 .map(ProductDataResolver::of);
-        return entry.map(ProductDataResolver::of)
+        return entry.filter(this::trusted)
+                .map(ProductDataResolver::of)
                 .map(fromPim -> fromTaxonomy.map(fromPim::orElse).orElse(fromPim))
                 .or(() -> fromTaxonomy);
+    }
+
+    // Client decision (pending): a global entry nobody has reviewed in the PIM is not trusted, and the taxonomy answers
+    // as if the entry were not there. A store's own entry is never skipped: the PIM marks it reviewed when the store
+    // creates it, so for those entries the flag says nothing about the data.
+    private boolean trusted(PimEntry entry) {
+        return !skipUnapprovedGlobalEntries || !entry.global() || entry.approved();
     }
 
     private static ProductData of(PimEntry entry) {
