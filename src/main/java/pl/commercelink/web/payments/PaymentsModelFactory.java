@@ -9,6 +9,7 @@ import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentSource;
@@ -19,6 +20,7 @@ import pl.commercelink.web.orders.OrderPageModelFactory;
 import pl.commercelink.web.payments.PaymentsPageModel.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -156,8 +158,19 @@ public class PaymentsModelFactory {
     /** Urgent, then warned, then by date, cash on delivery on its way, refunds last (spec §5.2). */
     private static Comparator<ReceivableEntry> receivableOrder() {
         return Comparator.comparing(PaymentsModelFactory::rank)
-                .thenComparing(ReceivableEntry::shipDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(PaymentsModelFactory::shippedOrCancelled, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(e -> e.order().getOrderId());
+    }
+
+    /**
+     * The date of the row's shipping column: a cancelled order has nothing left to ship, so it goes by when it was
+     * cancelled and, among the cancelled orders, the refund waiting longest comes first.
+     */
+    private static LocalDateTime shippedOrCancelled(ReceivableEntry e) {
+        if (e.order().hasStatus(OrderStatus.Cancelled)) {
+            return e.order().cancelledSince();
+        }
+        return e.shipDate() == null ? null : e.shipDate().atStartOfDay();
     }
 
     private static int rank(ReceivableEntry e) {

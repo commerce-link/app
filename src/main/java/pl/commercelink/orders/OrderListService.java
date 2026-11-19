@@ -31,6 +31,7 @@ import pl.commercelink.web.orders.Pagination;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -141,7 +142,7 @@ public class OrderListService {
 
     private static Comparator<Order> comparator(Sort sort, Direction dir) {
         Comparator<Order> base = switch (sort) {
-            case DUE -> Comparator.comparing(Order::getShippingDueAt, Comparator.nullsLast(Comparator.naturalOrder()))
+            case DUE -> Comparator.comparing(OrderListService::dueOrCancelled, Comparator.nullsLast(Comparator.naturalOrder()))
                     .thenComparing(Order::getOrderedAt, Comparator.nullsLast(Comparator.naturalOrder()));
             case AMOUNT -> Comparator.comparingDouble(Order::getTotalPrice);
             case NUMBER -> Comparator.comparing(Order::getOrderId, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
@@ -156,11 +157,24 @@ public class OrderListService {
         }
         // "no date" stays last whichever way the dates run
         if (sort == Sort.DUE) {
-            return Comparator.comparing((Order o) -> o.getShippingDueAt() == null ? 1 : 0)
-                    .thenComparing(Comparator.comparing(Order::getShippingDueAt, Comparator.nullsLast(Comparator.<LocalDate>reverseOrder())))
+            return Comparator.comparing((Order o) -> dueOrCancelled(o) == null ? 1 : 0)
+                    .thenComparing(Comparator.comparing(OrderListService::dueOrCancelled, Comparator.nullsLast(Comparator.<LocalDateTime>reverseOrder())))
                     .thenComparing(Order::getOrderedAt, Comparator.nullsLast(Comparator.reverseOrder()));
         }
         return base.reversed();
+    }
+
+    /**
+     * What the date column sorts a row by: the shipping due date, or for a cancelled order, which has nothing left to
+     * ship, when it was cancelled (the date OrderRowMapper prints in that column), so among the cancelled orders the
+     * refund waiting longest comes first.
+     */
+    private static LocalDateTime dueOrCancelled(Order order) {
+        if (order.hasStatus(OrderStatus.Cancelled)) {
+            return order.cancelledSince();
+        }
+        LocalDate due = order.getShippingDueAt();
+        return due == null ? null : due.atStartOfDay();
     }
 
     private List<Tile> tiles(List<Order> open, OrderListQuery query, LocalDate today, Locale locale) {
@@ -255,7 +269,7 @@ public class OrderListService {
     /** Statuses in lifecycle order (the OrderStatus declaration: New … Delivered), then due first within one status. */
     private static Comparator<Order> byStatus(Comparator<OrderStatus> statusOrder) {
         return Comparator.comparing(Order::getStatus, Comparator.nullsLast(statusOrder))
-                .thenComparing(Order::getShippingDueAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(OrderListService::dueOrCancelled, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(Order::getOrderedAt, Comparator.nullsLast(Comparator.naturalOrder()));
     }
 

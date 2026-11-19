@@ -731,6 +731,49 @@ class OrderTest {
     }
 
     @Test
+    void aCancelledOrderCountsAsCancelledSinceTheRecordedDate() {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Cancelled);
+        order.setOrderedAt(LocalDateTime.of(2026, 11, 3, 14, 25));
+        order.setCancelledAt(LocalDateTime.of(2026, 11, 12, 9, 0));
+
+        // when
+        LocalDateTime since = order.cancelledSince();
+
+        // then
+        assertThat(since).isEqualTo(LocalDateTime.of(2026, 11, 12, 9, 0));
+    }
+
+    @Test
+    void anOrderCancelledBeforeTheDateWasRecordedCountsSinceItsOrderDate() {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Cancelled);
+        order.setOrderedAt(LocalDateTime.of(2026, 11, 3, 14, 25));
+
+        // when
+        LocalDateTime since = order.cancelledSince();
+
+        // then
+        assertThat(since).isEqualTo(LocalDateTime.of(2026, 11, 3, 14, 25));
+    }
+
+    @Test
+    void anOrderThatIsNotCancelledHasNoSuchDate() {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Assembly);
+        order.setOrderedAt(LocalDateTime.of(2026, 11, 3, 14, 25));
+
+        // when
+        LocalDateTime since = order.cancelledSince();
+
+        // then
+        assertThat(since).isNull();
+    }
+
+    @Test
     void goodsTheWarehouseCouldNotTakeBackRefuseTheCancel() {
         // given: reserved, but without the manufacturer code the release goes by (older data)
         OrderItem reserved = reservedProduct();

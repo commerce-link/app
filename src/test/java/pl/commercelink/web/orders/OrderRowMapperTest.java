@@ -122,6 +122,50 @@ class OrderRowMapperTest {
     }
 
     @Test
+    void aCancelledOrderShowsWhenItWasCancelledInPlaceOfItsShippingDate() {
+        // given: its shipping date passed two days ago
+        Order order = order();
+        order.setStatus(OrderStatus.Cancelled);
+        order.setCancelledAt(LocalDateTime.of(2026, 9, 24, 15, 30));
+
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
+        assertThat(row.dueText()).isEqualTo("24.09");
+        assertThat(row.dueNote()).isEqualTo("anulowano");
+        assertThat(row.dueTone()).isEmpty();
+    }
+
+    @Test
+    void aCancellationOfAnotherYearShowsItsYear() {
+        // given
+        Order order = order();
+        order.setStatus(OrderStatus.Cancelled);
+        order.setCancelledAt(LocalDateTime.of(2025, 12, 30, 15, 30));
+
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
+        assertThat(row.dueText()).isEqualTo("30.12.2025");
+    }
+
+    @Test
+    void anOrderCancelledBeforeTheDateWasRecordedShowsNoDate() {
+        // given
+        Order order = order();
+        order.setStatus(OrderStatus.Cancelled);
+
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then: neither the shipping date nor the order date stands in for the day it was cancelled
+        assertThat(row.dueText()).isEqualTo("anulowane");
+        assertThat(row.dueNote()).isNull();
+    }
+
+    @Test
     void overpaidOpenOrderShowsNoRefund() {
         // given: an overpayment of an open order may still be settled against it, so it is not called a refund
         Order order = order();

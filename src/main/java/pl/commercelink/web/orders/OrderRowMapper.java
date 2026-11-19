@@ -74,6 +74,14 @@ public class OrderRowMapper {
             dueNote = text("orders.list.due.today");
             dueTone = "is-warn";
         }
+        String dueText = due == null ? text("orders.list.due.none") : day(due, today);
+        if (order.hasStatus(OrderStatus.Cancelled)) {
+            // nothing of a cancelled order is left to ship: the column says when it was cancelled, the date the list
+            // sorts it by; an order cancelled before the date was recorded has none to show
+            LocalDateTime cancelledAt = order.getCancelledAt();
+            dueText = cancelledAt == null ? text("orders.list.due.cancelled.undated") : day(cancelledAt.toLocalDate(), today);
+            dueNote = cancelledAt == null ? null : text("orders.list.due.cancelled");
+        }
         double unpaid = order.getUnpaidAmount();
         return new OrderRow(
                 order.getOrderId(),
@@ -85,8 +93,7 @@ public class OrderRowMapper {
                 name != null ? name : (email != null ? email : text("orders.list.client.unknown")),
                 shipping == null ? null : blankToNull(shipping.getCity()),
                 name != null ? email : null,
-                due == null ? text("orders.list.due.none")
-                        : (due.getYear() == today.getYear() ? SAME_YEAR : OTHER_YEAR).format(due),
+                dueText,
                 dueNote,
                 dueTone,
                 order.getStatus() == null ? "" : text("OrderStatus." + order.getStatus().name()),
@@ -226,6 +233,10 @@ public class OrderRowMapper {
             return marketplace;
         }
         return text("order.source.type." + type.name());
+    }
+
+    private static String day(LocalDate date, LocalDate today) {
+        return (date.getYear() == today.getYear() ? SAME_YEAR : OTHER_YEAR).format(date);
     }
 
     private String money(double value) {

@@ -26,6 +26,7 @@
             <span th:if="${h.sourceName() != null or h.sourceTypeKey() != null}"
                   th:text="${h.sourceName() != null} ? ${h.sourceName()} : #{${h.sourceTypeKey()}}"></span>
             <span th:text="${h.orderedAt()}"></span>
+            <span th:if="${h.cancelledAt() != null}" th:text="#{order.page.meta.cancelled(${h.cancelledAt()})}"></span>
             <span><strong th:text="#{general.currency.amount(${h.total()})}"></strong></span>
             <span th:if="${h.fulfilmentTypeShortKey() != null}" class="cl-icon-text">
                 <i class="fas" th:classappend="${h.fulfilmentTypeIcon()}" aria-hidden="true"></i>

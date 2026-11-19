@@ -22,15 +22,14 @@ public final class RefundDueSortKey {
 
     /**
      * Null for an order that awaits no refund: without the attribute the order is not in the index at all. An order
-     * cancelled before cancelledAt was recorded is keyed by its order date instead of being given a date afterwards:
-     * that date is earlier than every cancellation recorded since, so such orders still come first. Once none of them
-     * awaits a refund the order date can go from here.
+     * cancelled before cancelledAt was recorded is keyed by its order date instead of being given a date afterwards
+     * (Order#cancelledSince, the date the orders list and the Payments page sort such orders by too).
      */
     public static String of(Order order) {
         if (!order.awaitsRefund()) {
             return null;
         }
-        LocalDateTime since = order.getCancelledAt() != null ? order.getCancelledAt() : order.getOrderedAt();
+        LocalDateTime since = order.cancelledSince();
         return since == null ? UNDATED : since.format(STORED_FORMAT);
     }
 }

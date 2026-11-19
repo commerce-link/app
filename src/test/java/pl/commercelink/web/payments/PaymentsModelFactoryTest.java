@@ -197,6 +197,27 @@ class PaymentsModelFactoryTest {
     }
 
     @Test
+    void refundsOfCancelledOrdersComeLongestWaitingFirst() {
+        // given: the order numbers run the other way round
+        Order later = receivable("e0000001", 0, OrderStatus.Cancelled, PaymentSource.BankTransfer, 250, null);
+        later.setCancelledAt(TODAY.minusDays(1).atTime(9, 0));
+        Order first = receivable("e0000002", 0, OrderStatus.Cancelled, PaymentSource.BankTransfer, 250, null);
+        first.setCancelledAt(TODAY.minusDays(6).atTime(9, 0));
+        // cancelled before the date was recorded: it goes by its order date, earlier than any recorded cancellation
+        Order undated = receivable("e0000003", 0, OrderStatus.Cancelled, PaymentSource.BankTransfer, 250, null);
+        undated.setOrderedAt(TODAY.minusDays(30).atTime(12, 0));
+        when(orders.findCancelledAwaitingRefund("store-1", TODAY)).thenReturn(List.of(later, first, undated));
+
+        // when
+        PaymentsPageModel page = page("side", "receivables");
+
+        // then
+        assertThat(page.receivables()).extracting(ReceivableRow::number).containsExactly("e0000003", "e0000002", "e0000001");
+        assertThat(page.receivables()).extracting(ReceivableRow::shipText)
+                .containsExactly("anulowane", "anulowane 25.09", "anulowane 30.09");
+    }
+
+    @Test
     void switchingATileOffKeepsTheShownSide() {
         // given
         unpaid.add(withProvider(delivery(100, TODAY.minusDays(20), 14), "aaaa0001", "Acme"));

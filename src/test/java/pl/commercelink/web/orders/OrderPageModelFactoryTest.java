@@ -254,6 +254,26 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void theHeaderOfACancelledOrderSaysWhenItWasCancelled() {
+        // given
+        OrderPageModelFactory.Viewer viewer = new OrderPageModelFactory.Viewer(false, true, null);
+        Order cancelled = order(OrderStatus.Cancelled);
+        cancelled.setCancelledAt(LocalDateTime.of(2026, 11, 12, 14, 25));
+        Order cancelledBeforeTheDateWasRecorded = order(OrderStatus.Cancelled);
+        cancelledBeforeTheDateWasRecorded.setOrderedAt(LocalDateTime.of(2026, 11, 3, 10, 0));
+
+        // when
+        OrderPageModel dated = factory.build(cancelled, List.of(), viewer, PL);
+        OrderPageModel undated = factory.build(cancelledBeforeTheDateWasRecorded, List.of(), viewer, PL);
+        OrderPageModel open = factory.build(order(OrderStatus.New), List.of(), viewer, PL);
+
+        // then: the order date never stands in for it
+        assertThat(dated.header().cancelledAt()).isEqualTo("12.11.2026, 14:25");
+        assertThat(undated.header().cancelledAt()).isNull();
+        assertThat(open.header().cancelledAt()).isNull();
+    }
+
+    @Test
     void aUserReceivesTheSameCostAndProfitAsAnAdmin() {
         // when
         OrderPageModel user = factory.build(order(OrderStatus.New), List.of(item(FulfilmentStatus.New)),

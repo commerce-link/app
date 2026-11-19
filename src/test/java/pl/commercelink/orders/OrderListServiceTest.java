@@ -258,6 +258,42 @@ class OrderListServiceTest {
     }
 
     @Test
+    void cancelledOrdersAreSortedByWhenTheyWereCancelledNotByTheirOldShippingDate() {
+        // given: the shipping dates run the other way round
+        add("later", OrderStatus.Cancelled, TODAY.minusDays(9), 10, 10, null).setCancelledAt(TODAY.minusDays(1).atTime(9, 0));
+        add("first", OrderStatus.Cancelled, TODAY.minusDays(2), 10, 10, null).setCancelledAt(TODAY.minusDays(3).atTime(9, 0));
+        // cancelled before the date was recorded: it goes by its order date, earlier than any recorded cancellation
+        add("undated", OrderStatus.Cancelled, TODAY.minusDays(1), 10, 10, null);
+        add("open", OrderStatus.Delivered, TODAY.minusDays(20), 10, 0, null);
+
+        // when
+        OrdersPageModel longestWaitingFirst = page(query("status", "Cancelled"));
+        OrdersPageModel latestFirst = page(query("status", "Cancelled", "sort", "due", "dir", "desc"));
+        OrdersPageModel byStatus = page(query("sort", "status"));
+
+        // then
+        assertThat(longestWaitingFirst.rows()).extracting(r -> path(r).substring(18)).containsExactly("undated", "first", "later");
+        assertThat(longestWaitingFirst.rows()).extracting(OrderRow::dueText).containsExactly("anulowane", "22.09", "24.09");
+        assertThat(latestFirst.rows()).extracting(r -> path(r).substring(18)).containsExactly("later", "first", "undated");
+        assertThat(byStatus.rows()).extracting(r -> path(r).substring(18)).containsExactly("open", "undated", "first", "later");
+    }
+
+    @Test
+    void amongTheOpenOrdersACancelledOneStandsByTheDayItWasCancelled() {
+        // given
+        add("due-yesterday", OrderStatus.New, TODAY.minusDays(1), 10, 10, null);
+        add("cancelled-today", OrderStatus.Cancelled, TODAY.minusDays(9), 10, 10, null).setCancelledAt(TODAY.atTime(8, 0));
+        add("due-tomorrow", OrderStatus.New, TODAY.plusDays(1), 10, 10, null);
+
+        // when
+        OrdersPageModel model = page(query());
+
+        // then
+        assertThat(model.rows()).extracting(r -> path(r).substring(18))
+                .containsExactly("due-yesterday", "cancelled-today", "due-tomorrow");
+    }
+
+    @Test
     void choosingAFilterFromTheMenuTicksItsOwnStatus() {
         add("a", OrderStatus.Assembled, null, 10, 10, "Allegro");
         add("b", OrderStatus.New, null, 10, 10, "Allegro");

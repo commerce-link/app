@@ -559,6 +559,20 @@ public class Order {
         status = OrderStatus.Cancelled;
     }
 
+    /**
+     * The date cancelled orders are put in order by: when the order was cancelled, or its order date when it was
+     * cancelled before the date was recorded. That date is earlier than every cancellation recorded since, so such
+     * orders still come first; it is never shown as the day of the cancellation (cancelledAt is). Once no such order
+     * awaits a refund the order date can go from here. Null while the order is not cancelled.
+     */
+    @DynamoDBIgnore
+    public LocalDateTime cancelledSince() {
+        if (!hasStatus(OrderStatus.Cancelled)) {
+            return null;
+        }
+        return cancelledAt != null ? cancelledAt : orderedAt;
+    }
+
     @DynamoDBIgnore
     public boolean canBeSplit() {
         return hasOneOfStatuses(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly, OrderStatus.Assembled)
