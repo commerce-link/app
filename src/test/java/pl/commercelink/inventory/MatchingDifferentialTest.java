@@ -59,8 +59,7 @@ class MatchingDifferentialTest {
                 // when
                 Run reference = run(scenario, referenceGrouper(new ReferenceAutoDiscovery(pimCatalog, taxonomyCache,
                         supplierRegistry, properties)), null);
-                Run actual = run(scenario, actualGrouper(new InventoryAutoDiscovery(pimCatalog, taxonomyCache,
-                        supplierRegistry, properties)), null);
+                Run actual = run(scenario, actualGrouper(new InventoryAutoDiscovery(pimCatalog, supplierRegistry, properties)), null);
 
                 // then
                 assertThat(signaturesOf(actual.global().groups())).as(description)
@@ -87,8 +86,7 @@ class MatchingDifferentialTest {
                 // when
                 Run reference = run(scenario, referenceGrouper(new ReferenceAutoDiscovery(pimCatalog, taxonomyCache,
                         supplierRegistry, properties)), ReferenceOwnToGlobalLinks::apply);
-                Run actual = run(scenario, actualGrouper(new InventoryAutoDiscovery(pimCatalog, taxonomyCache,
-                        supplierRegistry, properties)), OwnToGlobalLinks::apply);
+                Run actual = run(scenario, actualGrouper(new InventoryAutoDiscovery(pimCatalog, supplierRegistry, properties)), OwnToGlobalLinks::apply);
 
                 // then
                 assertThat(signaturesOf(actual.decisions())).as(description).isEqualTo(signaturesOf(reference.decisions()));

@@ -32,7 +32,7 @@ class GlobalMatchedInventoryTest {
     }
 
     private MatchedInventory keyed(String ean, String mfn) {
-        return new MatchedInventory(new InventoryKey(ean, mfn), null, null);
+        return new MatchedInventory(new InventoryKey(ean, mfn), null);
     }
 
     @Test
@@ -147,8 +147,8 @@ class GlobalMatchedInventoryTest {
         InventoryItem action = item("Action");
         InventoryItem elko = item("Elko");
         inventory.replace(List.of(
-                new MatchedInventory(new InventoryKey("4711111111111", "MFN"), List.of(action), null, null),
-                new MatchedInventory(new InventoryKey("4711111111112", "MFN-2"), List.of(elko), null, null)));
+                new MatchedInventory(new InventoryKey("4711111111111", "MFN"), List.of(action), null),
+                new MatchedInventory(new InventoryKey("4711111111112", "MFN-2"), List.of(elko), null)));
 
         // when / then
         assertThat(inventory.generation().allItems()).containsExactlyInAnyOrder(action, elko);

@@ -12,7 +12,6 @@ import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimIdentifier;
 import pl.commercelink.pim.api.PimIdentifierType;
 import pl.commercelink.pim.api.PimView;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.Collection;
 import java.util.List;
@@ -32,15 +31,13 @@ class InventoryAutoDiscoveryTest {
     @Mock
     private PimView pimView;
     @Mock
-    private TaxonomyCache taxonomyCache;
-    @Mock
     private SupplierRegistry supplierRegistry;
 
     private InventoryAutoDiscovery autoDiscovery;
 
     @BeforeEach
     void globalInventoryMatchesAgainstTheGlobalView() {
-        autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry, InventoryMatchingProperties.allEnabled());
+        autoDiscovery = new InventoryAutoDiscovery(pimCatalog, supplierRegistry, InventoryMatchingProperties.allEnabled());
         lenient().when(pimCatalog.withGlobalData()).thenReturn(pimView);
     }
 
@@ -519,7 +516,7 @@ class InventoryAutoDiscoveryTest {
     @Test
     void withTheSwitchOffTheConflictingOfferJoinsAsToday() {
         // given
-        autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
+        autoDiscovery = new InventoryAutoDiscovery(pimCatalog, supplierRegistry,
                 new InventoryMatchingProperties(false, true, true, true, true, true));
         when(pimView.findAll()).thenReturn(List.of());
         InventoryItem kosatec9060 = item("4895106296381", "11350-03-20G", 2613, "Kosatec", "Sapphire");
@@ -573,7 +570,7 @@ class InventoryAutoDiscoveryTest {
     @Test
     void witnessesAreNotFetchedWithTheSwitchOff() {
         // given
-        autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
+        autoDiscovery = new InventoryAutoDiscovery(pimCatalog, supplierRegistry,
                 new InventoryMatchingProperties(false, true, true, true, true, true));
         when(pimView.findAll()).thenReturn(List.of());
         AtomicInteger fetches = new AtomicInteger();
@@ -665,7 +662,7 @@ class InventoryAutoDiscoveryTest {
     @Test
     void withTheSwitchOffTheGroupStaysWhole() {
         // given
-        autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
+        autoDiscovery = new InventoryAutoDiscovery(pimCatalog, supplierRegistry,
                 new InventoryMatchingProperties(true, true, false, true, true, true));
         when(pimView.findAll()).thenReturn(List.of());
 

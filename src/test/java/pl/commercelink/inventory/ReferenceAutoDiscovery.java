@@ -112,7 +112,7 @@ class ReferenceAutoDiscovery {
             matchingItems.addAll(findItemsByKeysModifyingCollection(inventoryKey.getProductEans(), mappedByEan));
             matchingItems.addAll(takeItemsOfBrandModifyingCollection(inventoryKey.getProductCodes(), mappedByProductCode, pimEntry.brand()));
 
-            MatchedInventory matchedInventory = new MatchedInventory(inventoryKey, matchingItems, taxonomyCache, supplierRegistry);
+            MatchedInventory matchedInventory = new MatchedInventory(inventoryKey, matchingItems, supplierRegistry);
 
             for (String ean : matchedInventory.getEans()) {
                 keyToMatchedInventory.put(ean, matchedInventory);
@@ -148,7 +148,7 @@ class ReferenceAutoDiscovery {
                 inv.addAlternativeInventoryItems(matchingItems);
             } else {
                 InventoryKey ik = new InventoryKey(eans, productCodes);
-                MatchedInventory mi = new MatchedInventory(ik, matchingItems, taxonomyCache, supplierRegistry);
+                MatchedInventory mi = new MatchedInventory(ik, matchingItems, supplierRegistry);
 
                 for (String ean : eans) {
                     keyToMatchedInventory.put(ean, mi);
@@ -320,7 +320,7 @@ class ReferenceAutoDiscovery {
     private MatchedInventory createMatchedInventoryOf(List<InventoryItem> inventoryItems) {
         Set<String> eans = inventoryItems.stream().map(InventoryItem::ean).collect(Collectors.toSet());
         Set<String> productCodes = inventoryItems.stream().map(InventoryItem::mfn).collect(Collectors.toSet());
-        return new MatchedInventory(new InventoryKey(eans, productCodes), inventoryItems, taxonomyCache, supplierRegistry);
+        return new MatchedInventory(new InventoryKey(eans, productCodes), inventoryItems, supplierRegistry);
     }
 
     private boolean isUniformGroupOfItems(List<InventoryItem> inventoryItems) {

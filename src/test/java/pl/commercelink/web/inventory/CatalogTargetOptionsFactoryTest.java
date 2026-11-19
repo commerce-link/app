@@ -213,7 +213,7 @@ class CatalogTargetOptionsFactoryTest {
     private void product(String ean, String name, String categoryId) {
         InventoryKey key = InventoryKey.fromEan(ean);
         MatchedInventory matched = MatchedInventoryFixture.readingFrom(taxonomyCache, new MatchedInventory(key,
-                new InventoryItem(ean, "M-" + ean, 100.0, "PLN", 1, 1, "AB"), taxonomyCache, null));
+                new InventoryItem(ean, "M-" + ean, 100.0, "PLN", 1, 1, "AB"), null));
         when(taxonomyCache.find(same(key)))
                 .thenReturn(new Taxonomy(ean, "M-" + ean, "Brand", name, "x", 1, null, null, null, categoryId));
         when(view.findByEan(ean)).thenReturn(matched);

@@ -13,7 +13,6 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.InventoryItem;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -36,20 +35,19 @@ class RedisStoreInventoryCacheTest {
 
     @Mock private StringRedisTemplate redisTemplate;
     @Mock private ValueOperations<String, String> valueOps;
-    @Mock private TaxonomyCache taxonomyCache;
     @Mock private SupplierRegistry supplierRegistry;
 
     private final ObjectMapper objectMapper = Jackson2ObjectMapperBuilder.json().build();
 
     private RedisStoreInventoryCache cache() {
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        return new RedisStoreInventoryCache(redisTemplate, objectMapper, taxonomyCache, supplierRegistry);
+        return new RedisStoreInventoryCache(redisTemplate, objectMapper, supplierRegistry);
     }
 
     private StoreInventory sampleInventory() {
         InventoryItem item = new InventoryItem("5900000000002", "MFN-1", 10.0, "PLN", 5, 1, "Acme", true, true, false);
         MatchedInventory matched = new MatchedInventory(new InventoryKey("5900000000002", "MFN-1"),
-                List.of(item), taxonomyCache, supplierRegistry);
+                List.of(item), supplierRegistry);
         return new StoreInventory(InventoryIndex.of(List.of(matched)), LocalDateTime.of(2026, 6, 17, 10, 0));
     }
 
@@ -137,7 +135,7 @@ class RedisStoreInventoryCacheTest {
             String ean = String.format("59%011d", i);
             String mfn = "MFN-" + i;
             InventoryItem item = new InventoryItem(ean, mfn, 10.0 + i, "PLN", 5, 1, "Acme", true, true, false);
-            matched.add(new MatchedInventory(new InventoryKey(ean, mfn), List.of(item), taxonomyCache, supplierRegistry));
+            matched.add(new MatchedInventory(new InventoryKey(ean, mfn), List.of(item), supplierRegistry));
         }
         return new StoreInventory(InventoryIndex.of(matched), LocalDateTime.of(2026, 6, 17, 10, 0));
     }

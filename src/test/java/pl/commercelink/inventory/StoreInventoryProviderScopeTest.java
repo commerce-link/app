@@ -22,7 +22,6 @@ import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.Collection;
 import java.util.List;
@@ -47,7 +46,6 @@ class StoreInventoryProviderScopeTest {
     @Mock private SupplierProviderFactory supplierProviderFactory;
     @Mock private StoreFeedItemLoader storeFeedItemLoader;
     @Mock private ExchangeRates exchangeRates;
-    @Mock private TaxonomyCache taxonomyCache;
     @Mock private SupplierRegistry supplierRegistry;
 
     private final PimEntry storeEntry = new PimEntry("s1-2", List.of(
@@ -61,7 +59,7 @@ class StoreInventoryProviderScopeTest {
     }
 
     private Collection<MatchedInventory> inventoryOf(String storeId, PimCatalog pimCatalog) {
-        InventoryAutoDiscovery autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry);
+        InventoryAutoDiscovery autoDiscovery = new InventoryAutoDiscovery(pimCatalog, supplierRegistry);
         StoreInventoryProvider provider = new StoreInventoryProvider(cache, storesRepository, supplierProviderFactory,
                 autoDiscovery, storeFeedItemLoader, exchangeRates, pimCatalog, new GlobalMatchedInventory(),
                 InventoryMatchingProperties.allEnabled(),

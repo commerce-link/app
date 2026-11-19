@@ -7,7 +7,6 @@ import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimView;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.*;
 import java.util.function.Supplier;
@@ -17,19 +16,17 @@ import java.util.stream.Collectors;
 class InventoryAutoDiscovery {
 
     private PimCatalog pimCatalog;
-    private TaxonomyCache taxonomyCache;
     private SupplierRegistry supplierRegistry;
     private final MatchingRules rules;
 
-    public InventoryAutoDiscovery(PimCatalog pimCatalog, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
-        this(pimCatalog, taxonomyCache, supplierRegistry, InventoryMatchingProperties.allEnabled());
+    public InventoryAutoDiscovery(PimCatalog pimCatalog, SupplierRegistry supplierRegistry) {
+        this(pimCatalog, supplierRegistry, InventoryMatchingProperties.allEnabled());
     }
 
     @Autowired
-    public InventoryAutoDiscovery(PimCatalog pimCatalog, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry,
+    public InventoryAutoDiscovery(PimCatalog pimCatalog, SupplierRegistry supplierRegistry,
                                   InventoryMatchingProperties matchingProperties) {
         this.pimCatalog = pimCatalog;
-        this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
         this.rules = MatchingRules.of(matchingProperties);
     }
@@ -120,7 +117,7 @@ class InventoryAutoDiscovery {
             matchingItems.addAll(findItemsByKeysModifyingCollection(inventoryKey.getProductEans(), mappedByEan));
             matchingItems.addAll(takeItemsOfBrandModifyingCollection(inventoryKey.getProductCodes(), mappedByProductCode, pimEntry.brand()));
 
-            MatchedInventory matchedInventory = new MatchedInventory(inventoryKey, matchingItems, taxonomyCache, supplierRegistry);
+            MatchedInventory matchedInventory = new MatchedInventory(inventoryKey, matchingItems, supplierRegistry);
 
             for (String ean : matchedInventory.getEans()) {
                 keyToMatchedInventory.put(ean, matchedInventory);
@@ -160,7 +157,7 @@ class InventoryAutoDiscovery {
                 inv.addAlternativeInventoryItems(matchingItems);
             } else {
                 InventoryKey ik = new InventoryKey(eans, productCodes);
-                MatchedInventory mi = new MatchedInventory(ik, matchingItems, taxonomyCache, supplierRegistry);
+                MatchedInventory mi = new MatchedInventory(ik, matchingItems, supplierRegistry);
 
                 for (String ean : eans) {
                     keyToMatchedInventory.put(ean, mi);
@@ -236,7 +233,7 @@ class InventoryAutoDiscovery {
     private MatchedInventory createMatchedInventoryOf(List<InventoryItem> inventoryItems) {
         Set<String> eans = inventoryItems.stream().map(InventoryItem::ean).collect(Collectors.toSet());
         Set<String> productCodes = inventoryItems.stream().map(InventoryItem::mfn).collect(Collectors.toSet());
-        return new MatchedInventory(new InventoryKey(eans, productCodes), inventoryItems, taxonomyCache, supplierRegistry);
+        return new MatchedInventory(new InventoryKey(eans, productCodes), inventoryItems, supplierRegistry);
     }
 
 }

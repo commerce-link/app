@@ -15,7 +15,6 @@ import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.SupplierScope;
-import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.warehouse.api.Warehouse;
 
 import java.time.Duration;
@@ -39,7 +38,6 @@ public class Inventory {
     private final Warehouse warehouse;
     private final StoresRepository storesRepository;
     private final InventoryAutoDiscovery autoDiscovery;
-    private final TaxonomyCache taxonomyCache;
     private final SupplierRegistry supplierRegistry;
     private final StoreInventoryProvider storeInventoryProvider;
     private final GlobalMatchedInventory globalInventory;
@@ -111,13 +109,13 @@ public class Inventory {
     public InventoryView withGlobalData() {
         InventoryIndex globalIndex = globalInventory.index();
         return new InventoryView(null, productDataResolver, globalIndex, InventoryIndex.of(List.of()), StoreEntryKeys.none(),
-                taxonomyCache, supplierRegistry, GroupInventorySource.global(globalIndex, supplier -> true));
+                supplierRegistry, GroupInventorySource.global(globalIndex, supplier -> true));
     }
 
     public InventoryView withWarehouseDataOnly(String storeId) {
         InventoryIndex globalIndex = InventoryIndex.of(List.of());
         return new InventoryView(storeId, productDataResolver, globalIndex, InventoryIndex.of(List.of()), StoreEntryKeys.none(),
-                taxonomyCache, supplierRegistry, new WarehouseInventorySource(storeId, warehouse.stockQueryService(storeId)));
+                supplierRegistry, new WarehouseInventorySource(storeId, warehouse.stockQueryService(storeId)));
     }
 
     public InventoryView withEnabledSuppliersOnly(String storeId) {
@@ -160,7 +158,7 @@ public class Inventory {
                                InventorySource global, InventorySource own, InventorySource... additionalSources) {
         InventorySource[] sources = Stream.concat(Stream.of(global, own), Arrays.stream(additionalSources))
                 .toArray(InventorySource[]::new);
-        return new InventoryView(storeId, productDataResolver, globalIndex, ownIndex, storeEntries, taxonomyCache, supplierRegistry,
+        return new InventoryView(storeId, productDataResolver, globalIndex, ownIndex, storeEntries, supplierRegistry,
                 sources);
     }
 

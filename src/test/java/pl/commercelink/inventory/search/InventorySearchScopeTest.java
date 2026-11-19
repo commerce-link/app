@@ -44,7 +44,7 @@ class InventorySearchScopeTest {
     @Mock private InventoryView view;
 
     private InventorySearch search() {
-        MatchedInventory none = new MatchedInventory(new InventoryKey(), taxonomyCache, supplierRegistry);
+        MatchedInventory none = new MatchedInventory(new InventoryKey(), supplierRegistry);
         when(view.findByEan(anyString())).thenReturn(none);
         when(view.findByInventoryKey(any())).thenReturn(none);
         when(inventory.withEnabledSuppliersOnly(anyString())).thenReturn(view);

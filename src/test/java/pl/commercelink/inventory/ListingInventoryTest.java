@@ -5,7 +5,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.List;
 
@@ -15,15 +14,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ListingInventoryTest {
 
     @Mock
-    private TaxonomyCache taxonomyCache;
-    @Mock
     private SupplierRegistry supplierRegistry;
 
     // store entries in these tests carry an "-s-" id; every other id is a global PIM entry
     private static final StoreEntryKeys STORE_ENTRY = id -> id.contains("-s-");
 
     private MatchedInventory group(InventoryKey key) {
-        return new MatchedInventory(key, taxonomyCache, supplierRegistry);
+        return new MatchedInventory(key, supplierRegistry);
     }
 
     @Test

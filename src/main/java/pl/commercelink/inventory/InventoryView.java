@@ -4,7 +4,6 @@ import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.products.ResolvedProduct;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -24,19 +23,16 @@ public class InventoryView {
     private final InventoryIndex globalIndex;
     private final InventoryIndex ownIndex;
     private final StoreEntryKeys storeEntries;
-    private final TaxonomyCache taxonomyCache;
     private final SupplierRegistry supplierRegistry;
     private final List<InventorySource> sources;
 
     InventoryView(String storeId, ProductDataResolver products, InventoryIndex globalIndex, InventoryIndex ownIndex,
-                  StoreEntryKeys storeEntries, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry,
-                  InventorySource... sources) {
+                  StoreEntryKeys storeEntries, SupplierRegistry supplierRegistry, InventorySource... sources) {
         this.storeId = storeId;
         this.products = products;
         this.globalIndex = globalIndex;
         this.ownIndex = ownIndex;
         this.storeEntries = storeEntries;
-        this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
         this.sources = List.of(sources);
     }
@@ -120,7 +116,7 @@ public class InventoryView {
      * Without a new link there is exactly one pass.
      */
     private MatchedInventory assemble(InventoryKey lookupKey) {
-        MatchedInventory result = new MatchedInventory(lookupKey.copy(), taxonomyCache, supplierRegistry);
+        MatchedInventory result = new MatchedInventory(lookupKey.copy(), supplierRegistry);
         result.readProductFrom(key -> products.ofGroups(storeId, List.of(key)).get(0));
         Collection<String> linkedBefore = result.getInventoryKey().getLinkedEans();
         runSources(result);

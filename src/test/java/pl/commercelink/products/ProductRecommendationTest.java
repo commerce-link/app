@@ -81,7 +81,7 @@ class ProductRecommendationTest {
     private MatchedInventory group(InventoryItem... offers) {
         when(taxonomyCache.find(any(InventoryKey.class))).thenReturn(TAXONOMY);
         return MatchedInventoryFixture.readingFrom(taxonomyCache,
-                new MatchedInventory(new InventoryKey(), List.of(offers), taxonomyCache, supplierRegistry));
+                new MatchedInventory(new InventoryKey(), List.of(offers), supplierRegistry));
     }
 
     private static InventoryItem offer(String ean, String mfn) {

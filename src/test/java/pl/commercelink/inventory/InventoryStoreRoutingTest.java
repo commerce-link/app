@@ -45,7 +45,7 @@ class InventoryStoreRoutingTest {
     // the views read the store's clones from the PIM index copy: an empty one, with no entries and no clones
     @BeforeEach
     void createInventory() {
-        inventory = new Inventory(warehouse, storesRepository, autoDiscovery, taxonomyCache, supplierRegistry,
+        inventory = new Inventory(warehouse, storesRepository, autoDiscovery, supplierRegistry,
                 storeInventoryProvider, globalInventory, ScopedPimCatalog.of(), InventoryMatchingProperties.allEnabled(),
                 ProductDataFixture.resolverOver(taxonomyCache));
     }

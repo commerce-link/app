@@ -143,6 +143,6 @@ class BrowseIndexTest {
         Taxonomy taxonomy = new Taxonomy(ean, mfn, brand, name, "Kategoria", 1, null, null, null, categoryId);
         key.getProductCodes().forEach(code -> taxonomies.put(code, taxonomy));
         return new MatchedInventory(key, List.of(new InventoryItem(ean, mfn, 100.0, "PLN", 5, 1, "AB")),
-                taxonomyCache, supplierRegistry);
+                supplierRegistry);
     }
 }

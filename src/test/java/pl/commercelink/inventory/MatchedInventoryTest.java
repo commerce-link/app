@@ -11,7 +11,6 @@ import pl.commercelink.inventory.supplier.api.ShippingPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierType;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.List;
 
@@ -22,12 +21,10 @@ import static org.mockito.Mockito.when;
 class MatchedInventoryTest {
 
     @Mock
-    private TaxonomyCache taxonomyCache;
-    @Mock
     private SupplierRegistry supplierRegistry;
 
     private MatchedInventory inventoryWith(InventoryItem... items) {
-        return new MatchedInventory(new InventoryKey(null, "M1"), List.of(items), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(new InventoryKey(null, "M1"), List.of(items), supplierRegistry);
     }
 
     private InventoryItem warehouseItem(double netPrice, boolean inStock) {

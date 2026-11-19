@@ -144,8 +144,8 @@ class InventoryLoadTest {
     }
 
     private Inventory inventoryWith(InventoryMatchingProperties properties, PimCatalog pimCatalog) {
-        InventoryAutoDiscovery autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry, properties);
-        return new Inventory(warehouse, storesRepository, autoDiscovery, taxonomyCache, supplierRegistry,
+        InventoryAutoDiscovery autoDiscovery = new InventoryAutoDiscovery(pimCatalog, supplierRegistry, properties);
+        return new Inventory(warehouse, storesRepository, autoDiscovery, supplierRegistry,
                 storeInventoryProvider, globalInventory, pimCatalog, properties,
                 ProductDataFixture.resolverOver(taxonomyCache));
     }

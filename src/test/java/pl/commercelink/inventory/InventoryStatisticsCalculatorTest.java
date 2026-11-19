@@ -6,7 +6,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.InventoryItem;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.List;
 import java.util.Set;
@@ -17,22 +16,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 class InventoryStatisticsCalculatorTest {
 
     @Mock
-    private TaxonomyCache taxonomyCache;
-    @Mock
     private SupplierRegistry supplierRegistry;
 
     // store entries in these tests carry an "-s-" id; every other id is a global PIM entry
     private static final StoreEntryKeys STORE_ENTRY = id -> id.contains("-s-");
 
     private MatchedInventory group(String ean, String mfn, InventoryItem... items) {
-        return new MatchedInventory(new InventoryKey(ean, mfn), List.of(items), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(new InventoryKey(ean, mfn), List.of(items), supplierRegistry);
     }
 
     private MatchedInventory pimGroup(String id, String ean, String mfn, InventoryItem... items) {
         InventoryKey key = new InventoryKey(id);
         key.addEan(ean);
         key.addManufacturerCode(mfn);
-        return new MatchedInventory(key, List.of(items), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(key, List.of(items), supplierRegistry);
     }
 
     private InventoryItem item(String ean, String mfn, String supplier, int qty) {

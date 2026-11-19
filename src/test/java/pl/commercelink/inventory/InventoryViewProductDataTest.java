@@ -192,13 +192,13 @@ class InventoryViewProductDataTest {
     private InventoryView view(String storeId, ProductDataResolver resolver, MatchedInventory... groups) {
         InventoryIndex globalIndex = InventoryIndex.of(List.of(groups));
         return new InventoryView(storeId, resolver, globalIndex, InventoryIndex.of(List.of()), StoreEntryKeys.none(),
-                taxonomy, supplierRegistry, GroupInventorySource.global(globalIndex, supplier -> true));
+                supplierRegistry, GroupInventorySource.global(globalIndex, supplier -> true));
     }
 
     private MatchedInventory group(String ean) {
         return new MatchedInventory(new InventoryKey(ean, "M-" + ean),
                 List.of(new InventoryItem(ean, "M-" + ean, 100.0, "PLN", 5, 1, "Elko", true, true, false)),
-                taxonomy, supplierRegistry);
+                supplierRegistry);
     }
 
     private static Taxonomy record(String ean, String name, String categoryId) {

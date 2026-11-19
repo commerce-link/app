@@ -66,7 +66,7 @@ class StockLevelsStockTest {
     void stockOfAnotherProductWithTheSameShortCodeDoesNotCount() {
         // given
         catalogWith(new Product("cat-1", null, EAN, "X1", "Asus", "l", "Asus X1", "Default"));
-        when(inventoryView.findByInventoryKey(any())).thenAnswer(call -> new MatchedInventory(call.getArgument(0), null, null));
+        when(inventoryView.findByInventoryKey(any())).thenAnswer(call -> new MatchedInventory(call.getArgument(0), null));
         warehouseHolds(item(EAN, 1), item(OTHER_PRODUCT_EAN, 2));
 
         // when
@@ -82,7 +82,7 @@ class StockLevelsStockTest {
         catalogWith(new Product("cat-1", "pim-1", EAN, "X1", "Asus", "l", "Asus X1", "Default"));
         InventoryKey groupKey = InventoryKey.fromPimIdAndEan("pim-1", EAN);
         groupKey.addEan(SECOND_EAN);
-        when(inventoryView.findByInventoryKey(any())).thenReturn(new MatchedInventory(groupKey, null, null));
+        when(inventoryView.findByInventoryKey(any())).thenReturn(new MatchedInventory(groupKey, null));
         warehouseHolds(item(EAN, 1), item(SECOND_EAN, 2));
 
         // when

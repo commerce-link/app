@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -21,14 +20,12 @@ public class RedisStoreInventoryCache implements StoreInventoryCache {
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
-    private final TaxonomyCache taxonomyCache;
     private final SupplierRegistry supplierRegistry;
 
     public RedisStoreInventoryCache(StringRedisTemplate redisTemplate, ObjectMapper objectMapper,
-                                    TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
+                                    SupplierRegistry supplierRegistry) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
-        this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
     }
 
@@ -40,7 +37,7 @@ public class RedisStoreInventoryCache implements StoreInventoryCache {
                 return Optional.empty();
             }
             StoreInventorySnapshot snapshot = objectMapper.readValue(decompress(stored), StoreInventorySnapshot.class);
-            return Optional.of(snapshot.toStoreInventory(taxonomyCache, supplierRegistry));
+            return Optional.of(snapshot.toStoreInventory(supplierRegistry));
         } catch (Exception e) {
             System.err.println("Redis store-inventory get failed for " + storeId + ": " + e.getMessage());
             return Optional.empty();

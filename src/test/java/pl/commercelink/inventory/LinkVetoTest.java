@@ -8,7 +8,6 @@ import pl.commercelink.inventory.OwnToGlobalLinks.Decision;
 import pl.commercelink.inventory.OwnToGlobalLinks.Outcome;
 import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -25,8 +24,6 @@ class LinkVetoTest {
     private static final String CODE = "QP1324/20";
     private static final String PHILIPS = "Philips";
 
-    @Mock
-    private TaxonomyCache taxonomyCache;
     @Mock
     private SupplierRegistry supplierRegistry;
 
@@ -134,12 +131,12 @@ class LinkVetoTest {
                 key.addManufacturerCode(offer.mfn());
             }
         }
-        return new MatchedInventory(key, List.of(offers), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(key, List.of(offers), supplierRegistry);
     }
 
     private MatchedInventory withPimId(String pimId, String ean, InventoryItem... offers) {
         InventoryKey key = InventoryKey.fromPimIdAndEan(pimId, ean);
-        return new MatchedInventory(key, List.of(offers), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(key, List.of(offers), supplierRegistry);
     }
 
     private static GlobalMatchedInventory.Generation generation(MatchedInventory... groups) {

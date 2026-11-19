@@ -5,7 +5,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.List;
 
@@ -16,12 +15,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class InventoryIndexTest {
 
     @Mock
-    private TaxonomyCache taxonomyCache;
-    @Mock
     private SupplierRegistry supplierRegistry;
 
     private MatchedInventory group(InventoryKey key) {
-        return new MatchedInventory(key, taxonomyCache, supplierRegistry);
+        return new MatchedInventory(key, supplierRegistry);
     }
 
     @Test

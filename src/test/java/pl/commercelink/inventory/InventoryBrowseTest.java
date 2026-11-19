@@ -414,7 +414,7 @@ class InventoryBrowseTest {
         InventoryKey key = new InventoryKey(ean, mfn);
         Taxonomy taxonomy = new Taxonomy(ean, mfn, "Brand", name, "Kategoria " + categoryId, 1, null, null, null, categoryId);
         key.getProductCodes().forEach(code -> taxonomies.put(code, taxonomy));
-        return new MatchedInventory(key, List.of(items), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(key, List.of(items), supplierRegistry);
     }
 
     private static InventoryItem item(String ean, String mfn, String supplier, double net, int qty) {

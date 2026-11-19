@@ -126,11 +126,11 @@ class InventoryViewStoreListingsTest {
         return new MatchedInventory(key, List.of(
                 item("AB Group", 1399.0),
                 item("Action", 1450.0),
-                item("Elko", 1300.0)), taxonomyCache, supplierRegistry);
+                item("Elko", 1300.0)), supplierRegistry);
     }
 
     private MatchedInventory ownActionGroup() {
-        return new MatchedInventory(new InventoryKey(EAN, MFN), List.of(item("Action", 1380.0)), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(new InventoryKey(EAN, MFN), List.of(item("Action", 1380.0)), supplierRegistry);
     }
 
     private void storeWithGlobalAbGroupAndOwnAction() {
@@ -194,7 +194,7 @@ class InventoryViewStoreListingsTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN),
-                List.of(item("Elko", 1300.0), item("Action", 1450.0)), taxonomyCache, supplierRegistry)));
+                List.of(item("Elko", 1300.0), item("Action", 1450.0)), supplierRegistry)));
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
         when(pimView.findByPimIdOrGtins(any(), any())).thenReturn(Optional.empty());
 
@@ -240,13 +240,13 @@ class InventoryViewStoreListingsTest {
         InventoryKey ownKey = new InventoryKey("PIM-1");
         MatchedInventory ownGroup = new MatchedInventory(ownKey,
                 List.of(new InventoryItem("5907777777777", "MFN-OWN", 1380.0, "PLN", 5, 1, "Action", true, true, false)),
-                taxonomyCache, supplierRegistry);
+                supplierRegistry);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownGroup)));
         InventoryKey globalKey = new InventoryKey("PIM-1");
         globalKey.addEan(EAN);
         globalKey.addManufacturerCode(MFN);
         stubGlobalIndex(List.of(new MatchedInventory(globalKey,
-                List.of(item("AB Group", 1399.0)), taxonomyCache, supplierRegistry)));
+                List.of(item("AB Group", 1399.0)), supplierRegistry)));
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 1, null, null, null, "989"));
 
         // when
@@ -285,11 +285,11 @@ class InventoryViewStoreListingsTest {
         // given
         MatchedInventory smaller = new MatchedInventory(new InventoryKey(EAN, "MFN-A"),
                 List.of(new InventoryItem(EAN, "MFN-A", 100.0, "PLN", 5, 1, "SupplierX", true, true, false)),
-                taxonomyCache, supplierRegistry);
+                supplierRegistry);
         MatchedInventory bigger = new MatchedInventory(new InventoryKey(EAN, "MFN-B"),
                 List.of(new InventoryItem(EAN, "MFN-B", 90.0, "PLN", 5, 1, "SupplierY", true, true, false),
                         new InventoryItem(EAN, "MFN-B", 95.0, "PLN", 5, 1, "SupplierZ", true, true, false)),
-                taxonomyCache, supplierRegistry);
+                supplierRegistry);
         stubGlobalIndex(List.of(smaller, bigger));
 
         // when
@@ -308,7 +308,7 @@ class InventoryViewStoreListingsTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN),
-                List.of(item("AB Group", 1399.0), item("Action", 1450.0)), taxonomyCache, supplierRegistry)));
+                List.of(item("AB Group", 1399.0), item("Action", 1450.0)), supplierRegistry)));
 
         // when
         MatchedInventory matched = inventory.withEnabledSuppliersOnly(STORE_ID).findByEan(EAN);
@@ -331,7 +331,7 @@ class InventoryViewStoreListingsTest {
         globalKey.addEan(EAN);
         globalKey.addManufacturerCode(MFN);
         stubGlobalIndex(List.of(new MatchedInventory(globalKey,
-                List.of(item("AB Group", 1399.0)), taxonomyCache, supplierRegistry)));
+                List.of(item("AB Group", 1399.0)), supplierRegistry)));
 
         // when
         MatchedInventory matched = inventory.withEnabledSuppliersOnly(STORE_ID).findByEan(EAN);
@@ -350,7 +350,7 @@ class InventoryViewStoreListingsTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of()));
         stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN),
-                List.of(item("AB Group", 1399.0)), taxonomyCache, supplierRegistry)));
+                List.of(item("AB Group", 1399.0)), supplierRegistry)));
         StockQueryService stockQueryService = org.mockito.Mockito.mock(StockQueryService.class);
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
         WarehouseItemView view = new WarehouseItemView(STORE_ID, "wh-1", "Widget", EAN, MFN, Price.fromNet(1200.0, 0.23), 3,
@@ -373,7 +373,7 @@ class InventoryViewStoreListingsTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of()));
         stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN),
-                List.of(item("AB Group", 1399.0)), taxonomyCache, supplierRegistry)));
+                List.of(item("AB Group", 1399.0)), supplierRegistry)));
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 1, null, null, null, "989"));
         StockQueryService stockQueryService = org.mockito.Mockito.mock(StockQueryService.class);
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
@@ -478,17 +478,17 @@ class InventoryViewStoreListingsTest {
         InventoryKey keyA = new InventoryKey(EAN, "MFN-A");
         MatchedInventory groupA = new MatchedInventory(keyA,
                 List.of(new InventoryItem(EAN, "MFN-A", 100.0, "PLN", 5, 1, "AB Group", true, true, false)),
-                realCache, supplierRegistry);
+                supplierRegistry);
         InventoryIndex globalIndex = InventoryIndex.of(List.of(groupA));
 
         InventoryKey keyB = new InventoryKey(secondEan, "MFN-A");
         MatchedInventory groupB = new MatchedInventory(keyB,
                 List.of(new InventoryItem(secondEan, "MFN-A", 90.0, "PLN", 5, 1, "AB Group", true, true, false)),
-                realCache, supplierRegistry);
+                supplierRegistry);
         InventoryIndex mergingIndex = InventoryIndex.of(List.of(groupB));
 
         InventoryView view = new InventoryView(null, ProductDataFixture.resolverOver(realCache), globalIndex, InventoryIndex.of(List.of()),
-                pimId -> false, realCache, supplierRegistry,
+                pimId -> false, supplierRegistry,
                 GroupInventorySource.global(globalIndex, supplier -> true),
                 GroupInventorySource.global(mergingIndex, supplier -> true));
 
@@ -536,10 +536,10 @@ class InventoryViewStoreListingsTest {
     void storeEntrySoldAlsoByAGlobalSupplierWithoutGlobalEntryIsListedAndCountedOnce() {
         // given
         InventoryKey ownKey = new InventoryKey("st-s-1");
-        MatchedInventory ownGroup = new MatchedInventory(ownKey, List.of(item("Action", 1380.0)), taxonomyCache, supplierRegistry);
+        MatchedInventory ownGroup = new MatchedInventory(ownKey, List.of(item("Action", 1380.0)), supplierRegistry);
         storeWithGlobalAbAndOwnIndex(ownGroup);
         stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN), List.of(item("AB Group", 1399.0)),
-                taxonomyCache, supplierRegistry)));
+                supplierRegistry)));
 
         // when
         InventoryView view = inventory.withEnabledSuppliersOnly(STORE_ID);
@@ -567,11 +567,11 @@ class InventoryViewStoreListingsTest {
         globalKey.addManufacturerCode("MFN-G");
         MatchedInventory globalGroup = new MatchedInventory(globalKey,
                 List.of(new InventoryItem("5900000000031", "MFN-S", 1399.0, "PLN", 5, 1, "AB Group", true, true, false)),
-                taxonomyCache, supplierRegistry);
+                supplierRegistry);
         InventoryKey ownKey = new InventoryKey("st-s-1");
         MatchedInventory ownGroup = new MatchedInventory(ownKey,
                 List.of(new InventoryItem("5900000000032", "MFN-S", 1380.0, "PLN", 5, 1, "Action", true, true, false)),
-                taxonomyCache, supplierRegistry);
+                supplierRegistry);
         storeWithGlobalAbAndOwnIndex(ownGroup);
         stubGlobalIndex(List.of(globalGroup));
 
@@ -602,7 +602,7 @@ class InventoryViewStoreListingsTest {
     void cloneRowIsListedOnceWithGlobalOffers() {
         // given
         InventoryKey cloneKey = cloneOfPim1();
-        storeWithGlobalAbAndOwnIndex(new MatchedInventory(cloneKey, List.of(item("Action", 1380.0)), taxonomyCache, supplierRegistry));
+        storeWithGlobalAbAndOwnIndex(new MatchedInventory(cloneKey, List.of(item("Action", 1380.0)), supplierRegistry));
         stubGlobalIndex(List.of(globalGroupWithPimId()));
 
         // when
@@ -620,7 +620,7 @@ class InventoryViewStoreListingsTest {
     void cloneSourcesAreReadOncePerView() {
         // given
         InventoryKey cloneKey = cloneOfPim1();
-        storeWithGlobalAbAndOwnIndex(new MatchedInventory(cloneKey, List.of(item("Action", 1380.0)), taxonomyCache, supplierRegistry));
+        storeWithGlobalAbAndOwnIndex(new MatchedInventory(cloneKey, List.of(item("Action", 1380.0)), supplierRegistry));
         stubGlobalIndex(List.of(globalGroupWithPimId()));
 
         // when: several lookups on one view, each of them resolving the clone's source (read once, when the view is built)
@@ -661,13 +661,13 @@ class InventoryViewStoreListingsTest {
 
     private MatchedInventory philipsGlobal() {
         return new MatchedInventory(new InventoryKey(PHILIPS_GLOBAL_EAN, "QP1324/20"),
-                List.of(philips(PHILIPS_GLOBAL_EAN, "MxSolution", 107.11)), taxonomyCache, supplierRegistry);
+                List.of(philips(PHILIPS_GLOBAL_EAN, "MxSolution", 107.11)), supplierRegistry);
     }
 
     private MatchedInventory philipsOwn() {
         return new MatchedInventory(new InventoryKey(PHILIPS_OWN_EAN, "QP1324/20"),
                 List.of(philips(PHILIPS_OWN_EAN, "Action", 75.00), philips(PHILIPS_OWN_EAN, "Elko", 65.76)),
-                taxonomyCache, supplierRegistry);
+                supplierRegistry);
     }
 
     private InventoryView philipsView(java.util.function.Predicate<String> enabledGlobal, InventorySource... extra) {
@@ -681,8 +681,7 @@ class InventoryViewStoreListingsTest {
         List<InventorySource> sources = new java.util.ArrayList<>(List.of(
                 GroupInventorySource.global(globalIndex, enabledGlobal), GroupInventorySource.own(ownIndex)));
         sources.addAll(List.of(extra));
-        return new InventoryView(STORE_ID, productDataResolver, globalIndex, ownIndex, pimId -> false, taxonomyCache,
-                supplierRegistry,
+        return new InventoryView(STORE_ID, productDataResolver, globalIndex, ownIndex, pimId -> false, supplierRegistry,
                 sources.toArray(InventorySource[]::new));
     }
 
@@ -737,8 +736,7 @@ class InventoryViewStoreListingsTest {
         InventoryIndex globalIndex = InventoryIndex.of(List.of(philipsGlobal()));
         InventoryIndex ownIndex = InventoryIndex.of(List.of(philipsOwn()));
         SpySource spy = new SpySource();
-        InventoryView view = new InventoryView(STORE_ID, productDataResolver, globalIndex, ownIndex, pimId -> false, taxonomyCache,
-                supplierRegistry,
+        InventoryView view = new InventoryView(STORE_ID, productDataResolver, globalIndex, ownIndex, pimId -> false, supplierRegistry,
                 GroupInventorySource.global(globalIndex, supplier -> true), GroupInventorySource.own(ownIndex), spy);
 
         // when
@@ -772,14 +770,13 @@ class InventoryViewStoreListingsTest {
         ownKey.addManufacturerCode("QP1324/20");
         MatchedInventory own = new MatchedInventory(ownKey,
                 List.of(philips(PHILIPS_OWN_EAN, "Action", 75.00), philips(PHILIPS_OWN_EAN, "Elko", 65.76)),
-                taxonomyCache, supplierRegistry);
+                supplierRegistry);
         InventoryIndex globalIndex = InventoryIndex.of(List.of(global));
         InventoryIndex ownIndex = InventoryIndex.of(List.of(own));
         if (linked) {
             ownIndex.link(own, global.getInventoryKey().getProductEans());
         }
-        return new InventoryView(STORE_ID, productDataResolver, globalIndex, ownIndex, pimId -> false, taxonomyCache,
-                supplierRegistry,
+        return new InventoryView(STORE_ID, productDataResolver, globalIndex, ownIndex, pimId -> false, supplierRegistry,
                 GroupInventorySource.global(globalIndex, supplier -> true), GroupInventorySource.own(ownIndex));
     }
 
@@ -823,17 +820,16 @@ class InventoryViewStoreListingsTest {
         String otherOwnEan = "8720689021197";
         MatchedInventory reloadedGlobal = new MatchedInventory(new InventoryKey(Set.of(PHILIPS_GLOBAL_EAN, otherOwnEan),
                 Set.of("QP1324/20")), List.of(philips(PHILIPS_GLOBAL_EAN, "MxSolution", 107.11),
-                philips(otherOwnEan, "Wave", 104.00)), taxonomyCache, supplierRegistry);
+                philips(otherOwnEan, "Wave", 104.00)), supplierRegistry);
         MatchedInventory linkedOwn = philipsOwn();
         MatchedInventory otherOwn = new MatchedInventory(new InventoryKey(otherOwnEan, "QP1324/20"),
-                List.of(philips(otherOwnEan, "Komputronik", 99.00)), taxonomyCache, supplierRegistry);
+                List.of(philips(otherOwnEan, "Komputronik", 99.00)), supplierRegistry);
         InventoryIndex globalIndex = InventoryIndex.of(List.of(reloadedGlobal));
         InventoryIndex ownIndex = InventoryIndex.of(List.of(linkedOwn, otherOwn));
         ownIndex.link(linkedOwn, List.of(PHILIPS_GLOBAL_EAN));
         when(taxonomyCache.find(any())).thenReturn(
                 new Taxonomy(PHILIPS_GLOBAL_EAN, "QP1324/20", "Philips", "QP1324/20", "Golarki", 1, null, null, null, "31"));
-        InventoryView view = new InventoryView(STORE_ID, productDataResolver, globalIndex, ownIndex, pimId -> false, taxonomyCache,
-                supplierRegistry,
+        InventoryView view = new InventoryView(STORE_ID, productDataResolver, globalIndex, ownIndex, pimId -> false, supplierRegistry,
                 GroupInventorySource.global(globalIndex, supplier -> true), GroupInventorySource.own(ownIndex));
 
         // when

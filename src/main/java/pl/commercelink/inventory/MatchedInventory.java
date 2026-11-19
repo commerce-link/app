@@ -8,7 +8,6 @@ import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.products.ProductData;
 import pl.commercelink.products.ResolvedProduct;
 import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.*;
 import java.util.function.Function;
@@ -24,28 +23,24 @@ public class MatchedInventory {
 
     private InventoryKey key;
     private Collection<InventoryItem> inventoryItems = new LinkedHashSet<>();
-    private TaxonomyCache taxonomyCache;
     private SupplierRegistry supplierRegistry;
     // set by the InventoryView that assembled this row; a group of the pool has neither and is described in bulk
     private Function<InventoryKey, ResolvedProduct> productSource;
     private ResolvedProduct product;
 
-    public MatchedInventory(InventoryKey key, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
+    public MatchedInventory(InventoryKey key, SupplierRegistry supplierRegistry) {
         this.key = key;
-        this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
     }
 
-    public MatchedInventory(InventoryKey key, InventoryItem inventoryItem, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
+    public MatchedInventory(InventoryKey key, InventoryItem inventoryItem, SupplierRegistry supplierRegistry) {
         this.key = key;
-        this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
         addAlternativeInventoryItem(inventoryItem);
     }
 
-    public MatchedInventory(InventoryKey key, Collection<InventoryItem> inventoryItems, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
+    public MatchedInventory(InventoryKey key, Collection<InventoryItem> inventoryItems, SupplierRegistry supplierRegistry) {
         this.key = key;
-        this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
         addAlternativeInventoryItems(inventoryItems);
     }
@@ -234,7 +229,7 @@ public class MatchedInventory {
     }
 
     public MatchedInventory atPricePoint(long grossPrice) {
-        MatchedInventory filtered = new MatchedInventory(key, taxonomyCache, supplierRegistry);
+        MatchedInventory filtered = new MatchedInventory(key, supplierRegistry);
         filtered.productSource = productSource;
         filtered.product = product;
         inventoryItems.stream()
@@ -271,7 +266,7 @@ public class MatchedInventory {
     }
 
     public static MatchedInventory empty(InventoryKey inventoryKey) {
-        return new MatchedInventory(inventoryKey, null, null);
+        return new MatchedInventory(inventoryKey, null);
     }
 
     void addAlternativeInventoryItems(Collection<? extends InventoryItem> items) {
