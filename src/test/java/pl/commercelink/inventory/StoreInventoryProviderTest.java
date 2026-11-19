@@ -319,7 +319,7 @@ class StoreInventoryProviderTest {
         StoreInventory result = provider.get("store-1");
 
         // then
-        verify(cache).put(eq("store-1"), same(result), any(Duration.class));
+        verify(cache).put(eq("store-1"), same(result), any(Duration.class), anyLong());
     }
 
     @Test
@@ -880,7 +880,7 @@ class StoreInventoryProviderTest {
         // then: the build still serves this request
         assertThat(result.index().all()).singleElement().satisfies(group ->
                 assertThat(group.getInventoryItems()).containsExactlyInAnyOrderElementsOf(philipsOwnOffers()));
-        verify(cache, never()).put(any(), any(), any());
+        verify(cache, never()).put(any(), any(), any(), anyLong());
     }
 
     @Test
@@ -895,7 +895,7 @@ class StoreInventoryProviderTest {
         StoreInventory result = providerWith(autoDiscovery, InventoryMatchingProperties.allEnabled()).get("store-1");
 
         // then
-        verify(cache).put(eq("store-1"), same(result), any(Duration.class));
+        verify(cache).put(eq("store-1"), same(result), any(Duration.class), anyLong());
     }
 
     @Test
@@ -910,7 +910,7 @@ class StoreInventoryProviderTest {
         StoreInventory result = providerWith(autoDiscovery, InventoryMatchingProperties.allEnabled()).get("store-1");
 
         // then
-        verify(cache).put(eq("store-1"), same(result), any(Duration.class));
+        verify(cache).put(eq("store-1"), same(result), any(Duration.class), anyLong());
     }
 
     @Test
