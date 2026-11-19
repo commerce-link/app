@@ -7,6 +7,7 @@ import pl.commercelink.starter.csv.CSVLoader;
 import pl.commercelink.inventory.supplier.api.CsvRowParser;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.InventoryRepository;
+import pl.commercelink.inventory.VariantCodes;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -29,29 +30,31 @@ public class CsvProductFeedLoader {
             return new LinkedList<>();
         }
         try (Reader reader = inventoryRepository.read(supplierName)) {
-            return parseRows(parser, separator, reader, supplierInfo, 0);
+            return parseRows(parser, separator, reader, supplierInfo, 0, VariantCodes.none());
         } catch (IOException e) {
             System.out.println("Error reading feed file for " + supplierName + ": " + e.getMessage());
             return new LinkedList<>();
         }
     }
 
-    public List<InventoryItem> fetch(CsvRowParser parser, Character separator, String storeId, SupplierInfo supplierInfo, int taxonomyPenalty) {
+    public List<InventoryItem> fetch(CsvRowParser parser, Character separator, String storeId, SupplierInfo supplierInfo, int taxonomyPenalty,
+                                       VariantCodes storeEanOnly) {
         String supplierName = supplierInfo.name();
         if (!storeFeedRepository.canRead(storeId, supplierName, "csv")) {
             System.out.println("Skipping store feed file for " + storeId + "/" + supplierName + " as it does not exist or is unreadable.");
             return new LinkedList<>();
         }
         try (Reader reader = storeFeedRepository.read(storeId, supplierName, "csv")) {
-            return parseRows(parser, separator, reader, supplierInfo, taxonomyPenalty);
+            return parseRows(parser, separator, reader, supplierInfo, taxonomyPenalty, storeEanOnly);
         } catch (IOException e) {
             System.out.println("Error reading store feed file for " + storeId + "/" + supplierName + ": " + e.getMessage());
             return new LinkedList<>();
         }
     }
 
-    private List<InventoryItem> parseRows(CsvRowParser parser, Character separator, Reader reader, SupplierInfo supplierInfo, int taxonomyPenalty) {
-        FeedProcessing processing = feedProcessor.start(supplierInfo.name(), taxonomyPenalty);
+    private List<InventoryItem> parseRows(CsvRowParser parser, Character separator, Reader reader, SupplierInfo supplierInfo, int taxonomyPenalty,
+                                         VariantCodes extraEanOnly) {
+        FeedProcessing processing = feedProcessor.start(supplierInfo.name(), taxonomyPenalty, extraEanOnly);
         new CSVLoader(reader).readRows(separator, row ->
                 ParsedRow.tryParse(parser, row, supplierInfo).ifPresentOrElse(processing::add, processing::skipInvalid));
         return dataCleanup.run(processing.finish());

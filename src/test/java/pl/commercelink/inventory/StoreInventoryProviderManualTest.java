@@ -45,6 +45,7 @@ class StoreInventoryProviderManualTest {
     @Mock
     private PimView pimView;
     @Mock GlobalMatchedInventory globalInventory;
+    @Mock StoreEanOnlyCodes storeEanOnlyCodes;
     @Spy InventoryMatchingProperties matchingProperties = InventoryMatchingProperties.allEnabled();
     @InjectMocks StoreInventoryProvider provider;
 
@@ -64,15 +65,15 @@ class StoreInventoryProviderManualTest {
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
         when(globalInventory.generation()).thenReturn(
                 new GlobalMatchedInventory.Generation(0, List.of(), InventoryIndex.of(List.of()), VariantCodes.none()));
-        when(autoDiscovery.group(any(), any(), any(), any())).thenReturn(new InventoryAutoDiscovery.Grouping(List.of(), VariantCodes.none()));
-        when(storeFeedItemLoader.load(eq("store-1"), any(String.class), any(SupplierProviderDescriptor.class), any()))
+        when(autoDiscovery.group(any(), any(), any(), any(), any())).thenReturn(new InventoryAutoDiscovery.Grouping(List.of(), VariantCodes.none()));
+        when(storeFeedItemLoader.load(eq("store-1"), any(String.class), any(SupplierProviderDescriptor.class), any(), any()))
                 .thenReturn(List.of());
 
         // when
         provider.ownIndex(store);
 
         // then
-        verify(storeFeedItemLoader, times(1)).load(eq("store-1"), eq("manual:H1"), descriptorCaptor.capture(), any());
+        verify(storeFeedItemLoader, times(1)).load(eq("store-1"), eq("manual:H1"), descriptorCaptor.capture(), any(), any());
         assertInstanceOf(ManualSupplierDescriptor.class, descriptorCaptor.getValue());
         assertEquals("manual:H1", descriptorCaptor.getValue().name());
         verifyNoInteractions(supplierProviderFactory);
@@ -94,20 +95,21 @@ class StoreInventoryProviderManualTest {
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
         when(globalInventory.generation()).thenReturn(
                 new GlobalMatchedInventory.Generation(0, List.of(), InventoryIndex.of(List.of()), VariantCodes.none()));
-        when(autoDiscovery.group(any(), any(), any(), any())).thenReturn(new InventoryAutoDiscovery.Grouping(List.of(), VariantCodes.none()));
-        when(storeFeedItemLoader.load(eq("store-1"), any(String.class), any(SupplierProviderDescriptor.class), any()))
+        when(autoDiscovery.group(any(), any(), any(), any(), any())).thenReturn(new InventoryAutoDiscovery.Grouping(List.of(), VariantCodes.none()));
+        when(storeFeedItemLoader.load(eq("store-1"), any(String.class), any(SupplierProviderDescriptor.class), any(), any()))
                 .thenReturn(List.of());
 
         // when
         provider.ownIndex(store);
 
         // then
-        verify(storeFeedItemLoader, times(1)).load(eq("store-1"), eq("manual:Enabled"), descriptorCaptor.capture(), any());
+        verify(storeFeedItemLoader, times(1)).load(eq("store-1"), eq("manual:Enabled"), descriptorCaptor.capture(), any(), any());
         assertEquals("manual:Enabled", descriptorCaptor.getValue().name());
     }
     @org.junit.jupiter.api.BeforeEach
     void pimStoreViewIsTheCatalog() {
         org.mockito.Mockito.lenient().when(pimCatalog.withStoreData(org.mockito.ArgumentMatchers.any())).thenReturn(pimView);
         org.mockito.Mockito.lenient().when(pimCatalog.withGlobalData()).thenReturn(pimView);
+        org.mockito.Mockito.lenient().when(storeEanOnlyCodes.of(org.mockito.ArgumentMatchers.any())).thenReturn(VariantCodes.none());
     }
 }

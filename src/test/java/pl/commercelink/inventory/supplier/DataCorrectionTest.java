@@ -6,6 +6,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import pl.commercelink.inventory.EanOnlyCodes;
+import pl.commercelink.inventory.VariantCodes;
+import pl.commercelink.inventory.InventoryMatchingProperties;
 import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.Brand;
 import pl.commercelink.pim.api.PimCatalog;
@@ -43,7 +46,7 @@ class DataCorrectionTest {
         when(pimCatalog.withGlobalData()).thenReturn(pimView);
         when(pimCatalog.allBrands()).thenReturn(List.of(new Brand("Western Digital", List.of("SanDisk"))));
         brandMapper = spy(new BrandMapper(pimCatalog));
-        dataCorrection = new DataCorrection(pimCatalog, brandMapper);
+        dataCorrection = new DataCorrection(pimCatalog, brandMapper, eanOnlyCodes(pimCatalog));
     }
 
     @Test
@@ -210,7 +213,7 @@ class DataCorrectionTest {
         when(pimView.findByMpnAndBrand("MFN", "PimBrand")).thenReturn(Optional.of(pim));
 
         // when
-        InventoryItem result = dataCorrection.run(offer("PimBrand", "", "MFN"));
+        InventoryItem result = dataCorrection.run(offer("PimBrand", "", "MFN"), VariantCodes.none());
 
         // then
         assertThat(result.ean()).isEqualTo("5900000000002");
@@ -223,11 +226,12 @@ class DataCorrectionTest {
                 new PimIdentifier("5900000000002", PimIdentifierType.GTIN),
                 new PimIdentifier("MFN", PimIdentifierType.MPN)),
                 "StoreBrand", "StoreName", "Monitors", null, true, 4000, 5000, null, "s1");
-        DataCorrection correction = new DataCorrection(ScopedPimCatalog.of(storeEntry), brandMapper);
+        PimCatalog storeCatalog = ScopedPimCatalog.of(storeEntry);
+        DataCorrection correction = new DataCorrection(storeCatalog, brandMapper, eanOnlyCodes(storeCatalog));
         SupplierProduct fromFeed = new SupplierProduct("", "MFN", "FeedBrand", "FeedName", 5, 100, 200);
 
         // when
-        InventoryItem offer = correction.run(offerOf(fromFeed));
+        InventoryItem offer = correction.run(offerOf(fromFeed), VariantCodes.none());
         Taxonomy result = correction.run(fromFeed, offer);
 
         // then
@@ -244,7 +248,7 @@ class DataCorrectionTest {
         DataCorrection correction = correctionWith(entryWithBrand("PimBrand", true, "5900000000002", "SDSSDA-1T00"));
 
         // when
-        InventoryItem result = correction.run(offer("Sandisk", "5900000000002", "SDSSDA-1T00"));
+        InventoryItem result = correction.run(offer("Sandisk", "5900000000002", "SDSSDA-1T00"), VariantCodes.none());
 
         // then
         assertThat(result.brand()).isEqualTo("Western Digital");
@@ -270,7 +274,7 @@ class DataCorrectionTest {
         InventoryItem fromFeed = offer("Logitech", "5900000000002", "910-006559");
 
         // when
-        InventoryItem result = dataCorrection.run(fromFeed);
+        InventoryItem result = dataCorrection.run(fromFeed, VariantCodes.none());
 
         // then
         assertThat(result).isSameAs(fromFeed);
@@ -282,7 +286,7 @@ class DataCorrectionTest {
         DataCorrection correction = correctionWith(entryWithBrand("Trust", true, "5900000000002", "23647"));
 
         // when
-        InventoryItem result = correction.run(offer("Trust", "", "OTHER-CODE"));
+        InventoryItem result = correction.run(offer("Trust", "", "OTHER-CODE"), VariantCodes.none());
 
         // then
         assertThat(result.isSellable()).isFalse();
@@ -308,7 +312,7 @@ class DataCorrectionTest {
         DataCorrection correction = correctionWith(entryWithBrand("Logitech", true, "5900000000002", "910-006559"));
 
         // when
-        InventoryItem result = correction.run(offer(null, "5900000000002", "MX-MASTER-3S"));
+        InventoryItem result = correction.run(offer(null, "5900000000002", "MX-MASTER-3S"), VariantCodes.none());
 
         // then
         assertThat(result.brand()).isEqualTo("Logitech");
@@ -320,7 +324,7 @@ class DataCorrectionTest {
         DataCorrection correction = correctionWith(entryWithBrand("Logitech", false, "5900000000002", "910-006559"));
 
         // when
-        InventoryItem result = correction.run(offer(null, "5900000000002", "910-006559"));
+        InventoryItem result = correction.run(offer(null, "5900000000002", "910-006559"), VariantCodes.none());
 
         // then
         assertThat(result.brand()).isEqualTo(NoNameBrand.NAME);
@@ -332,7 +336,7 @@ class DataCorrectionTest {
         DataCorrection correction = correctionWith(entryWithBrand("Trust", true, "5900000000002", "23647"));
 
         // when
-        InventoryItem result = correction.run(offer(null, "5900000000009", "23647"));
+        InventoryItem result = correction.run(offer(null, "5900000000009", "23647"), VariantCodes.none());
 
         // then
         assertThat(result.brand()).isEqualTo(NoNameBrand.NAME);
@@ -344,7 +348,7 @@ class DataCorrectionTest {
         SupplierProduct fromFeed = new SupplierProduct("5900000000009", "11T105", null, "FeedName", 3, null, null);
 
         // when
-        InventoryItem offer = dataCorrection.run(offerOf(fromFeed));
+        InventoryItem offer = dataCorrection.run(offerOf(fromFeed), VariantCodes.none());
         Taxonomy result = dataCorrection.run(fromFeed, offer);
 
         // then
@@ -359,7 +363,7 @@ class DataCorrectionTest {
         DataCorrection correction = correctionWith(entryWithBrand("Western Digital", true, "5900000000002", "SDSSDA-1T00"));
 
         // when
-        InventoryItem result = correction.run(offer(null, "", "SDSSDA-1T00"));
+        InventoryItem result = correction.run(offer(null, "", "SDSSDA-1T00"), VariantCodes.none());
 
         // then
         assertThat(result.ean()).isEmpty();
@@ -374,7 +378,7 @@ class DataCorrectionTest {
                 entryWithBrand("Logitech", true, "1111111111111", "910-006559"));
 
         // when
-        InventoryItem result = correction.run(offer(null, "1111111111111", "TRUST-23647"));
+        InventoryItem result = correction.run(offer(null, "1111111111111", "TRUST-23647"), VariantCodes.none());
 
         // then
         assertThat(result.brand()).isNull();
@@ -386,7 +390,7 @@ class DataCorrectionTest {
         DataCorrection correction = correctionWith(entryWithBrand("Trust", true, "5900000000002", "23647"));
 
         // when
-        InventoryItem result = correction.run(offer(null, "", "23647"));
+        InventoryItem result = correction.run(offer(null, "", "23647"), VariantCodes.none());
 
         // then
         assertThat(result.ean()).isEmpty();
@@ -398,7 +402,7 @@ class DataCorrectionTest {
         DataCorrection correction = correctionWith(entryWithBrand("Trust", true, "5900000000002", "23647"));
 
         // when
-        InventoryItem result = correction.run(offer("Genesis", "", "23647"));
+        InventoryItem result = correction.run(offer("Genesis", "", "23647"), VariantCodes.none());
 
         // then
         assertThat(result.ean()).isEmpty();
@@ -425,7 +429,7 @@ class DataCorrectionTest {
         DataCorrection correction = correctionWith(entryWithBrand("Western Digital", true, "5900000000002", "WDS100"));
 
         // when
-        InventoryItem result = correction.run(offer("SanDisk", "", "WDS100"));
+        InventoryItem result = correction.run(offer("SanDisk", "", "WDS100"), VariantCodes.none());
 
         // then
         assertThat(result.ean()).isEqualTo("5900000000002");
@@ -474,16 +478,136 @@ class DataCorrectionTest {
         assertThat(result.name()).isEqualTo("FeedName");
     }
 
+    @Test
+    void offerWithoutEanGetsNoEanForAnEanOnlyPair() {
+        // given -- the operator flagged the entry: its code is shared by variants with different EANs
+        DataCorrection correction = correctionWith(eanOnlyEntry("Mova", "5900000000002", "SHINE10"));
+
+        // when
+        InventoryItem result = correction.run(offer("Mova", "", "SHINE10"), VariantCodes.none());
+
+        // then
+        assertThat(result.ean()).isEmpty();
+        assertThat(result.isSellable()).isFalse();
+    }
+
+    @Test
+    void offerWithoutEanStillGetsThePimEanForOtherPairs() {
+        // given
+        DataCorrection correction = correctionWith(
+                eanOnlyEntry("Mova", "5900000000002", "SHINE10"),
+                entryWithBrand("Mova", true, "5900000000003", "SHINE11"));
+
+        // when
+        InventoryItem result = correction.run(offer("Mova", "", "SHINE11"), VariantCodes.none());
+
+        // then
+        assertThat(result.ean()).isEqualTo("5900000000003");
+    }
+
+    @Test
+    void offerWithItsOwnEanIsUntouched() {
+        // given
+        DataCorrection correction = correctionWith(eanOnlyEntry("Mova", "5900000000002", "SHINE10"));
+        InventoryItem fromFeed = offer("Mova", "5900000000009", "SHINE10");
+
+        // when
+        InventoryItem result = correction.run(fromFeed, VariantCodes.none());
+
+        // then
+        assertThat(result.ean()).isEqualTo("5900000000009");
+    }
+
+    @Test
+    void aliasBrandOfferGetsNoEanForAnEanOnlyPair() {
+        // given -- the fixture maps the alias "SanDisk" to "Western Digital"
+        DataCorrection correction = correctionWith(eanOnlyEntry("Western Digital", "5900000000002", "WDS100"));
+
+        // when
+        InventoryItem result = correction.run(offer("SanDisk", "", "WDS100"), VariantCodes.none());
+
+        // then
+        assertThat(result.ean()).isEmpty();
+    }
+
+    @Test
+    void correctEanSkipsAStorePair() {
+        // given -- the global entry is not flagged, only the store flagged the pair
+        DataCorrection correction = correctionWith(entryWithBrand("Mova", true, "5900000000003", "SHINE10"));
+        VariantCodes storePairs = pairsOf(eanOnlyEntry("Mova", "5900000000003", "SHINE10"));
+
+        // when
+        InventoryItem result = correction.run(offer("Mova", "", "SHINE10"), storePairs);
+
+        // then
+        assertThat(result.ean()).isEmpty();
+        assertThat(result.isSellable()).isFalse();
+    }
+
+    @Test
+    void correctEanStillUsesAnUnflaggedPair() {
+        // given
+        DataCorrection correction = correctionWith(entryWithBrand("Mova", true, "5900000000003", "SHINE11"));
+        VariantCodes storePairs = pairsOf(eanOnlyEntry("Mova", "5900000000002", "SHINE10"));
+
+        // when
+        InventoryItem result = correction.run(offer("Mova", "", "SHINE11"), storePairs);
+
+        // then
+        assertThat(result.ean()).isEqualTo("5900000000003");
+    }
+
+    @Test
+    void correctEanWithoutAnyPairsIsUnchanged() {
+        // given
+        DataCorrection correction = correctionWith(entryWithBrand("Mova", true, "5900000000003", "SHINE10"));
+
+        // when
+        InventoryItem result = correction.run(offer("Mova", "", "SHINE10"), VariantCodes.none());
+
+        // then
+        assertThat(result.ean()).isEqualTo("5900000000003");
+    }
+
+    @Test
+    void correctEanStillSkipsAGlobalPairWhenStorePairsAreGiven() {
+        // given
+        DataCorrection correction = correctionWith(eanOnlyEntry("Mova", "5900000000002", "SHINE10"));
+        VariantCodes storePairs = pairsOf(eanOnlyEntry("Mova", "5900000000009", "OTHER"));
+
+        // when
+        InventoryItem result = correction.run(offer("Mova", "", "SHINE10"), storePairs);
+
+        // then
+        assertThat(result.ean()).isEmpty();
+    }
+
+    private static VariantCodes pairsOf(PimEntry... flagged) {
+        return eanOnlyCodes(ScopedPimCatalog.of(flagged)).current();
+    }
+
     private Taxonomy taxonomyOf(SupplierProduct product) {
         return taxonomyOf(dataCorrection, product);
     }
 
     private static Taxonomy taxonomyOf(DataCorrection correction, SupplierProduct product) {
-        return correction.run(product, correction.run(offerOf(product)));
+        return correction.run(product, correction.run(offerOf(product), VariantCodes.none()));
     }
 
     private DataCorrection correctionWith(PimEntry... entries) {
-        return new DataCorrection(ScopedPimCatalog.of(entries), brandMapper);
+        PimCatalog catalog = ScopedPimCatalog.of(entries);
+        return new DataCorrection(catalog, brandMapper, eanOnlyCodes(catalog));
+    }
+
+    private static EanOnlyCodes eanOnlyCodes(PimCatalog catalog) {
+        return new EanOnlyCodes(catalog, InventoryMatchingProperties.allEnabled());
+    }
+
+    private static PimEntry eanOnlyEntry(String brand, String gtin, String mpn) {
+        return new PimEntry("pim-" + gtin, List.of(
+                new PimIdentifier(gtin, PimIdentifierType.GTIN),
+                new PimIdentifier(mpn, PimIdentifierType.MPN)),
+                brand, "PimName", null, null, true, null, null, null, null, null, true);
     }
 
     private static InventoryItem offerOf(SupplierProduct product) {

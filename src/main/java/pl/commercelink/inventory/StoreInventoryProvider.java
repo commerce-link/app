@@ -39,6 +39,7 @@ public class StoreInventoryProvider {
     private final PimCatalog pimCatalog;
     private final GlobalMatchedInventory globalInventory;
     private final InventoryMatchingProperties matchingProperties;
+    private final StoreEanOnlyCodes storeEanOnlyCodes;
 
     @Value("${inventory.store-cache.ttl-minutes}")
     long defaultTtlMinutes;
@@ -60,9 +61,23 @@ public class StoreInventoryProvider {
     }
 
     private StoreInventory buildAndCache(Store store, String storeId) {
-        StoreInventory built = build(storeId, store);
-        cache.put(storeId, built, resolveTtl(store));
-        return built;
+        Build build = build(storeId, store);
+        // a global reload during the build (new feeds, or a regroup on changed EAN-only pairs that has already evicted
+        // the stores) makes these groups stale: they serve this request, but caching them would keep them for the TTL;
+        // so do store pairs changed in PIM meanwhile, whose eviction may already have run
+        boolean sameGlobal = build.globalVersion() == null || build.globalVersion() == globalInventory.version();
+        boolean sameStorePairs = build.storePairs() == null || build.storePairs().equals(storeEanOnlyCodes.of(storeId));
+        if (sameGlobal && sameStorePairs) {
+            cache.put(storeId, build.inventory(), resolveTtl(store));
+        }
+        return build.inventory();
+    }
+
+    /**
+     * @param globalVersion the version of the global generation the build used, null when it used none
+     * @param storePairs    the store's own EAN-only pairs the build used, null when it grouped nothing
+     */
+    private record Build(StoreInventory inventory, Long globalVersion, VariantCodes storePairs) {
     }
 
     private Duration resolveTtl(Store storeEntity) {
@@ -74,11 +89,13 @@ public class StoreInventoryProvider {
         return Duration.ofMinutes(Math.max(1, minutes));
     }
 
-    private StoreInventory build(String storeId, Store storeEntity) {
+    private Build build(String storeId, Store storeEntity) {
         if (storeEntity == null) {
-            return new StoreInventory(InventoryIndex.of(List.of()), LocalDateTime.now());
+            return new Build(new StoreInventory(InventoryIndex.of(List.of()), LocalDateTime.now()), null, null);
         }
 
+        // read once, before the feeds, so the feed parsing and the grouping see the same pairs
+        VariantCodes storePairs = storeEanOnlyCodes.of(storeId);
         List<InventoryItem> ownItems = new ArrayList<>();
         Map<String, Double> sellRates = exchangeRates.getCurrentSellRates();
         for (StoreSupplierConnection connection : storeEntity.getOwnAndManualConnections()) {
@@ -87,20 +104,22 @@ public class StoreInventoryProvider {
             }
             SupplierProviderDescriptor descriptor = descriptorFor(connection);
             if (descriptor != null) {
-                ownItems.addAll(storeFeedItemLoader.load(storeId, connection.getSupplierName(), descriptor, sellRates));
+                ownItems.addAll(storeFeedItemLoader.load(storeId, connection.getSupplierName(), descriptor, sellRates, storePairs));
             }
         }
 
         // one reload of the global inventory for the whole build: its offers witness, its variant codes join the own
-        // ones for linking own groups to global ones
+        // ones for linking own groups to global ones, and its EAN-only pairs hold here too, even where a store entry
+        // shadows the flagged global one; the store's own pairs join them only in this store's pool and links
         GlobalMatchedInventory.Generation global = globalInventory.generation();
+        VariantCodes eanOnly = global.eanOnlyCodes().plus(storePairs);
         InventoryAutoDiscovery.Grouping grouping = autoDiscovery.group(
-                ownItems, pimCatalog.withStoreData(storeId), global::allItems, global.variantCodes());
+                ownItems, pimCatalog.withStoreData(storeId), global::allItems, global.variantCodes(), eanOnly);
         InventoryIndex index = InventoryIndex.of(grouping.groups());
         if (matchingProperties.linkOwnToGlobalByCode() && !index.all().isEmpty()) {
             linkToGlobal(storeId, index, global, grouping.variantCodes());
         }
-        return new StoreInventory(index, LocalDateTime.now());
+        return new Build(new StoreInventory(index, LocalDateTime.now()), global.version(), storePairs);
     }
 
     private static void linkToGlobal(String storeId, InventoryIndex index, GlobalMatchedInventory.Generation global,

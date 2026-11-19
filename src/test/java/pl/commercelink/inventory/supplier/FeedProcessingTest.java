@@ -5,6 +5,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.inventory.EanOnlyCodes;
+import pl.commercelink.inventory.InventoryMatchingProperties;
+import pl.commercelink.inventory.VariantCodes;
 import pl.commercelink.inventory.supplier.api.FeedItem;
 import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingPolicy;
@@ -13,6 +16,9 @@ import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.pim.api.PimIdentifier;
+import pl.commercelink.pim.api.PimIdentifierType;
 import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.products.brand.NoNameBrand;
 import pl.commercelink.taxonomy.Taxonomy;
@@ -62,9 +68,27 @@ class FeedProcessingTest {
             new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 5, null, null);
 
     @Test
+    void storePairsAreHandedToTheCorrectionOfEveryRow() {
+        // given
+        VariantCodes storePairs = flaggedPairs();
+        when(dataCorrection.run(sellableItem, storePairs)).thenReturn(sellableItem);
+        when(dataCorrection.run(feedProduct, sellableItem)).thenReturn(pendingTaxonomy);
+        when(enrichment.enrichFromOwnRecord(pendingTaxonomy)).thenReturn(categorizedTaxonomy);
+        FeedProcessing processing = new FeedProcessing(dataCorrection, taxonomyCache, enrichment, stats, 0, false, storePairs);
+
+        // when
+        processing.add(new ParsedRow(sellableItem, feedProduct));
+        List<InventoryItem> result = processing.finish();
+
+        // then
+        assertEquals(List.of(sellableItem), result);
+        verify(dataCorrection).run(sellableItem, storePairs);
+    }
+
+    @Test
     void processableRowGoesToCacheAndInventory() {
         // given
-        when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
+        when(dataCorrection.run(sellableItem, VariantCodes.none())).thenReturn(sellableItem);
         when(dataCorrection.run(feedProduct, sellableItem)).thenReturn(categorizedTaxonomy);
         when(enrichment.enrichFromOwnRecord(categorizedTaxonomy)).thenReturn(categorizedTaxonomy);
         FeedProcessing processing = processing(0);
@@ -86,10 +110,11 @@ class FeedProcessingTest {
     void feedRowWithNoNameBrandIsProcessableAndEntersTheInventory() {
         // given
         PimCatalog pimWithoutTheProduct = ScopedPimCatalog.of();
-        DataCorrection realCorrection = new DataCorrection(pimWithoutTheProduct, new BrandMapper(pimWithoutTheProduct));
+        DataCorrection realCorrection = new DataCorrection(pimWithoutTheProduct, new BrandMapper(pimWithoutTheProduct),
+                new EanOnlyCodes(pimWithoutTheProduct, InventoryMatchingProperties.allEnabled()));
         when(enrichment.enrichFromOwnRecord(any()))
                 .thenAnswer(invocation -> invocation.<Taxonomy>getArgument(0).withCategory("Kable", "120"));
-        FeedProcessing processing = new FeedProcessing(realCorrection, taxonomyCache, enrichment, stats, 0, true);
+        FeedProcessing processing = new FeedProcessing(realCorrection, taxonomyCache, enrichment, stats, 0, true, VariantCodes.none());
 
         // when
         processing.add(ParsedRow.of(feedItemWithBrand("No Name"), ACME));
@@ -111,7 +136,7 @@ class FeedProcessingTest {
         // given
         InventoryItem branded = new InventoryItem("Logitech", null, "1234567890123", "MFN-1", "Acme",
                 10.0, "PLN", 5, 1, true, false, false);
-        when(dataCorrection.run(sellableItem)).thenReturn(branded);
+        when(dataCorrection.run(sellableItem, VariantCodes.none())).thenReturn(branded);
         when(dataCorrection.run(feedProduct, branded)).thenReturn(categorizedTaxonomy);
         when(enrichment.enrichFromOwnRecord(categorizedTaxonomy)).thenReturn(categorizedTaxonomy);
         FeedProcessing processing = processing(0);
@@ -223,7 +248,7 @@ class FeedProcessingTest {
     @Test
     void categoryOfTheOwnRecordPutsItemIntoInventoryWithoutTheCodeIndex() {
         // given
-        when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
+        when(dataCorrection.run(sellableItem, VariantCodes.none())).thenReturn(sellableItem);
         when(dataCorrection.run(feedProduct, sellableItem)).thenReturn(pendingTaxonomy);
         when(enrichment.enrichFromOwnRecord(pendingTaxonomy)).thenReturn(categorizedTaxonomy);
         FeedProcessing processing = processing(0);
@@ -243,7 +268,7 @@ class FeedProcessingTest {
     @Test
     void rowWaitingForTheCodeIndexEntersTheInventoryOnFinish() {
         // given
-        when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
+        when(dataCorrection.run(sellableItem, VariantCodes.none())).thenReturn(sellableItem);
         when(dataCorrection.run(feedProduct, sellableItem)).thenReturn(pendingTaxonomy);
         when(enrichment.enrichFromOwnRecord(pendingTaxonomy)).thenReturn(pendingTaxonomy);
         when(enrichment.enrich(pendingTaxonomy)).thenReturn(categorizedTaxonomy);
@@ -308,7 +333,7 @@ class FeedProcessingTest {
         // given
         Taxonomy noBrand = new Taxonomy("1234567890123", "MFN-1", null, "Name", null, 5, null, null);
         Taxonomy enrichedNoBrand = new Taxonomy("1234567890123", "MFN-1", null, "Name", "CPU", 5, null, null);
-        when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
+        when(dataCorrection.run(sellableItem, VariantCodes.none())).thenReturn(sellableItem);
         when(dataCorrection.run(feedProduct, sellableItem)).thenReturn(noBrand);
         when(enrichment.enrichFromOwnRecord(noBrand)).thenReturn(enrichedNoBrand);
         when(enrichment.isPendingEligible(enrichedNoBrand)).thenReturn(false);
@@ -330,7 +355,7 @@ class FeedProcessingTest {
     void notSellableItemIsDroppedWithoutTouchingCache() {
         // given
         InventoryItem noQty = new InventoryItem("1234567890123", "MFN-1", 10.0, "PLN", 0, 1, "Acme", true);
-        when(dataCorrection.run(noQty)).thenReturn(noQty);
+        when(dataCorrection.run(noQty, VariantCodes.none())).thenReturn(noQty);
         FeedProcessing processing = processing(0);
 
         // when
@@ -349,7 +374,7 @@ class FeedProcessingTest {
     void taxonomyIsNotCorrectedForAnOfferThatCannotBeSold() {
         // given
         InventoryItem noQty = new InventoryItem("1234567890123", "MFN-1", 10.0, "PLN", 0, 1, "Acme", true);
-        when(dataCorrection.run(noQty)).thenReturn(noQty);
+        when(dataCorrection.run(noQty, VariantCodes.none())).thenReturn(noQty);
         FeedProcessing processing = processing(0);
 
         // when
@@ -377,7 +402,7 @@ class FeedProcessingTest {
     @Test
     void taxonomyPenaltyIsAppliedBeforeCacheAdd() {
         // given
-        when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
+        when(dataCorrection.run(sellableItem, VariantCodes.none())).thenReturn(sellableItem);
         when(dataCorrection.run(feedProduct, sellableItem)).thenReturn(categorizedTaxonomy);
         when(enrichment.enrichFromOwnRecord(categorizedTaxonomy)).thenReturn(categorizedTaxonomy);
         FeedProcessing processing = processing(1000);
@@ -393,7 +418,7 @@ class FeedProcessingTest {
     @Test
     void offersUnderAPlaceholderEanAreNotImported() {
         // given
-        when(dataCorrection.run(any(InventoryItem.class))).then(returnsFirstArg());
+        when(dataCorrection.run(any(InventoryItem.class), eq(VariantCodes.none()))).then(returnsFirstArg());
         FeedProcessing processing = processing(true);
 
         // when
@@ -413,7 +438,7 @@ class FeedProcessingTest {
     void placeholderOfferCompletedFromPimIsImported() {
         // given
         givenTaxonomyIsBuiltFromTheOffer("Kable");
-        when(dataCorrection.run(any(InventoryItem.class))).thenAnswer(invocation -> {
+        when(dataCorrection.run(any(InventoryItem.class), eq(VariantCodes.none()))).thenAnswer(invocation -> {
             InventoryItem offer = invocation.getArgument(0);
             return "ZT51042-T1E0000Z".equals(offer.mfn()) ? offer.withBrandAndEan(offer.brand(), "5901234567801") : offer;
         });
@@ -429,7 +454,7 @@ class FeedProcessingTest {
         assertEquals(1, result.size());
         assertEquals("5901234567801", result.get(0).ean());
         ArgumentCaptor<InventoryItem> corrected = ArgumentCaptor.forClass(InventoryItem.class);
-        verify(dataCorrection, times(3)).run(corrected.capture());
+        verify(dataCorrection, times(3)).run(corrected.capture(), eq(VariantCodes.none()));
         corrected.getAllValues().forEach(offer -> assertNull(offer.ean()));
         verify(stats, times(2)).markInvalid();
         verify(stats, times(1)).markImported();
@@ -438,7 +463,7 @@ class FeedProcessingTest {
     @Test
     void onlyRowsInStockCountTowardsAPlaceholderEan() {
         // given
-        when(dataCorrection.run(any(InventoryItem.class))).then(returnsFirstArg());
+        when(dataCorrection.run(any(InventoryItem.class), eq(VariantCodes.none()))).then(returnsFirstArg());
         givenTaxonomyIsBuiltFromTheOffer("Kable");
         FeedProcessing placeholder = processing(true);
         placeholder.add(row(PLACEHOLDER_EAN, "ZT51042-T1E0000Z", "Cable A"));
@@ -461,7 +486,7 @@ class FeedProcessingTest {
     @Test
     void placeholderEanReturnedByPimIsStillRejected() {
         // given
-        when(dataCorrection.run(any(InventoryItem.class)))
+        when(dataCorrection.run(any(InventoryItem.class), eq(VariantCodes.none())))
                 .thenAnswer(invocation -> invocation.<InventoryItem>getArgument(0).withBrandAndEan("Brand", PLACEHOLDER_EAN));
         FeedProcessing processing = processing(true);
 
@@ -492,7 +517,7 @@ class FeedProcessingTest {
 
         // then
         verify(stats, never()).markInvalid();
-        verify(dataCorrection, times(2)).run(any(InventoryItem.class));
+        verify(dataCorrection, times(2)).run(any(InventoryItem.class), eq(VariantCodes.none()));
         verify(dataCorrection, times(2)).run(any(SupplierProduct.class), argThat(offer -> PLACEHOLDER_EAN.equals(offer.ean())));
     }
 
@@ -525,7 +550,7 @@ class FeedProcessingTest {
         processing.add(row(PLACEHOLDER_EAN, "A-1", "Cable A"));
 
         // then
-        verify(dataCorrection).run(any(InventoryItem.class));
+        verify(dataCorrection).run(any(InventoryItem.class), eq(VariantCodes.none()));
         verify(stats, never()).log();
     }
 
@@ -533,8 +558,9 @@ class FeedProcessingTest {
     void offerWithoutBrandUnderAPlaceholderEanIsRejectedWithoutError() {
         // given
         PimCatalog pimWithoutTheProduct = ScopedPimCatalog.of();
-        DataCorrection realCorrection = new DataCorrection(pimWithoutTheProduct, new BrandMapper(pimWithoutTheProduct));
-        FeedProcessing processing = new FeedProcessing(realCorrection, taxonomyCache, enrichment, stats, 0, true);
+        DataCorrection realCorrection = new DataCorrection(pimWithoutTheProduct, new BrandMapper(pimWithoutTheProduct),
+                new EanOnlyCodes(pimWithoutTheProduct, InventoryMatchingProperties.allEnabled()));
+        FeedProcessing processing = new FeedProcessing(realCorrection, taxonomyCache, enrichment, stats, 0, true, VariantCodes.none());
 
         // when
         processing.add(ParsedRow.of(feedItem(PLACEHOLDER_EAN, "ZT51042-T1E0000Z", null), ACME));
@@ -549,22 +575,22 @@ class FeedProcessingTest {
     }
 
     private FeedProcessing processing(int taxonomyPenalty) {
-        return new FeedProcessing(dataCorrection, taxonomyCache, enrichment, stats, taxonomyPenalty, true);
+        return new FeedProcessing(dataCorrection, taxonomyCache, enrichment, stats, taxonomyPenalty, true, VariantCodes.none());
     }
 
     private FeedProcessing processing(boolean ignorePlaceholderEans) {
-        return new FeedProcessing(dataCorrection, taxonomyCache, enrichment, stats, 0, ignorePlaceholderEans);
+        return new FeedProcessing(dataCorrection, taxonomyCache, enrichment, stats, 0, ignorePlaceholderEans, VariantCodes.none());
     }
 
     private void givenAPendingRow() {
-        when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
+        when(dataCorrection.run(sellableItem, VariantCodes.none())).thenReturn(sellableItem);
         when(dataCorrection.run(feedProduct, sellableItem)).thenReturn(pendingTaxonomy);
         when(enrichment.enrichFromOwnRecord(pendingTaxonomy)).thenReturn(pendingTaxonomy);
         when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
     }
 
     private void givenRowsAreTakenAsTheyCome() {
-        when(dataCorrection.run(any(InventoryItem.class))).then(returnsFirstArg());
+        when(dataCorrection.run(any(InventoryItem.class), eq(VariantCodes.none()))).then(returnsFirstArg());
         givenTaxonomyIsBuiltFromTheOffer();
     }
 
@@ -601,5 +627,13 @@ class FeedProcessingTest {
     private static ParsedRow row(String ean, String mfn, String name) {
         InventoryItem offer = new InventoryItem("Brand", null, ean, mfn, "Acme", 10.0, "PLN", 5, 1, true, false, false);
         return new ParsedRow(offer, new SupplierProduct(ean, mfn, "Brand", name, 5, null, null));
+    }
+
+    private static VariantCodes flaggedPairs() {
+        PimEntry flagged = new PimEntry("pim-1", List.of(
+                new PimIdentifier("5900000000002", PimIdentifierType.GTIN),
+                new PimIdentifier("SHINE10", PimIdentifierType.MPN)),
+                "Mova", "PimName", null, null, true, null, null, null, null, null, true);
+        return new EanOnlyCodes(ScopedPimCatalog.of(flagged), InventoryMatchingProperties.allEnabled()).current();
     }
 }

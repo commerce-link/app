@@ -4,6 +4,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import pl.commercelink.inventory.SharedManufacturerCodes;
+import pl.commercelink.inventory.VariantCodes;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
@@ -21,6 +22,7 @@ class FeedProcessing {
     private final FeedParseStats stats;
     private final int taxonomyPenalty;
     private final boolean ignorePlaceholderEans;
+    private final VariantCodes extraEanOnly;
     private final List<ParsedRow> rows = new ArrayList<>();
     private final List<InventoryItem> sellableOffers = new ArrayList<>();
     private final List<InventoryItem> imported = new ArrayList<>();
@@ -39,7 +41,7 @@ class FeedProcessing {
         InventoryItem raw = parsed.item();
         boolean placeholder = placeholderEans.contains(raw.ean());
         // Dropping the number lets the PIM supply the real one from the manufacturer code.
-        InventoryItem item = dataCorrection.run(placeholder ? raw.withBrandAndEan(raw.brand(), null) : raw);
+        InventoryItem item = dataCorrection.run(placeholder ? raw.withBrandAndEan(raw.brand(), null) : raw, extraEanOnly);
         if (!item.isSellable() || placeholderEans.contains(item.ean())) {
             stats.markInvalid();
             return false;

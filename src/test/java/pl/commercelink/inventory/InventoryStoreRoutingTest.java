@@ -45,7 +45,7 @@ class InventoryStoreRoutingTest {
     @BeforeEach
     void createInventory() {
         inventory = new Inventory(warehouse, storesRepository, autoDiscovery, taxonomyCache, supplierRegistry,
-                storeInventoryProvider, globalInventory, ScopedPimCatalog.of());
+                storeInventoryProvider, globalInventory, ScopedPimCatalog.of(), InventoryMatchingProperties.allEnabled());
     }
 
     private Store store() {

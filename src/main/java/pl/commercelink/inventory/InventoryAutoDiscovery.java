@@ -73,8 +73,18 @@ class InventoryAutoDiscovery {
      */
     Grouping group(List<InventoryItem> allOffers, PimView pim,
                    Supplier<? extends Collection<InventoryItem>> witnesses, VariantCodes inherited) {
+        return group(allOffers, pim, witnesses, inherited, VariantCodes.none());
+    }
+
+    /**
+     * @param eanOnly pairs of the PIM entries an operator flagged to join by EAN only: an offer under such a pair
+     *                neither pulls nor is pulled by its code, here or in the PIM step; it joins by EAN alone. The
+     *                pairs are also returned among the variant codes, so no own group is linked to a global one by them.
+     */
+    Grouping group(List<InventoryItem> allOffers, PimView pim,
+                   Supplier<? extends Collection<InventoryItem>> witnesses, VariantCodes inherited, VariantCodes eanOnly) {
         SharedManufacturerCodes sharedCodes = SharedManufacturerCodes.of(allOffers);
-        VariantCodes variantCodes = sharedCodes.variantCodes().plus(inherited);
+        VariantCodes variantCodes = sharedCodes.variantCodes().plus(inherited).plus(eanOnly);
 
         ConflictingOffers conflicting = matchingProperties.excludeConflictingOffers() && !allOffers.isEmpty()
                 ? ConflictingOffers.of(allOffers, witnesses.get(), sharedCodes)
@@ -90,7 +100,7 @@ class InventoryAutoDiscovery {
         Map<String, List<InventoryItem>> mappedByProductCode = new HashMap<>();
         for (InventoryItem inventoryItem : inventoryItems) {
             mappedByEan.computeIfAbsent(inventoryItem.ean(), k -> new LinkedList<>()).add(inventoryItem);
-            if (!sharedCodes.isShared(inventoryItem)) {
+            if (!sharedCodes.isShared(inventoryItem) && !isEanOnly(inventoryItem, eanOnly)) {
                 mappedByProductCode.computeIfAbsent(inventoryItem.mfn(), k -> new LinkedList<>()).add(inventoryItem);
             }
         }
@@ -117,7 +127,7 @@ class InventoryAutoDiscovery {
 
             for (InventoryItem itemByEan : items) {
                 matchingItems.add(itemByEan);
-                if (sharedCodes.isShared(itemByEan)) {
+                if (sharedCodes.isShared(itemByEan) || isEanOnly(itemByEan, eanOnly)) {
                     continue;
                 }
                 mappedByProductCode.getOrDefault(itemByEan.mfn(), Collections.emptyList()).stream()
@@ -149,6 +159,11 @@ class InventoryAutoDiscovery {
         }
 
         return new Grouping(processMatchedInventoryCandidates(keyToMatchedInventory.values()), variantCodes);
+    }
+
+    private static boolean isEanOnly(InventoryItem offer, VariantCodes eanOnly) {
+        // checked before the brand key is built, so a pool without flagged pairs does no extra work per offer
+        return eanOnly.size() > 0 && eanOnly.contains(offer.brandKey(), offer.mfn());
     }
 
     private static Collection<InventoryItem> findItemsByKeysModifyingCollection(Collection<String> keys, Map<String, List<InventoryItem>> col) {

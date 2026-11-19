@@ -139,6 +139,46 @@ class VariantCodesTest {
         assertThat(variantCodes.contains("nike", null)).isFalse();
     }
 
+    @Test
+    void equalSetsAreEqual() {
+        // given
+        VariantCodes first = VariantCodes.of(Set.of(
+                new VariantCodes.BrandCode("nike", "AIR1"), new VariantCodes.BrandCode("adidas", "SAMBA")));
+        VariantCodes second = VariantCodes.of(Set.of(
+                new VariantCodes.BrandCode("adidas", "SAMBA"), new VariantCodes.BrandCode("nike", "AIR1")));
+        VariantCodes other = VariantCodes.of(Set.of(new VariantCodes.BrandCode("nike", "AIR1")));
+
+        // then
+        assertThat(first).isEqualTo(second);
+        assertThat(first.hashCode()).isEqualTo(second.hashCode());
+        assertThat(first).isNotEqualTo(other);
+    }
+
+    @Test
+    void noneEqualsEmpty() {
+        // given
+        VariantCodes empty = SharedManufacturerCodes.of(List.of(offer("X", "Nike", "AIR1", "5901234567801")))
+                .variantCodes();
+
+        // then
+        assertThat(empty).isEqualTo(VariantCodes.none());
+        assertThat(empty.hashCode()).isEqualTo(VariantCodes.none().hashCode());
+    }
+
+    @Test
+    void countsPairsMissingFromTheOther() {
+        // given
+        VariantCodes three = VariantCodes.of(Set.of(new VariantCodes.BrandCode("nike", "AIR1"),
+                new VariantCodes.BrandCode("adidas", "SAMBA"), new VariantCodes.BrandCode("puma", "SUEDE")));
+        VariantCodes one = VariantCodes.of(Set.of(new VariantCodes.BrandCode("nike", "AIR1")));
+
+        // then
+        assertThat(three.countNotIn(one)).isEqualTo(2);
+        assertThat(one.countNotIn(three)).isZero();
+        assertThat(three.countNotIn(VariantCodes.none())).isEqualTo(3);
+        assertThat(VariantCodes.none().countNotIn(three)).isZero();
+    }
+
     private static InventoryItem offer(String supplier, String brand, String mfn, String ean) {
         return new InventoryItem(brand, null, ean, mfn, supplier, 10.0, "PLN", 1, 1, true, false, false);
     }
