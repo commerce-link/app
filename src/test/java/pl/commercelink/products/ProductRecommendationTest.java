@@ -78,6 +78,24 @@ class ProductRecommendationTest {
         assertThat(product.getName()).isEqualTo("Other product");
     }
 
+    @Test
+    void withoutPimEntryEverythingComesFromTheResolvedProductData() {
+        // given
+        MatchedInventory group = MatchedInventoryFixture.describedAs(
+                new ProductData("PIM name", "PIM brand", "PIM category", "989", "5900000000016", "PIM-MFN", null, null),
+                new MatchedInventory(new InventoryKey(), List.of(offer("5900000000016", "PIM-MFN")), supplierRegistry));
+
+        // when
+        Product product = new ProductRecommendation(new CategoryDefinition(), group, Optional.empty()).toProduct();
+
+        // then
+        assertThat(product.getEan()).isEqualTo("5900000000016");
+        assertThat(product.getManufacturerCode()).isEqualTo("PIM-MFN");
+        assertThat(product.getBrand()).isEqualTo("PIM brand");
+        assertThat(product.getName()).isEqualTo("PIM name");
+        assertThat(product.getLabel()).isEqualTo("PIM name");
+    }
+
     private MatchedInventory group(InventoryItem... offers) {
         when(taxonomyCache.find(any(InventoryKey.class))).thenReturn(TAXONOMY);
         return MatchedInventoryFixture.readingFrom(taxonomyCache,

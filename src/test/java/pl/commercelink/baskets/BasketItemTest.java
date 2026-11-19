@@ -5,11 +5,15 @@ import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.products.ProductData;
 import pl.commercelink.products.ProductDataFixture;
 import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.inventory.MatchedInventoryFixture;
+import pl.commercelink.inventory.supplier.InventoryItem;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.taxonomy.Taxonomy;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -108,6 +112,23 @@ class BasketItemTest {
         // then
         assertThat(item.getSku()).isEqualTo("5901234123464");
         assertThat(item.getName()).isEqualTo("Dysk");
+    }
+
+    @Test
+    void inventoryItemIsNamedAndFiledByTheResolvedProductData() {
+        // given
+        MatchedInventory row = MatchedInventoryFixture.describedAs(
+                new ProductData("PIM name", "PIM brand", "PIM category", "989", "5900000000016", "PIM-MFN", null, null),
+                new MatchedInventory(InventoryKey.fromEan("5900000000016"),
+                        new InventoryItem("5900000000016", "PIM-MFN", 100.0, "PLN", 5, 1, "Elko"),
+                        mock(SupplierRegistry.class, RETURNS_DEEP_STUBS)));
+
+        // when
+        BasketItem item = BasketItem.of(row, "5900000000016", 1, false);
+
+        // then
+        assertThat(item.getName()).isEqualTo("PIM name");
+        assertThat(item.getCategory()).isEqualTo("PIM category");
     }
 
     @Test

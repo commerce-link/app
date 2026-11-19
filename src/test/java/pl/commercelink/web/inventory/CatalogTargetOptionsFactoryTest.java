@@ -17,6 +17,7 @@ import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCategory;
 import pl.commercelink.products.CatalogPlacement;
+import pl.commercelink.products.ProductData;
 import pl.commercelink.products.PimCategoryTree;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
@@ -76,6 +77,24 @@ class CatalogTargetOptionsFactoryTest {
         assertThat(options.matching()).extracting(CatalogTargetOptions.Option::alreadyIn).containsExactly(0, 1);
         assertThat(options.preselectedValue()).isEqualTo("c-1/cat-gpu");
         assertThat(options.others()).extracting(CatalogTargetOptions.Option::value).containsExactly("c-1/cat-case");
+    }
+
+    @Test
+    void productIsMatchedToCategoriesByTheResolvedProductData() {
+        // given
+        String ean = "5901000000055";
+        MatchedInventory row = MatchedInventoryFixture.describedAs(
+                new ProductData("PIM name", "PIM brand", "Karty graficzne", "11", ean, "PIM-MFN", null, null),
+                new MatchedInventory(InventoryKey.fromEan(ean), new InventoryItem(ean, "PIM-MFN", 100.0, "PLN", 1, 1, "AB"), null));
+        when(view.findByEan(ean)).thenReturn(row);
+
+        // when
+        CatalogTargetOptions options = factory.build(STORE_ID, List.of(ean));
+
+        // then
+        assertThat(options.matching()).extracting(CatalogTargetOptions.Option::value)
+                .containsExactly("c-1/cat-gpu", "c-2/cat-b2b");
+        assertThat(options.pimCategoryName()).isEqualTo("Karty graficzne");
     }
 
     @Test

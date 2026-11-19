@@ -174,6 +174,31 @@ class InventoryViewProductDataTest {
     }
 
     @Test
+    void listedRowIsDescribedByAllTheEansItWasAssembledWithNotOnlyByItsListedKey() {
+        // given
+        taxonomy.add(record(CPU_EAN, "Listed under the global EAN", "989"));
+        PimEntry entryOfTheOwnEan = new PimEntry("g2", ScopedPimCatalog.identifiers(GPU_EAN, null), "Brand",
+                "Global g2", "Procesory", null, true, null, null, "989");
+        MatchedInventory global = group(CPU_EAN);
+        MatchedInventory own = group(GPU_EAN);
+        InventoryIndex globalIndex = InventoryIndex.of(List.of(global));
+        InventoryIndex ownIndex = InventoryIndex.of(List.of(own));
+        ownIndex.link(own, global.getInventoryKey().getProductEans());
+        InventoryView view = new InventoryView(STORE_ID, new ProductDataResolver(ScopedPimCatalog.of(entryOfTheOwnEan), taxonomy),
+                globalIndex, ownIndex, StoreEntryKeys.none(), supplierRegistry,
+                GroupInventorySource.global(globalIndex, supplier -> true), GroupInventorySource.own(ownIndex));
+
+        // when
+        Collection<MatchedInventory> listed = view.findAllByProductCategoryIds(List.of("989")).get("989");
+
+        // then
+        assertThat(listed).singleElement().satisfies(row -> {
+            assertThat(row.getEans()).containsExactlyInAnyOrder(CPU_EAN, GPU_EAN);
+            assertThat(row.getProductData().name()).isEqualTo("Global g2");
+        });
+    }
+
+    @Test
     void rowWithoutAnyDataIsDescribedAsUnknown() {
         // given
         InventoryView view = view(STORE_ID, new ProductDataResolver(ScopedPimCatalog.of(), taxonomy), group(CPU_EAN));
