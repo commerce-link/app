@@ -3,6 +3,7 @@ package pl.commercelink.inventory.supplier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
+import pl.commercelink.inventory.VariantCodes;
 import pl.commercelink.inventory.supplier.api.FeedFormat;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
@@ -28,13 +29,13 @@ public class StoreFeedItemLoader {
     // identity is the connection's stored identity (e.g. Kosatec-k7f3a9c2); the descriptor is the
     // adapter type's own and keeps reporting the type name, which never reaches the loaded items.
     public List<InventoryItem> load(String storeId, String identity, SupplierProviderDescriptor descriptor,
-                                    Map<String, Double> sellRates) {
+                                    Map<String, Double> sellRates, VariantCodes storeEanOnly) {
         SupplierInfo supplierInfo = descriptor.supplierInfo().withName(identity);
         List<InventoryItem> items = switch (descriptor.feedFormat()) {
             case FeedFormat.Csv csv ->
-                    csvProductFeedLoader.fetch(csv.parser(), csv.separator(), storeId, supplierInfo, taxonomyPenalty);
+                    csvProductFeedLoader.fetch(csv.parser(), csv.separator(), storeId, supplierInfo, taxonomyPenalty, storeEanOnly);
             case FeedFormat.Xml xml ->
-                    xmlProductFeedLoader.load(xml.itemClass(), xml.itemElementName(), supplierInfo, storeId, taxonomyPenalty);
+                    xmlProductFeedLoader.load(xml.itemClass(), xml.itemElementName(), supplierInfo, storeId, taxonomyPenalty, storeEanOnly);
         };
 
         return items.stream()

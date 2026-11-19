@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.InventoryRepository;
+import pl.commercelink.inventory.VariantCodes;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.XmlItem;
 
@@ -36,7 +37,7 @@ public class XmlProductFeedLoader {
     public <V extends XmlItem> List<InventoryItem> load(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo) {
         String supplierName = supplierInfo.name();
         try (Reader reader = inventoryRepository.read(supplierName, "xml")) {
-            return parse(itemClass, itemElementName, supplierInfo, reader, 0);
+            return parse(itemClass, itemElementName, supplierInfo, reader, 0, VariantCodes.none());
         } catch (JAXBException | XMLStreamException e) {
             log.error("Skipping feed for supplier {}: content cannot be deserialized (malformed or rejected); previous inventory is kept", supplierName, e);
             return new LinkedList<>();
@@ -49,10 +50,11 @@ public class XmlProductFeedLoader {
         }
     }
 
-    public <V extends XmlItem> List<InventoryItem> load(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo, String storeId, int taxonomyPenalty) {
+    public <V extends XmlItem> List<InventoryItem> load(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo, String storeId, int taxonomyPenalty,
+                                                                 VariantCodes storeEanOnly) {
         String supplierName = supplierInfo.name();
         try (Reader reader = storeFeedRepository.read(storeId, supplierName, "xml")) {
-            return parse(itemClass, itemElementName, supplierInfo, reader, taxonomyPenalty);
+            return parse(itemClass, itemElementName, supplierInfo, reader, taxonomyPenalty, storeEanOnly);
         } catch (JAXBException | XMLStreamException e) {
             log.error("Skipping store feed for {}/{}: content cannot be deserialized (malformed or rejected)", storeId, supplierName, e);
             return new LinkedList<>();
@@ -65,7 +67,8 @@ public class XmlProductFeedLoader {
         }
     }
 
-    private <V extends XmlItem> List<InventoryItem> parse(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo, Reader reader, int taxonomyPenalty)
+    private <V extends XmlItem> List<InventoryItem> parse(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo, Reader reader, int taxonomyPenalty,
+                                                          VariantCodes extraEanOnly)
             throws JAXBException, XMLStreamException {
         XMLInputFactory xif = XMLInputFactory.newFactory();
         // Reject DTDs/external entities: feeds are attacker-influenceable (XXE, SSRF, billion-laughs).
@@ -76,7 +79,7 @@ public class XmlProductFeedLoader {
         JAXBContext jaxbContext = JAXBContext.newInstance(itemClass);
         Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
 
-        FeedProcessing processing = feedProcessor.start(supplierInfo.name(), taxonomyPenalty);
+        FeedProcessing processing = feedProcessor.start(supplierInfo.name(), taxonomyPenalty, extraEanOnly);
 
         try {
             while (xsr.hasNext()) {

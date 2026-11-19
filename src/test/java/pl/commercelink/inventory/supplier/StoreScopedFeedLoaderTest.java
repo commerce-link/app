@@ -9,7 +9,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.inventory.EanOnlyCodes;
+import pl.commercelink.inventory.InventoryMatchingProperties;
 import pl.commercelink.inventory.InventoryRepository;
+import pl.commercelink.inventory.VariantCodes;
+import pl.commercelink.pim.ScopedPimCatalog;
+import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.pim.api.PimIdentifier;
+import pl.commercelink.pim.api.PimIdentifierType;
 import pl.commercelink.inventory.supplier.api.CsvRowParser;
 import pl.commercelink.inventory.supplier.api.FeedItem;
 import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
@@ -32,8 +39,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -59,7 +68,7 @@ class StoreScopedFeedLoaderTest {
 
     @BeforeEach
     void setUp() {
-        when(feedProcessor.start(any(), anyInt())).thenReturn(processing);
+        when(feedProcessor.start(any(), anyInt(), any())).thenReturn(processing);
         when(processing.finish()).thenReturn(new ArrayList<>());
     }
 
@@ -114,7 +123,7 @@ class StoreScopedFeedLoaderTest {
         when(storeFeedRepository.canRead("store-1", "Action", "csv")).thenReturn(false);
 
         // when
-        List<?> result = loader.fetch(mock(CsvRowParser.class), ';', "store-1", supplierInfo("Action"), 0);
+        List<?> result = loader.fetch(mock(CsvRowParser.class), ';', "store-1", supplierInfo("Action"), 0, VariantCodes.none());
 
         // then
         assertTrue(result.isEmpty());
@@ -132,10 +141,10 @@ class StoreScopedFeedLoaderTest {
         when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
-        loader.fetch(parser, ';', "store-1", supplierInfo("Action"), 1000);
+        loader.fetch(parser, ';', "store-1", supplierInfo("Action"), 1000, VariantCodes.none());
 
         // then
-        verify(feedProcessor).start("Action", 1000);
+        verify(feedProcessor).start("Action", 1000, VariantCodes.none());
         verify(processing).add(any(ParsedRow.class));
         verify(processing).finish();
     }
@@ -150,10 +159,10 @@ class StoreScopedFeedLoaderTest {
         when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
-        loader.fetch(parser, ';', "store-1", supplierInfo("Action-k7f3a9c2"), 0);
+        loader.fetch(parser, ';', "store-1", supplierInfo("Action-k7f3a9c2"), 0, VariantCodes.none());
 
         // then
-        verify(feedProcessor).start("Action-k7f3a9c2", 0);
+        verify(feedProcessor).start("Action-k7f3a9c2", 0, VariantCodes.none());
         ArgumentCaptor<ParsedRow> captor = ArgumentCaptor.forClass(ParsedRow.class);
         verify(processing).add(captor.capture());
         assertEquals("Action-k7f3a9c2", captor.getValue().item().supplier());
@@ -171,7 +180,7 @@ class StoreScopedFeedLoaderTest {
         when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
-        List<?> result = loader.fetch(parser, ';', "store-1", supplierInfo("Action"), 0);
+        List<?> result = loader.fetch(parser, ';', "store-1", supplierInfo("Action"), 0, VariantCodes.none());
 
         // then
         assertTrue(result.isEmpty());
@@ -185,7 +194,7 @@ class StoreScopedFeedLoaderTest {
         when(storeFeedRepository.read("store-1", "Action", "xml")).thenThrow(new FileNotFoundException());
 
         // when
-        List<?> result = xmlLoader.load(TestXmlItem.class, "Item", supplierInfo("Action"), "store-1", 0);
+        List<?> result = xmlLoader.load(TestXmlItem.class, "Item", supplierInfo("Action"), "store-1", 0, VariantCodes.none());
 
         // then
         assertTrue(result.isEmpty());
@@ -199,12 +208,62 @@ class StoreScopedFeedLoaderTest {
         when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
-        xmlLoader.load(TestXmlItem.class, "Item", supplierInfo("Action"), "store-1", 1000);
+        xmlLoader.load(TestXmlItem.class, "Item", supplierInfo("Action"), "store-1", 1000, VariantCodes.none());
 
         // then
-        verify(feedProcessor).start("Action", 1000);
+        verify(feedProcessor).start("Action", 1000, VariantCodes.none());
         verify(processing).add(any(ParsedRow.class));
         verify(processing).finish();
+    }
+
+    @Test
+    void storeFeedPassesStorePairsToCorrection() throws Exception {
+        // given
+        VariantCodes storePairs = flaggedPairs();
+        when(storeFeedRepository.canRead("store-1", "Action", "csv")).thenReturn(true);
+        when(storeFeedRepository.read("store-1", "Action", "csv")).thenReturn(new StringReader("header\nrow"));
+        CsvRowParser parser = mock(CsvRowParser.class);
+        when(parser.parse(any())).thenReturn(feedItem("10.0"));
+        when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        loader.fetch(parser, ';', "store-1", supplierInfo("Action"), 1000, storePairs);
+
+        // then
+        verify(feedProcessor).start("Action", 1000, storePairs);
+    }
+
+    @Test
+    void xmlStoreFeedPassesStorePairsToCorrection() throws Exception {
+        // given
+        VariantCodes storePairs = flaggedPairs();
+        when(storeFeedRepository.read("store-1", "Action", "xml")).thenReturn(new StringReader(XML_FEED));
+        when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        xmlLoader.load(TestXmlItem.class, "Item", supplierInfo("Action"), "store-1", 1000, storePairs);
+
+        // then
+        verify(feedProcessor).start("Action", 1000, storePairs);
+    }
+
+    @Test
+    void globalFeedIgnoresStorePairs() throws Exception {
+        // given
+        when(inventoryRepository.canRead("Action")).thenReturn(true);
+        when(inventoryRepository.read("Action")).thenReturn(new StringReader("header\nrow"));
+        when(inventoryRepository.read("Action", "xml")).thenReturn(new StringReader(XML_FEED));
+        CsvRowParser parser = mock(CsvRowParser.class);
+        when(parser.parse(any())).thenReturn(feedItem("10.0"));
+        when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        loader.fetch(parser, ';', supplierInfo("Action"));
+        xmlLoader.load(TestXmlItem.class, "Item", supplierInfo("Action"));
+
+        // then -- store pairs never reach a global feed
+        verify(feedProcessor, times(2)).start("Action", 0, VariantCodes.none());
+        verify(feedProcessor, never()).start(any(), anyInt(), argThat((VariantCodes pairs) -> pairs.size() > 0));
     }
 
     @Test
@@ -221,7 +280,7 @@ class StoreScopedFeedLoaderTest {
         loader.fetch(parser, ';', supplierInfo("Action"));
 
         // then
-        verify(feedProcessor).start("Action", 0);
+        verify(feedProcessor).start("Action", 0, VariantCodes.none());
     }
 
     @Test
@@ -234,6 +293,14 @@ class StoreScopedFeedLoaderTest {
         xmlLoader.load(TestXmlItem.class, "Item", supplierInfo("Action"));
 
         // then
-        verify(feedProcessor).start("Action", 0);
+        verify(feedProcessor).start("Action", 0, VariantCodes.none());
+    }
+
+    private static VariantCodes flaggedPairs() {
+        PimEntry flagged = new PimEntry("pim-1", List.of(
+                new PimIdentifier("5900000000002", PimIdentifierType.GTIN),
+                new PimIdentifier("SHINE10", PimIdentifierType.MPN)),
+                "Mova", "PimName", null, null, true, null, null, null, null, null, true);
+        return new EanOnlyCodes(ScopedPimCatalog.of(flagged), InventoryMatchingProperties.allEnabled()).current();
     }
 }
