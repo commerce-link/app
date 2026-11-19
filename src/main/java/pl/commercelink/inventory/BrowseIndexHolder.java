@@ -6,6 +6,7 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import pl.commercelink.products.ProductDataResolver;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -25,22 +26,25 @@ import java.util.concurrent.atomic.AtomicReference;
 public class BrowseIndexHolder {
 
     private final GlobalMatchedInventory global;
+    // the index is shared by every store, so its products are described from global data only
+    private final GroupProducts products;
     private final Executor executor;
     private final AtomicReference<BrowseIndex> current = new AtomicReference<>();
     private final AtomicBoolean rebuilding = new AtomicBoolean();
     private final List<Runnable> replacedListeners = new CopyOnWriteArrayList<>();
 
     @Autowired
-    public BrowseIndexHolder(GlobalMatchedInventory global) {
-        this(global, Executors.newSingleThreadExecutor(runnable -> {
+    public BrowseIndexHolder(GlobalMatchedInventory global, ProductDataResolver productDataResolver) {
+        this(global, GroupProducts.of(productDataResolver, null), Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(runnable, "browse-index");
             thread.setDaemon(true);
             return thread;
         }));
     }
 
-    BrowseIndexHolder(GlobalMatchedInventory global, Executor executor) {
+    BrowseIndexHolder(GlobalMatchedInventory global, GroupProducts products, Executor executor) {
         this.global = global;
+        this.products = products;
         this.executor = executor;
     }
 
@@ -129,7 +133,7 @@ public class BrowseIndexHolder {
     private BrowseIndex build() {
         long started = System.nanoTime();
         GlobalMatchedInventory.Generation generation = global.generation();
-        BrowseIndex index = BrowseIndex.build(generation.version(), generation.all(), generation.index());
+        BrowseIndex index = BrowseIndex.build(generation.version(), generation.all(), generation.index(), products);
         log.info("Browse index built: {} products, version {}, {} ms", index.size(), generation.version(),
                 (System.nanoTime() - started) / 1_000_000);
         return index;

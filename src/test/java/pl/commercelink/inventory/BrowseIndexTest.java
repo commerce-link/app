@@ -8,10 +8,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.products.ProductData;
+import pl.commercelink.products.ProductDataFixture;
 import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +39,7 @@ class BrowseIndexTest {
         MatchedInventory ssd = group("5901000000002", "SSD-1", "ADATA Legend 800", "ADATA", "12");
 
         // when
-        BrowseIndex index = BrowseIndex.build(7, List.of(gpu, ssd));
+        BrowseIndex index = BrowseIndex.build(7, List.of(gpu, ssd), products());
 
         // then
         assertThat(index.version()).isEqualTo(7);
@@ -47,12 +50,49 @@ class BrowseIndexTest {
     }
 
     @Test
+    void allGroupsAreDescribedInOneCall() {
+        // given
+        MatchedInventory gpu = group("5901000000001", "GPU-1", "Gigabyte RTX 4060", "Gigabyte", "11");
+        MatchedInventory ssd = group("5901000000002", "SSD-1", "ADATA Legend 800", "ADATA", "12");
+        List<List<InventoryKey>> calls = new ArrayList<>();
+        GroupProducts counted = keys -> {
+            calls.add(keys);
+            return products().of(keys);
+        };
+
+        // when
+        BrowseIndex index = BrowseIndex.build(1, List.of(gpu, ssd), counted);
+        index.all().forEach(BrowseEntry::name);
+
+        // then
+        assertThat(calls).containsExactly(List.of(gpu.getInventoryKey(), ssd.getInventoryKey()));
+    }
+
+    @Test
+    void entryIsDescribedByTheProductDataGivenForItsGroup() {
+        // given
+        MatchedInventory gpu = group("5901000000001", "GPU-1", "Supplier name of the card", "Gigabyte", "11");
+        ProductData fromPim = new ProductData("Gigabyte GeForce RTX 4060 (GV-N4060)", "GIGABYTE", "Karty graficzne", "170",
+                "5901000000001", "GPU-1", null, null);
+
+        // when
+        BrowseIndex index = BrowseIndex.build(1, List.of(gpu), keys -> List.of(fromPim));
+
+        // then
+        BrowseEntry entry = index.inCategories(Set.of("170")).get(0);
+        assertThat(entry.name()).isEqualTo("Gigabyte GeForce RTX 4060 (GV-N4060)");
+        assertThat(entry.brand()).isEqualTo("GIGABYTE");
+        assertThat(entry.category()).isEqualTo("Karty graficzne");
+        assertThat(index.inCategories(Set.of("11"))).isEmpty();
+    }
+
+    @Test
     void blankCategoryIdGoesToUnassigned() {
         // given
         MatchedInventory noId = group("5901000000003", "X-1", "Kabel HDMI", "Goobay", " ");
 
         // when
-        BrowseIndex index = BrowseIndex.build(1, List.of(noId));
+        BrowseIndex index = BrowseIndex.build(1, List.of(noId), products());
 
         // then
         assertThat(index.inCategories(Set.of(BrowseIndex.UNASSIGNED))).extracting(BrowseEntry::group).containsExactly(noId);
@@ -61,7 +101,7 @@ class BrowseIndexTest {
     @Test
     void textMatchesNameBrandEanAndMfnIgnoringCase() {
         // given
-        BrowseEntry entry = BrowseIndex.build(1, List.of(group("5901000000004", "MX-3S", "MX Master 3S", "Logitech", "11")))
+        BrowseEntry entry = BrowseIndex.build(1, List.of(group("5901000000004", "MX-3S", "MX Master 3S", "Logitech", "11")), products())
                 .all().get(0);
 
         // when / then
@@ -76,7 +116,7 @@ class BrowseIndexTest {
     void entryOfFindsTheEntryOfTheSameGroupInstance() {
         // given
         MatchedInventory gpu = group("5901000000001", "GPU-1", "Gigabyte RTX 4060", "Gigabyte", "11");
-        BrowseIndex index = BrowseIndex.build(1, List.of(gpu));
+        BrowseIndex index = BrowseIndex.build(1, List.of(gpu), products());
 
         // when / then
         assertThat(index.entryOf(gpu)).isPresent();
@@ -92,6 +132,10 @@ class BrowseIndexTest {
             return key.getProductCodes().stream().map(taxonomies::get).filter(Objects::nonNull).findFirst()
                     .orElse(Taxonomy.EMPTY);
         });
+    }
+
+    private GroupProducts products() {
+        return GroupProducts.of(ProductDataFixture.resolverOver(taxonomyCache), null);
     }
 
     private MatchedInventory group(String ean, String mfn, String name, String brand, String categoryId) {

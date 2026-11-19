@@ -5,6 +5,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.search.OfferShipping;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.stores.Store;
@@ -32,6 +33,7 @@ public class InventoryBrowse {
     private final StoresRepository storesRepository;
     private final StoreInventoryProvider storeInventoryProvider;
     private final SupplierRegistry supplierRegistry;
+    private final ProductDataResolver productDataResolver;
     // Same key and lifetime as Inventory.storeStatistics: a supplier change or a global feed reload (the index version)
     // makes a new key; an own-feed reload keeps the key and is picked up when the entry expires after two minutes.
     private final Cache<ScopeKey, BrowseScope> scopes = Caffeine.newBuilder()
@@ -52,7 +54,9 @@ public class InventoryBrowse {
             .build();
 
     InventoryBrowse(BrowseIndexHolder holder, StoresRepository storesRepository,
-                    StoreInventoryProvider storeInventoryProvider, SupplierRegistry supplierRegistry) {
+                    StoreInventoryProvider storeInventoryProvider, SupplierRegistry supplierRegistry,
+                    ProductDataResolver productDataResolver) {
+        this.productDataResolver = productDataResolver;
         this.holder = holder;
         this.storesRepository = storesRepository;
         this.storeInventoryProvider = storeInventoryProvider;
@@ -125,7 +129,7 @@ public class InventoryBrowse {
                 .collect(Collectors.toUnmodifiableSet());
         ScopeKey key = new ScopeKey(storeId, index.version(), enabled, Inventory.ownConnectionFingerprint(store));
         return scopes.get(key, k -> BrowseScope.of(index, enabled::contains,
-                storeInventoryProvider.ownInventory(store).items()));
+                storeInventoryProvider.ownInventory(store).items(), GroupProducts.of(productDataResolver, storeId)));
     }
 
     private Selection selection(BrowseScope scope, @Nullable Set<String> categoryIds, Set<String> suppliers,
@@ -215,7 +219,7 @@ public class InventoryBrowse {
         String ean = best.ean() != null ? best.ean() : key.getProductEans().stream().findFirst().orElse(null);
         String mfn = best.mfn() != null ? best.mfn() : key.getProductCodes().stream().findFirst().orElse(null);
         return new BrowseRow(key, entry.name(), entry.brand(), ean, mfn, entry.categoryId(),
-                entry.taxonomy().category(), price.total(), price.known(), best.supplier(), totalQty(offers),
+                entry.category(), price.total(), price.known(), best.supplier(), totalQty(offers),
                 suppliers.size());
     }
 
