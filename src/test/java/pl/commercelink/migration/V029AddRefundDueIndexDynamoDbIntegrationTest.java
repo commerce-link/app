@@ -89,61 +89,26 @@ class V029AddRefundDueIndexDynamoDbIntegrationTest {
     }
 
     @Test
-    void ordersCancelledBeforeTheIndexGetTheirKeyAndAreFoundThroughIt() {
-        // given: orders as an earlier version stored them, without the key
+    void anOrderStoredWithoutTheKeyIsListedOnlyAfterItsNextSave() {
+        // given: cancelled with the customer's payment on it by a version that does not write the key
         Order owedBack = storedByAnEarlierVersion(cancelled(10, 500));
-        Order neverPaid = storedByAnEarlierVersion(cancelled(10, 0));
-        Order longAgo = storedByAnEarlierVersion(cancelled(120, 500));
-        Order open = storedByAnEarlierVersion(order(OrderStatus.New, 10, 500));
+        OrdersRepository repository = new OrdersRepository(client);
 
-        // when
+        // when: the unit creates the index and gives no order its key
         migration().execute();
         await(this::indexesActive, "the new index");
 
         // then
-        assertThat(storedKey(owedBack)).isEqualTo(owedBack.getRefundDueSortKey()).isNotNull();
-        assertThat(storedKey(neverPaid)).isNull();
-        assertThat(storedKey(longAgo)).isNull();
-        assertThat(storedKey(open)).isNull();
-        assertThat(new OrdersRepository(client).findCancelledAwaitingRefund("store-1", TODAY))
+        assertThat(storedKey(owedBack)).isNull();
+        assertThat(repository.findCancelledAwaitingRefund("store-1", TODAY)).isEmpty();
+
+        // when: the order is saved again, whatever the reason
+        repository.save(repository.findById("store-1", owedBack.getOrderId()));
+
+        // then
+        await(() -> indexedOrderIds().contains(owedBack.getOrderId()), "the order to enter the index");
+        assertThat(repository.findCancelledAwaitingRefund("store-1", TODAY))
                 .extracting(Order::getOrderId).containsExactly(owedBack.getOrderId());
-    }
-
-    @Test
-    void theBackfillNeverTouchesTheVersionAndKeysAnOrderWithoutOne() {
-        // given
-        Order versioned = storedByAnEarlierVersion(cancelled(10, 500));
-        Order unversioned = storedByAnEarlierVersion(cancelled(11, 500));
-        remove(unversioned, "version");
-        String versionBefore = stored(versioned).get("version").getN();
-
-        // when
-        new RefundDueKeyBackfill(client).run(TODAY);
-
-        // then
-        assertThat(storedKey(versioned)).isNotNull();
-        assertThat(stored(versioned).get("version").getN()).isEqualTo(versionBefore);
-        assertThat(storedKey(unversioned)).isNotNull();
-        assertThat(stored(unversioned)).doesNotContainKey("version");
-    }
-
-    @Test
-    void aKeyLeftOnAnOrderWhoseRefundAnEarlierVersionRecordedIsRemoved() {
-        // given: an earlier version saved the refund and, not knowing the key, left it on the record
-        Order refunded = cancelled(10, 500);
-        mapper.save(refunded);
-        String staleKey = storedKey(refunded);
-        refunded.addPayment(refund(500));
-        mapper.save(refunded);
-        client.updateItem(new UpdateItemRequest().withTableName("Orders").withKey(key(refunded))
-                .withUpdateExpression("SET refundDueSortKey = :key")
-                .withExpressionAttributeValues(Map.of(":key", new AttributeValue(staleKey))));
-
-        // when
-        new RefundDueKeyBackfill(client).run(TODAY);
-
-        // then
-        assertThat(storedKey(refunded)).isNull();
     }
 
     @Test
@@ -199,14 +164,11 @@ class V029AddRefundDueIndexDynamoDbIntegrationTest {
 
     private Order storedByAnEarlierVersion(Order order) {
         mapper.save(order);
-        remove(order, "refundDueSortKey");
+        client.updateItem(new UpdateItemRequest().withTableName("Orders").withKey(key(order))
+                .withUpdateExpression("REMOVE refundDueSortKey"));
         return order;
     }
 
-    private void remove(Order order, String attribute) {
-        client.updateItem(new UpdateItemRequest().withTableName("Orders").withKey(key(order))
-                .withUpdateExpression("REMOVE #a").withExpressionAttributeNames(Map.of("#a", attribute)));
-    }
 
     private static Map<String, AttributeValue> key(Order order) {
         return Map.of("storeId", new AttributeValue(order.getStoreId()), "orderId", new AttributeValue(order.getOrderId()));
@@ -229,7 +191,7 @@ class V029AddRefundDueIndexDynamoDbIntegrationTest {
     }
 
     // refundDueSortKey has no index annotation, so the table generated from the entity is the one before V029; the order
-    // date index carries the status as in production (V001), which the backfill filters on
+    // date index carries the status as in production (V001)
     private CreateTableRequest ordersTableBefore() {
         CreateTableRequest request = mapper.generateCreateTableRequest(Order.class);
         request.getGlobalSecondaryIndexes().forEach(index -> index.withProjection(

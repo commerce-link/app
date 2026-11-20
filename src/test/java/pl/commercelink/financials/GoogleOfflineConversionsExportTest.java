@@ -45,7 +45,7 @@ class GoogleOfflineConversionsExportTest {
     }
 
     @Test
-    void anOrderCancelledAfterItsGoodsCameBackIsWorthWhatTheCustomerPaidIn() {
+    void anOrderCancelledAfterItsGoodsCameBackIsWorthItsTotalWhateverWasPaidIn() {
         // given: the returns took everything out of totalPrice, and the refund is already recorded
         Order returned = order("gclid-2", OrderStatus.Cancelled, 0);
         returned.addPayment(Payment.bankTransfer("REF-IN", "Jan", 1249));
@@ -55,8 +55,8 @@ class GoogleOfflineConversionsExportTest {
         // when
         String csv = export.run("store-1", FROM, TO);
 
-        // then
-        assertThat(csv).contains("gclid-2,Zakupy offline,2026-09-10 12:30:00,1249.0,PLN,Granted,Granted");
+        // then: the value is always totalPrice, never worked out from the payments
+        assertThat(csv).contains("gclid-2,Zakupy offline,2026-09-10 12:30:00,0.0,PLN,Granted,Granted");
     }
 
     @Test
