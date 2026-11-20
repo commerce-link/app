@@ -33,9 +33,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Testcontainers(disabledWithoutDocker = true)
 class RedisStoreInventoryCacheIntegrationTest {
 
+    // production runs Valkey (ElastiCache, major version 9), so the scripts are checked against it, not against Redis
     @Container
     static final GenericContainer<?> REDIS =
-            new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
+            new GenericContainer<>(DockerImageName.parse("valkey/valkey:9")).withExposedPorts(6379);
 
     static LettuceConnectionFactory factory;
     static StringRedisTemplate redisTemplate;
