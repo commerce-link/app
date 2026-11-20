@@ -27,14 +27,16 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Testcontainers(disabledWithoutDocker = true)
 class RedisStoreInventoryCacheIntegrationTest {
 
+    // production runs Valkey (ElastiCache, major version 9), so the scripts are checked against it, not against Redis
     @Container
     static final GenericContainer<?> REDIS =
-            new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
+            new GenericContainer<>(DockerImageName.parse("valkey/valkey:9")).withExposedPorts(6379);
 
     static LettuceConnectionFactory factory;
     static StringRedisTemplate redisTemplate;
@@ -96,7 +98,7 @@ class RedisStoreInventoryCacheIntegrationTest {
         RedisStoreInventoryCache cache = cache();
 
         // when
-        cache.put("s1", sampleInventory(), Duration.ofMinutes(60));
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), cache.clockMillis());
         Optional<StoreInventory> result = cache.get("s1");
 
         // then
@@ -111,11 +113,170 @@ class RedisStoreInventoryCacheIntegrationTest {
         RedisStoreInventoryCache cache = cache();
 
         // when
-        cache.put("s1", sampleInventory(), Duration.ofMinutes(60));
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), cache.clockMillis());
 
         // then
         Long ttl = redisTemplate.getExpire("store-inventory:v3:s1");
         assertTrue(ttl != null && ttl > 0 && ttl <= 3600);
+    }
+
+    @Test
+    void buildThatStartedEarlierDoesNotReplaceALaterOne() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        long earlier = cache.clockMillis();
+        long later = earlier + 5_000;
+        cache.put("s1", largeInventory(2), Duration.ofMinutes(60), later);
+
+        // when
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), earlier);
+
+        // then
+        assertEquals(2, cache.get("s1").orElseThrow().items().size());
+    }
+
+    @Test
+    void buildThatStartedLaterReplacesAnEarlierOne() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        long earlier = cache.clockMillis();
+        cache.put("s1", largeInventory(2), Duration.ofMinutes(60), earlier);
+
+        // when
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), earlier + 5_000);
+
+        // then
+        assertEquals(1, cache.get("s1").orElseThrow().items().size());
+    }
+
+    @Test
+    void buildThatStartedBeforeAnEvictionIsNotStored() throws InterruptedException {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        long startedBeforeEviction = cache.clockMillis();
+        Thread.sleep(5);
+        cache.evict("s1");
+
+        // when
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), startedBeforeEviction);
+
+        // then
+        assertTrue(cache.get("s1").isEmpty());
+    }
+
+    @Test
+    void buildThatStartedAfterAnEvictionIsStored() throws InterruptedException {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        cache.put("s1", largeInventory(2), Duration.ofMinutes(60), cache.clockMillis());
+        cache.evict("s1");
+        Thread.sleep(5);
+
+        // when
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), cache.clockMillis());
+
+        // then
+        assertEquals(1, cache.get("s1").orElseThrow().items().size());
+    }
+
+    @Test
+    void snapshotBuiltAfterTheRequestAnswersIt() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        long requestedAt = cache.clockMillis();
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), requestedAt + 1);
+
+        // when / then
+        assertTrue(cache.builtSince("s1", requestedAt));
+    }
+
+    @Test
+    void snapshotBuiltBeforeTheRequestDoesNotAnswerIt() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        long builtAt = cache.clockMillis();
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), builtAt);
+
+        // when / then
+        org.junit.jupiter.api.Assertions.assertFalse(cache.builtSince("s1", builtAt + 1));
+    }
+
+    @Test
+    void evictionAfterTheRequestDoesNotAnswerIt() throws InterruptedException {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        long requestedAt = cache.clockMillis();
+        Thread.sleep(5);
+        cache.evict("s1");
+
+        // when / then
+        org.junit.jupiter.api.Assertions.assertFalse(cache.builtSince("s1", requestedAt));
+    }
+
+    @Test
+    void storeWithoutASnapshotHasNoBuild() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+
+        // when / then
+        org.junit.jupiter.api.Assertions.assertFalse(cache.builtSince("s1", 0));
+    }
+
+    @Test
+    void recentSnapshotIsKeptAndGetsItsLifetimeAgain() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(5), cache.clockMillis());
+
+        // when
+        boolean kept = cache.keepIfBuiltWithin("s1", Duration.ofHours(24), Duration.ofMinutes(2880));
+
+        // then
+        assertTrue(kept);
+        Long snapshotTtl = redisTemplate.getExpire("store-inventory:v3:s1");
+        Long markTtl = redisTemplate.getExpire("store-inventory:v3:s1:build-started");
+        assertTrue(snapshotTtl != null && snapshotTtl > 172_000 && snapshotTtl <= 172_800);
+        assertTrue(markTtl != null && markTtl > 172_000 && markTtl <= 172_800);
+    }
+
+    @Test
+    void snapshotBuiltLongerAgoThanTheLimitIsNotKept() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        long twentyFiveHoursAgo = cache.clockMillis() - Duration.ofHours(25).toMillis();
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), twentyFiveHoursAgo);
+
+        // when
+        boolean kept = cache.keepIfBuiltWithin("s1", Duration.ofHours(24), Duration.ofMinutes(2880));
+
+        // then
+        assertFalse(kept);
+        Long snapshotTtl = redisTemplate.getExpire("store-inventory:v3:s1");
+        assertTrue(snapshotTtl != null && snapshotTtl <= 3600);
+    }
+
+    @Test
+    void storeWithoutASnapshotHasNothingToKeep() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+
+        // when / then
+        assertFalse(cache.keepIfBuiltWithin("s1", Duration.ofHours(24), Duration.ofMinutes(2880)));
+    }
+
+    @Test
+    void evictedSnapshotIsNotKeptAlthoughItsMarkIsRecent() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), cache.clockMillis());
+        cache.evict("s1");
+
+        // when
+        boolean kept = cache.keepIfBuiltWithin("s1", Duration.ofHours(24), Duration.ofMinutes(2880));
+
+        // then
+        assertFalse(kept);
+        assertTrue(cache.get("s1").isEmpty());
     }
 
     @Test
@@ -137,7 +298,7 @@ class RedisStoreInventoryCacheIntegrationTest {
                 .getBytes(StandardCharsets.UTF_8).length;
 
         // when
-        cache.put("big", large, Duration.ofMinutes(60));
+        cache.put("big", large, Duration.ofMinutes(60), cache.clockMillis());
         Optional<StoreInventory> result = cache.get("big");
 
         // then

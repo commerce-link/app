@@ -30,6 +30,9 @@ import java.util.Optional;
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class StoreInventoryProvider {
 
+    private static final Duration MAX_AGE_OF_KEPT_SNAPSHOT = Duration.ofHours(24);
+    private static final int REFRESH_ATTEMPTS = 3;
+
     private final StoreInventoryCache cache;
     private final StoresRepository storesRepository;
     private final SupplierProviderFactory supplierProviderFactory;
@@ -45,7 +48,7 @@ public class StoreInventoryProvider {
     long defaultTtlMinutes;
 
     public StoreInventory get(String storeId) {
-        return cache.get(storeId).orElseGet(() -> buildAndCache(storesRepository.findById(storeId), storeId));
+        return cache.get(storeId).orElseGet(() -> buildAndCache(storesRepository.findById(storeId), storeId, UnstoredSnapshot.IS_REPORTED).inventory());
     }
 
     public InventoryIndex ownIndex(Store store) {
@@ -57,20 +60,69 @@ public class StoreInventoryProvider {
             return new StoreInventory(InventoryIndex.of(List.of()), null);
         }
         String storeId = store.getStoreId();
-        return cache.get(storeId).orElseGet(() -> buildAndCache(store, storeId));
+        return cache.get(storeId).orElseGet(() -> buildAndCache(store, storeId, UnstoredSnapshot.IS_REPORTED).inventory());
     }
 
-    private StoreInventory buildAndCache(Store store, String storeId) {
+    // Each feed import of a store asks for a rebuild. A build that started after a request has already read that
+    // import's file, so the request has nothing left to do; null rebuilds whatever is stored.
+    public void refresh(String storeId, Long requestedAtMillis) {
+        if (requestedAtMillis != null && cache.builtSince(storeId, requestedAtMillis)) {
+            return;
+        }
+        Store store = storesRepository.findById(storeId);
+        if (store == null) {
+            log.warn("Inventory snapshot of store {} is not rebuilt: the store does not exist", storeId);
+            return;
+        }
+        // a build that met a global reload or a change of the store's EAN-only pairs is not cached; the next one starts
+        // on the current ones
+        for (int attempt = 0; attempt < REFRESH_ATTEMPTS; attempt++) {
+            if (buildAndCache(store, storeId, UnstoredSnapshot.FAILS_THE_BUILD).cached()) {
+                return;
+            }
+        }
+        throw new IllegalStateException("The global inventory or the store's EAN-only pairs changed during each of "
+                + REFRESH_ATTEMPTS + " rebuilds of the inventory of store " + storeId);
+    }
+
+    // For an import that found its feed unchanged: the snapshot only lives on, without a rebuild. Not past a day
+    // though, since its prices carry the exchange rates of the day it was built; false asks the caller for a rebuild.
+    public boolean keepIfRecent(String storeId) {
+        Store store = storesRepository.findById(storeId);
+        return cache.keepIfBuiltWithin(storeId, MAX_AGE_OF_KEPT_SNAPSHOT, resolveTtl(store));
+    }
+
+    // A request is served with what it built either way. A rebuild exists only to store the snapshot, so it fails and
+    // is delivered again.
+    private enum UnstoredSnapshot { IS_REPORTED, FAILS_THE_BUILD }
+
+    private Built buildAndCache(Store store, String storeId, UnstoredSnapshot unstored) {
+        // read before the feed files are: the cache keeps the inventory of the build that started last
+        long startedAt = cache.clockMillis();
         Build build = build(storeId, store);
         // a global reload during the build (new feeds, or a regroup on changed EAN-only pairs that has already evicted
         // the stores) makes these groups stale: they serve this request, but caching them would keep them for the TTL;
         // so do store pairs changed in PIM meanwhile, whose eviction may already have run
         boolean sameGlobal = build.globalVersion() == null || build.globalVersion() == globalInventory.version();
         boolean sameStorePairs = build.storePairs() == null || build.storePairs().equals(storeEanOnlyCodes.of(storeId));
-        if (sameGlobal && sameStorePairs) {
-            cache.put(storeId, build.inventory(), resolveTtl(store));
+        boolean current = sameGlobal && sameStorePairs;
+        if (!current) {
+            return new Built(build.inventory(), false);
         }
-        return build.inventory();
+        try {
+            cache.put(storeId, build.inventory(), resolveTtl(store), startedAt);
+        } catch (StoreInventoryCacheException e) {
+            if (unstored == UnstoredSnapshot.FAILS_THE_BUILD) {
+                throw e;
+            }
+            // without a snapshot every read of this store builds it again, in the request
+            log.error("Inventory snapshot of store {} was built for a request but not stored", storeId, e);
+            return new Built(build.inventory(), false);
+        }
+        return new Built(build.inventory(), true);
+    }
+
+    private record Built(StoreInventory inventory, boolean cached) {
     }
 
     /**

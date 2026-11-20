@@ -7,6 +7,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.inventory.StoreInventoryProvider;
+import pl.commercelink.inventory.StoreInventoryRefreshPublisher;
 import pl.commercelink.inventory.supplier.api.FeedData;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
@@ -32,6 +34,10 @@ class StoreSupplierFeedServiceTest {
     private SupplierProviderFactory supplierProviderFactory;
     @Mock
     private StoreFeedRepository storeFeedRepository;
+    @Mock
+    private StoreInventoryProvider storeInventoryProvider;
+    @Mock
+    private StoreInventoryRefreshPublisher storeInventoryRefresh;
 
     @InjectMocks
     private StoreSupplierFeedService service;
@@ -60,6 +66,112 @@ class StoreSupplierFeedServiceTest {
 
         // then
         verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
+    }
+
+    private void supplierReturns(String storeId, byte[] data) {
+        Store store = storeWithId(storeId);
+        SupplierProvider supplier = () -> Optional.of(new FeedData(data, "csv"));
+        when(storesRepository.findById(storeId)).thenReturn(store);
+        when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(supplier);
+    }
+
+    @Test
+    void firstImportStoresTheFeedAsksForARebuildThenStoresTheHash() throws ResourceDownloadException {
+        // given
+        byte[] data = "rows".getBytes();
+        supplierReturns("store-1", data);
+        when(storeFeedRepository.storedHash("store-1", "Wortmann")).thenReturn(Optional.empty());
+
+        // when
+        service.loadStoreFeed("store-1", "Wortmann");
+
+        // then
+        org.mockito.InOrder order = inOrder(storeFeedRepository, storeInventoryRefresh);
+        order.verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
+        order.verify(storeInventoryRefresh).request("store-1");
+        order.verify(storeFeedRepository).storeHash("store-1", "Wortmann", FeedHash.of(data, "csv"));
+    }
+
+    @Test
+    void unchangedFeedIsNotStoredAndItsRecentSnapshotIsOnlyKept() throws ResourceDownloadException {
+        // given
+        byte[] data = "rows".getBytes();
+        supplierReturns("store-1", data);
+        when(storeFeedRepository.storedHash("store-1", "Wortmann")).thenReturn(Optional.of(FeedHash.of(data, "csv")));
+        when(storeInventoryProvider.keepIfRecent("store-1")).thenReturn(true);
+
+        // when
+        service.loadStoreFeed("store-1", "Wortmann");
+
+        // then
+        verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
+        verify(storeInventoryRefresh, never()).request(anyString());
+        verify(storeFeedRepository).storeHash("store-1", "Wortmann", FeedHash.of(data, "csv"));
+    }
+
+    @Test
+    void unchangedFeedWithAnOldOrMissingSnapshotAsksForARebuild() throws ResourceDownloadException {
+        // given
+        byte[] data = "rows".getBytes();
+        supplierReturns("store-1", data);
+        when(storeFeedRepository.storedHash("store-1", "Wortmann")).thenReturn(Optional.of(FeedHash.of(data, "csv")));
+        when(storeInventoryProvider.keepIfRecent("store-1")).thenReturn(false);
+
+        // when
+        service.loadStoreFeed("store-1", "Wortmann");
+
+        // then
+        verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
+        verify(storeInventoryRefresh).request("store-1");
+    }
+
+    @Test
+    void changedFeedIsStoredAndARebuildRequested() throws ResourceDownloadException {
+        // given
+        byte[] data = "new rows".getBytes();
+        supplierReturns("store-1", data);
+        when(storeFeedRepository.storedHash("store-1", "Wortmann")).thenReturn(Optional.of(FeedHash.of("rows".getBytes(), "csv")));
+
+        // when
+        service.loadStoreFeed("store-1", "Wortmann");
+
+        // then
+        verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
+        verify(storeInventoryRefresh).request("store-1");
+        verify(storeInventoryProvider, never()).keepIfRecent(anyString());
+        verify(storeFeedRepository).storeHash("store-1", "Wortmann", FeedHash.of(data, "csv"));
+    }
+
+    @Test
+    void requestThatCannotBeSentLeavesTheHashUnwritten() {
+        // given
+        supplierReturns("store-1", "rows".getBytes());
+        doThrow(new IllegalStateException("queue unavailable")).when(storeInventoryRefresh).request("store-1");
+
+        // when / then
+        assertThrows(IllegalStateException.class, () -> service.loadStoreFeed("store-1", "Wortmann"));
+        verify(storeFeedRepository, never()).storeHash(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void sameBytesUnderAnotherExtensionAreAChangedFeed() {
+        // when / then
+        org.junit.jupiter.api.Assertions.assertNotEquals(FeedHash.of("rows".getBytes(), "csv"), FeedHash.of("rows".getBytes(), "xml"));
+    }
+
+    @Test
+    void supplierWithoutAFeedLeavesTheInventoryAlone() throws ResourceDownloadException {
+        // given
+        Store store = storeWithId("store-1");
+        SupplierProvider supplier = Optional::empty;
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(supplier);
+
+        // when
+        service.loadStoreFeed("store-1", "Wortmann");
+
+        // then
+        verifyNoInteractions(storeInventoryProvider, storeInventoryRefresh);
     }
 
     @Test
