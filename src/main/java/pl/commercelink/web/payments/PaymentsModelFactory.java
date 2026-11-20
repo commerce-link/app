@@ -20,6 +20,7 @@ import pl.commercelink.web.orders.OrderPageModelFactory;
 import pl.commercelink.web.payments.PaymentsPageModel.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -41,17 +42,6 @@ public class PaymentsModelFactory {
     private final SupplierLabels supplierLabels;
     private final MessageSource messages;
 
-    static final int CANCELLED_ORDERS_WINDOW_DAYS = 90;
-
-    /**
-     * A cancelled order keeps the customer's payments, so it stays here until the refund is recorded. Limited to the
-     * orders placed lately: the cancelled orders of a store only grow, and this page is opened all day.
-     */
-    private Stream<Order> recentlyCancelled(String storeId, LocalDate today) {
-        return orders.findByStatusOrderedBetween(storeId, OrderStatus.Cancelled,
-                today.minusDays(CANCELLED_ORDERS_WINDOW_DAYS), today).stream();
-    }
-
     public PaymentsPageModel page(String storeId, PaymentsQuery query, LocalDate today, Locale locale) {
         SupplierLabelMap labels = supplierLabels.forStoreId(storeId);
         PaymentsRowMapper mapper = new PaymentsRowMapper(messages, locale, labels);
@@ -59,7 +49,7 @@ public class PaymentsModelFactory {
                 .map(PayableEntry::of).flatMap(Optional::stream).toList();
         List<ReceivableEntry> receivables = Stream.concat(
                         orders.findByStoreAndStatuses(storeId, ReceivableEntry.OPEN_STATUSES).stream(),
-                        recentlyCancelled(storeId, today))
+                        orders.findCancelledAwaitingRefund(storeId, today).stream())
                 .map(o -> ReceivableEntry.of(o, today)).flatMap(Optional::stream).toList();
 
         Predicate<PayableEntry> payableBase = e -> (query.focus() == null || query.focus().matches(e, today))
@@ -168,8 +158,19 @@ public class PaymentsModelFactory {
     /** Urgent, then warned, then by date, cash on delivery on its way, refunds last (spec §5.2). */
     private static Comparator<ReceivableEntry> receivableOrder() {
         return Comparator.comparing(PaymentsModelFactory::rank)
-                .thenComparing(ReceivableEntry::shipDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(PaymentsModelFactory::shippedOrCancelled, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(e -> e.order().getOrderId());
+    }
+
+    /**
+     * The date of the row's shipping column: a cancelled order has nothing left to ship, so it goes by when it was
+     * cancelled and, among the cancelled orders, the refund waiting longest comes first.
+     */
+    private static LocalDateTime shippedOrCancelled(ReceivableEntry e) {
+        if (e.order().hasStatus(OrderStatus.Cancelled)) {
+            return e.order().cancelledSince();
+        }
+        return e.shipDate() == null ? null : e.shipDate().atStartOfDay();
     }
 
     private static int rank(ReceivableEntry e) {

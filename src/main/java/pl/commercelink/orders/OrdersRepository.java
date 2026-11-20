@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.starter.dynamodb.QueryPageResult;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
 import pl.commercelink.migration.V023_AddDiscountCodeIndex;
+import pl.commercelink.migration.V029_AddRefundDueIndex;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 
 import java.time.LocalDate;
@@ -29,6 +30,9 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OrdersRepository.class);
     static final String STORE_STATUS_INDEX = "StoreIdStatusIndex";
     static final String DISCOUNT_CODE_INDEX = V023_AddDiscountCodeIndex.INDEX;
+    static final String REFUND_DUE_INDEX = V029_AddRefundDueIndex.INDEX;
+    /** How far back the cancelled orders awaiting a refund are looked for while StoreIdRefundDueIndex cannot be read. */
+    public static final int CANCELLED_AWAITING_REFUND_WINDOW_DAYS = 90;
 
     public OrdersRepository(AmazonDynamoDB amazonDynamoDB) {
         super(amazonDynamoDB);
@@ -506,6 +510,51 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
         return queryResult.getItems().stream()
                 .map(item -> dynamoDBMapper.load(Order.class, item.get("storeId").getS(), item.get("orderId").getS()))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Cancelled orders still holding the customer's money (Order#awaitsRefund): the orders list and the Payments page
+     * keep showing them until the refund is recorded, here in the order they were cancelled. Read from
+     * StoreIdRefundDueIndex, which holds only such orders (RefundDueSortKey), so the read grows with the refunds still
+     * due and not with the store's cancellations, and both pages are opened all day. While the index cannot be read
+     * yet (DynamoDB still builds it after V029) the orders placed in the last CANCELLED_AWAITING_REFUND_WINDOW_DAYS
+     * days are read instead, as before the index.
+     */
+    public List<Order> findCancelledAwaitingRefund(String storeId, LocalDate today) {
+        List<String> orderIds = new ArrayList<>();
+        try {
+            Map<String, AttributeValue> startKey = null;
+            do {
+                QueryResult page = amazonDynamoDB.query(new QueryRequest()
+                        .withTableName("Orders")
+                        .withIndexName(REFUND_DUE_INDEX)
+                        .withKeyConditionExpression("storeId = :storeId")
+                        .withExpressionAttributeValues(Map.of(":storeId", new AttributeValue().withS(storeId)))
+                        .withExclusiveStartKey(startKey));
+                page.getItems().forEach(item -> orderIds.add(item.get("orderId").getS()));
+                startKey = page.getLastEvaluatedKey();
+            } while (startKey != null && !startKey.isEmpty());
+        } catch (AmazonDynamoDBException e) {
+            if (!indexUnavailable(e, REFUND_DUE_INDEX)) {
+                throw e;
+            }
+            log.warn("{} is not available yet ({}); reading the cancelled orders of the last {} days for the refunds due",
+                    REFUND_DUE_INDEX, e.getErrorMessage(), CANCELLED_AWAITING_REFUND_WINDOW_DAYS);
+            return longestWaitingFirst(findByStatusOrderedBetween(storeId, OrderStatus.Cancelled,
+                    today.minusDays(CANCELLED_AWAITING_REFUND_WINDOW_DAYS), today));
+        }
+        return longestWaitingFirst(findAllByIds(storeId, orderIds));
+    }
+
+    /**
+     * The index is eventually consistent, so an order whose refund was recorded since is dropped after the full read,
+     * which also loses the order of the index: it is put back from the key the orders now carry.
+     */
+    private static List<Order> longestWaitingFirst(List<Order> cancelled) {
+        return cancelled.stream()
+                .filter(Order::awaitsRefund)
+                .sorted(Comparator.comparing(Order::getRefundDueSortKey))
+                .toList();
     }
 
     /**

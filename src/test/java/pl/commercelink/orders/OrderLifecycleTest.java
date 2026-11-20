@@ -155,6 +155,7 @@ class OrderLifecycleTest {
 
         // then
         assertEquals(OrderStatus.Cancelled, order.getStatus());
+        assertThat(order.getCancelledAt()).isNotNull();
         verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCancelled);
         verifyNoMoreInteractions(orderLifecycleEventPublisher);
     }

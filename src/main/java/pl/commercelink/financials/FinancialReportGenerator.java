@@ -50,6 +50,9 @@ public class FinancialReportGenerator {
 
     public FinancialReports generate(String storeId, LocalDate dateFrom, LocalDate dateTo) {
         List<String> orderIds = ordersRepository.findAllPastOrders(dateFrom, dateTo, storeId).stream()
+                // the index carries the status, so an order it already knows as cancelled is not read at all; one
+                // cancelled since the index was written is dropped after the read (loadEntries)
+                .filter(entry -> entry.getStatus() != OrderStatus.Cancelled)
                 .map(OrderIndexEntry::getOrderId)
                 .toList();
         List<Entry> entries = loadEntries(storeId, orderIds);
@@ -65,9 +68,12 @@ public class FinancialReportGenerator {
                 dailySales(dateFrom, dateTo, entries), supplierDeliveries(deliveries));
     }
 
-    // an index entry whose order was deleted since the index was read has nothing to report, so it is skipped
+    // an index entry whose order was deleted since the index was read has nothing to report, so it is skipped; a cancelled
+    // order was never sold, so it is left out of the order count as well as of the sales (its items are not read either)
     private List<Entry> loadEntries(String storeId, List<String> orderIds) {
-        List<Order> orders = ordersRepository.findByIds(storeId, orderIds);
+        List<Order> orders = ordersRepository.findByIds(storeId, orderIds).stream()
+                .filter(order -> !order.hasStatus(OrderStatus.Cancelled))
+                .toList();
         Map<String, List<OrderItem>> itemsByOrder = loadItems(orders.stream().map(Order::getOrderId).toList());
         return orders.stream()
                 .map(order -> new Entry(order, itemsByOrder.getOrDefault(order.getOrderId(), List.of())))

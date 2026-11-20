@@ -40,7 +40,8 @@ public class GoogleOfflineConversionsExport {
                     .append(CONVERSION_NAME).append(",")
                     .append(order.getOrderedAt().format(DATE_TIME_FORMATTER)).append(",");
 
-            csvWriter.append(String.valueOf(order.getAmountDue()));
+            // the order's value even when cancelled: for an ad campaign a placed order is the conversion
+            csvWriter.append(String.valueOf(order.getTotalPrice()));
             csvWriter.append(",");
 
             // Conversion Currency (opcjonalnie)
