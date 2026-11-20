@@ -13,6 +13,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.function.Consumer;
 
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,7 +34,7 @@ class StoreInventoryRefreshPublisherTest {
     private StoreInventoryRefreshPublisher publisher;
 
     @Test
-    void sendsADelayedRequestStampedWithTheCacheClock() {
+    void sendsARequestStampedWithTheCacheClockAndLeavesTheDelayToTheQueue() {
         // given
         when(cache.clockMillis()).thenReturn(4_242L);
 
@@ -44,6 +46,6 @@ class StoreInventoryRefreshPublisherTest {
         send.getValue().accept(options);
         verify(options).queue("store-inventory-refresh-queue");
         verify(options).payload(new StoreInventoryRefreshRequest("store-1", 4_242L));
-        verify(options).delaySeconds(60);
+        verify(options, never()).delaySeconds(anyInt());
     }
 }

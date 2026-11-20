@@ -52,10 +52,10 @@ awslocal sqs create-queue --queue-name report-generation-dlq.fifo \
 awslocal sqs create-queue --queue-name report-generation-queue.fifo \
   --attributes '{"FifoQueue":"true","ContentBasedDeduplication":"false","VisibilityTimeout":"900","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:report-generation-dlq.fifo\",\"maxReceiveCount\":\"3\"}"}'
 
-## Store inventory rebuild queue (standard) with a DLQ + redrive: visibility 120 s, 3 receives
+## Store inventory rebuild queue (standard) with a DLQ + redrive: visibility 120 s, 3 receives, every message delayed 60 s
 awslocal sqs create-queue --queue-name store-inventory-refresh-queue-dlq
 awslocal sqs create-queue --queue-name store-inventory-refresh-queue \
-  --attributes '{"VisibilityTimeout":"120","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:store-inventory-refresh-queue-dlq\",\"maxReceiveCount\":\"3\"}"}'
+  --attributes '{"VisibilityTimeout":"120","DelaySeconds":"60","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:store-inventory-refresh-queue-dlq\",\"maxReceiveCount\":\"3\"}"}'
 
 ## Offer matching queue (standard, not FIFO) with a DLQ + redrive mirroring prod: visibility 900 s, 3 receives
 awslocal sqs create-queue --queue-name marketplace-offer-match-queue-dlq
