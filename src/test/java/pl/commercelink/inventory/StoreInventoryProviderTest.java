@@ -47,6 +47,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -109,7 +110,7 @@ class StoreInventoryProviderTest {
 
         // when / then
         assertSame(cached, provider.get("store-1"));
-        verify(cache, never()).put(any(), any(), any());
+        verify(cache, never()).put(any(), any(), any(), anyLong());
     }
 
     @Test
@@ -135,8 +136,124 @@ class StoreInventoryProviderTest {
 
         // then
         assertEquals(List.of(matched), result.items());
-        verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class));
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class), anyLong());
         verify(autoDiscovery).group(argThat(list -> list.size() == 1), any(), any(), any(), any());
+    }
+
+    @Test
+    void refreshRebuildsAndOverwritesWithoutReadingTheSnapshot() {
+        // given
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.of(30));
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenReturn(grouping(List.of()));
+        when(cache.builtSince("store-1", 1_000L)).thenReturn(false);
+
+        // when
+        provider.refresh("store-1", 1_000L);
+
+        // then
+        verify(cache, never()).get(any());
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(30)), anyLong());
+    }
+
+    @Test
+    void requestAnsweredByALaterBuildRebuildsNothing() {
+        // given
+        when(cache.builtSince("store-1", 1_000L)).thenReturn(true);
+
+        // when
+        provider.refresh("store-1", 1_000L);
+
+        // then
+        verify(storesRepository, never()).findById(any());
+        verify(cache, never()).put(any(), any(), any(), anyLong());
+    }
+
+    @Test
+    void requestWithoutATimeAlwaysRebuilds() {
+        // given
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenReturn(grouping(List.of()));
+
+        // when
+        provider.refresh("store-1", null);
+
+        // then
+        verify(cache, never()).builtSince(any(), anyLong());
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class), anyLong());
+    }
+
+    @Test
+    void rebuildWhoseSnapshotCouldNotBeStoredFails() {
+        // given
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenReturn(grouping(List.of()));
+        org.mockito.Mockito.doThrow(new StoreInventoryCacheException("not stored", new RuntimeException("redis down")))
+                .when(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class), anyLong());
+
+        // when / then
+        org.junit.jupiter.api.Assertions.assertThrows(StoreInventoryCacheException.class,
+                () -> provider.refresh("store-1", null));
+    }
+
+    @Test
+    void requestIsServedWhenItsSnapshotCouldNotBeStored() {
+        // given
+        when(cache.get("store-1")).thenReturn(Optional.empty());
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenReturn(grouping(List.of()));
+        org.mockito.Mockito.doThrow(new StoreInventoryCacheException("not stored", new RuntimeException("redis down")))
+                .when(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class), anyLong());
+
+        // when
+        StoreInventory result = provider.get("store-1");
+
+        // then
+        assertThat(result.items()).isEmpty();
+    }
+
+    @Test
+    void refreshOfAStoreThatIsGoneStoresNothing() {
+        // given
+        when(storesRepository.findById("store-1")).thenReturn(null);
+
+        // when
+        provider.refresh("store-1", null);
+
+        // then
+        verify(cache, never()).put(any(), any(), any(), anyLong());
+    }
+
+    @Test
+    void buildIsTimedBeforeTheFeedsAreRead() {
+        // given
+        when(cache.get("store-1")).thenReturn(Optional.empty());
+        when(cache.clockMillis()).thenReturn(4_242L);
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
+        when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenReturn(grouping(List.of()));
+
+        // when
+        provider.get("store-1");
+
+        // then
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(cache, exchangeRates);
+        order.verify(cache).clockMillis();
+        order.verify(exchangeRates).getCurrentSellRates();
+        order.verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class), eq(4_242L));
     }
 
     @Test
@@ -171,7 +288,7 @@ class StoreInventoryProviderTest {
         provider.get("store-1");
 
         // then
-        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(30)));
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(30)), anyLong());
     }
 
     @Test
@@ -190,7 +307,7 @@ class StoreInventoryProviderTest {
         provider.get("store-1");
 
         // then
-        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(60)));
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(60)), anyLong());
     }
 
     @Test
@@ -209,7 +326,7 @@ class StoreInventoryProviderTest {
         provider.get("store-1");
 
         // then
-        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(60)));
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), eq(Duration.ofMinutes(60)), anyLong());
     }
 
     @Test
@@ -223,7 +340,7 @@ class StoreInventoryProviderTest {
 
         // then
         assertEquals(0, result.items().size());
-        verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class));
+        verify(cache).put(eq("store-1"), any(StoreInventory.class), any(Duration.class), anyLong());
     }
 
     @Test
@@ -237,7 +354,7 @@ class StoreInventoryProviderTest {
         StoreInventory result = provider.get("store-1");
 
         // then
-        verify(cache).put(eq("store-1"), same(result), any(Duration.class));
+        verify(cache).put(eq("store-1"), same(result), any(Duration.class), anyLong());
     }
 
     @Test
@@ -262,7 +379,7 @@ class StoreInventoryProviderTest {
         // then
         assertThat(result.all()).isEmpty();
         verify(cache, never()).get(any());
-        verify(cache, never()).put(any(), any(), any());
+        verify(cache, never()).put(any(), any(), any(), anyLong());
     }
 
     @Test
@@ -527,7 +644,44 @@ class StoreInventoryProviderTest {
         // then
         assertThat(result.index().all()).singleElement().satisfies(own ->
                 assertThat(own.getInventoryItems()).containsExactlyInAnyOrderElementsOf(philipsOwnOffers()));
-        verify(cache, never()).put(any(), any(), any());
+        verify(cache, never()).put(any(), any(), any(), anyLong());
+    }
+
+    @Test
+    void refreshBuildsAgainWhenTheGlobalGenerationWasReplacedDuringTheBuild() {
+        // given
+        GlobalMatchedInventory realGlobal = new GlobalMatchedInventory();
+        storeSellingOwnOffers(philipsOwnOffers());
+        AtomicInteger builds = new AtomicInteger();
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenAnswer(inv -> {
+            if (builds.incrementAndGet() == 1) {
+                realGlobal.replace(List.of(philipsGlobal()));
+            }
+            return grouping(List.of(groupOf(inv.getArgument(0))));
+        });
+
+        // when
+        providerWith(autoDiscovery, InventoryMatchingProperties.allEnabled(), realGlobal).refresh("store-1", null);
+
+        // then
+        assertThat(builds).hasValue(2);
+        verify(cache, times(1)).put(eq("store-1"), any(StoreInventory.class), any(Duration.class), anyLong());
+    }
+
+    @Test
+    void refreshFailsWhenEveryBuildMeetsAGlobalReload() {
+        // given
+        GlobalMatchedInventory realGlobal = new GlobalMatchedInventory();
+        storeSellingOwnOffers(philipsOwnOffers());
+        when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenAnswer(inv -> {
+            realGlobal.replace(List.of(philipsGlobal()));
+            return grouping(List.of(groupOf(inv.getArgument(0))));
+        });
+        StoreInventoryProvider provider = providerWith(autoDiscovery, InventoryMatchingProperties.allEnabled(), realGlobal);
+
+        // when / then
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> provider.refresh("store-1", null));
+        verify(cache, never()).put(any(), any(), any(), anyLong());
     }
 
     @Test
@@ -542,7 +696,7 @@ class StoreInventoryProviderTest {
         StoreInventory result = providerWith(autoDiscovery, InventoryMatchingProperties.allEnabled(), realGlobal).get("store-1");
 
         // then
-        verify(cache).put(eq("store-1"), same(result), any(Duration.class));
+        verify(cache).put(eq("store-1"), same(result), any(Duration.class), anyLong());
     }
 
     private static final String MOVA_EAN_176 = "6977728943176";
@@ -761,7 +915,7 @@ class StoreInventoryProviderTest {
         // then: the build still serves this request
         assertThat(result.index().all()).singleElement().satisfies(group ->
                 assertThat(group.getInventoryItems()).containsExactlyInAnyOrderElementsOf(philipsOwnOffers()));
-        verify(cache, never()).put(any(), any(), any());
+        verify(cache, never()).put(any(), any(), any(), anyLong());
     }
 
     @Test
@@ -776,7 +930,7 @@ class StoreInventoryProviderTest {
         StoreInventory result = providerWith(autoDiscovery, InventoryMatchingProperties.allEnabled()).get("store-1");
 
         // then
-        verify(cache).put(eq("store-1"), same(result), any(Duration.class));
+        verify(cache).put(eq("store-1"), same(result), any(Duration.class), anyLong());
     }
 
     @Test
@@ -791,7 +945,7 @@ class StoreInventoryProviderTest {
         StoreInventory result = providerWith(autoDiscovery, InventoryMatchingProperties.allEnabled()).get("store-1");
 
         // then
-        verify(cache).put(eq("store-1"), same(result), any(Duration.class));
+        verify(cache).put(eq("store-1"), same(result), any(Duration.class), anyLong());
     }
 
     @Test

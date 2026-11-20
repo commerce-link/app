@@ -2,6 +2,7 @@ package pl.commercelink.inventory.supplier;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import pl.commercelink.inventory.StoreInventoryRefreshPublisher;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.inventory.supplier.api.support.ResourceDownloadException;
@@ -16,6 +17,7 @@ public class StoreSupplierFeedService {
     private final StoresRepository storesRepository;
     private final SupplierProviderFactory supplierProviderFactory;
     private final StoreFeedRepository storeFeedRepository;
+    private final StoreInventoryRefreshPublisher storeInventoryRefresh;
 
     public void loadStoreFeed(String storeId, String supplierName) throws ResourceDownloadException {
         Store store = storesRepository.findById(storeId);
@@ -27,7 +29,10 @@ public class StoreSupplierFeedService {
         if (supplier == null) {
             throw new SupplierFeedTargetMissingException(storeId, supplierName, "no provider is registered for this supplier");
         }
-        supplier.download().ifPresent(feed -> storeFeedRepository.store(storeId, supplierName, feed.data(), feed.extension()));
+        supplier.download().ifPresent(feed -> {
+            storeFeedRepository.store(storeId, supplierName, feed.data(), feed.extension());
+            storeInventoryRefresh.request(storeId);
+        });
     }
 
     private void requireReadableConfiguration(Store store, String supplierName) {
