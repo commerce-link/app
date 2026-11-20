@@ -97,6 +97,35 @@ class PimCatalogRegistryTest {
         verify(productRepository).save(product);
     }
 
+    @Test
+    void globalEntryGivesItsBrandToTheAttachedProduct() {
+        // given
+        Product product = productWithEan("e1");
+        when(productRepository.findAllWithoutPimIdByEan(List.of("e1"))).thenReturn(List.of(product));
+
+        // when
+        PimCatalogRegistry.attachEntryToProducts(event(), productRepository);
+
+        // then
+        assertThat(product.getBrand()).isEqualTo("Logitech");
+    }
+
+    @Test
+    void globalEntryWithoutBrandKeepsTheProductsBrand() {
+        // given
+        Product product = productWithEan("e1");
+        product.setBrand("Razer");
+        when(productRepository.findAllWithoutPimIdByEan(List.of("e1"))).thenReturn(List.of(product));
+
+        // when
+        PimCatalogRegistry.attachEntryToProducts(
+                new PIMEntryAddedEvent("pim-1", null, List.of("e1"), List.of("m1"), null, null), productRepository);
+
+        // then
+        assertThat(product.getPimId()).isEqualTo("pim-1");
+        assertThat(product.getBrand()).isEqualTo("Razer");
+    }
+
     private static Product productWithEan(String ean) {
         Product product = new Product();
         product.setEan(ean);
