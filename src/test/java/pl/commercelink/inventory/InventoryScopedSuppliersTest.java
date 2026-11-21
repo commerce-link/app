@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.products.ProductDataFixture;
 import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.stores.ConnectionMode;
@@ -58,8 +59,9 @@ class InventoryScopedSuppliersTest {
     // the views read the store's clones from the PIM index copy: an empty one, with no entries and no clones
     @BeforeEach
     void createInventory() {
-        inventory = new Inventory(warehouse, storesRepository, autoDiscovery, taxonomyCache, supplierRegistry,
-                storeInventoryProvider, globalInventory, ScopedPimCatalog.of(), InventoryMatchingProperties.allEnabled());
+        inventory = new Inventory(warehouse, storesRepository, autoDiscovery, supplierRegistry,
+                storeInventoryProvider, globalInventory, ScopedPimCatalog.of(), InventoryMatchingProperties.allEnabled(),
+                ProductDataFixture.resolverOver(taxonomyCache));
     }
 
     private Store storeWith(StoreSupplierConnection... connections) {
@@ -84,7 +86,7 @@ class InventoryScopedSuppliersTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of()));
         MatchedInventory globalGroup = new MatchedInventory(new InventoryKey(EAN, MFN),
-                List.of(item("AB Group", 1399.0), item("Elko", 1300.0)), taxonomyCache, supplierRegistry);
+                List.of(item("AB Group", 1399.0), item("Elko", 1300.0)), supplierRegistry);
         when(globalInventory.index()).thenReturn(InventoryIndex.of(List.of(globalGroup)));
 
         // when
@@ -105,7 +107,7 @@ class InventoryScopedSuppliersTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of()));
         MatchedInventory globalGroup = new MatchedInventory(new InventoryKey(EAN, MFN),
-                List.of(item("AB Group", 1399.0), item("Elko", 1300.0)), taxonomyCache, supplierRegistry);
+                List.of(item("AB Group", 1399.0), item("Elko", 1300.0)), supplierRegistry);
         when(globalInventory.index()).thenReturn(InventoryIndex.of(List.of(globalGroup)));
 
         // when
@@ -122,7 +124,7 @@ class InventoryScopedSuppliersTest {
                 new StoreSupplierConnection("Action", ConnectionMode.OWN, true, false));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         MatchedInventory ownGroup = new MatchedInventory(new InventoryKey(EAN, MFN),
-                List.of(item("Action", 1380.0)), taxonomyCache, supplierRegistry);
+                List.of(item("Action", 1380.0)), supplierRegistry);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownGroup)));
         when(globalInventory.index()).thenReturn(InventoryIndex.of(List.of()));
 
@@ -144,7 +146,7 @@ class InventoryScopedSuppliersTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of()));
         MatchedInventory globalGroup = new MatchedInventory(new InventoryKey(EAN, MFN),
-                List.of(item("AB Group", 1399.0), item("Elko", 1300.0)), taxonomyCache, supplierRegistry);
+                List.of(item("AB Group", 1399.0), item("Elko", 1300.0)), supplierRegistry);
         when(globalInventory.index()).thenReturn(InventoryIndex.of(List.of(globalGroup)));
         StockQueryService stockQueryService = mock(StockQueryService.class);
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);

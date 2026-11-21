@@ -5,10 +5,12 @@ import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.invoicing.api.Price;
+import pl.commercelink.products.ProductData;
+import pl.commercelink.products.ResolvedProduct;
 import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -21,25 +23,24 @@ public class MatchedInventory {
 
     private InventoryKey key;
     private Collection<InventoryItem> inventoryItems = new LinkedHashSet<>();
-    private TaxonomyCache taxonomyCache;
     private SupplierRegistry supplierRegistry;
+    // set by the InventoryView that assembled this row; a group of the pool has neither and is described in bulk
+    private Function<InventoryKey, ResolvedProduct> productSource;
+    private ResolvedProduct product;
 
-    public MatchedInventory(InventoryKey key, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
+    public MatchedInventory(InventoryKey key, SupplierRegistry supplierRegistry) {
         this.key = key;
-        this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
     }
 
-    public MatchedInventory(InventoryKey key, InventoryItem inventoryItem, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
+    public MatchedInventory(InventoryKey key, InventoryItem inventoryItem, SupplierRegistry supplierRegistry) {
         this.key = key;
-        this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
         addAlternativeInventoryItem(inventoryItem);
     }
 
-    public MatchedInventory(InventoryKey key, Collection<InventoryItem> inventoryItems, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
+    public MatchedInventory(InventoryKey key, Collection<InventoryItem> inventoryItems, SupplierRegistry supplierRegistry) {
         this.key = key;
-        this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
         addAlternativeInventoryItems(inventoryItems);
     }
@@ -228,7 +229,9 @@ public class MatchedInventory {
     }
 
     public MatchedInventory atPricePoint(long grossPrice) {
-        MatchedInventory filtered = new MatchedInventory(key, taxonomyCache, supplierRegistry);
+        MatchedInventory filtered = new MatchedInventory(key, supplierRegistry);
+        filtered.productSource = productSource;
+        filtered.product = product;
         inventoryItems.stream()
                 .filter(i -> Price.fromNet(i.netPrice()).grossValue() <= grossPrice)
                 .forEach(filtered.inventoryItems::add);
@@ -263,7 +266,7 @@ public class MatchedInventory {
     }
 
     public static MatchedInventory empty(InventoryKey inventoryKey) {
-        return new MatchedInventory(inventoryKey, null, null);
+        return new MatchedInventory(inventoryKey, null);
     }
 
     void addAlternativeInventoryItems(Collection<? extends InventoryItem> items) {
@@ -276,8 +279,37 @@ public class MatchedInventory {
         inventoryItems.add(item);
     }
 
+    public ProductData getProductData() {
+        return product().data();
+    }
+
+    /** The taxonomy record alone, for readers that do not take PIM data yet; everyone else reads {@link #getProductData()}. */
     public Taxonomy getTaxonomy() {
-        return taxonomyCache.find(key);
+        return product().taxonomy();
+    }
+
+    /** The row reads its product on first use, with the key it has then, and keeps the answer. */
+    void readProductFrom(Function<InventoryKey, ResolvedProduct> source) {
+        this.productSource = source;
+    }
+
+    void describeAs(ResolvedProduct product) {
+        this.product = product;
+    }
+
+    boolean isDescribed() {
+        return product != null;
+    }
+
+    private ResolvedProduct product() {
+        if (product == null) {
+            if (productSource == null) {
+                throw new IllegalStateException("Product data comes with a row found through InventoryView; "
+                        + "a group of the inventory pool is described in bulk by ProductDataResolver.ofGroups");
+            }
+            product = productSource.apply(key);
+        }
+        return product;
     }
 
     public int size() {

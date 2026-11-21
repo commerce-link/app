@@ -29,7 +29,6 @@ import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -82,8 +81,6 @@ class StoreInventoryProviderTest {
     private PimView pimView;
     @Mock
     private GlobalMatchedInventory globalInventory;
-    @Mock
-    private TaxonomyCache taxonomyCache;
     @Mock
     private StoreEanOnlyCodes storeEanOnlyCodes;
     @Spy
@@ -271,7 +268,7 @@ class StoreInventoryProviderTest {
         Store store = mock(Store.class);
         when(store.getStoreId()).thenReturn("store-1");
         when(store.hasOwnOrManualSupplierConnections()).thenReturn(true);
-        MatchedInventory matched = new MatchedInventory(new InventoryKey("E1", "M1"), List.of(), taxonomyCache, supplierRegistry);
+        MatchedInventory matched = new MatchedInventory(new InventoryKey("E1", "M1"), List.of(), supplierRegistry);
         when(cache.get("store-1")).thenReturn(Optional.of(new StoreInventory(InventoryIndex.of(List.of(matched)), LocalDateTime.now())));
 
         // when
@@ -301,7 +298,7 @@ class StoreInventoryProviderTest {
                 .thenReturn(List.of(ownItem));
         when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenAnswer(inv -> {
             List<InventoryItem> items = inv.getArgument(0);
-            return grouping(List.of(new MatchedInventory(new InventoryKey("111", "AAA"), items, taxonomyCache, supplierRegistry)));
+            return grouping(List.of(new MatchedInventory(new InventoryKey("111", "AAA"), items, supplierRegistry)));
         });
 
         // when
@@ -323,7 +320,7 @@ class StoreInventoryProviderTest {
         when(storeEntity.getOwnAndManualConnections()).thenReturn(List.of());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of("PLN", 1.0));
         InventoryItem globalOffer = item("Asbis");
-        MatchedInventory globalGroup = new MatchedInventory(new InventoryKey("4711111111111", "MFN"), List.of(globalOffer), taxonomyCache, supplierRegistry);
+        MatchedInventory globalGroup = new MatchedInventory(new InventoryKey("4711111111111", "MFN"), List.of(globalOffer), supplierRegistry);
         currentGlobalGeneration(
                 new GlobalMatchedInventory.Generation(1, List.of(globalGroup), InventoryIndex.of(List.of(globalGroup)), VariantCodes.none()));
         when(autoDiscovery.group(anyList(), any(), any(), any(), any())).thenReturn(grouping(List.of()));
@@ -404,7 +401,7 @@ class StoreInventoryProviderTest {
         String ean7600 = "4895106293618";
         String ean9060 = "4895106296381";
         when(pimView.findAll()).thenReturn(List.of());
-        InventoryAutoDiscovery realDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
+        InventoryAutoDiscovery realDiscovery = new InventoryAutoDiscovery(pimCatalog, supplierRegistry,
                 InventoryMatchingProperties.allEnabled());
         InventoryAutoDiscovery.Grouping globalGrouping = realDiscovery.group(List.of(
                 sapphire(ean7600, "11324-01-20G", 1843, "Kosatec"),
@@ -445,7 +442,7 @@ class StoreInventoryProviderTest {
         InventoryItem kosatec = mova(ean176, 1200, "Kosatec");
         InventoryItem wave = mova(ean169, 1210, "Wave");
         storeSellingOwnOffers(List.of(kosatec, wave));
-        InventoryAutoDiscovery realDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
+        InventoryAutoDiscovery realDiscovery = new InventoryAutoDiscovery(pimCatalog, supplierRegistry,
                 InventoryMatchingProperties.allEnabled());
 
         // when
@@ -468,7 +465,7 @@ class StoreInventoryProviderTest {
         StoreInventory built = provider.get("store-1");
 
         // when
-        StoreInventory restored = StoreInventorySnapshot.from(built).toStoreInventory(taxonomyCache, supplierRegistry);
+        StoreInventory restored = StoreInventorySnapshot.from(built).toStoreInventory(supplierRegistry);
 
         // then
         assertThat(restored.index().all()).singleElement().satisfies(own ->
@@ -812,8 +809,7 @@ class StoreInventoryProviderTest {
 
     // the global pool as Inventory.load groups it: from global offers only, with the global EAN-only pairs
     private void globalPoolGroupedFrom(List<InventoryItem> globalOffers, VariantCodes globalPairs) {
-        InventoryAutoDiscovery.Grouping global = new InventoryAutoDiscovery(ScopedPimCatalog.of(), taxonomyCache,
-                supplierRegistry, InventoryMatchingProperties.allEnabled())
+        InventoryAutoDiscovery.Grouping global = new InventoryAutoDiscovery(ScopedPimCatalog.of(), supplierRegistry, InventoryMatchingProperties.allEnabled())
                 .group(globalOffers, ScopedPimCatalog.of().withGlobalData(), List::of, VariantCodes.none(), globalPairs);
         List<MatchedInventory> groups = List.copyOf(global.groups());
         currentGlobalGeneration(new GlobalMatchedInventory.Generation(
@@ -880,7 +876,7 @@ class StoreInventoryProviderTest {
 
     // grouping, linking and the store pairs all read the given catalog, whose store view holds only that store's entries
     private StoreInventoryProvider providerOver(PimCatalog catalog, InventoryMatchingProperties properties) {
-        InventoryAutoDiscovery discovery = new InventoryAutoDiscovery(catalog, taxonomyCache, supplierRegistry, properties);
+        InventoryAutoDiscovery discovery = new InventoryAutoDiscovery(catalog, supplierRegistry, properties);
         return new StoreInventoryProvider(cache, storesRepository, supplierProviderFactory, discovery,
                 storeFeedItemLoader, exchangeRates, catalog, globalInventory, properties,
                 new StoreEanOnlyCodes(catalog, properties));
@@ -918,7 +914,7 @@ class StoreInventoryProviderTest {
             key.addEan(offer.ean());
             key.addManufacturerCode(offer.mfn());
         });
-        return new MatchedInventory(key, offers, taxonomyCache, supplierRegistry);
+        return new MatchedInventory(key, offers, supplierRegistry);
     }
 
     private static InventoryItem philips(String ean, double netPrice, String supplier) {

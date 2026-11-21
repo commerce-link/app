@@ -17,7 +17,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.InventoryItem;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -39,7 +38,6 @@ class RedisStoreInventoryCacheIntegrationTest {
     static LettuceConnectionFactory factory;
     static StringRedisTemplate redisTemplate;
 
-    private final TaxonomyCache taxonomyCache = Mockito.mock(TaxonomyCache.class);
     private final SupplierRegistry supplierRegistry = Mockito.mock(SupplierRegistry.class);
     private final ObjectMapper objectMapper = Jackson2ObjectMapperBuilder.json().build();
 
@@ -66,13 +64,13 @@ class RedisStoreInventoryCacheIntegrationTest {
     }
 
     private RedisStoreInventoryCache cache() {
-        return new RedisStoreInventoryCache(redisTemplate, objectMapper, taxonomyCache, supplierRegistry);
+        return new RedisStoreInventoryCache(redisTemplate, objectMapper, supplierRegistry);
     }
 
     private StoreInventory sampleInventory() {
         InventoryItem item = new InventoryItem("5900000000002", "MFN-1", 10.0, "PLN", 5, 1, "Acme", true, true, false);
         MatchedInventory matched = new MatchedInventory(new InventoryKey("5900000000002", "MFN-1"),
-                List.of(item), taxonomyCache, supplierRegistry);
+                List.of(item), supplierRegistry);
         return new StoreInventory(InventoryIndex.of(List.of(matched)), LocalDateTime.of(2026, 6, 17, 10, 0));
     }
 
@@ -85,7 +83,7 @@ class RedisStoreInventoryCacheIntegrationTest {
                     new InventoryItem(ean, mfn, 10.0 + i, "PLN", 5, 1, "Acme", true, true, false),
                     new InventoryItem(ean, mfn, 11.0 + i, "PLN", 3, 2, "Beta", true, false, true),
                     new InventoryItem(ean, mfn, 12.0 + i, "PLN", 7, 1, "Gamma", true, true, false));
-            matched.add(new MatchedInventory(new InventoryKey(ean, mfn), items, taxonomyCache, supplierRegistry));
+            matched.add(new MatchedInventory(new InventoryKey(ean, mfn), items, supplierRegistry));
         }
         return new StoreInventory(InventoryIndex.of(matched), LocalDateTime.of(2026, 6, 17, 10, 0));
     }

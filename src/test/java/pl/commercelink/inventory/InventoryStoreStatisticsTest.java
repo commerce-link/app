@@ -19,7 +19,6 @@ import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.warehouse.api.Warehouse;
 
 import java.time.LocalDateTime;
@@ -46,8 +45,6 @@ class InventoryStoreStatisticsTest {
     private StoresRepository storesRepository;
     @Mock
     private InventoryAutoDiscovery autoDiscovery;
-    @Mock
-    private TaxonomyCache taxonomyCache;
     @Mock
     private SupplierRegistry supplierRegistry;
     @Mock
@@ -79,7 +76,7 @@ class InventoryStoreStatisticsTest {
         when(storeInventoryProvider.ownInventory(store))
                 .thenReturn(new StoreInventory(InventoryIndex.of(List.of()), LocalDateTime.of(2026, 9, 14, 10, 0)));
         MatchedInventory group = new MatchedInventory(new InventoryKey("5900000000001", "A"),
-                List.of(new InventoryItem("5900000000001", "A", 100.0, "PLN", 5, 1, "Elko")), taxonomyCache, supplierRegistry);
+                List.of(new InventoryItem("5900000000001", "A", 100.0, "PLN", 5, 1, "Elko")), supplierRegistry);
         when(globalInventory.index()).thenReturn(InventoryIndex.of(List.of(group)));
         when(globalInventory.version()).thenReturn(globalVersion);
     }
@@ -183,12 +180,12 @@ class InventoryStoreStatisticsTest {
         ownKey.addEan("5900000000041");
         ownKey.addManufacturerCode("G4");
         MatchedInventory own = new MatchedInventory(ownKey,
-                List.of(new InventoryItem("5900000000041", "G4", 100.0, "PLN", 3, 1, "Kosatec")), taxonomyCache, supplierRegistry);
+                List.of(new InventoryItem("5900000000041", "G4", 100.0, "PLN", 3, 1, "Kosatec")), supplierRegistry);
         when(storeInventoryProvider.ownInventory(store))
                 .thenReturn(new StoreInventory(InventoryIndex.of(List.of(own)), LocalDateTime.of(2026, 9, 14, 10, 0)));
         InventoryKey globalKey = new InventoryKey(globalPimId);
         MatchedInventory global = new MatchedInventory(globalKey,
-                List.of(new InventoryItem("5900000000041", "G4", 100.0, "PLN", 5, 1, "Elko")), taxonomyCache, supplierRegistry);
+                List.of(new InventoryItem("5900000000041", "G4", 100.0, "PLN", 5, 1, "Elko")), supplierRegistry);
         when(globalInventory.index()).thenReturn(InventoryIndex.of(List.of(global)));
         when(globalInventory.version()).thenReturn(1L);
         return inventory.storeStatistics(STORE_ID);

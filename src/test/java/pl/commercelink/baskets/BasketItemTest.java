@@ -2,12 +2,18 @@ package pl.commercelink.baskets;
 
 import org.junit.jupiter.api.Test;
 import pl.commercelink.inventory.InventoryKey;
+import pl.commercelink.products.ProductData;
+import pl.commercelink.products.ProductDataFixture;
 import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.inventory.MatchedInventoryFixture;
+import pl.commercelink.inventory.supplier.InventoryItem;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.taxonomy.Taxonomy;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -109,6 +115,23 @@ class BasketItemTest {
     }
 
     @Test
+    void inventoryItemIsNamedAndFiledByTheResolvedProductData() {
+        // given
+        MatchedInventory row = MatchedInventoryFixture.describedAs(
+                new ProductData("PIM name", "PIM brand", "PIM category", "989", "5900000000016", "PIM-MFN", null, null),
+                new MatchedInventory(InventoryKey.fromEan("5900000000016"),
+                        new InventoryItem("5900000000016", "PIM-MFN", 100.0, "PLN", 5, 1, "Elko"),
+                        mock(SupplierRegistry.class, RETURNS_DEEP_STUBS)));
+
+        // when
+        BasketItem item = BasketItem.of(row, "5900000000016", 1, false);
+
+        // then
+        assertThat(item.getName()).isEqualTo("PIM name");
+        assertThat(item.getCategory()).isEqualTo("PIM category");
+    }
+
+    @Test
     void missingProductLineGetsTheTypedEan() {
         // given
         MatchedInventory matched = MatchedInventory.empty(InventoryKey.fromEan("5901234123457"));
@@ -126,7 +149,7 @@ class BasketItemTest {
         // given — net 100 and 200: gross 123,00 and 246,00
         MatchedInventory matched = mock(MatchedInventory.class);
         when(matched.hasAnyOffers()).thenReturn(true);
-        when(matched.getTaxonomy()).thenReturn(mock(Taxonomy.class));
+        when(matched.getProductData()).thenReturn(ProductData.UNKNOWN);
         when(matched.getLowestPrice()).thenReturn(Price.fromNet(100));
         when(matched.getMedianPrice()).thenReturn(Price.fromNet(200));
 
@@ -179,7 +202,7 @@ class BasketItemTest {
     private static MatchedInventory offeredProduct(Taxonomy taxonomy) {
         MatchedInventory matched = mock(MatchedInventory.class);
         when(matched.hasAnyOffers()).thenReturn(true);
-        when(matched.getTaxonomy()).thenReturn(taxonomy);
+        when(matched.getProductData()).thenReturn(ProductDataFixture.from(taxonomy));
         when(matched.getLowestPrice()).thenReturn(Price.fromNet(100));
         when(matched.getMedianPrice()).thenReturn(Price.fromNet(200));
         return matched;

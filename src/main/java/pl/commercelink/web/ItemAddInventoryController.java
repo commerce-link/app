@@ -26,7 +26,8 @@ public class ItemAddInventoryController extends BaseController {
         if (StringUtils.isBlank(ean)) {
             return List.of();
         }
-        MatchedInventory matched = inventory.withEnabledSuppliersOnly(getStoreId()).findByEan(ean.trim());
-        return List.of(matched.hasAnyOffers() ? ItemAddInventoryRow.of(matched) : ItemAddInventoryRow.missing(ean.trim(), matched));
+        String typedEan = ean.trim();
+        MatchedInventory matched = inventory.withEnabledSuppliersOnly(getStoreId()).findByEan(typedEan);
+        return List.of(matched.hasAnyOffers() ? ItemAddInventoryRow.of(typedEan, matched) : ItemAddInventoryRow.missing(typedEan, matched));
     }
 }

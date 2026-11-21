@@ -15,7 +15,6 @@ import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.SupplierScope;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -46,8 +45,6 @@ class DailyPriceSnapshotGeneratorTest {
     private StoreActivity storeActivity;
     @Mock
     private InventoryView view;
-    @Mock
-    private TaxonomyCache taxonomyCache;
     @Mock
     private SupplierRegistry supplierRegistry;
 
@@ -143,6 +140,6 @@ class DailyPriceSnapshotGeneratorTest {
         return new MatchedInventory(new InventoryKey("pim-1"), List.of(
                 new InventoryItem("5900000000001", "MFN-1", 100.0, "PLN", 5, 1, "Alpha"),
                 new InventoryItem("5900000000001", "MFN-1", 110.0, "PLN", 3, 1, "Beta")),
-                taxonomyCache, supplierRegistry);
+                supplierRegistry);
     }
 }

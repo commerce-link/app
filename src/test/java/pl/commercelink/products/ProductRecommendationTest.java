@@ -5,6 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.InventoryKey;
+import pl.commercelink.inventory.MatchedInventoryFixture;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.InventoryItem;
@@ -77,9 +78,28 @@ class ProductRecommendationTest {
         assertThat(product.getName()).isEqualTo("Other product");
     }
 
+    @Test
+    void withoutPimEntryEverythingComesFromTheResolvedProductData() {
+        // given
+        MatchedInventory group = MatchedInventoryFixture.describedAs(
+                new ProductData("PIM name", "PIM brand", "PIM category", "989", "5900000000016", "PIM-MFN", null, null),
+                new MatchedInventory(new InventoryKey(), List.of(offer("5900000000016", "PIM-MFN")), supplierRegistry));
+
+        // when
+        Product product = new ProductRecommendation(new CategoryDefinition(), group, Optional.empty()).toProduct();
+
+        // then
+        assertThat(product.getEan()).isEqualTo("5900000000016");
+        assertThat(product.getManufacturerCode()).isEqualTo("PIM-MFN");
+        assertThat(product.getBrand()).isEqualTo("PIM brand");
+        assertThat(product.getName()).isEqualTo("PIM name");
+        assertThat(product.getLabel()).isEqualTo("PIM name");
+    }
+
     private MatchedInventory group(InventoryItem... offers) {
         when(taxonomyCache.find(any(InventoryKey.class))).thenReturn(TAXONOMY);
-        return new MatchedInventory(new InventoryKey(), List.of(offers), taxonomyCache, supplierRegistry);
+        return MatchedInventoryFixture.readingFrom(taxonomyCache,
+                new MatchedInventory(new InventoryKey(), List.of(offers), supplierRegistry));
     }
 
     private static InventoryItem offer(String ean, String mfn) {

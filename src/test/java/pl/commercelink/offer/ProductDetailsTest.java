@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.InventoryKey;
+import pl.commercelink.products.ProductDataFixture;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.taxonomy.Taxonomy;
@@ -81,7 +82,7 @@ class ProductDetailsTest {
         // given
         dynamicDefinition("Karty graficzne");
         when(inventory.findByInventoryKey(any())).thenReturn(matchedInventory);
-        when(matchedInventory.getTaxonomy()).thenReturn(taxonomy());
+        when(matchedInventory.getProductData()).thenReturn(ProductDataFixture.from(taxonomy()));
         when(matchedInventory.getLowestPrice()).thenReturn(new Price(1000, 1230));
         when(matchedInventory.getInventoryKey()).thenReturn(new InventoryKey(PIM_ID));
 
@@ -128,7 +129,7 @@ class ProductDetailsTest {
         // given
         dynamicDefinition("Karty graficzne");
         when(inventory.findByInventoryKey(any())).thenReturn(matchedInventory);
-        when(matchedInventory.getTaxonomy()).thenReturn(taxonomy());
+        when(matchedInventory.getProductData()).thenReturn(ProductDataFixture.from(taxonomy()));
         when(matchedInventory.getLowestPrice()).thenReturn(new Price(1000, 1230));
         when(matchedInventory.getInventoryKey()).thenReturn(new InventoryKey("pim-clone"));
 

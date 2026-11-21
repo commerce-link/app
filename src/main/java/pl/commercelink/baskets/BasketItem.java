@@ -8,7 +8,7 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
-import pl.commercelink.taxonomy.Taxonomy;
+import pl.commercelink.products.ProductData;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -253,12 +253,12 @@ public class BasketItem {
         if (!matchedInventory.hasAnyOffers()) {
             return BasketItem.missing(ean, qty, consolidated);
         } else {
-            Taxonomy taxonomy = matchedInventory.getTaxonomy();
+            ProductData product = matchedInventory.getProductData();
             return new BasketItem(
                     "",
-                    taxonomy.name(),
+                    product.name(),
                     ean,
-                    taxonomy.category(),
+                    product.category(),
                     matchedInventory.getMedianPrice().grossValue(),
                     // client 2026-10-27: an item outside the price list costs the estimate, not the lowest price
                     EstimatedCost.between(matchedInventory.getLowestPrice().grossValue(),

@@ -3,7 +3,6 @@ package pl.commercelink.inventory;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.InventoryItem;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -55,13 +54,13 @@ public record StoreInventorySnapshot(LocalDateTime builtAt, List<Entry> entries)
         return new StoreInventorySnapshot(inventory.builtAt(), entries);
     }
 
-    public StoreInventory toStoreInventory(TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
+    public StoreInventory toStoreInventory(SupplierRegistry supplierRegistry) {
         Collection<MatchedInventory> matched = new ArrayList<>();
         for (Entry entry : entries) {
             List<InventoryItem> items = entry.items().stream()
                     .map(ItemData::toInventoryItem)
                     .toList();
-            matched.add(new MatchedInventory(restoreKey(entry), items, taxonomyCache, supplierRegistry));
+            matched.add(new MatchedInventory(restoreKey(entry), items, supplierRegistry));
         }
         return new StoreInventory(InventoryIndex.of(matched), builtAt);
     }

@@ -7,7 +7,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.products.Product;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.List;
 
@@ -17,8 +16,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 class GroupInventorySourceTest {
 
     @Mock
-    private TaxonomyCache taxonomyCache;
-    @Mock
     private SupplierRegistry supplierRegistry;
 
     private InventoryItem item(String ean, String mfn, String supplier, double price) {
@@ -26,11 +23,11 @@ class GroupInventorySourceTest {
     }
 
     private MatchedInventory group(InventoryKey key, InventoryItem... items) {
-        return new MatchedInventory(key, List.of(items), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(key, List.of(items), supplierRegistry);
     }
 
     private MatchedInventory accumulator(InventoryKey lookupKey) {
-        return new MatchedInventory(lookupKey.copy(), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(lookupKey.copy(), supplierRegistry);
     }
 
     private static InventoryKey productKey(String pimId, String ean, String mfn) {

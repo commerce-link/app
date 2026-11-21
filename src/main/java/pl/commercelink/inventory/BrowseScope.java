@@ -35,10 +35,12 @@ final class BrowseScope {
     }
 
     static BrowseScope everyGlobalSupplier(BrowseIndex global) {
-        return new BrowseScope(global, supplier -> true, Map.of(), global.alongside(List.of()));
+        return new BrowseScope(global, supplier -> true, Map.of(), global.alongside(List.of(), keys -> List.of()));
     }
 
-    static BrowseScope of(BrowseIndex global, Predicate<String> enabledGlobal, Collection<MatchedInventory> own) {
+    /** {@code ownProducts} describes the store's own products the global index does not list, in one call. */
+    static BrowseScope of(BrowseIndex global, Predicate<String> enabledGlobal, Collection<MatchedInventory> own,
+                          GroupProducts ownProducts) {
         Map<MatchedInventory, List<InventoryItem>> extras = new IdentityHashMap<>();
         List<MatchedInventory> ownOnly = new ArrayList<>();
         for (MatchedInventory ownGroup : own) {
@@ -49,7 +51,7 @@ final class BrowseScope {
                 ownOnly.add(ownGroup);
             }
         }
-        return new BrowseScope(global, enabledGlobal, extras, global.alongside(ownOnly));
+        return new BrowseScope(global, enabledGlobal, extras, global.alongside(ownOnly, ownProducts));
     }
 
     Stream<BrowseEntry> entries(Set<String> categoryIds) {

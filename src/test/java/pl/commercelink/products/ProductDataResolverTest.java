@@ -8,10 +8,14 @@ import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.TaxonomyRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 import static pl.commercelink.pim.ScopedPimCatalog.globalEntry;
 import static pl.commercelink.pim.ScopedPimCatalog.storeEntry;
 
@@ -248,6 +252,172 @@ class ProductDataResolverTest {
 
         // then
         assertThat(product).map(ProductData::mfn).isEmpty();
+    }
+
+    @Test
+    void groupsAreAnsweredInTheirOrderLikeEachGroupAlone() {
+        // given
+        taxonomy.add(record(EAN));
+        taxonomy.add(record(OTHER_EAN));
+        ProductDataResolver resolver = resolver(globalEntry("g1", EAN, "M-1", "GPU"),
+                storeEntry("s1-1", STORE_ID, EAN, "M-1", "GPU"));
+        InventoryKey inPim = InventoryKey.fromPimIdAndEan("g1", EAN);
+        InventoryKey inTaxonomy = InventoryKey.fromEan(OTHER_EAN);
+        InventoryKey nowhere = InventoryKey.fromEan("5900000000613");
+
+        // when
+        List<ResolvedProduct> products = resolver.ofGroups(STORE_ID, List.of(nowhere, inTaxonomy, inPim));
+
+        // then
+        assertThat(products).extracting(ResolvedProduct::data).containsExactly(
+                ProductData.UNKNOWN,
+                resolver.ofGroup(STORE_ID, inTaxonomy).orElseThrow(),
+                resolver.ofGroup(STORE_ID, inPim).orElseThrow());
+        assertThat(products.get(2).data().name()).isEqualTo("Store s1-1");
+    }
+
+    @Test
+    void groupsOfTheGlobalScopeDoNotSeeStoreEntries() {
+        // given
+        ProductDataResolver resolver = resolver(globalEntry("g1", EAN, "M-1", "GPU"),
+                storeEntry("s1-1", STORE_ID, EAN, "M-1", "GPU"));
+
+        // when
+        List<ResolvedProduct> products = resolver.ofGroups(null, List.of(InventoryKey.fromEan(EAN)));
+
+        // then
+        assertThat(products).extracting(product -> product.data().name()).containsExactly("Global g1");
+    }
+
+    @Test
+    void groupComesWithTheTaxonomyRecordReadForIt() {
+        // given
+        taxonomy.add(record(EAN));
+        ProductDataResolver resolver = resolver(globalEntry("g1", EAN, "M-1", "GPU"));
+
+        // when
+        List<ResolvedProduct> products = resolver.ofGroups(STORE_ID,
+                List.of(InventoryKey.fromEan(EAN), InventoryKey.fromEan(OTHER_EAN)));
+
+        // then
+        assertThat(products).extracting(ResolvedProduct::taxonomy).containsExactly(record(EAN), Taxonomy.EMPTY);
+    }
+
+    @Test
+    void allGroupsAreReadFromTheTaxonomyInOneCall() {
+        // given
+        TaxonomyCache counted = mock(TaxonomyCache.class);
+        List<InventoryKey> groups = List.of(InventoryKey.fromEan(EAN), InventoryKey.fromEan(OTHER_EAN));
+        when(counted.findAll(groups)).thenReturn(List.of(record(EAN), Taxonomy.EMPTY));
+        ProductDataResolver resolver = new ProductDataResolver(ScopedPimCatalog.of(), counted);
+
+        // when
+        List<ResolvedProduct> products = resolver.ofGroups(STORE_ID, groups);
+
+        // then
+        assertThat(products).extracting(product -> product.data().name()).containsExactly("Taxonomy name", "N/A");
+        verify(counted).findAll(groups);
+        verifyNoMoreInteractions(counted);
+    }
+
+    @Test
+    void unapprovedGlobalEntryIsSkippedAndTheTaxonomyAnswers() {
+        // given
+        taxonomy.add(record(EAN));
+        ProductDataResolver resolver = resolver(unapproved(globalEntry("g1", EAN, "M-1", "GPU")));
+        InventoryKey group = InventoryKey.fromPimIdAndEan("g1", EAN);
+
+        // when
+        Optional<ProductData> byEan = resolver.ofEan(STORE_ID, EAN);
+        Optional<ProductData> byGroup = resolver.ofGroup(STORE_ID, group);
+        List<ResolvedProduct> byGroups = resolver.ofGroups(STORE_ID, List.of(group));
+        Optional<ProductData> byPimId = resolver.ofPimId(STORE_ID, "g1");
+
+        // then
+        ProductData fromTaxonomy = new ProductData("Taxonomy name", "Samsung", "Dyski SSD", "pim-ssd", EAN, "M-1", 9, 60);
+        assertThat(byEan).contains(fromTaxonomy);
+        assertThat(byGroup).contains(fromTaxonomy);
+        assertThat(byGroups).extracting(ResolvedProduct::data).containsExactly(fromTaxonomy);
+        assertThat(byPimId).contains(fromTaxonomy);
+    }
+
+    @Test
+    void unapprovedGlobalEntryWithoutATaxonomyRecordGivesNothing() {
+        // given
+        ProductDataResolver resolver = resolver(unapproved(globalEntry("g1", EAN, "M-1", "GPU")));
+
+        // when
+        Optional<ProductData> byEan = resolver.ofEan(STORE_ID, EAN);
+        List<ResolvedProduct> byGroups = resolver.ofGroups(null, List.of(InventoryKey.fromEan(EAN)));
+        Optional<ProductData> byPimId = resolver.ofPimId(null, "g1");
+
+        // then
+        assertThat(byEan).isEmpty();
+        assertThat(byGroups).containsExactly(ResolvedProduct.UNKNOWN);
+        assertThat(byPimId).isEmpty();
+    }
+
+    @Test
+    void unapprovedGlobalEntryAnswersBeforeTheTaxonomyWhenSkippingIsSwitchedOff() {
+        // given
+        taxonomy.add(record(EAN));
+        ProductDataResolver resolver = new ProductDataResolver(
+                ScopedPimCatalog.of(unapproved(globalEntry("g1", EAN, "M-1", "GPU"))), taxonomy, false);
+        InventoryKey group = InventoryKey.fromPimIdAndEan("g1", EAN);
+
+        // when
+        Optional<ProductData> byEan = resolver.ofEan(STORE_ID, EAN);
+        Optional<ProductData> byGroup = resolver.ofGroup(STORE_ID, group);
+        List<ResolvedProduct> byGroups = resolver.ofGroups(STORE_ID, List.of(group));
+        Optional<ProductData> byPimId = resolver.ofPimId(STORE_ID, "g1");
+
+        // then
+        ProductData fromPim = new ProductData("Global g1", "Brand", "GPU", null, EAN, "M-1", 1000, 1200);
+        assertThat(byEan).contains(fromPim);
+        assertThat(byGroup).contains(fromPim);
+        assertThat(byGroups).extracting(ResolvedProduct::data).containsExactly(fromPim);
+        assertThat(byPimId).contains(fromPim);
+    }
+
+    @Test
+    void approvedGlobalEntryAnswersWhetherSkippingIsOnOrOff() {
+        // given
+        taxonomy.add(record(EAN));
+        PimEntry approved = globalEntry("g1", EAN, "M-1", "GPU");
+
+        // when
+        Optional<ProductData> skipping = new ProductDataResolver(ScopedPimCatalog.of(approved), taxonomy, true)
+                .ofEan(STORE_ID, EAN);
+        Optional<ProductData> notSkipping = new ProductDataResolver(ScopedPimCatalog.of(approved), taxonomy, false)
+                .ofEan(STORE_ID, EAN);
+
+        // then
+        assertThat(skipping).map(ProductData::name).contains("Global g1");
+        assertThat(notSkipping).isEqualTo(skipping);
+    }
+
+    @Test
+    void storeEntryIsNeverSkippedForBeingUnapproved() {
+        // given
+        taxonomy.add(record(EAN));
+        ProductDataResolver resolver = resolver(globalEntry("g1", EAN, "M-1", "GPU"),
+                unapproved(storeEntry("s1-1", STORE_ID, EAN, "M-1", "GPU")));
+
+        // when
+        Optional<ProductData> byEan = resolver.ofEan(STORE_ID, EAN);
+        List<ResolvedProduct> byGroups = resolver.ofGroups(STORE_ID, List.of(InventoryKey.fromEan(EAN)));
+        Optional<ProductData> byPimId = resolver.ofPimId(STORE_ID, "s1-1");
+
+        // then
+        assertThat(byEan).map(ProductData::name).contains("Store s1-1");
+        assertThat(byGroups).extracting(product -> product.data().name()).containsExactly("Store s1-1");
+        assertThat(byPimId).map(ProductData::name).contains("Store s1-1");
+    }
+
+    private static PimEntry unapproved(PimEntry entry) {
+        return new PimEntry(entry.pimId(), entry.identifiers(), entry.brand(), entry.name(), entry.category(),
+                entry.subcategory(), false, entry.netWeightInGrams(), entry.grossWeightInGrams(), entry.categoryId(),
+                entry.ownerStoreId(), entry.clonedFromPimId(), entry.eanOnlyMatching());
     }
 
     private static PimEntry entryWithNameOnly(String pimId, String gtin) {

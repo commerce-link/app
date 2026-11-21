@@ -14,7 +14,6 @@ import pl.commercelink.pim.api.PimIdentifier;
 import pl.commercelink.pim.api.PimIdentifierType;
 import pl.commercelink.pim.api.PimView;
 import pl.commercelink.products.brand.NoNameBrand;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -32,8 +31,6 @@ class OwnToGlobalLinksTest {
     private static final String CODE = "QP1324/20";
     private static final String PHILIPS = "Philips";
 
-    @Mock
-    private TaxonomyCache taxonomyCache;
     @Mock
     private SupplierRegistry supplierRegistry;
     @Mock
@@ -314,7 +311,7 @@ class OwnToGlobalLinksTest {
                 offer(ean9060, "11350-03-20G", 2613, "Kosatec", "Sapphire"),
                 offer(ean9060, "11350-03-20G", 2663, "IncomGroup", "Sapphire"),
                 offer(ean9060, "11324-01-20G", 3563, "Elko", "Sapphire"));
-        InventoryAutoDiscovery autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
+        InventoryAutoDiscovery autoDiscovery = new InventoryAutoDiscovery(pimCatalog, supplierRegistry,
                 InventoryMatchingProperties.allEnabled());
         InventoryAutoDiscovery.Grouping globalGrouping = autoDiscovery.group(globalOffers, pimView, List::of, VariantCodes.none());
         MatchedInventory own = group(offer("4895106299993", "11324-01-20G", 1850, "Action", "Sapphire"));
@@ -340,7 +337,7 @@ class OwnToGlobalLinksTest {
         VariantCodes eanOnly = PimEanOnlyCodes.of(List.of(new PimEntry("pim-mova", List.of(
                 new PimIdentifier("6977728943176", PimIdentifierType.GTIN), new PimIdentifier("SHINE10", PimIdentifierType.MPN)),
                 "Mova", "Name", null, null, true, null, null, null, null, null, true)));
-        InventoryAutoDiscovery autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry,
+        InventoryAutoDiscovery autoDiscovery = new InventoryAutoDiscovery(pimCatalog, supplierRegistry,
                 InventoryMatchingProperties.allEnabled());
         InventoryAutoDiscovery.Grouping globalGrouping = autoDiscovery.group(
                 List.of(offer("6977728943176", "SHINE10", 1200, "Kosatec", "Mova")), pimView, List::of, VariantCodes.none(), eanOnly);
@@ -493,12 +490,12 @@ class OwnToGlobalLinksTest {
                 key.addManufacturerCode(offer.mfn());
             }
         }
-        return new MatchedInventory(key, List.of(offers), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(key, List.of(offers), supplierRegistry);
     }
 
     private MatchedInventory withPimId(String pimId, String ean, InventoryItem... offers) {
         InventoryKey key = InventoryKey.fromPimIdAndEan(pimId, ean);
-        return new MatchedInventory(key, List.of(offers), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(key, List.of(offers), supplierRegistry);
     }
 
     private static GlobalMatchedInventory.Generation generation(MatchedInventory... groups) {

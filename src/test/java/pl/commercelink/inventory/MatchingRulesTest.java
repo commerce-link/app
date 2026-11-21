@@ -9,7 +9,6 @@ import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimView;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.Collection;
 import java.util.List;
@@ -27,8 +26,6 @@ class MatchingRulesTest {
     private PimCatalog pimCatalog;
     @Mock
     private PimView pim;
-    @Mock
-    private TaxonomyCache taxonomyCache;
     @Mock
     private SupplierRegistry supplierRegistry;
 
@@ -104,7 +101,7 @@ class MatchingRulesTest {
         // given
         List<InventoryItem> offers = List.of(item("EAN1", "MFN1", "A"), item("EAN1", "MFN2", "B"));
         MatchedInventory group = new MatchedInventory(
-                new InventoryKey(Set.of("EAN1"), Set.of("MFN1", "MFN2")), offers, taxonomyCache, supplierRegistry);
+                new InventoryKey(Set.of("EAN1"), Set.of("MFN1", "MFN2")), offers, supplierRegistry);
 
         // when
         List<MatchedInventory> result = autoDiscovery(InventoryMatchingProperties.allEnabled())
@@ -141,7 +138,7 @@ class MatchingRulesTest {
     }
 
     private InventoryAutoDiscovery autoDiscovery(InventoryMatchingProperties properties) {
-        return new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry, properties);
+        return new InventoryAutoDiscovery(pimCatalog, supplierRegistry, properties);
     }
 
     private InventoryItem item(String ean, String mfn, String supplier) {

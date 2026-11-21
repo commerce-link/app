@@ -24,7 +24,7 @@ public class ProductEanByBrandNotEqInventoryFilter extends InventoryFilter {
 
     @Override
     public boolean run(MatchedInventory matchedInventory, List<Metadata> metadata) {
-        String brand = matchedInventory.getTaxonomy().brand();
+        String brand = matchedInventory.getProductData().brand();
 
         if (metadata.stream().noneMatch(m -> m.hasKey(brand))) {
             return true;

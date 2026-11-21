@@ -8,13 +8,21 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.Inventory;
+import pl.commercelink.inventory.MatchedInventoryFixture;
+import pl.commercelink.products.ProductDataFixture;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCategory;
+import pl.commercelink.inventory.InventoryViewFixture;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.products.CatalogPlacement;
+import pl.commercelink.products.ProductDataResolver;
+import pl.commercelink.taxonomy.TaxonomyRepository;
+import pl.commercelink.products.ProductData;
 import pl.commercelink.products.PimCategoryTree;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
@@ -25,6 +33,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -74,6 +88,47 @@ class CatalogTargetOptionsFactoryTest {
         assertThat(options.matching()).extracting(CatalogTargetOptions.Option::alreadyIn).containsExactly(0, 1);
         assertThat(options.preselectedValue()).isEqualTo("c-1/cat-gpu");
         assertThat(options.others()).extracting(CatalogTargetOptions.Option::value).containsExactly("c-1/cat-case");
+    }
+
+    @Test
+    void productIsMatchedToCategoriesByTheResolvedProductData() {
+        // given
+        String ean = "5901000000055";
+        MatchedInventory row = MatchedInventoryFixture.describedAs(
+                new ProductData("PIM name", "PIM brand", "Karty graficzne", "11", ean, "PIM-MFN", null, null),
+                new MatchedInventory(InventoryKey.fromEan(ean), new InventoryItem(ean, "PIM-MFN", 100.0, "PLN", 1, 1, "AB"), null));
+        when(view.findByEan(ean)).thenReturn(row);
+
+        // when
+        CatalogTargetOptions options = factory.build(STORE_ID, List.of(ean));
+
+        // then
+        assertThat(options.matching()).extracting(CatalogTargetOptions.Option::value)
+                .containsExactly("c-1/cat-gpu", "c-2/cat-b2b");
+        assertThat(options.pimCategoryName()).isEqualTo("Karty graficzne");
+    }
+
+    @Test
+    void productsFoundInTheViewAreDescribedInOneReadHoweverManyThereAre() {
+        // given
+        TaxonomyCache records = new TaxonomyCache(mock(TaxonomyRepository.class));
+        List<String> eans = List.of("5901000000061", "5901000000062", "5901000000063");
+        List<MatchedInventory> groups = eans.stream().map(ean -> {
+            records.add(new Taxonomy(ean, "M-" + ean, "Brand", "GPU " + ean, "x", 1, null, null, null, "11"));
+            return new MatchedInventory(new InventoryKey(ean, "M-" + ean),
+                    List.of(new InventoryItem(ean, "M-" + ean, 100.0, "PLN", 1, 1, "AB")), mock(SupplierRegistry.class));
+        }).toList();
+        ProductDataResolver resolver = spy(new ProductDataResolver(ScopedPimCatalog.of(), records));
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(InventoryViewFixture.over(STORE_ID, resolver,
+                mock(SupplierRegistry.class), groups.toArray(MatchedInventory[]::new)));
+
+        // when
+        CatalogTargetOptions options = factory.build(STORE_ID, eans);
+
+        // then
+        assertThat(options.count()).isEqualTo(3);
+        assertThat(options.pimCategoryName()).isEqualTo("Karty graficzne");
+        verify(resolver, times(1)).ofGroups(eq(STORE_ID), any());
     }
 
     @Test
@@ -204,14 +259,14 @@ class CatalogTargetOptionsFactoryTest {
         group.addManufacturerCode("GLOBAL-98");
         when(merged.isEmpty()).thenReturn(false);
         when(merged.getInventoryKey()).thenReturn(group);
-        when(merged.getTaxonomy()).thenReturn(new Taxonomy(ownEan, ownMfn, "Brand", "Merged", "x", 1, null, null, null, "11"));
+        when(merged.getProductData()).thenReturn(ProductDataFixture.from(new Taxonomy(ownEan, ownMfn, "Brand", "Merged", "x", 1, null, null, null, "11")));
         when(view.findByEan(ownEan)).thenReturn(merged);
     }
 
     private void product(String ean, String name, String categoryId) {
         InventoryKey key = InventoryKey.fromEan(ean);
-        MatchedInventory matched = new MatchedInventory(key,
-                new InventoryItem(ean, "M-" + ean, 100.0, "PLN", 1, 1, "AB"), taxonomyCache, null);
+        MatchedInventory matched = MatchedInventoryFixture.readingFrom(taxonomyCache, new MatchedInventory(key,
+                new InventoryItem(ean, "M-" + ean, 100.0, "PLN", 1, 1, "AB"), null));
         when(taxonomyCache.find(same(key)))
                 .thenReturn(new Taxonomy(ean, "M-" + ean, "Brand", name, "x", 1, null, null, null, categoryId));
         when(view.findByEan(ean)).thenReturn(matched);

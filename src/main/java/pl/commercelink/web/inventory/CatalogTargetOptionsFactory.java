@@ -34,7 +34,7 @@ public class CatalogTargetOptionsFactory {
     public CatalogTargetOptions build(String storeId, List<String> eans) {
         InventoryView view = inventory.withEnabledSuppliersOnly(storeId);
         List<InventoryKey> keys = new ArrayList<>();
-        Set<String> categoryIds = new LinkedHashSet<>();
+        List<MatchedInventory> found = new ArrayList<>();
         for (String ean : new LinkedHashSet<>(eans)) {
             if (keys.size() == MAX_PRODUCTS) {
                 break;
@@ -44,7 +44,12 @@ public class CatalogTargetOptionsFactory {
                 continue;
             }
             keys.add(BrowseRow.catalogKey(matched.getInventoryKey(), ean));
-            categoryIds.add(Objects.requireNonNullElse(matched.getTaxonomy().categoryId(), ""));
+            found.add(matched);
+        }
+        view.loadProductData(found);
+        Set<String> categoryIds = new LinkedHashSet<>();
+        for (MatchedInventory matched : found) {
+            categoryIds.add(Objects.requireNonNullElse(matched.getProductData().categoryId(), ""));
         }
         CatalogPlacement.StorePlacement placement = catalogPlacement.forStore(storeId);
         List<CatalogTargetOptions.Option> matching = new ArrayList<>();

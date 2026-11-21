@@ -5,6 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.supplier.InventoryItem;
+import pl.commercelink.products.ProductDataFixture;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.PimCatalog;
@@ -143,9 +144,10 @@ class InventoryLoadTest {
     }
 
     private Inventory inventoryWith(InventoryMatchingProperties properties, PimCatalog pimCatalog) {
-        InventoryAutoDiscovery autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry, properties);
-        return new Inventory(warehouse, storesRepository, autoDiscovery, taxonomyCache, supplierRegistry,
-                storeInventoryProvider, globalInventory, pimCatalog, properties);
+        InventoryAutoDiscovery autoDiscovery = new InventoryAutoDiscovery(pimCatalog, supplierRegistry, properties);
+        return new Inventory(warehouse, storesRepository, autoDiscovery, supplierRegistry,
+                storeInventoryProvider, globalInventory, pimCatalog, properties,
+                ProductDataFixture.resolverOver(taxonomyCache));
     }
 
     private Set<Set<InventoryItem>> offerSets() {

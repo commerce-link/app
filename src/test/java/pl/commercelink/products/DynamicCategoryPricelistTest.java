@@ -156,7 +156,7 @@ class DynamicCategoryPricelistTest {
     private void mockInventoryWithSingleGraphicsCard() {
         when(matchedInventory.hasAnyOffers()).thenReturn(true);
         when(matchedInventory.getInventoryKey()).thenReturn(new InventoryKey(PIM_ID));
-        when(matchedInventory.getTaxonomy()).thenReturn(taxonomy());
+        when(matchedInventory.getProductData()).thenReturn(ProductDataFixture.from(taxonomy()));
 
         when(matchedInventory.getLowestPrice()).thenReturn(new Price(1000, 1230));
         when(matchedInventory.getLowestPrice(true, null)).thenReturn(new Price(1000, 1230));

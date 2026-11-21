@@ -73,7 +73,7 @@ public class ProductsAddReview {
         List<InventoryKey> alreadyInCategory = productRepository.findAll(category.getCategoryId()).stream()
                 .map(InventoryKey::fromProduct)
                 .toList();
-        List<Product> products = new ArrayList<>();
+        List<MatchedInventory> added = new ArrayList<>();
         List<String> sources = new ArrayList<>();
         List<String> skipped = new ArrayList<>();
         List<String> skippedExisting = new ArrayList<>();
@@ -89,9 +89,14 @@ public class ProductsAddReview {
                 skippedExisting.add(ean);
                 continue;
             }
-            Optional<PimEntry> entry = pimEntryOfGroup(storeId, key);
-            products.add(new ProductRecommendation(category, matched, entry).toProduct());
+            added.add(matched);
             sources.add(ean);
+        }
+        enabled.loadProductData(added);
+        List<Product> products = new ArrayList<>();
+        for (MatchedInventory matched : added) {
+            Optional<PimEntry> entry = pimEntryOfGroup(storeId, matched.getInventoryKey());
+            products.add(new ProductRecommendation(category, matched, entry).toProduct());
         }
         ProductsBulkAddForm form = ProductsBulkAddForm.of(products);
         for (int index = 0; index < sources.size(); index++) {

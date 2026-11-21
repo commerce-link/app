@@ -57,7 +57,7 @@ class ProductRecommendationEngineTest {
         when(group.hasAnyOffers()).thenReturn(true);
         when(group.getInventoryKey()).thenReturn(new InventoryKey("5901000000043", "SHOE-1"));
         when(group.getLowestPrice()).thenReturn(Price.fromNet(100.0));
-        when(group.getTaxonomy()).thenReturn(new Taxonomy("5901000000043", "SHOE-1", "Nike", "Nike 43", "Shoes", 1, null, null, null, "989"));
+        when(group.getProductData()).thenReturn(ProductDataFixture.from(new Taxonomy("5901000000043", "SHOE-1", "Nike", "Nike 43", "Shoes", 1, null, null, null, "989")));
 
         // when
         List<ProductRecommendation> recommendations = engine.getRecommendationsNotInCategory(pim, definition, inventory);
@@ -167,7 +167,7 @@ class ProductRecommendationEngineTest {
     /** What the engine reads of a group it recommends. */
     private void priced(String ean, String code, String name) {
         when(group.getLowestPrice()).thenReturn(Price.fromNet(100.0));
-        when(group.getTaxonomy()).thenReturn(new Taxonomy(ean, code, "Nike", name, "Shoes", 1, null, null, null, "989"));
+        when(group.getProductData()).thenReturn(ProductDataFixture.from(new Taxonomy(ean, code, "Nike", name, "Shoes", 1, null, null, null, "989")));
     }
 
     /** One of several groups a test needs, so built here rather than declared as a field. */
@@ -176,7 +176,7 @@ class ProductRecommendationEngineTest {
         when(group.hasAnyOffers()).thenReturn(true);
         when(group.getInventoryKey()).thenReturn(InventoryKey.fromEan(ean));
         when(group.getLowestPrice()).thenReturn(Price.fromNet(100.0));
-        when(group.getTaxonomy()).thenReturn(new Taxonomy(ean, null, "MSI", name, "GPU", 1, null, null, null, "170"));
+        when(group.getProductData()).thenReturn(ProductDataFixture.from(new Taxonomy(ean, null, "MSI", name, "GPU", 1, null, null, null, "170")));
         return group;
     }
 
@@ -193,7 +193,7 @@ class ProductRecommendationEngineTest {
         when(group.hasAnyOffers()).thenReturn(true);
         when(group.getInventoryKey()).thenReturn(new InventoryKey("5901000000043", "SHOE-1"));
         when(group.getLowestPrice()).thenReturn(Price.fromNet(100.0));
-        when(group.getTaxonomy()).thenReturn(new Taxonomy("5901000000043", "SHOE-1", "Nike", "Nike 43", "Shoes", 1, null, null, null, "989"));
+        when(group.getProductData()).thenReturn(ProductDataFixture.from(new Taxonomy("5901000000043", "SHOE-1", "Nike", "Nike 43", "Shoes", 1, null, null, null, "989")));
 
         // when
         List<ProductRecommendation> recommendations = engine.getRecommendations(index.global(), definition, inventory);
@@ -215,7 +215,7 @@ class ProductRecommendationEngineTest {
         when(group.hasAnyOffers()).thenReturn(true);
         when(group.getInventoryKey()).thenReturn(new InventoryKey("5901000000043", "SHOE-1"));
         when(group.getLowestPrice()).thenReturn(Price.fromNet(100.0));
-        when(group.getTaxonomy()).thenReturn(new Taxonomy("5901000000043", "SHOE-1", "Nike", "Nike 43", "Shoes", 1, null, null, null, "989"));
+        when(group.getProductData()).thenReturn(ProductDataFixture.from(new Taxonomy("5901000000043", "SHOE-1", "Nike", "Nike 43", "Shoes", 1, null, null, null, "989")));
 
         // when
         List<ProductRecommendation> recommendations = engine.getRecommendations(index.global(), definition, inventory);

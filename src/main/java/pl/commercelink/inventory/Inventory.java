@@ -10,11 +10,11 @@ import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimView;
+import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.SupplierScope;
-import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.warehouse.api.Warehouse;
 
 import java.time.Duration;
@@ -38,12 +38,12 @@ public class Inventory {
     private final Warehouse warehouse;
     private final StoresRepository storesRepository;
     private final InventoryAutoDiscovery autoDiscovery;
-    private final TaxonomyCache taxonomyCache;
     private final SupplierRegistry supplierRegistry;
     private final StoreInventoryProvider storeInventoryProvider;
     private final GlobalMatchedInventory globalInventory;
     private final PimCatalog pimCatalog;
     private final InventoryMatchingProperties matchingProperties;
+    private final ProductDataResolver productDataResolver;
 
     // Per supplier, the feed version last attempted (successful load or markSeen) — not a guarantee of
     // held inventory; drives the scheduler's "is there a newer feed to load?" check.
@@ -108,14 +108,14 @@ public class Inventory {
 
     public InventoryView withGlobalData() {
         InventoryIndex globalIndex = globalInventory.index();
-        return new InventoryView(globalIndex, InventoryIndex.of(List.of()), StoreEntryKeys.none(), taxonomyCache, supplierRegistry,
-                GroupInventorySource.global(globalIndex, supplier -> true));
+        return new InventoryView(null, productDataResolver, globalIndex, InventoryIndex.of(List.of()), StoreEntryKeys.none(),
+                supplierRegistry, GroupInventorySource.global(globalIndex, supplier -> true));
     }
 
     public InventoryView withWarehouseDataOnly(String storeId) {
         InventoryIndex globalIndex = InventoryIndex.of(List.of());
-        return new InventoryView(globalIndex, InventoryIndex.of(List.of()), StoreEntryKeys.none(), taxonomyCache, supplierRegistry,
-                new WarehouseInventorySource(storeId, warehouse.stockQueryService(storeId)));
+        return new InventoryView(storeId, productDataResolver, globalIndex, InventoryIndex.of(List.of()), StoreEntryKeys.none(),
+                supplierRegistry, new WarehouseInventorySource(storeId, warehouse.stockQueryService(storeId)));
     }
 
     public InventoryView withEnabledSuppliersOnly(String storeId) {
@@ -141,7 +141,7 @@ public class Inventory {
         StoreEntryKeys storeEntries = storeEntryKeys(storeId);
         InventorySource global = GroupInventorySource.global(globalIndex, enabledGlobalSupplier(store), storeEntries);
         InventorySource own = GroupInventorySource.own(ownIndex);
-        return view(storeEntries, globalIndex, ownIndex, global, own, additionalSources);
+        return view(storeId, storeEntries, globalIndex, ownIndex, global, own, additionalSources);
     }
 
     private InventoryView scopedView(String storeId, SupplierScope scope, InventorySource... additionalSources) {
@@ -151,14 +151,15 @@ public class Inventory {
         StoreEntryKeys storeEntries = storeEntryKeys(storeId);
         InventorySource global = GroupInventorySource.global(globalIndex, scopedSupplier(store, ConnectionMode.GLOBAL, scope), storeEntries);
         InventorySource own = GroupInventorySource.own(ownIndex, scopedOwnAndManualSupplier(store, scope));
-        return view(storeEntries, globalIndex, ownIndex, global, own, additionalSources);
+        return view(storeId, storeEntries, globalIndex, ownIndex, global, own, additionalSources);
     }
 
-    private InventoryView view(StoreEntryKeys storeEntries, InventoryIndex globalIndex, InventoryIndex ownIndex,
+    private InventoryView view(String storeId, StoreEntryKeys storeEntries, InventoryIndex globalIndex, InventoryIndex ownIndex,
                                InventorySource global, InventorySource own, InventorySource... additionalSources) {
         InventorySource[] sources = Stream.concat(Stream.of(global, own), Arrays.stream(additionalSources))
                 .toArray(InventorySource[]::new);
-        return new InventoryView(globalIndex, ownIndex, storeEntries, taxonomyCache, supplierRegistry, sources);
+        return new InventoryView(storeId, productDataResolver, globalIndex, ownIndex, storeEntries, supplierRegistry,
+                sources);
     }
 
     private Predicate<String> scopedSupplier(Store store, ConnectionMode mode, SupplierScope scope) {

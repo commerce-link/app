@@ -10,6 +10,9 @@ public record ProductData(String name, String brand, String category, String cat
 
     public static final ProductData EMPTY = new ProductData(null, null, null, null, null, null, null, null);
 
+    /** A product nothing is known about, described the way {@code Taxonomy.EMPTY} describes it. */
+    public static final ProductData UNKNOWN = new ProductData("N/A", "N/A", null, null, "N/A", "N/A", null, null);
+
     public ProductData {
         ean = unifyEan(StringUtils.trimToNull(ean));
         mfn = unifyMfn(StringUtils.trimToNull(mfn));

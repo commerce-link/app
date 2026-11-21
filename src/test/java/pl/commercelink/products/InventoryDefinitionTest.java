@@ -7,7 +7,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.products.filters.InventoryFilterType;
 import pl.commercelink.starter.dynamodb.Metadata;
-import pl.commercelink.taxonomy.Taxonomy;
 
 import java.util.List;
 
@@ -25,7 +24,7 @@ class InventoryDefinitionTest {
         // given
         InventoryDefinition definition = new InventoryDefinition(InventoryFilterType.PRODUCT_LINE_BY_BRAND_NOT_CONTAIN,
                 List.of(new Metadata("gigabyte", "Windforce")));
-        when(matchedInventory.getTaxonomy()).thenReturn(gpu("Gigabyte GeForce RTX 5070 Windforce OC"));
+        when(matchedInventory.getProductData()).thenReturn(gpu("Gigabyte GeForce RTX 5070 Windforce OC"));
 
         // when
         boolean accepted = definition.test(matchedInventory);
@@ -39,7 +38,7 @@ class InventoryDefinitionTest {
         // given
         InventoryDefinition definition = new InventoryDefinition(InventoryFilterType.PRODUCT_LINE_BY_BRAND_NOT_CONTAIN,
                 List.of(new Metadata("gigabyte", "Windforce")));
-        when(matchedInventory.getTaxonomy()).thenReturn(gpu("Gigabyte GeForce RTX 5070 Gaming OC"));
+        when(matchedInventory.getProductData()).thenReturn(gpu("Gigabyte GeForce RTX 5070 Gaming OC"));
 
         // when
         boolean accepted = definition.test(matchedInventory);
@@ -48,7 +47,7 @@ class InventoryDefinitionTest {
         assertThat(accepted).isTrue();
     }
 
-    private static Taxonomy gpu(String name) {
-        return new Taxonomy("5900000000001", "MFN-1", "Gigabyte", name, "GPU", 1, null, null);
+    private static ProductData gpu(String name) {
+        return new ProductData(name, "Gigabyte", "GPU", null, "5900000000001", "MFN-1", null, null);
     }
 }

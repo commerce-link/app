@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.InventoryItem;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -20,7 +19,6 @@ import static org.mockito.Mockito.mock;
 
 class StoreInventorySnapshotTest {
 
-    private final TaxonomyCache taxonomyCache = mock(TaxonomyCache.class);
     private final SupplierRegistry supplierRegistry = mock(SupplierRegistry.class);
     private final ObjectMapper objectMapper = Jackson2ObjectMapperBuilder.json().build();
 
@@ -35,7 +33,7 @@ class StoreInventorySnapshotTest {
 
     private StoreInventory sampleInventory() {
         MatchedInventory matched = new MatchedInventory(new InventoryKey(KEY_EANS, KEY_CODES),
-                List.of(ITEM), taxonomyCache, supplierRegistry);
+                List.of(ITEM), supplierRegistry);
         return new StoreInventory(InventoryIndex.of(List.of(matched)), LocalDateTime.of(2026, 6, 17, 10, 0));
     }
 
@@ -59,7 +57,7 @@ class StoreInventorySnapshotTest {
         StoreInventory original = sampleInventory();
 
         // when
-        StoreInventory restored = StoreInventorySnapshot.from(original).toStoreInventory(taxonomyCache, supplierRegistry);
+        StoreInventory restored = StoreInventorySnapshot.from(original).toStoreInventory(supplierRegistry);
 
         // then
         assertEquals(1, restored.items().size());
@@ -82,7 +80,7 @@ class StoreInventorySnapshotTest {
         StoreInventorySnapshot back = objectMapper.readValue(json, StoreInventorySnapshot.class);
 
         // then
-        StoreInventory restored = back.toStoreInventory(taxonomyCache, supplierRegistry);
+        StoreInventory restored = back.toStoreInventory(supplierRegistry);
         MatchedInventory m = restored.items().iterator().next();
         assertEquals("5900000000002", m.getInventoryItems().get(0).ean());
         assertItemEquals(ITEM, m.getInventoryItems().get(0));
@@ -100,7 +98,7 @@ class StoreInventorySnapshotTest {
         StoreInventorySnapshot back = objectMapper.readValue(objectMapper.writeValueAsString(snapshot), StoreInventorySnapshot.class);
 
         // then
-        InventoryItem restored = back.toStoreInventory(taxonomyCache, supplierRegistry).items().iterator().next()
+        InventoryItem restored = back.toStoreInventory(supplierRegistry).items().iterator().next()
                 .getInventoryItems().get(0);
         assertEquals(BRANDED_ITEM, restored);
     }
@@ -115,7 +113,7 @@ class StoreInventorySnapshotTest {
         StoreInventorySnapshot back = objectMapper.treeToValue(json, StoreInventorySnapshot.class);
 
         // then
-        InventoryItem restored = back.toStoreInventory(taxonomyCache, supplierRegistry).items().iterator().next()
+        InventoryItem restored = back.toStoreInventory(supplierRegistry).items().iterator().next()
                 .getInventoryItems().get(0);
         assertNull(restored.brand());
         assertEquals("5900000000002", restored.ean());
@@ -123,7 +121,7 @@ class StoreInventorySnapshotTest {
 
     private StoreInventory inventoryOf(InventoryItem item) {
         MatchedInventory matched = new MatchedInventory(new InventoryKey(KEY_EANS, KEY_CODES),
-                List.of(item), taxonomyCache, supplierRegistry);
+                List.of(item), supplierRegistry);
         return new StoreInventory(InventoryIndex.of(List.of(matched)), LocalDateTime.of(2026, 6, 17, 10, 0));
     }
 
@@ -133,7 +131,7 @@ class StoreInventorySnapshotTest {
         InventoryKey keyWithId = new InventoryKey("PIM-123");
         keyWithId.addEan("5900000000002");
         keyWithId.addManufacturerCode("MFN-1");
-        MatchedInventory matched = new MatchedInventory(keyWithId, List.of(ITEM), taxonomyCache, supplierRegistry);
+        MatchedInventory matched = new MatchedInventory(keyWithId, List.of(ITEM), supplierRegistry);
         StoreInventorySnapshot snapshot =
                 StoreInventorySnapshot.from(new StoreInventory(InventoryIndex.of(List.of(matched)), LocalDateTime.of(2026, 6, 17, 10, 0)));
 
@@ -142,7 +140,7 @@ class StoreInventorySnapshotTest {
                 objectMapper.readValue(objectMapper.writeValueAsString(snapshot), StoreInventorySnapshot.class);
 
         // then
-        StoreInventory restored = back.toStoreInventory(taxonomyCache, supplierRegistry);
+        StoreInventory restored = back.toStoreInventory(supplierRegistry);
         assertEquals("PIM-123", restored.items().iterator().next().getInventoryKey().getId());
     }
 
@@ -150,7 +148,7 @@ class StoreInventorySnapshotTest {
     void linkSurvivesTheSnapshot() throws Exception {
         // given
         MatchedInventory own = new MatchedInventory(new InventoryKey("8720689021180", "QP1324/20"),
-                List.of(ITEM), taxonomyCache, supplierRegistry);
+                List.of(ITEM), supplierRegistry);
         InventoryIndex ownIndex = InventoryIndex.of(List.of(own));
         ownIndex.link(own, List.of("8720689010825"));
         StoreInventorySnapshot snapshot =
@@ -161,7 +159,7 @@ class StoreInventorySnapshotTest {
                 objectMapper.readValue(objectMapper.writeValueAsString(snapshot), StoreInventorySnapshot.class);
 
         // then
-        StoreInventory restored = back.toStoreInventory(taxonomyCache, supplierRegistry);
+        StoreInventory restored = back.toStoreInventory(supplierRegistry);
         MatchedInventory restoredOwn = restored.items().iterator().next();
         assertEquals(List.of("8720689010825"), List.copyOf(restoredOwn.getInventoryKey().getLinkedEans()));
         assertEquals(List.of(restoredOwn), restored.index().findMatching(InventoryKey.fromEan("8720689010825")));
@@ -190,7 +188,7 @@ class StoreInventorySnapshotTest {
 
         // then
         assertNull(back.entries().get(0).linkedEans());
-        MatchedInventory restored = back.toStoreInventory(taxonomyCache, supplierRegistry).items().iterator().next();
+        MatchedInventory restored = back.toStoreInventory(supplierRegistry).items().iterator().next();
         assertTrue(restored.getInventoryKey().getLinkedEans().isEmpty());
         assertEquals(KEY_EANS, Set.copyOf(restored.getInventoryKey().getProductEans()));
     }

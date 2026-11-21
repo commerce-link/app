@@ -1,6 +1,13 @@
 package pl.commercelink.inventory;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.inventory.supplier.InventoryItem;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.pim.ScopedPimCatalog;
+import pl.commercelink.products.ProductData;
+import pl.commercelink.products.ProductDataResolver;
+import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyRepository;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -11,6 +18,9 @@ import java.util.concurrent.Executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static pl.commercelink.pim.ScopedPimCatalog.globalEntry;
+import static pl.commercelink.pim.ScopedPimCatalog.storeEntry;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -23,11 +33,31 @@ class BrowseIndexHolderTest {
     private final Executor manual = queued::add;
 
     @Test
+    void sharedIndexIsDescribedWithGlobalEntriesEvenWhereAStoreHasItsOwn() {
+        // given
+        String ean = "5900000000101";
+        ProductDataResolver resolver = new ProductDataResolver(ScopedPimCatalog.of(
+                globalEntry("g1", ean, "M-1", "CPU"), storeEntry("st-1", "s1", ean, "M-1", "CPU")),
+                new TaxonomyCache(mock(TaxonomyRepository.class)));
+        MatchedInventory group = new MatchedInventory(new InventoryKey(ean, "M-1"),
+                List.of(new InventoryItem(ean, "M-1", 100.0, "PLN", 5, 1, "Elko")), mock(SupplierRegistry.class));
+        when(global.generation()).thenReturn(new GlobalMatchedInventory.Generation(3L, List.of(group),
+                InventoryIndex.of(List.of(group)), VariantCodes.none()));
+        BrowseIndexHolder holder = new BrowseIndexHolder(global, resolver);
+
+        // when
+        BrowseIndex index = holder.current();
+
+        // then
+        assertThat(index.all()).extracting(BrowseEntry::name).containsExactly("Global g1");
+    }
+
+    @Test
     void firstCallBuildsSynchronously() {
         // given
         when(global.version()).thenReturn(3L);
         when(global.generation()).thenAnswer(call -> generation());
-        BrowseIndexHolder holder = new BrowseIndexHolder(global, manual);
+        BrowseIndexHolder holder = new BrowseIndexHolder(global, keys -> keys.stream().map(key -> ProductData.UNKNOWN).toList(), manual);
 
         // when
         BrowseIndex index = holder.current();
@@ -42,7 +72,7 @@ class BrowseIndexHolderTest {
         // given
         when(global.version()).thenReturn(3L);
         when(global.generation()).thenAnswer(call -> generation());
-        BrowseIndexHolder holder = new BrowseIndexHolder(global, manual);
+        BrowseIndexHolder holder = new BrowseIndexHolder(global, keys -> keys.stream().map(key -> ProductData.UNKNOWN).toList(), manual);
         holder.current();
         when(global.version()).thenReturn(4L);
 
@@ -64,7 +94,7 @@ class BrowseIndexHolderTest {
         // given
         when(global.version()).thenReturn(3L);
         when(global.generation()).thenAnswer(call -> generation());
-        BrowseIndexHolder holder = new BrowseIndexHolder(global, manual);
+        BrowseIndexHolder holder = new BrowseIndexHolder(global, keys -> keys.stream().map(key -> ProductData.UNKNOWN).toList(), manual);
         holder.current();
         when(global.version()).thenReturn(4L);
         doThrow(new IllegalStateException("feed broken")).doAnswer(call -> generation()).when(global).generation();
@@ -86,7 +116,7 @@ class BrowseIndexHolderTest {
         // given
         when(global.version()).thenReturn(3L);
         when(global.generation()).thenAnswer(call -> generation());
-        BrowseIndexHolder holder = new BrowseIndexHolder(global, manual);
+        BrowseIndexHolder holder = new BrowseIndexHolder(global, keys -> keys.stream().map(key -> ProductData.UNKNOWN).toList(), manual);
         holder.current();
         when(global.version()).thenReturn(4L);
 
@@ -102,7 +132,7 @@ class BrowseIndexHolderTest {
     @Test
     void scheduledRefreshDoesNotBuildTheFirstIndex() {
         // given
-        BrowseIndexHolder holder = new BrowseIndexHolder(global, manual);
+        BrowseIndexHolder holder = new BrowseIndexHolder(global, keys -> keys.stream().map(key -> ProductData.UNKNOWN).toList(), manual);
 
         // when
         holder.refreshIfStale();
@@ -117,7 +147,7 @@ class BrowseIndexHolderTest {
         // given
         when(global.version()).thenReturn(3L);
         when(global.generation()).thenAnswer(call -> generation());
-        BrowseIndexHolder holder = new BrowseIndexHolder(global, manual);
+        BrowseIndexHolder holder = new BrowseIndexHolder(global, keys -> keys.stream().map(key -> ProductData.UNKNOWN).toList(), manual);
         holder.current();
         List<Long> seen = new ArrayList<>();
         holder.onReplaced(() -> seen.add(holder.current().version()));
@@ -138,7 +168,7 @@ class BrowseIndexHolderTest {
         // given
         when(global.version()).thenReturn(3L);
         when(global.generation()).thenAnswer(call -> generation());
-        BrowseIndexHolder holder = new BrowseIndexHolder(global, manual);
+        BrowseIndexHolder holder = new BrowseIndexHolder(global, keys -> keys.stream().map(key -> ProductData.UNKNOWN).toList(), manual);
 
         // when
         boolean before = holder.isReady();
@@ -157,7 +187,7 @@ class BrowseIndexHolderTest {
     @Test
     void startupStartsTheFirstBuildOnlyOnce() {
         // given
-        BrowseIndexHolder holder = new BrowseIndexHolder(global, manual);
+        BrowseIndexHolder holder = new BrowseIndexHolder(global, keys -> keys.stream().map(key -> ProductData.UNKNOWN).toList(), manual);
 
         // when
         holder.buildFirstInBackground();
@@ -174,7 +204,7 @@ class BrowseIndexHolderTest {
         // given
         when(global.version()).thenReturn(0L);
         when(global.generation()).thenAnswer(call -> generation());
-        BrowseIndexHolder holder = new BrowseIndexHolder(global, manual);
+        BrowseIndexHolder holder = new BrowseIndexHolder(global, keys -> keys.stream().map(key -> ProductData.UNKNOWN).toList(), manual);
         holder.buildFirstInBackground();
         queued.forEach(Runnable::run);
         queued.clear();
@@ -195,7 +225,7 @@ class BrowseIndexHolderTest {
         // given
         when(global.version()).thenReturn(3L);
         doThrow(new IllegalStateException("feed broken")).doAnswer(call -> generation()).when(global).generation();
-        BrowseIndexHolder holder = new BrowseIndexHolder(global, manual);
+        BrowseIndexHolder holder = new BrowseIndexHolder(global, keys -> keys.stream().map(key -> ProductData.UNKNOWN).toList(), manual);
         holder.buildFirstInBackground();
         queued.forEach(Runnable::run);
         queued.clear();

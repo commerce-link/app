@@ -196,7 +196,7 @@ class RestockSuggestionServiceTest {
     private static MatchedInventory group(String pimId, String... eans) {
         InventoryKey key = InventoryKey.fromPimIdAndEan(pimId, eans[0]);
         Stream.of(eans).forEach(key::addEan);
-        return new MatchedInventory(key, List.of(new InventoryItem(eans[0], "X1", 100.0, "PLN", 5, 1, "Action")), null, null);
+        return new MatchedInventory(key, List.of(new InventoryItem(eans[0], "X1", 100.0, "PLN", 5, 1, "Action")), null);
     }
 
     @Test

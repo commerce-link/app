@@ -122,11 +122,11 @@ class InventorySearchTest {
     }
 
     private MatchedInventory empty() {
-        return new MatchedInventory(new InventoryKey(), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(new InventoryKey(), supplierRegistry);
     }
 
     private MatchedInventory offers(InventoryItem... items) {
-        return new MatchedInventory(new InventoryKey(EAN, MFN), List.of(items), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(new InventoryKey(EAN, MFN), List.of(items), supplierRegistry);
     }
 
     private InventoryItem offer(String supplier, double netPrice, int qty) {
@@ -358,7 +358,7 @@ class InventorySearchTest {
         InventoryKey key = new InventoryKey("PIM-1");
         key.addEan(EAN);
         key.addManufacturerCode(MFN);
-        when(view.findByEan(EAN)).thenReturn(new MatchedInventory(key, List.of(offer("Elko", 100.0, 5)), taxonomyCache, supplierRegistry));
+        when(view.findByEan(EAN)).thenReturn(new MatchedInventory(key, List.of(offer("Elko", 100.0, 5)), supplierRegistry));
         PimEntry entry = mock(PimEntry.class);
         when(entry.name()).thenReturn("Logitech MX Keys S");
         when(pimView.findByPimIdOrGtins(eq("PIM-1"), any())).thenReturn(Optional.of(entry));
@@ -375,7 +375,7 @@ class InventorySearchTest {
         // given
         InventoryKey key = new InventoryKey("PIM-1");
         key.addEan(EAN);
-        when(view.findByEan(EAN)).thenReturn(new MatchedInventory(key, List.of(offer("Elko", 100.0, 5)), taxonomyCache, supplierRegistry));
+        when(view.findByEan(EAN)).thenReturn(new MatchedInventory(key, List.of(offer("Elko", 100.0, 5)), supplierRegistry));
         when(taxonomyCache.find(any())).thenReturn(taxonomy());
         PimEntry entry = mock(PimEntry.class);
         when(entry.name()).thenReturn("Logitech MX Keys S");

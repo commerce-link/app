@@ -1,12 +1,13 @@
 package pl.commercelink.inventory;
 
-import pl.commercelink.taxonomy.Taxonomy;
+import pl.commercelink.products.ProductData;
 
 import java.util.Collection;
 
 /**
- * One product of the browse index: the matched group as the inventory already holds it, its taxonomy, its place in the
- * Polish name order and its codes. The group and taxonomy are not copied, so the index costs a few references per
+ * One product of the browse index: the matched group as the inventory already holds it, how the product is described
+ * (name, brand, category), its place in the Polish name order and its codes. The group is not copied and the
+ * description is kept as four references, not as an object per product, so the index costs a few references per
  * product (spec §5.3, memory budget).
  */
 public final class BrowseEntry {
@@ -14,14 +15,20 @@ public final class BrowseEntry {
     private static final String[] NO_CODES = new String[0];
 
     private final MatchedInventory group;
-    private final Taxonomy taxonomy;
+    private final String name;
+    private final String brand;
+    private final String category;
+    private final String categoryId;
     private final long nameRank;
     // The key normalizes its codes on every read; a phrase scans every product, so they are read once here.
     private final String[] codes;
 
-    BrowseEntry(MatchedInventory group, Taxonomy taxonomy, long nameRank) {
+    BrowseEntry(MatchedInventory group, ProductData product, long nameRank) {
         this.group = group;
-        this.taxonomy = taxonomy;
+        this.name = product.name();
+        this.brand = product.brand();
+        this.category = product.category();
+        this.categoryId = product.categoryId();
         this.nameRank = nameRank;
         this.codes = codesOf(group.getInventoryKey());
     }
@@ -30,8 +37,8 @@ public final class BrowseEntry {
         return group;
     }
 
-    public Taxonomy taxonomy() {
-        return taxonomy;
+    public String category() {
+        return category;
     }
 
     /** Position in the Polish collation order of names; comparing two ranks orders by name without a collator. */
@@ -40,21 +47,20 @@ public final class BrowseEntry {
     }
 
     public String categoryId() {
-        String id = taxonomy.categoryId();
-        return id == null || id.isBlank() ? BrowseIndex.UNASSIGNED : id.strip();
+        return categoryId == null || categoryId.isBlank() ? BrowseIndex.UNASSIGNED : categoryId.strip();
     }
 
     public String name() {
-        return taxonomy.name();
+        return name;
     }
 
     public String brand() {
-        return taxonomy.brand();
+        return brand;
     }
 
     /** Case-insensitive "contains" without lower-casing a copy of each field: 600 thousand products per query. */
     public boolean matchesText(String needle) {
-        if (contains(taxonomy.name(), needle) || contains(taxonomy.brand(), needle)) {
+        if (contains(name, needle) || contains(brand, needle)) {
             return true;
         }
         for (String code : codes) {

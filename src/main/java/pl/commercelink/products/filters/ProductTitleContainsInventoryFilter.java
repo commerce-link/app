@@ -27,7 +27,7 @@ public class ProductTitleContainsInventoryFilter extends InventoryFilter {
     @Override
     public boolean run(MatchedInventory matchedInventory, List<Metadata> metadata) {
         Collection<String> keywords =  asDistinctCollectionFromCommaSeparateText(getMetadataByKey(metadata, KEYWORDS_FIELD_NAME).getValue());
-        return containsKeyword(matchedInventory.getTaxonomy().name(), keywords);
+        return containsKeyword(matchedInventory.getProductData().name(), keywords);
     }
 
     private boolean containsKeyword(String name, Collection<String> keywords) {

@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.products.ProductDataFixture;
 import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -44,8 +45,9 @@ class InventoryStoreRoutingTest {
     // the views read the store's clones from the PIM index copy: an empty one, with no entries and no clones
     @BeforeEach
     void createInventory() {
-        inventory = new Inventory(warehouse, storesRepository, autoDiscovery, taxonomyCache, supplierRegistry,
-                storeInventoryProvider, globalInventory, ScopedPimCatalog.of(), InventoryMatchingProperties.allEnabled());
+        inventory = new Inventory(warehouse, storesRepository, autoDiscovery, supplierRegistry,
+                storeInventoryProvider, globalInventory, ScopedPimCatalog.of(), InventoryMatchingProperties.allEnabled(),
+                ProductDataFixture.resolverOver(taxonomyCache));
     }
 
     private Store store() {

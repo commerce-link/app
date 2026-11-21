@@ -2,6 +2,7 @@ package pl.commercelink.web.catalog;
 
 import org.junit.jupiter.api.BeforeEach;
 import pl.commercelink.pim.api.PimView;
+import pl.commercelink.products.ProductDataFixture;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -244,7 +245,7 @@ class ProductsAddReviewTest {
         MatchedInventory matched = mock(MatchedInventory.class);
         when(matched.isEmpty()).thenReturn(false);
         when(matched.getInventoryKey()).thenReturn(new InventoryKey(ean, "M-" + ean));
-        when(matched.getTaxonomy()).thenReturn(new Taxonomy(ean, "M-" + ean, "Brand", name, "GPU", 1, null, null));
+        when(matched.getProductData()).thenReturn(ProductDataFixture.from(new Taxonomy(ean, "M-" + ean, "Brand", name, "GPU", 1, null, null)));
         when(matched.getLowestPrice()).thenReturn(Price.fromGross(1000));
         when(view.findByEan(ean)).thenReturn(matched);
     }

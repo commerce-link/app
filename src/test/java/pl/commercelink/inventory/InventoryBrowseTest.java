@@ -8,6 +8,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.products.ProductDataResolver;
+import pl.commercelink.products.ProductDataFixture;
 import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingPolicy;
@@ -18,6 +20,8 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyRepository;
+import pl.commercelink.pim.ScopedPimCatalog;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -34,7 +38,12 @@ import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
+import static pl.commercelink.pim.ScopedPimCatalog.globalEntry;
+import static pl.commercelink.pim.ScopedPimCatalog.storeEntry;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -50,6 +59,7 @@ class InventoryBrowseTest {
 
     private final Map<String, Taxonomy> taxonomies = new HashMap<>();
     private final GlobalMatchedInventory global = new GlobalMatchedInventory();
+    private ProductDataResolver productDataResolver;
     private final List<MatchedInventory> own = new ArrayList<>();
     private InventoryBrowse browse;
 
@@ -65,8 +75,9 @@ class InventoryBrowseTest {
         when(store.getGlobalSupplierNames()).thenReturn(List.of("AB"));
         when(storeInventoryProvider.ownInventory(store))
                 .thenAnswer(call -> new StoreInventory(InventoryIndex.of(own), LocalDateTime.now()));
-        browse = new InventoryBrowse(new BrowseIndexHolder(global, Runnable::run), storesRepository,
-                storeInventoryProvider, supplierRegistry);
+        productDataResolver = ProductDataFixture.resolverOver(taxonomyCache);
+        browse = new InventoryBrowse(new BrowseIndexHolder(global, GroupProducts.of(productDataResolver, null), Runnable::run),
+                storesRepository, storeInventoryProvider, supplierRegistry, productDataResolver);
     }
 
     @Test
@@ -126,6 +137,43 @@ class InventoryBrowseTest {
 
         // then
         assertThat(result.rows()).extracting(BrowseRow::name).containsExactly("Kabel HDMI");
+    }
+
+    @Test
+    void sharedIndexIsDescribedWithGlobalDataAndOwnOnlyProductsWithTheStoresData() {
+        // given
+        global.replace(List.of(product("5901000000001", "GPU-1", "RTX 4060", "11", item("5901000000001", "GPU-1", "AB", 100, 5))));
+        own.add(product("5901000000009", "OWN-9", "Kabel HDMI", "30", item("5901000000009", "OWN-9", "MyFeed", 10, 40)));
+        own.add(product("5901000000008", "OWN-8", "Kabel USB", "30", item("5901000000008", "OWN-8", "MyFeed", 10, 40)));
+
+        // when
+        browse.browse(STORE_ID, BrowseCriteria.all());
+        browse.browse(STORE_ID, BrowseCriteria.all().inCategories(Set.of("30")));
+
+        // then
+        verify(productDataResolver, times(1)).ofGroups(isNull(), any());
+        verify(productDataResolver, times(1)).ofGroups(eq(STORE_ID), any());
+    }
+
+    @Test
+    void storesOwnProductIsNamedByTheStoreEntryAndASharedOneByTheGlobalEntry() {
+        // given
+        String shared = "5901000000001";
+        String ownOnly = "5901000000009";
+        ProductDataResolver resolver = new ProductDataResolver(ScopedPimCatalog.of(
+                globalEntry("g1", shared, "GPU-1", "Karty graficzne"), storeEntry("st-1", STORE_ID, shared, "GPU-1", "Karty graficzne"),
+                globalEntry("g9", ownOnly, "OWN-9", "Kable"), storeEntry("st-9", STORE_ID, ownOnly, "OWN-9", "Kable")),
+                new TaxonomyCache(mock(TaxonomyRepository.class)));
+        InventoryBrowse described = new InventoryBrowse(new BrowseIndexHolder(global, GroupProducts.of(resolver, null), Runnable::run),
+                storesRepository, storeInventoryProvider, supplierRegistry, resolver);
+        global.replace(List.of(product(shared, "GPU-1", "RTX 4060", "11", item(shared, "GPU-1", "AB", 100, 5))));
+        own.add(product(ownOnly, "OWN-9", "Kabel HDMI", "30", item(ownOnly, "OWN-9", "MyFeed", 10, 40)));
+
+        // when
+        BrowseResult result = described.browse(STORE_ID, BrowseCriteria.all());
+
+        // then
+        assertThat(result.rows()).extracting(BrowseRow::name).containsExactlyInAnyOrder("Global g1", "Store st-9");
     }
 
     @Test
@@ -313,8 +361,9 @@ class InventoryBrowseTest {
     void ownOfferJoinsTheIndexedProductWhileTheIndexLagsAReload() {
         // given
         List<Runnable> rebuilds = new ArrayList<>();
-        InventoryBrowse lagging = new InventoryBrowse(new BrowseIndexHolder(global, rebuilds::add), storesRepository,
-                storeInventoryProvider, supplierRegistry);
+        InventoryBrowse lagging = new InventoryBrowse(
+                new BrowseIndexHolder(global, GroupProducts.of(productDataResolver, null), rebuilds::add), storesRepository,
+                storeInventoryProvider, supplierRegistry, productDataResolver);
         global.replace(List.of(product("5901000000001", "GPU-1", "RTX 4060", "11", item("5901000000001", "GPU-1", "AB", 100, 5))));
         lagging.summary(null);
         global.replace(List.of(product("5901000000001", "GPU-1", "RTX 4060", "11", item("5901000000001", "GPU-1", "AB", 95, 5))));
@@ -391,7 +440,7 @@ class InventoryBrowseTest {
         InventoryKey key = new InventoryKey(ean, mfn);
         Taxonomy taxonomy = new Taxonomy(ean, mfn, "Brand", name, "Kategoria " + categoryId, 1, null, null, null, categoryId);
         key.getProductCodes().forEach(code -> taxonomies.put(code, taxonomy));
-        return new MatchedInventory(key, List.of(items), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(key, List.of(items), supplierRegistry);
     }
 
     private static InventoryItem item(String ean, String mfn, String supplier, double net, int qty) {

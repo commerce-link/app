@@ -355,6 +355,34 @@ class TaxonomyCacheTest {
     }
 
     @Test
+    void manyKeysAreAnsweredInTheirOrderLikeEachKeyAlone() {
+        // given
+        cache.add(new Taxonomy(EAN_1, "MFN-A", "NoName", "Name A", "CPU", 2, null, null));
+        cache.add(new Taxonomy(EAN_2, "MFN-B", "Satechi", "Name B", "CPU", 5, null, null));
+        cache.add(new Taxonomy(EAN_3, "MFN-C", "Brand", "Name C", null, 1, null, null));
+        InventoryKey branded = new InventoryKey(Set.of(EAN_1, EAN_2), Set.of());
+        InventoryKey unknown = new InventoryKey("4006381333931", null);
+        InventoryKey pending = new InventoryKey(EAN_3, null);
+        List<InventoryKey> keys = List.of(pending, unknown, branded);
+
+        // when
+        List<Taxonomy> result = cache.findAll(keys);
+
+        // then
+        assertEquals(List.of(cache.find(pending), Taxonomy.EMPTY, cache.find(branded)), result);
+        assertEquals("Satechi", result.get(2).brand());
+    }
+
+    @Test
+    void noKeysGiveNoRecords() {
+        // when
+        List<Taxonomy> result = cache.findAll(List.of());
+
+        // then
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
     void noNameRecordGivesNoCategoryByCode() {
         // given
         cache.add(new Taxonomy(EAN_1, "11T105", "NoName", "Morele name", "Taśmy", 1, null, null));

@@ -9,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
 import pl.commercelink.inventory.Inventory;
+import pl.commercelink.products.ProductDataFixture;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
@@ -65,7 +66,7 @@ class ProductsAddReviewScopeTest {
         MatchedInventory matched = mock(MatchedInventory.class);
         when(matched.isEmpty()).thenReturn(false);
         when(matched.getInventoryKey()).thenReturn(new InventoryKey(EAN, MFN));
-        when(matched.getTaxonomy()).thenReturn(new Taxonomy(EAN, MFN, "Brand", "Taxonomy name", "GPU", 1, null, null));
+        when(matched.getProductData()).thenReturn(ProductDataFixture.from(new Taxonomy(EAN, MFN, "Brand", "Taxonomy name", "GPU", 1, null, null)));
         when(matched.getLowestPrice()).thenReturn(Price.fromGross(1000));
         when(view.findByEan(EAN)).thenReturn(matched);
         StorePimAliases aliases = new StorePimAliases(catalog);
