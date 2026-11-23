@@ -12,6 +12,7 @@ import pl.commercelink.web.orders.PendingPaymentsJson;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -143,7 +144,10 @@ public class PaymentsRowMapper {
 
     private String shipText(ReceivableEntry entry, LocalDate today) {
         if (entry.order().hasStatus(OrderStatus.Cancelled)) {
-            return text("payments.ship.cancelled");
+            // an order cancelled before the date was recorded has none to show
+            LocalDateTime cancelledAt = entry.order().getCancelledAt();
+            return cancelledAt == null ? text("payments.ship.cancelled")
+                    : text("payments.ship.cancelled.dated", format(cancelledAt.toLocalDate(), today));
         }
         if (entry.shipped()) {
             if (entry.shipDate() == null) {

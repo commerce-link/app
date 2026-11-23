@@ -43,12 +43,21 @@ class OrderListQueryTest {
 
     @Test
     void closedStatusesInTheAddressAreIgnored() {
-        // Completed and Cancelled are not part of the list: old bookmarks open the open list, due first
+        // Completed orders are not part of the list: old bookmarks open the open list, due first
         OrderListQuery query = OrderListQuery.parse(params("status", "completed"));
         assertThat(query.statuses()).isEmpty();
         assertThat(query.isOpen()).isTrue();
         assertThat(query.effectiveSort()).isEqualTo(OrderListQuery.Sort.DUE);
         assertThat(OrderListQuery.parse(params("status", "Completed", "status", "New")).statuses()).containsExactly(OrderStatus.New);
+    }
+
+    @Test
+    void cancelledCanBeTickedForTheOrdersAwaitingARefund() {
+        // when
+        OrderListQuery query = OrderListQuery.parse(params("status", "Cancelled", "status", "New"));
+
+        // then
+        assertThat(query.statuses()).containsExactly(OrderStatus.New, OrderStatus.Cancelled);
     }
 
     @Test

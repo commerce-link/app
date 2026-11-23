@@ -25,7 +25,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/** The read of cancelled orders behind the Payments page: filtered on the index, loaded in full only when matching. */
+/**
+ * The store's orders in one status and period: filtered on the index, loaded in full only when matching. It finds the
+ * cancelled orders awaiting a refund while their own index cannot be read (OrdersRepositoryRefundDueIndexTest).
+ */
 @ExtendWith(MockitoExtension.class)
 class OrdersRepositoryFindByStatusTest {
 

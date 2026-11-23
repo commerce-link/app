@@ -79,7 +79,7 @@ class OrderRowMapperTest {
         assertThat(row.clientName()).isEqualTo("Anna Nowak");
         assertThat(row.clientCity()).isEqualTo("Kraków");
         assertThat(row.email()).isEqualTo("anna.nowak74@test.com");
-        assertThat(row.dueText()).isEqualTo("23.09");
+        assertThat(row.dueText()).isEqualTo("23.09.2026");
         assertThat(row.dueNote()).isEqualTo("po terminie: 2 dni");
         assertThat(row.dueTone()).isEqualTo("is-bad");
         assertThat(row.statusLabel()).isEqualTo("Zablokowane");
@@ -104,6 +104,80 @@ class OrderRowMapperTest {
         assertThat(row.dueNote()).isEqualTo("dziś");
         assertThat(row.dueTone()).isEqualTo("is-warn");
         assertThat(row.statusTone()).isEqualTo("is-info");
+        assertThat(row.unpaidText()).isNull();
+    }
+
+    @Test
+    void cancelledOrderWithThePaymentStillOnItShowsTheRefundDue() {
+        // given
+        Order order = order();
+        order.setStatus(OrderStatus.Cancelled);
+        order.getPayments().get(0).setAmount(1249);
+
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
+        assertThat(row.unpaidText()).isEqualTo("do zwrotu 1 249,00 PLN");
+    }
+
+    @Test
+    void aCancelledOrderShowsWhenItWasCancelledUnderItsStatusAndNoShippingDate() {
+        // given: its shipping date passed two days ago
+        Order order = order();
+        order.setStatus(OrderStatus.Cancelled);
+        order.setCancelledAt(LocalDateTime.of(2026, 9, 24, 15, 30));
+
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
+        assertThat(row.statusLabel()).isEqualTo("Anulowane");
+        assertThat(row.cancelledText()).isEqualTo("24.09.2026");
+        assertThat(row.dueText()).isEqualTo("—");
+        assertThat(row.dueNote()).isNull();
+        assertThat(row.dueTone()).isEmpty();
+    }
+
+    @Test
+    void anOrderThatIsNotCancelledHasNoCancellationDay() {
+        // given: a date left on a record that is not cancelled says nothing
+        Order order = order();
+        order.setCancelledAt(LocalDateTime.of(2026, 9, 24, 15, 30));
+
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
+        assertThat(row.cancelledText()).isNull();
+        assertThat(row.dueText()).isEqualTo("23.09.2026");
+    }
+
+    @Test
+    void anOrderCancelledBeforeTheDateWasRecordedShowsNoDate() {
+        // given
+        Order order = order();
+        order.setStatus(OrderStatus.Cancelled);
+
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then: neither the shipping date nor the order date stands in for the day it was cancelled
+        assertThat(row.cancelledText()).isNull();
+        assertThat(row.dueText()).isEqualTo("—");
+        assertThat(row.dueNote()).isNull();
+    }
+
+    @Test
+    void overpaidOpenOrderShowsNoRefund() {
+        // given: an overpayment of an open order may still be settled against it, so it is not called a refund
+        Order order = order();
+        order.getPayments().get(0).setAmount(1300);
+
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
         assertThat(row.unpaidText()).isNull();
     }
 
