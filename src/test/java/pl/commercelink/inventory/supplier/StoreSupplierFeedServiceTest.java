@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.inventory.StoreInventoryRefreshPublisher;
 import pl.commercelink.inventory.supplier.api.FeedData;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
@@ -32,6 +33,8 @@ class StoreSupplierFeedServiceTest {
     private SupplierProviderFactory supplierProviderFactory;
     @Mock
     private StoreFeedRepository storeFeedRepository;
+    @Mock
+    private StoreInventoryRefreshPublisher storeInventoryRefresh;
 
     @InjectMocks
     private StoreSupplierFeedService service;
@@ -60,6 +63,53 @@ class StoreSupplierFeedServiceTest {
 
         // then
         verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
+    }
+
+    private void supplierReturns(String storeId, byte[] data) {
+        Store store = storeWithId(storeId);
+        SupplierProvider supplier = () -> Optional.of(new FeedData(data, "csv"));
+        when(storesRepository.findById(storeId)).thenReturn(store);
+        when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(supplier);
+    }
+
+    @Test
+    void asksForARebuildOnceTheFeedIsStored() throws ResourceDownloadException {
+        // given
+        byte[] data = "rows".getBytes();
+        supplierReturns("store-1", data);
+
+        // when
+        service.loadStoreFeed("store-1", "Wortmann");
+
+        // then
+        org.mockito.InOrder order = inOrder(storeFeedRepository, storeInventoryRefresh);
+        order.verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
+        order.verify(storeInventoryRefresh).request("store-1");
+    }
+
+    @Test
+    void requestThatCannotBeSentFailsTheImport() {
+        // given
+        supplierReturns("store-1", "rows".getBytes());
+        doThrow(new IllegalStateException("queue unavailable")).when(storeInventoryRefresh).request("store-1");
+
+        // when / then
+        assertThrows(IllegalStateException.class, () -> service.loadStoreFeed("store-1", "Wortmann"));
+    }
+
+    @Test
+    void supplierWithoutAFeedLeavesTheInventoryAlone() throws ResourceDownloadException {
+        // given
+        Store store = storeWithId("store-1");
+        SupplierProvider supplier = Optional::empty;
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(supplier);
+
+        // when
+        service.loadStoreFeed("store-1", "Wortmann");
+
+        // then
+        verifyNoInteractions(storeInventoryRefresh);
     }
 
     @Test
