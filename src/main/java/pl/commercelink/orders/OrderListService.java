@@ -31,6 +31,7 @@ import pl.commercelink.web.orders.Pagination;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -44,8 +45,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Builds the orders list page from one query of the store's open orders (spec §8.2, §23): tiles from all open orders,
- * status counts within the custom filter and the search, rows within the ticked statuses, then sort and page.
+ * Builds the orders list page from one query of the store's open orders (spec §8.2, §23), plus the cancelled ones still
+ * awaiting a refund: tiles from all open orders, status counts within the custom filter and the search, rows within the
+ * ticked statuses (a cancelled one under its own status, Anulowane), then sort and page.
  */
 @Slf4j
 @Service
@@ -53,6 +55,9 @@ public class OrderListService {
 
     public static final List<OrderStatus> OPEN = List.of(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly,
             OrderStatus.Assembled, OrderStatus.Realization, OrderStatus.Shipping, OrderStatus.Delivered);
+
+    /** The Status menu: the open statuses, then Cancelled for the cancelled orders still awaiting a refund. */
+    static final List<OrderStatus> MENU = Stream.concat(OPEN.stream(), Stream.of(OrderStatus.Cancelled)).toList();
 
     private final OrdersRepository ordersRepository;
     private final OrderFiltersService orderFilters;
@@ -82,12 +87,15 @@ public class OrderListService {
     private OrdersPageModel build(FilterActor actor, OrderListQuery query, LocalDate today, Locale locale,
                                   boolean withHeader) {
         // Only open orders are read (StoreIdStatusIndex): Completed and Cancelled are not part of this list, so a store's
-        // growing history costs nothing here.
+        // growing history costs nothing here. The one exception is a cancelled order whose refund is not recorded yet:
+        // it stays listed until it is, so the money owed back is not lost in the archive.
         List<Order> open = ordersRepository.findByStoreAndStatuses(actor.storeId(), OPEN);
+        List<Order> listed = Stream.concat(open.stream(),
+                ordersRepository.findCancelledAwaitingRefund(actor.storeId(), today).stream()).toList();
         ListOrderFiltersView filters = orderFilters.list(actor);
         Optional<OrderFilter> activeFilter = query.hasFilter() ? filters.byId(query.filterId()) : Optional.empty();
 
-        List<Order> filtered = open.stream()
+        List<Order> filtered = listed.stream()
                 .filter(order -> activeFilter.map(f -> f.matchesIgnoring(OrderFilterField.Status, order, today)).orElse(true))
                 .filter(order -> query.focus() == null || query.focus().matches(order, today))
                 .filter(order -> OrderSearch.matches(order, query.q()))
@@ -106,7 +114,7 @@ public class OrderListService {
         return new OrdersPageModel(
                 query,
                 tiles(open, query, today, locale),
-                statusOptions(filtered, OPEN, query, locale),
+                statusOptions(filtered, MENU, query, locale),
                 statusSummary(query, locale),
                 filterOptions(filters, query),
                 activeFilter,
@@ -134,7 +142,8 @@ public class OrderListService {
 
     private static Comparator<Order> comparator(Sort sort, Direction dir) {
         Comparator<Order> base = switch (sort) {
-            case DUE -> Comparator.comparing(Order::getShippingDueAt, Comparator.nullsLast(Comparator.naturalOrder()))
+            case DUE -> cancelledLast()
+                    .thenComparing(OrderListService::dueOrCancelled, Comparator.nullsLast(Comparator.naturalOrder()))
                     .thenComparing(Order::getOrderedAt, Comparator.nullsLast(Comparator.naturalOrder()));
             case AMOUNT -> Comparator.comparingDouble(Order::getTotalPrice);
             case NUMBER -> Comparator.comparing(Order::getOrderId, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
@@ -149,11 +158,33 @@ public class OrderListService {
         }
         // "no date" stays last whichever way the dates run
         if (sort == Sort.DUE) {
-            return Comparator.comparing((Order o) -> o.getShippingDueAt() == null ? 1 : 0)
-                    .thenComparing(Comparator.comparing(Order::getShippingDueAt, Comparator.nullsLast(Comparator.<LocalDate>reverseOrder())))
+            return cancelledLast()
+                    .thenComparing((Order o) -> dueOrCancelled(o) == null ? 1 : 0)
+                    .thenComparing(Comparator.comparing(OrderListService::dueOrCancelled, Comparator.nullsLast(Comparator.<LocalDateTime>reverseOrder())))
                     .thenComparing(Order::getOrderedAt, Comparator.nullsLast(Comparator.reverseOrder()));
         }
         return base.reversed();
+    }
+
+    /**
+     * A cancelled order has no shipping date left to be sorted by, so by that column it follows the orders that have
+     * one or may still get one, whichever way the dates run.
+     */
+    private static Comparator<Order> cancelledLast() {
+        return Comparator.comparing(order -> order.hasStatus(OrderStatus.Cancelled));
+    }
+
+    /**
+     * The date a row is put in order by among the rows of its kind: the shipping due date, or for a cancelled order
+     * when it was cancelled (the date OrderRowMapper prints under its status), so among the cancelled orders the
+     * refund waiting longest comes first.
+     */
+    private static LocalDateTime dueOrCancelled(Order order) {
+        if (order.hasStatus(OrderStatus.Cancelled)) {
+            return order.cancelledSince();
+        }
+        LocalDate due = order.getShippingDueAt();
+        return due == null ? null : due.atStartOfDay();
     }
 
     private List<Tile> tiles(List<Order> open, OrderListQuery query, LocalDate today, Locale locale) {
@@ -248,7 +279,7 @@ public class OrderListService {
     /** Statuses in lifecycle order (the OrderStatus declaration: New … Delivered), then due first within one status. */
     private static Comparator<Order> byStatus(Comparator<OrderStatus> statusOrder) {
         return Comparator.comparing(Order::getStatus, Comparator.nullsLast(statusOrder))
-                .thenComparing(Order::getShippingDueAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(OrderListService::dueOrCancelled, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(Order::getOrderedAt, Comparator.nullsLast(Comparator.naturalOrder()));
     }
 

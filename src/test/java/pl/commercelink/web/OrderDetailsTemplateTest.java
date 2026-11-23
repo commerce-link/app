@@ -276,6 +276,21 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void theHeaderOfACancelledOrderSaysWhenItWasCancelled() {
+        // given
+        Order cancelled = order(OrderStatus.Cancelled);
+        cancelled.setCancelledAt(LocalDateTime.of(2026, 11, 12, 14, 25));
+
+        // when
+        String cancelledHeader = header(page(render(cancelled, ADMIN)));
+        String openHeader = header(page(render(order(OrderStatus.Assembly), ADMIN)));
+
+        // then
+        assertThat(cancelledHeader).contains("Anulowano: 12.11.2026, 14:25");
+        assertThat(openHeader).doesNotContain("Anulowano");
+    }
+
+    @Test
     void theCardsFollowOneReadingOrderInTheHtmlSoPhonesNeedNoReordering() {
         // when
         String html = page(render(order(OrderStatus.Assembly), ADMIN));

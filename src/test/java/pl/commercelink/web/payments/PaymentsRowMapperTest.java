@@ -219,4 +219,32 @@ class PaymentsRowMapperTest {
         assertThat(row.shipText()).isEqualTo("doręczone");
         assertThat(row.shipNote()).isEqualTo("wysłane bez zapłaty");
     }
+
+    @Test
+    void aCancelledOrderShowsWhenItWasCancelled() {
+        // given
+        Order o = order(0, OrderStatus.Cancelled, PaymentSource.BankTransfer, 250);
+        o.setCancelledAt(TODAY.minusDays(3).atTime(14, 25));
+
+        // when
+        ReceivableRow row = mapper.map(ReceivableEntry.of(o, TODAY).orElseThrow(), TODAY);
+
+        // then
+        assertThat(row.shipText()).isEqualTo("anulowane 28.09");
+        assertThat(row.shipNote()).isNull();
+        assertThat(row.refund()).isTrue();
+    }
+
+    @Test
+    void anOrderCancelledBeforeTheDateWasRecordedShowsNoDate() {
+        // given
+        Order o = order(0, OrderStatus.Cancelled, PaymentSource.BankTransfer, 250);
+        o.setOrderedAt(TODAY.minusDays(30).atTime(12, 0));
+
+        // when
+        ReceivableRow row = mapper.map(ReceivableEntry.of(o, TODAY).orElseThrow(), TODAY);
+
+        // then: the order date does not stand in for the day it was cancelled
+        assertThat(row.shipText()).isEqualTo("anulowane");
+    }
 }

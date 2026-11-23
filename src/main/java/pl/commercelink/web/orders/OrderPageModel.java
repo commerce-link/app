@@ -32,13 +32,15 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     }
 
     /**
-     * cancelLockedKey: why "Cancel order" is greyed although the order could otherwise be cancelled (an e-receipt
-     * being issued), null for the general reason; cancelUnavailableKey: that general reason, which names what the
-     * order still lacks (see OrderPageModelFactory#cancelUnavailableKey); cancelMessage: the confirmation, with the
-     * fiscalised-receipt warning.
+     * cancelledAt: when the order was cancelled, null for an open order and for one cancelled before the date was
+     * recorded; cancelLockedKey: why "Cancel order" is greyed although the order could otherwise be cancelled (an
+     * e-receipt being issued), null for the general reason; cancelUnavailableKey: that general reason, which names
+     * what the order still lacks (see OrderPageModelFactory#cancelUnavailableKey); cancelMessage: the confirmation,
+     * with the fiscalised-receipt warning.
      */
     public record Header(String statusKey, String statusTone, boolean canChangeStatus, boolean completedAutomatically,
-                         String clientName, String sourceName, String sourceTypeKey, String orderedAt, String total,
+                         String clientName, String sourceName, String sourceTypeKey, String orderedAt, String cancelledAt,
+                         String total,
                          String fulfilmentTypeShortKey, String fulfilmentTypeIcon, String externalOrderId, RoutedSupplierView routedSupplier,
                          String splitFromShortId, String splitFromHref, String clientOrderUrl, PrimaryAction primaryAction,
                          String cardHref, String collectionHref, boolean canCancel,
