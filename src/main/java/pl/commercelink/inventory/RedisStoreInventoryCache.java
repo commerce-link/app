@@ -49,6 +49,20 @@ public class RedisStoreInventoryCache implements StoreInventoryCache {
             return redis.call('EXISTS', KEYS[1])
             """, Long.class);
 
+    // The age comes from the build-start mark, a few bytes, instead of the snapshot itself, megabytes for a large
+    // store. PEXPIRE answers 0 for a snapshot that is gone, which is reported as not kept so the caller rebuilds it.
+    private static final RedisScript<Long> KEEP_IF_RECENT = new DefaultRedisScript<>("""
+            local mark = redis.call('GET', KEYS[2])
+            if not mark or tonumber(ARGV[1]) - tonumber(mark) > tonumber(ARGV[2]) then
+                return 0
+            end
+            if redis.call('PEXPIRE', KEYS[1], ARGV[3]) == 0 then
+                return 0
+            end
+            redis.call('PEXPIRE', KEYS[2], ARGV[4])
+            return 1
+            """, Long.class);
+
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final TaxonomyCache taxonomyCache;
@@ -110,6 +124,19 @@ public class RedisStoreInventoryCache implements StoreInventoryCache {
             return built != null && built == 1;
         } catch (Exception e) {
             log.warn("The build time of the store inventory snapshot of {} could not be read, it is rebuilt", storeId, e);
+            return false;
+        }
+    }
+
+    @Override
+    public boolean keepIfBuiltWithin(String storeId, Duration maxAge, Duration ttl) {
+        try {
+            Long kept = redisTemplate.execute(KEEP_IF_RECENT, List.of(key(storeId), buildStartKey(storeId)),
+                    String.valueOf(clockMillis()), String.valueOf(maxAge.toMillis()),
+                    String.valueOf(ttl.toMillis()), String.valueOf(markLifetime(ttl).toMillis()));
+            return kept != null && kept == 1;
+        } catch (Exception e) {
+            log.warn("The age of the store inventory snapshot of {} could not be read, it is rebuilt instead", storeId, e);
             return false;
         }
     }

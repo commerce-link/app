@@ -2,7 +2,9 @@ package pl.commercelink.inventory.supplier;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import pl.commercelink.inventory.StoreInventoryProvider;
 import pl.commercelink.inventory.StoreInventoryRefreshPublisher;
+import pl.commercelink.inventory.supplier.api.FeedData;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.inventory.supplier.api.support.ResourceDownloadException;
@@ -17,6 +19,7 @@ public class StoreSupplierFeedService {
     private final StoresRepository storesRepository;
     private final SupplierProviderFactory supplierProviderFactory;
     private final StoreFeedRepository storeFeedRepository;
+    private final StoreInventoryProvider storeInventoryProvider;
     private final StoreInventoryRefreshPublisher storeInventoryRefresh;
 
     public void loadStoreFeed(String storeId, String supplierName) throws ResourceDownloadException {
@@ -29,10 +32,23 @@ public class StoreSupplierFeedService {
         if (supplier == null) {
             throw new SupplierFeedTargetMissingException(storeId, supplierName, "no provider is registered for this supplier");
         }
-        supplier.download().ifPresent(feed -> {
-            storeFeedRepository.store(storeId, supplierName, feed.data(), feed.extension());
-            storeInventoryRefresh.request(storeId);
-        });
+        supplier.download().ifPresent(feed -> storeIfChanged(storeId, supplierName, feed));
+    }
+
+    private void storeIfChanged(String storeId, String supplierName, FeedData feed) {
+        String hash = FeedHash.of(feed.data(), feed.extension());
+        if (storeFeedRepository.storedHash(storeId, supplierName).filter(hash::equals).isPresent()) {
+            if (!storeInventoryProvider.keepIfRecent(storeId)) {
+                storeInventoryRefresh.request(storeId);
+            }
+            storeFeedRepository.storeHash(storeId, supplierName, hash);
+            return;
+        }
+        storeFeedRepository.store(storeId, supplierName, feed.data(), feed.extension());
+        storeInventoryRefresh.request(storeId);
+        // stored last: an import that stopped before asking for the rebuild must not be taken for unchanged when it is
+        // delivered again
+        storeFeedRepository.storeHash(storeId, supplierName, hash);
     }
 
     private void requireReadableConfiguration(Store store, String supplierName) {

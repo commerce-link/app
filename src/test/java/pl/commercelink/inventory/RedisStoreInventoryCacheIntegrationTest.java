@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Testcontainers(disabledWithoutDocker = true)
@@ -219,6 +220,63 @@ class RedisStoreInventoryCacheIntegrationTest {
 
         // when / then
         org.junit.jupiter.api.Assertions.assertFalse(cache.builtSince("s1", 0));
+    }
+
+    @Test
+    void recentSnapshotIsKeptAndGetsItsLifetimeAgain() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(5), cache.clockMillis());
+
+        // when
+        boolean kept = cache.keepIfBuiltWithin("s1", Duration.ofHours(24), Duration.ofMinutes(2880));
+
+        // then
+        assertTrue(kept);
+        Long snapshotTtl = redisTemplate.getExpire("store-inventory:v3:s1");
+        Long markTtl = redisTemplate.getExpire("store-inventory:v3:s1:build-started");
+        assertTrue(snapshotTtl != null && snapshotTtl > 172_000 && snapshotTtl <= 172_800);
+        assertTrue(markTtl != null && markTtl > 172_000 && markTtl <= 172_800);
+    }
+
+    @Test
+    void snapshotBuiltLongerAgoThanTheLimitIsNotKept() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        long twentyFiveHoursAgo = cache.clockMillis() - Duration.ofHours(25).toMillis();
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), twentyFiveHoursAgo);
+
+        // when
+        boolean kept = cache.keepIfBuiltWithin("s1", Duration.ofHours(24), Duration.ofMinutes(2880));
+
+        // then
+        assertFalse(kept);
+        Long snapshotTtl = redisTemplate.getExpire("store-inventory:v3:s1");
+        assertTrue(snapshotTtl != null && snapshotTtl <= 3600);
+    }
+
+    @Test
+    void storeWithoutASnapshotHasNothingToKeep() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+
+        // when / then
+        assertFalse(cache.keepIfBuiltWithin("s1", Duration.ofHours(24), Duration.ofMinutes(2880)));
+    }
+
+    @Test
+    void evictedSnapshotIsNotKeptAlthoughItsMarkIsRecent() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        cache.put("s1", sampleInventory(), Duration.ofMinutes(60), cache.clockMillis());
+        cache.evict("s1");
+
+        // when
+        boolean kept = cache.keepIfBuiltWithin("s1", Duration.ofHours(24), Duration.ofMinutes(2880));
+
+        // then
+        assertFalse(kept);
+        assertTrue(cache.get("s1").isEmpty());
     }
 
     @Test

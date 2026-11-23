@@ -26,5 +26,12 @@ public interface StoreInventoryCache {
      */
     boolean builtSince(String storeId, long sinceMillis);
 
+    /**
+     * Gives the stored inventory its lifetime again when its build started less than {@code maxAge} ago.
+     *
+     * @return false when nothing was kept: no inventory is stored, it is older, or its age is unknown
+     */
+    boolean keepIfBuiltWithin(String storeId, Duration maxAge, Duration ttl);
+
     void evict(String storeId);
 }

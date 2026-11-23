@@ -257,6 +257,39 @@ class StoreInventoryProviderTest {
     }
 
     @Test
+    void recentSnapshotIsKeptForTheStoresLifetimeWithoutBeingRead() {
+        // given
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.of(30));
+        when(cache.keepIfBuiltWithin("store-1", Duration.ofHours(24), Duration.ofMinutes(30))).thenReturn(true);
+
+        // when
+        boolean kept = provider.keepIfRecent("store-1");
+
+        // then
+        assertThat(kept).isTrue();
+        verify(cache, never()).get(any());
+        verify(cache, never()).put(any(), any(), any(), anyLong());
+    }
+
+    @Test
+    void snapshotThatWasNotKeptIsReportedAndNotRebuiltHere() {
+        // given
+        Store storeEntity = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(storeEntity);
+        when(storeEntity.getInventoryCacheTtlMinutes()).thenReturn(Optional.empty());
+        when(cache.keepIfBuiltWithin(eq("store-1"), any(), any())).thenReturn(false);
+
+        // when
+        boolean kept = provider.keepIfRecent("store-1");
+
+        // then
+        assertThat(kept).isFalse();
+        verify(cache, never()).put(any(), any(), any(), anyLong());
+    }
+
+    @Test
     void buildsWithEmptyListWhenNoOwnSuppliers() {
         // given
         when(cache.get("store-1")).thenReturn(Optional.empty());

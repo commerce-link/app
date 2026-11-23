@@ -26,6 +26,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -56,6 +57,44 @@ class RedisStoreInventoryCacheTest {
         MatchedInventory matched = new MatchedInventory(new InventoryKey("5900000000002", "MFN-1"),
                 List.of(item), taxonomyCache, supplierRegistry);
         return new StoreInventory(InventoryIndex.of(List.of(matched)), LocalDateTime.of(2026, 6, 17, 10, 0));
+    }
+
+    @Test
+    void keepSendsTheClockTheAgeLimitAndBothLifetimes() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        when(redisTemplate.execute(any(RedisCallback.class))).thenReturn(9_000L);
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class))).thenReturn(1L);
+
+        // when
+        boolean kept = cache.keepIfBuiltWithin("s1", Duration.ofHours(24), Duration.ofMinutes(2880));
+
+        // then
+        assertTrue(kept);
+        verify(redisTemplate).execute(any(RedisScript.class),
+                eq(List.of("store-inventory:v3:s1", "store-inventory:v3:s1:build-started")),
+                eq("9000"), eq("86400000"), eq("172800000"), eq("172800000"));
+    }
+
+    @Test
+    void snapshotTheScriptDidNotKeepIsReportedAsNotKept() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class))).thenReturn(0L);
+
+        // when / then
+        assertFalse(cache.keepIfBuiltWithin("s1", Duration.ofHours(24), Duration.ofMinutes(2880)));
+    }
+
+    @Test
+    void redisFailureWhileKeepingIsReportedAsNotKept() {
+        // given
+        RedisStoreInventoryCache cache = cache();
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(Object[].class)))
+                .thenThrow(new IllegalStateException("redis down"));
+
+        // when / then
+        assertFalse(cache.keepIfBuiltWithin("s1", Duration.ofHours(24), Duration.ofMinutes(2880)));
     }
 
     @Test

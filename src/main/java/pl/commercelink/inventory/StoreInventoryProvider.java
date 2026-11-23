@@ -30,6 +30,7 @@ import java.util.Optional;
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class StoreInventoryProvider {
 
+    private static final Duration MAX_AGE_OF_KEPT_SNAPSHOT = Duration.ofHours(24);
     private static final int REFRESH_ATTEMPTS = 3;
 
     private final StoreInventoryCache cache;
@@ -82,6 +83,13 @@ public class StoreInventoryProvider {
         }
         throw new IllegalStateException("The global inventory or the store's EAN-only pairs changed during each of "
                 + REFRESH_ATTEMPTS + " rebuilds of the inventory of store " + storeId);
+    }
+
+    // For an import that found its feed unchanged: the snapshot only lives on, without a rebuild. Not past a day
+    // though, since its prices carry the exchange rates of the day it was built; false asks the caller for a rebuild.
+    public boolean keepIfRecent(String storeId) {
+        Store store = storesRepository.findById(storeId);
+        return cache.keepIfBuiltWithin(storeId, MAX_AGE_OF_KEPT_SNAPSHOT, resolveTtl(store));
     }
 
     // A request is served with what it built either way. A rebuild exists only to store the snapshot, so it fails and
