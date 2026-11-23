@@ -10,6 +10,7 @@ import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -46,6 +47,14 @@ final class OwnToGlobalLinks {
      * @param variantCodes variant codes of the own and the global pool together
      */
     static List<Decision> apply(InventoryIndex ownIndex, GlobalMatchedInventory.Generation global, VariantCodes variantCodes) {
+        return apply(ownIndex, global, variantCodes, MatchingRules.standard().linkVetos());
+    }
+
+    /**
+     * @param vetos asked in order for a candidate with a single target; the first that refuses names the outcome
+     */
+    static List<Decision> apply(InventoryIndex ownIndex, GlobalMatchedInventory.Generation global, VariantCodes variantCodes,
+                                List<LinkVeto> vetos) {
         // keyed by the raw code, so the pass over the global pool allocates nothing for offers no own group shares;
         // one small Pair per distinct own pair, nothing per own group until a global offer hits it
         Map<String, Pair> pairsByCode = collectPairs(ownIndex, global.index());
@@ -62,7 +71,7 @@ final class OwnToGlobalLinks {
             if (candidate == null) {
                 continue;
             }
-            Decision decision = evaluate(candidate, pairsByCode, ownIndex, global.index());
+            Decision decision = evaluate(candidate, pairsByCode, ownIndex, global.index(), vetos);
             if (decision.outcome() == Outcome.LINKED) {
                 claimsByTarget.merge(decision.global(), 1, Integer::sum);
             }
@@ -135,7 +144,7 @@ final class OwnToGlobalLinks {
     }
 
     private static Decision evaluate(Candidate candidate, Map<String, Pair> pairsByCode, InventoryIndex ownIndex,
-                                     InventoryIndex globalIndex) {
+                                     InventoryIndex globalIndex, List<LinkVeto> vetos) {
         MatchedInventory own = candidate.own;
         if (candidate.targets.isEmpty()) {
             return new Decision(own, null, Outcome.VARIANT_CODE, Double.NaN, Double.NaN);
@@ -148,23 +157,16 @@ final class OwnToGlobalLinks {
         double ownAverage = candidate.ownAveragePrice(pairsByCode);
         double globalAverage = target.getValue().average();
 
-        Outcome outcome;
-        if (haveConflictingPimIds(own.getInventoryKey(), global.getInventoryKey())) {
-            outcome = Outcome.CONFLICTING_PIM_IDS;
-        } else if (globalIndex.findMatching(global.getInventoryKey()).stream().anyMatch(other -> other != global)) {
-            outcome = Outcome.TARGET_SHARES_EAN;
-        } else if (!ownIndex.findMatching(global.getInventoryKey()).isEmpty()) {
-            outcome = Outcome.TARGET_HAS_OWN_GROUP;
-        } else if (PriceSplitThresholds.areTooFarApart(ownAverage, globalAverage)) {
-            outcome = Outcome.PRICE_TOO_FAR;
-        } else {
-            outcome = Outcome.LINKED;
+        LinkCandidate linkCandidate = new LinkCandidate(own, global, ownAverage, globalAverage, ownIndex, globalIndex);
+        Outcome outcome = Outcome.LINKED;
+        for (LinkVeto veto : vetos) {
+            Optional<Outcome> refusal = veto.refuse(linkCandidate);
+            if (refusal.isPresent()) {
+                outcome = refusal.get();
+                break;
+            }
         }
         return new Decision(own, global, outcome, ownAverage, globalAverage);
-    }
-
-    private static boolean haveConflictingPimIds(InventoryKey own, InventoryKey global) {
-        return own.getId() != null && global.getId() != null && !own.getId().equals(global.getId());
     }
 
     private static boolean hasPair(InventoryItem offer) {

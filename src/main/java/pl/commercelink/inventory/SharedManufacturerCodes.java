@@ -17,7 +17,7 @@ import java.util.Set;
  * as before. The same pairs without the supplier, {@link #variantCodes}, are used to refuse a link between an own
  * and a global group.
  */
-public final class SharedManufacturerCodes {
+public final class SharedManufacturerCodes implements CodeJoinGuard {
 
     private final Set<InventoryItem> offersUnderSharedCode;
     private final VariantCodes variantCodes;
@@ -46,11 +46,17 @@ public final class SharedManufacturerCodes {
         return offersUnderSharedCode.contains(offer);
     }
 
+    @Override
+    public boolean joinsOnlyByEan(InventoryItem offer) {
+        return isShared(offer);
+    }
+
     public Set<InventoryItem> offersUnderSharedCode() {
         return Collections.unmodifiableSet(offersUnderSharedCode);
     }
 
     /** The brand and code of every per-supplier shared code, without the supplier. */
+    @Override
     public VariantCodes variantCodes() {
         return variantCodes;
     }

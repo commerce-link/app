@@ -213,6 +213,9 @@ public class PimCatalogRegistry {
         productRepository.findAllWithoutPimIdByEan(event.eans())
                 .forEach(product -> {
                     product.setPimId(event.pimId());
+                    if (event.brand() != null && !event.brand().isBlank()) {
+                        product.setBrand(event.brand());
+                    }
                     productRepository.save(product);
                 });
     }
