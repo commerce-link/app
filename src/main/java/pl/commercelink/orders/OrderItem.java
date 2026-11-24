@@ -112,6 +112,10 @@ public class OrderItem extends Item {
         return isInAllocation() || (hasAllocationDetails() && hasOneOfTheStatuses(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered, FulfilmentStatus.InExternalService, FulfilmentStatus.Returned, FulfilmentStatus.Replaced));
     }
 
+    public void update(OrderItem other) {
+        update(other, false);
+    }
+
     /** fullEdit: the store lets its admin change a fulfilled item like a new one (OrderEditPolicy#editsItemsInAnyStatus). */
     public void update(OrderItem other, boolean fullEdit) {
         if (isNew() || fullEdit) {

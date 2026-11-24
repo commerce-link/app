@@ -46,7 +46,7 @@ class OrderTest {
 
             // when / then
             boolean expected = status.isOneOf(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly, OrderStatus.Assembled);
-            assertThat(order.canBeSplit(OrderEditPolicy.STRICT)).as(status.name()).isEqualTo(expected);
+            assertThat(order.canBeSplit()).as(status.name()).isEqualTo(expected);
         }
     }
 
@@ -61,7 +61,7 @@ class OrderTest {
         // when / then
         assertThat(order.isInvoiced()).isTrue();
         assertThat(order.hasClosingDocument()).isFalse();
-        assertThat(order.canBeSplit(OrderEditPolicy.STRICT)).isFalse();
+        assertThat(order.canBeSplit()).isFalse();
     }
 
     @ParameterizedTest
@@ -74,7 +74,7 @@ class OrderTest {
         order.addDocument(new Document("doc-1", "DOC/1", null, type));
 
         // when / then
-        assertThat(order.canBeSplit(OrderEditPolicy.STRICT)).isFalse();
+        assertThat(order.canBeSplit()).isFalse();
     }
 
     @Test
@@ -762,7 +762,7 @@ class OrderTest {
         paidAndRefundedInFull(order);
 
         // when / then
-        assertThat(order.canBeSplit(OrderEditPolicy.STRICT)).isTrue();
+        assertThat(order.canBeSplit()).isTrue();
     }
 
     @Test
@@ -773,7 +773,7 @@ class OrderTest {
         order.addPayment(new Payment("REF-2", "Jan", PaymentSource.BankTransfer, PaymentDirection.Outgoing, -181.57, 0, null, null));
 
         // when / then
-        assertThat(order.canBeSplit(OrderEditPolicy.STRICT)).isFalse();
+        assertThat(order.canBeSplit()).isFalse();
     }
 
     private static void paidAndRefundedInFull(Order order) {

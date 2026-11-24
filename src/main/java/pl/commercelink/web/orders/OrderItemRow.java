@@ -103,8 +103,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 // without the item menu a closed order would have no way to its item page (EAN, VAT, delivery dates)
                 context.readOnly() && !context.superAdmin() ? itemHref : null,
                 // the badge asks for a link, which only a New item of an open order can still take
-                linkable(item, context.ownOffer()) && item.hasUnlinkedExternalOffer() && !context.order().isClosed()
-                        && (item.isNew() || editsItemsInAnyStatus(context.order(), context.editPolicy(), context.receiptLock())),
+                linkable(item, context.ownOffer()) && item.hasUnlinkedExternalOffer() && item.isNew() && !context.order().isClosed(),
                 item.getExternalOfferKey());
     }
 
@@ -191,15 +190,17 @@ public record OrderItemRow(String itemId, int index, String name, String categor
         String assignReason = item.isGroup() ? "order.item.unavailable.group"
                 : item.isNew() || anyStatus ? null
                 : "order.item.unavailable.not.new";
+        // the offer link fills the item as an import would, so it stays with New items whatever the store allows
+        String linkReason = !item.isGroup() && !item.isNew() ? "order.item.unavailable.not.new" : assignReason;
         if (!releaseFirst) {
             // only an imported line that carries the seller's offer key can be linked; older lines keep "Assign SKU".
             // A line already recognised can have its link changed, e.g. a mistyped EAN
             if (!linkable(item, ownOffer)) {
                 // an offer CommerceLink published, or a line without an offer key: no link to make or change
             } else if (item.hasUnlinkedExternalOffer()) {
-                states.add(ItemAction.State.of(ItemAction.LINK_OFFER, assignReason, null));
+                states.add(ItemAction.State.of(ItemAction.LINK_OFFER, linkReason, null));
             } else if (!item.isService()) {
-                states.add(ItemAction.State.of(ItemAction.CHANGE_OFFER_LINK, assignReason, null));
+                states.add(ItemAction.State.of(ItemAction.CHANGE_OFFER_LINK, linkReason, null));
             }
             states.add(ItemAction.State.of(ItemAction.ASSIGN_SKU, assignReason, null));
             states.add(ItemAction.State.of(ItemAction.ASSIGN_SUPPLIER, assignReason, null));
@@ -223,7 +224,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
             // splitting rewrites the lines the sale document lists (OrdersController#splitGroupItem refuses the same)
             ItemSaleLock saleLock = ItemSaleLock.of(order, receiptLock, editPolicy);
             String splitReason = item.isService() ? "order.item.unavailable.service"
-                    : !item.isNew() && !anyStatus ? "order.item.unavailable.not.new"
+                    : !item.isNew() ? "order.item.unavailable.not.new"
                     : saleLock != null ? saleLock.menuReasonKey() : null;
             states.add(ItemAction.State.of(ItemAction.SPLIT_GROUP, splitReason, null));
         }

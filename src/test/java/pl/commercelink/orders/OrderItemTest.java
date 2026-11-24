@@ -138,7 +138,7 @@ class OrderItemTest {
         updated.setCost(60.0);
 
         // when
-        orderItem.update(updated, false);
+        orderItem.update(updated);
 
         // then
         assertThat(orderItem.getPrice()).isEqualTo(150.0);
@@ -292,7 +292,7 @@ class OrderItemTest {
 
         // when
         stored.updateAllFields(fromForm);
-        stored.update(fromForm, false);
+        stored.update(fromForm);
 
         // then
         assertThat(stored.getExternalOfferKey()).isEqualTo("PS-8001");

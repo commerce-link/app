@@ -1334,18 +1334,16 @@ public class OrdersController extends BaseController {
             return refuse(redirectAttributes, orderId, "order.item.error.closed", locale);
         }
         OrderItem orderItem = requireItem(orderId, itemId);
-        // the rule of "Assign SKU": the codes are filled before fulfilment only, unless the store lets its admin
-        // change fulfilled items
-        boolean anyStatus = OrderItemRow.editsItemsInAnyStatus(order, editPolicy(), receiptAttemptService.receiptLock(order));
-        if ((!orderItem.isNew() && !anyStatus) || orderItem.isGroup()) {
+        // the rule of "Assign SKU": the codes are filled before fulfilment only
+        if (!orderItem.isNew() || orderItem.isGroup()) {
             return refuse(redirectAttributes, orderId, "order.item.link.offer.locked", locale);
         }
         ExternalOfferLinking.LinkResult result;
         try {
             // a typed EAN wins: the dialog clears the product choice when one is typed; spaces alone are a bad EAN
             result = StringUtils.isNotEmpty(ean)
-                    ? externalOfferLinking.linkEan(getStoreId(), order, itemId, ean, getUserId(), anyStatus)
-                    : externalOfferLinking.link(getStoreId(), order, itemId, categoryId, productId, getUserId(), anyStatus);
+                    ? externalOfferLinking.linkEan(getStoreId(), order, itemId, ean, getUserId())
+                    : externalOfferLinking.link(getStoreId(), order, itemId, categoryId, productId, getUserId());
         } catch (IllegalArgumentException e) {
             return refuse(redirectAttributes, orderId, e.getMessage(), locale);
         }
@@ -1376,15 +1374,13 @@ public class OrdersController extends BaseController {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
         // splitting a set replaces its line with the components' names, quantities and prices: the sale document (or
         // the e-receipt being issued) lists the set, so the menu greys it with the same reason
-        OrderEditPolicy editPolicy = editPolicy();
-        ItemSaleLock saleLock = ItemSaleLock.of(order, receiptAttemptService.receiptLock(order), editPolicy);
+        ItemSaleLock saleLock = ItemSaleLock.of(order, receiptAttemptService.receiptLock(order), editPolicy());
         if (saleLock != null) {
             return refuse(redirectAttributes, orderId, saleLock.splitGroupRefusalKey(), locale);
         }
         requireItem(orderId, form.getItemId());
         try {
-            // no sale lock means no e-receipt in flight either, so the policy alone opens a fulfilled set
-            ordersManager.splitGroupItem(orderId, form.getItemId(), form.toComponents(), editPolicy.editsItemsInAnyStatus(order));
+            ordersManager.splitGroupItem(orderId, form.getItemId(), form.toComponents());
         } catch (IllegalStateException e) {
             return refuse(redirectAttributes, orderId, "error.message." + e.getMessage(), locale);
         }
@@ -1489,7 +1485,7 @@ public class OrdersController extends BaseController {
             return refuse(redirectAttributes, orderId, receiptLock.key(DELETE_LOCKED_RECEIPT), locale);
         }
         try {
-            ordersManager.deleteOrder(getStoreId(), orderId, editPolicy());
+            ordersManager.deleteOrder(getStoreId(), orderId);
         } catch (IllegalStateException e) {
             // a page left open while the order gained an item or an invoice: the reason, not an error page
             return refuse(redirectAttributes, orderId, "order.page.delete.unavailable", locale);

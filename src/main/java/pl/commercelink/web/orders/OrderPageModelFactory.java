@@ -121,8 +121,7 @@ public class OrderPageModelFactory {
         return new OrderPageModel(order.getOrderId(), order.getShortenedOrderId(),
                 viewer.superAdmin() ? null : OrderBackLink.sanitize(viewer.back()),
                 closed, readOnly, viewer.superAdmin(), viewer.admin(), store == null ? null : store.getName(),
-                header(order, items, dropshipItemIds, store, viewer, readOnly, links, locale, dropship, receipts, receiptLock,
-                        editPolicy),
+                header(order, items, dropshipItemIds, store, viewer, readOnly, links, locale, dropship, receipts, receiptLock),
                 items(order, items, store, viewer, readOnly, links, hasDropshipItems, dropship, receiptLock, editPolicy,
                         locale),
                 shipments(order, store, readOnly, locale),
@@ -144,8 +143,7 @@ public class OrderPageModelFactory {
     private OrderPageModel.Header header(Order order, List<OrderItem> items, Set<String> dropshipItemIds, Store store,
                                          Viewer viewer, boolean readOnly,
                                          OrderLinks links, Locale locale, DropshipAssessment dropship,
-                                         ReceiptOrderState receipts, ReceiptLock receiptLock,
-                                         OrderEditPolicy editPolicy) {
+                                         ReceiptOrderState receipts, ReceiptLock receiptLock) {
         boolean receiptLocked = receiptLock.locks();
         boolean canOrderShipment = order.canOrderShipment();
         OrderPageModel.PrimaryAction primary = null;
@@ -172,8 +170,7 @@ public class OrderPageModelFactory {
         String sourceTypeKey = order.getSource() == null || sourceName != null ? null
                 : OrderLabels.sourceType(order.getSource().getType());
         // as OrdersController#deleteOrder refuses: an order whose e-receipt is being issued stays
-        boolean canDelete = !viewer.superAdmin() && items.isEmpty()
-                && !editPolicy.invoiceLocks(order)
+        boolean canDelete = !viewer.superAdmin() && items.isEmpty() && !order.isInvoiced()
                 && !order.hasRecordedPayments() && !receiptLocked;
         boolean canCancel = order.canBeCancelled(items, dropshipItemIds);
         // not tied to readOnly: a completed order is closed, yet a return is exactly when an RMA is reported

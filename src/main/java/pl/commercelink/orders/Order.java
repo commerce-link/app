@@ -567,7 +567,12 @@ public class Order {
     }
 
     @DynamoDBIgnore
+    public boolean canBeSplit() {
+        return canBeSplit(OrderEditPolicy.STRICT);
+    }
+
     /** editPolicy: a WZ and an invoice stop the split only while the store did not release them. */
+    @DynamoDBIgnore
     public boolean canBeSplit(OrderEditPolicy editPolicy) {
         return hasOneOfStatuses(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly, OrderStatus.Assembled)
                 && isZero(getPaidAmount())

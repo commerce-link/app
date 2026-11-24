@@ -127,7 +127,7 @@ class OrderEditPolicyTest {
         Order issuedAndInvoiced = orderWith(DocumentType.GoodsIssue, DocumentType.InvoiceVat);
 
         // when / then
-        assertThat(issuedAndInvoiced.canBeSplit(OrderEditPolicy.STRICT)).isFalse();
+        assertThat(issuedAndInvoiced.canBeSplit()).isFalse();
         assertThat(issuedAndInvoiced.canBeSplit(AFTER_SALE)).isFalse();
         assertThat(issuedAndInvoiced.canBeSplit(new OrderEditPolicy(true, true, false))).isTrue();
     }

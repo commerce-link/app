@@ -4236,7 +4236,7 @@ class OrdersControllerTest {
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
             fresh.setExternalOfferKey("XS-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
-            when(externalOfferLinking.link(STORE_ID, order, "i1", "c1", "p1", null, false))
+            when(externalOfferLinking.link(STORE_ID, order, "i1", "c1", "p1", null))
                     .thenReturn(new pl.commercelink.externaloffers.ExternalOfferLinking.LinkResult(3));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
@@ -4256,7 +4256,7 @@ class OrdersControllerTest {
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
             fresh.setExternalOfferKey("XS-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
-            when(externalOfferLinking.link(STORE_ID, order, "i1", "c-foreign", "p1", null, false)).thenThrow(
+            when(externalOfferLinking.link(STORE_ID, order, "i1", "c-foreign", "p1", null)).thenThrow(
                     new IllegalArgumentException(pl.commercelink.externaloffers.ExternalOfferLinking.PRODUCT_NOT_IN_CATALOG));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
@@ -4276,7 +4276,7 @@ class OrdersControllerTest {
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
             fresh.setExternalOfferKey("PS-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
-            when(externalOfferLinking.linkEan(STORE_ID, order, "i1", "2001000000043", null, false))
+            when(externalOfferLinking.linkEan(STORE_ID, order, "i1", "2001000000043", null))
                     .thenReturn(new pl.commercelink.externaloffers.ExternalOfferLinking.LinkResult(1));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
@@ -4285,7 +4285,7 @@ class OrdersControllerTest {
 
             // then
             assertThat(notice(redirect).text()).isEqualTo("order.item.link.offer.done [1]");
-            verify(externalOfferLinking, never()).link(any(), any(), any(), any(), any(), any(), anyBoolean());
+            verify(externalOfferLinking, never()).link(any(), any(), any(), any(), any(), any());
         }
 
         @Test
@@ -4296,7 +4296,7 @@ class OrdersControllerTest {
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
             fresh.setExternalOfferKey("PS-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
-            when(externalOfferLinking.linkEan(STORE_ID, order, "i1", "   ", null, false)).thenThrow(new IllegalArgumentException(
+            when(externalOfferLinking.linkEan(STORE_ID, order, "i1", "   ", null)).thenThrow(new IllegalArgumentException(
                     pl.commercelink.externaloffers.ExternalOfferLinking.INVALID_EAN));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
@@ -4306,7 +4306,7 @@ class OrdersControllerTest {
             // then
             assertThat(flash(redirect)).containsEntry("errorMessage",
                     pl.commercelink.externaloffers.ExternalOfferLinking.INVALID_EAN);
-            verify(externalOfferLinking, never()).link(any(), any(), any(), any(), any(), any(), anyBoolean());
+            verify(externalOfferLinking, never()).link(any(), any(), any(), any(), any(), any());
         }
 
         @Test
@@ -4317,7 +4317,7 @@ class OrdersControllerTest {
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
             fresh.setExternalOfferKey("PS-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
-            when(externalOfferLinking.linkEan(STORE_ID, order, "i1", "12AB", null, false)).thenThrow(
+            when(externalOfferLinking.linkEan(STORE_ID, order, "i1", "12AB", null)).thenThrow(
                     new IllegalArgumentException(pl.commercelink.externaloffers.ExternalOfferLinking.INVALID_EAN));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
@@ -4519,7 +4519,7 @@ class OrdersControllerTest {
         void deletingAnOrderThatCanNoLongerBeDeletedGoesBackWithTheReason() {
             // given
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.New));
-            org.mockito.Mockito.doThrow(new IllegalStateException("not deletable")).when(ordersManager).deleteOrder(STORE_ID, ORDER_ID, OrderEditPolicy.STRICT);
+            org.mockito.Mockito.doThrow(new IllegalStateException("not deletable")).when(ordersManager).deleteOrder(STORE_ID, ORDER_ID);
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
@@ -4540,7 +4540,7 @@ class OrdersControllerTest {
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/orders");
-            verify(ordersManager).deleteOrder(STORE_ID, ORDER_ID, OrderEditPolicy.STRICT);
+            verify(ordersManager).deleteOrder(STORE_ID, ORDER_ID);
         }
 
         @Test
@@ -6442,7 +6442,7 @@ class OrdersControllerTest {
             // when / then
             assertThatThrownBy(() -> ordersController.splitGroupItem(ORDER_ID, form, new RedirectAttributesModelMap(), polish))
                     .isInstanceOf(ResponseStatusException.class);
-            verify(ordersManager, never()).splitGroupItem(any(), any(), any(), anyBoolean());
+            verify(ordersManager, never()).splitGroupItem(any(), any(), any());
         }
 
         @Test
