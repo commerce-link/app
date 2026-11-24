@@ -102,14 +102,16 @@ public class ExternalOfferLinking {
      *
      * @throws IllegalArgumentException with a message key when the item or the product cannot be linked
      */
-    public LinkResult link(String storeId, Order order, String itemId, String categoryId, String productId, String userId) {
+    /** chosenAnyStatus: the chosen item is filled past the New status too (OrderEditPolicy#editsItemsInAnyStatus). */
+    public LinkResult link(String storeId, Order order, String itemId, String categoryId, String productId, String userId,
+                           boolean chosenAnyStatus) {
         OrderItem chosen = linkableItem(storeId, order, itemId);
         Product product = resolver.forStore(storeId).catalogProduct(categoryId, productId)
                 // same rule as the dialog's list: a link holds EANs, and the import skips a value without the format
                 // of one, so a product without a valid EAN cannot be linked
                 .filter(candidate -> OfferEans.unifyValid(candidate.getEan()) != null)
                 .orElseThrow(() -> new IllegalArgumentException(PRODUCT_NOT_IN_CATALOG));
-        return save(storeId, order, chosen, OfferEans.unifyValid(product.getEan()), userId);
+        return save(storeId, order, chosen, OfferEans.unifyValid(product.getEan()), userId, chosenAnyStatus);
     }
 
     /**
@@ -117,13 +119,13 @@ public class ExternalOfferLinking {
      *
      * @throws IllegalArgumentException with a message key when the item cannot be linked or the EAN is malformed
      */
-    public LinkResult linkEan(String storeId, Order order, String itemId, String ean, String userId) {
+    public LinkResult linkEan(String storeId, Order order, String itemId, String ean, String userId, boolean chosenAnyStatus) {
         OrderItem chosen = linkableItem(storeId, order, itemId);
         String typed = SPACES.matcher(StringUtils.defaultString(ean)).replaceAll("");
         if (!EAN.matcher(typed).matches() || !OfferEans.hasValidCheckDigit(typed)) {
             throw new IllegalArgumentException(INVALID_EAN);
         }
-        return save(storeId, order, chosen, OfferEans.unify(typed), userId);
+        return save(storeId, order, chosen, OfferEans.unify(typed), userId, chosenAnyStatus);
     }
 
     private OrderItem linkableItem(String storeId, Order order, String itemId) {
@@ -141,7 +143,8 @@ public class ExternalOfferLinking {
         return chosen;
     }
 
-    private LinkResult save(String storeId, Order order, OrderItem chosen, String ean, String userId) {
+    private LinkResult save(String storeId, Order order, OrderItem chosen, String ean, String userId,
+                            boolean chosenAnyStatus) {
         String orderSource = marketplaceOf(order);
         String offerKey = chosen.getExternalOfferKey();
         // what the replaced link gave the lines, so items it filled are corrected and nothing else is touched
@@ -158,10 +161,11 @@ public class ExternalOfferLinking {
         ResolvedOffer offer = resolver.forStore(storeId).linked(List.of(ean));
         int updated = 0;
         for (OrderItem item : itemsWithTheKey(storeId, order, orderSource, offerKey)) {
-            if (!item.isNew() || item.isGroup()) {
+            boolean isChosen = item.getItemId().equals(chosen.getItemId());
+            // only the item the admin chose is filled past New; the offer's other items keep the New-only rule
+            if ((!item.isNew() && !(isChosen && chosenAnyStatus)) || item.isGroup()) {
                 continue;
             }
-            boolean isChosen = item.getItemId().equals(chosen.getItemId());
             // a link outranks a manufacturer code in the resolver, but only a line nobody categorised or re-skued since
             // is re-filled, as before the source was stored
             boolean recognisedByManufacturerCode = item.getExternalOfferSource() == ResolvedOffer.Source.MFN

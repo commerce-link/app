@@ -4,6 +4,7 @@ import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderEditPolicy;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.starter.util.ConversionUtil;
@@ -33,7 +34,16 @@ public record OrderItemRow(String itemId, int index, String name, String categor
      */
     public record Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
                           Function<OrderItem, String> deliveryHref, Function<String, String> serialHref,
-                          ReceiptLock receiptLock, boolean dropshipLocked, Predicate<String> ownOffer) {
+                          ReceiptLock receiptLock, boolean dropshipLocked, Predicate<String> ownOffer,
+                          OrderEditPolicy editPolicy) {
+
+        /** editPolicy: which documents still lock the order for its store; every one where none is given. */
+        public Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
+                       Function<OrderItem, String> deliveryHref, Function<String, String> serialHref,
+                       ReceiptLock receiptLock, boolean dropshipLocked, Predicate<String> ownOffer) {
+            this(order, readOnly, superAdmin, labels, deliveryHref, serialHref, receiptLock, dropshipLocked, ownOffer,
+                    OrderEditPolicy.STRICT);
+        }
 
         /** ownOffer: whether a marketplace offer key is an offer CommerceLink published, which offer links leave out. */
         public Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
@@ -55,6 +65,15 @@ public record OrderItemRow(String itemId, int index, String name, String categor
         }
     }
 
+    /**
+     * Whether the store's admin works on the order's items whatever their status (OrderEditPolicy#editsItemsInAnyStatus): the
+     * item page takes every field and the item menu and "Usuń" work past New. Never while an e-receipt is being
+     * issued. OrdersController decides its refusals by the same rule.
+     */
+    public static boolean editsItemsInAnyStatus(Order order, OrderEditPolicy editPolicy, ReceiptLock receiptLock) {
+        return editPolicy.editsItemsInAnyStatus(order) && !receiptLock.locks();
+    }
+
     public static OrderItemRow of(OrderItem item, int index, Context context) {
         String itemHref = "/dashboard/orders/" + context.order().getOrderId() + "/items/" + item.getItemId();
         String deliveryId = StringUtils.trimToNull(item.getDeliveryId());
@@ -74,15 +93,18 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 OrderLabels.itemStatus(item.getStatus()), OrderLabels.tone(item.getStatus()),
                 deliveryLabel, deliveryHref, DeliveryRedirectResolver.isCreateLink(deliveryHref),
                 item.isReadyForAllocation(), item.isProduct() && item.isAllocated(), item.isProduct() && item.isDelivered(),
-                item.canBeMovedToAnotherOrder(), item.isNew() || item.isService(),
+                item.canBeMovedToAnotherOrder(),
+                item.isNew() || item.isService() || editsItemsInAnyStatus(context.order(), context.editPolicy(), context.receiptLock()),
                 context.readOnly() ? List.of() : actions(item, context.order(), context.receiptLock(), context.dropshipLocked(),
+                        context.editPolicy(),
                         context.ownOffer()),
                 context.readOnly() ? null : itemHref,
                 item.getPrice(), item.getTax(), item.isGroup(),
                 // without the item menu a closed order would have no way to its item page (EAN, VAT, delivery dates)
                 context.readOnly() && !context.superAdmin() ? itemHref : null,
                 // the badge asks for a link, which only a New item of an open order can still take
-                linkable(item, context.ownOffer()) && item.hasUnlinkedExternalOffer() && item.isNew() && !context.order().isClosed(),
+                linkable(item, context.ownOffer()) && item.hasUnlinkedExternalOffer() && !context.order().isClosed()
+                        && (item.isNew() || editsItemsInAnyStatus(context.order(), context.editPolicy(), context.receiptLock())),
                 item.getExternalOfferKey());
     }
 
@@ -155,12 +177,19 @@ public record OrderItemRow(String itemId, int index, String name, String categor
     /** ownOffer: whether an offer key is an offer CommerceLink published; its lines get no link entry at all. */
     public static List<ItemAction.State> actions(OrderItem item, Order order, ReceiptLock receiptLock, boolean dropshipLocked,
                                                  Predicate<String> ownOffer) {
+        return actions(item, order, receiptLock, dropshipLocked, OrderEditPolicy.STRICT, ownOffer);
+    }
+
+    /** editPolicy: a store that lets its orders change after a sale document keeps "Split set" available. */
+    public static List<ItemAction.State> actions(OrderItem item, Order order, ReceiptLock receiptLock, boolean dropshipLocked,
+                                                 OrderEditPolicy editPolicy, Predicate<String> ownOffer) {
         List<ItemAction.State> states = new ArrayList<>();
         // an item that already has a supplier (Allocation) is released first, then reassigned: while it is
         // releasable only "Usuń dostawcę" is offered, the assign entries are absent rather than greyed
         boolean releaseFirst = !item.isGroup() && !item.isNew() && item.isReleasable();
+                boolean anyStatus = editsItemsInAnyStatus(order, editPolicy, receiptLock);
         String assignReason = item.isGroup() ? "order.item.unavailable.group"
-                : item.isNew() ? null
+                : item.isNew() || anyStatus ? null
                 : "order.item.unavailable.not.new";
         if (!releaseFirst) {
             // only an imported line that carries the seller's offer key can be linked; older lines keep "Assign SKU".
@@ -192,13 +221,13 @@ public record OrderItemRow(String itemId, int index, String name, String categor
         // "Split set" only exists for a set; for any other item it is not greyed out but absent
         if (item.isGroup()) {
             // splitting rewrites the lines the sale document lists (OrdersController#splitGroupItem refuses the same)
-            ItemSaleLock saleLock = ItemSaleLock.of(order, receiptLock);
+            ItemSaleLock saleLock = ItemSaleLock.of(order, receiptLock, editPolicy);
             String splitReason = item.isService() ? "order.item.unavailable.service"
-                    : !item.isNew() ? "order.item.unavailable.not.new"
+                    : !item.isNew() && !anyStatus ? "order.item.unavailable.not.new"
                     : saleLock != null ? saleLock.menuReasonKey() : null;
             states.add(ItemAction.State.of(ItemAction.SPLIT_GROUP, splitReason, null));
         }
-        String consolidateReason = order.hasClosingDocument() ? "order.item.unavailable.invoiced"
+        String consolidateReason = editPolicy.saleDocumentLocks(order) ? "order.item.unavailable.invoiced"
                 : receiptLock.locks() ? receiptLock.key("order.item.unavailable.receipt") : null;
         states.add(new ItemAction.State(ItemAction.CONSOLIDATE,
                 item.isConsolidated() ? "order.item.menu.deconsolidate" : "order.item.menu.consolidate",

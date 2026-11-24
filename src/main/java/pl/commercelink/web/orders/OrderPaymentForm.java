@@ -2,6 +2,7 @@ package pl.commercelink.web.orders;
 
 import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderEditPolicy;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
@@ -111,7 +112,11 @@ public record OrderPaymentForm(String orderId, int index, String version, boolea
      * (Order#isInvoiced, or the order's e-receipt locking it), worded after the e-receipt's state like them.
      */
     public static String methodLockedKey(Order order, ReceiptLock receiptLock) {
-        if (order.isInvoiced()) {
+        return methodLockedKey(order, receiptLock, OrderEditPolicy.STRICT);
+    }
+
+    public static String methodLockedKey(Order order, ReceiptLock receiptLock, OrderEditPolicy editPolicy) {
+        if (editPolicy.invoiceLocks(order)) {
             return METHOD_LOCKED;
         }
         return receiptLock.locks() ? receiptLock.key(METHOD_LOCKED + ".receipt") : null;

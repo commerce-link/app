@@ -335,7 +335,7 @@ public class ReceiptAttemptService {
      * stopped; live attempts keep theirs, a fiscalised receipt whose e-mail failed still needs sending); otherwise the
      * newest attempt, when dead, has its alert raised again (it may have been resolved by a closing document that is
      * gone now). Earlier, superseded attempts are left resolved: only the newest one asks for anything. Called by
-     * every write that can change the rule's inputs: an order saved through the lifecycle, a document unpinned, an
+     * every write that can change the rule's inputs: an order saved through the lifecycle, an
      * invoice issued, the order cancelled, an attempt that died while the order changed under it. Costs one strongly
      * consistent query of the order's own key range ({@link ReceiptAttemptStore#findByOrder}), empty for an order that
      * never had an attempt; writes to the bell only for an order with a dead attempt. Never throws: the alerts must

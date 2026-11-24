@@ -46,7 +46,7 @@ class OrderTest {
 
             // when / then
             boolean expected = status.isOneOf(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly, OrderStatus.Assembled);
-            assertThat(order.canBeSplit()).as(status.name()).isEqualTo(expected);
+            assertThat(order.canBeSplit(OrderEditPolicy.STRICT)).as(status.name()).isEqualTo(expected);
         }
     }
 
@@ -61,7 +61,7 @@ class OrderTest {
         // when / then
         assertThat(order.isInvoiced()).isTrue();
         assertThat(order.hasClosingDocument()).isFalse();
-        assertThat(order.canBeSplit()).isFalse();
+        assertThat(order.canBeSplit(OrderEditPolicy.STRICT)).isFalse();
     }
 
     @ParameterizedTest
@@ -74,7 +74,7 @@ class OrderTest {
         order.addDocument(new Document("doc-1", "DOC/1", null, type));
 
         // when / then
-        assertThat(order.canBeSplit()).isFalse();
+        assertThat(order.canBeSplit(OrderEditPolicy.STRICT)).isFalse();
     }
 
     @Test
@@ -147,67 +147,6 @@ class OrderTest {
         order.addDocument(new Document("vat-1", "FV/1/2026", null, DocumentType.InvoiceVat));
 
         assertThat(order.getIssuableDocumentTypes()).isEmpty();
-    }
-
-    @Test
-    @DisplayName("removeDocument removes an invoice matched by type and number")
-    void removeDocumentRemovesInvoiceMatchedByTypeAndNumber() {
-        // given
-        Order order = b2bOrder();
-        order.addDocument(new Document("vat-1", "FV/1/2026", null, DocumentType.InvoiceVat));
-
-        // when
-        boolean removed = order.removeDocument(DocumentType.InvoiceVat, "FV/1/2026");
-
-        // then
-        assertThat(removed).isTrue();
-        assertThat(order.getDocuments()).isEmpty();
-        assertThat(order.isInvoiced()).isFalse();
-    }
-
-    @Test
-    @DisplayName("removeDocument refuses to remove a warehouse document")
-    void removeDocumentRefusesWarehouseDocument() {
-        // given
-        Order order = b2bOrder();
-        order.addDocument(new Document("wz-1", "WZ/1/2026", null, DocumentType.GoodsIssue));
-
-        // when
-        boolean removed = order.removeDocument(DocumentType.GoodsIssue, "WZ/1/2026");
-
-        // then
-        assertThat(removed).isFalse();
-        assertThat(order.getDocuments()).hasSize(1);
-    }
-
-    @Test
-    @DisplayName("removeDocument refuses to remove an order document")
-    void removeDocumentRefusesOrderDocument() {
-        // given
-        Order order = b2bOrder();
-        order.addDocument(orderDocument());
-
-        // when
-        boolean removed = order.removeDocument(DocumentType.Order, "ZAM/1/2026");
-
-        // then
-        assertThat(removed).isFalse();
-        assertThat(order.getDocuments()).hasSize(1);
-    }
-
-    @Test
-    @DisplayName("removeDocument returns false when no document matches the number")
-    void removeDocumentReturnsFalseWhenNumberDoesNotMatch() {
-        // given
-        Order order = b2bOrder();
-        order.addDocument(new Document("vat-1", "FV/1/2026", null, DocumentType.InvoiceVat));
-
-        // when
-        boolean removed = order.removeDocument(DocumentType.InvoiceVat, "FV/2/2026");
-
-        // then
-        assertThat(removed).isFalse();
-        assertThat(order.getDocuments()).hasSize(1);
     }
 
     @Test
@@ -823,7 +762,7 @@ class OrderTest {
         paidAndRefundedInFull(order);
 
         // when / then
-        assertThat(order.canBeSplit()).isTrue();
+        assertThat(order.canBeSplit(OrderEditPolicy.STRICT)).isTrue();
     }
 
     @Test
@@ -834,7 +773,7 @@ class OrderTest {
         order.addPayment(new Payment("REF-2", "Jan", PaymentSource.BankTransfer, PaymentDirection.Outgoing, -181.57, 0, null, null));
 
         // when / then
-        assertThat(order.canBeSplit()).isFalse();
+        assertThat(order.canBeSplit(OrderEditPolicy.STRICT)).isFalse();
     }
 
     private static void paidAndRefundedInFull(Order order) {

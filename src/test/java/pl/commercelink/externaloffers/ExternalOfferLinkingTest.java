@@ -99,7 +99,7 @@ class ExternalOfferLinkingTest {
         openOrders(order);
 
         // when
-        ExternalOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1");
+        ExternalOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1", false);
 
         // then
         ArgumentCaptor<ExternalOfferLink> saved = ArgumentCaptor.forClass(ExternalOfferLink.class);
@@ -140,7 +140,7 @@ class ExternalOfferLinkingTest {
         openOrders(order, other, otherMarketplace, tooOld);
 
         // when
-        ExternalOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1");
+        ExternalOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1", false);
 
         // then
         assertThat(result.updatedItems()).isEqualTo(3);
@@ -167,7 +167,7 @@ class ExternalOfferLinkingTest {
         openOrders(order);
 
         // when
-        ExternalOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1");
+        ExternalOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1", false);
 
         // then
         verify(linkRepository).save(any());
@@ -188,7 +188,7 @@ class ExternalOfferLinkingTest {
         when(orderItemsRepository.findById("o1", "i1")).thenReturn(item);
 
         // when / then
-        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "other-store-category", "p1", "user-1"))
+        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "other-store-category", "p1", "user-1", false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage(ExternalOfferLinking.PRODUCT_NOT_IN_CATALOG);
         verify(linkRepository, never()).save(any());
@@ -204,7 +204,7 @@ class ExternalOfferLinkingTest {
         when(orderItemsRepository.findById("o1", "i1")).thenReturn(item);
 
         // when / then
-        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", productId, "user-1"))
+        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", productId, "user-1", false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage(ExternalOfferLinking.PRODUCT_NOT_IN_CATALOG);
         verify(linkRepository, never()).save(any());
@@ -219,7 +219,7 @@ class ExternalOfferLinkingTest {
         when(orderItemsRepository.findById("o1", "i1")).thenReturn(item);
 
         // when / then
-        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", "p2", "user-1"))
+        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", "p2", "user-1", false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage(ExternalOfferLinking.PRODUCT_NOT_IN_CATALOG);
         verify(linkRepository, never()).save(any());
@@ -233,7 +233,7 @@ class ExternalOfferLinkingTest {
         openOrders(order);
 
         // when
-        ExternalOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p3", "user-1");
+        ExternalOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p3", "user-1", false);
 
         // then
         ArgumentCaptor<ExternalOfferLink> saved = ArgumentCaptor.forClass(ExternalOfferLink.class);
@@ -252,7 +252,7 @@ class ExternalOfferLinkingTest {
         openOrders(order);
 
         // when
-        ExternalOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1");
+        ExternalOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1", false);
 
         // then
         ArgumentCaptor<ExternalOfferLink> saved = ArgumentCaptor.forClass(ExternalOfferLink.class);
@@ -271,7 +271,7 @@ class ExternalOfferLinkingTest {
         openOrders(order);
 
         // when
-        linking.link(STORE, order, "i1", "c1", "p4", "user-1");
+        linking.link(STORE, order, "i1", "c1", "p4", "user-1", false);
 
         // then
         ArgumentCaptor<ExternalOfferLink> saved = ArgumentCaptor.forClass(ExternalOfferLink.class);
@@ -289,7 +289,7 @@ class ExternalOfferLinkingTest {
         openOrders(order);
 
         // when
-        ExternalOfferLinking.LinkResult result = linking.linkEan(STORE, order, "i1", " 200 1000 000043 ", "user-1");
+        ExternalOfferLinking.LinkResult result = linking.linkEan(STORE, order, "i1", " 200 1000 000043 ", "user-1", false);
 
         // then
         ArgumentCaptor<ExternalOfferLink> saved = ArgumentCaptor.forClass(ExternalOfferLink.class);
@@ -316,7 +316,7 @@ class ExternalOfferLinkingTest {
                 .thenReturn(ResolvedOffer.linked(List.of("2001000000043"), "Dom i kuchnia"));
 
         // when
-        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1", false);
 
         // then
         assertThat(item.getCategory()).isEqualTo("Dom i kuchnia");
@@ -335,7 +335,7 @@ class ExternalOfferLinkingTest {
         assertThat(item.hasUnlinkedExternalOffer()).isTrue();
 
         // when
-        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1", false);
 
         // then
         assertThat(item.getExternalOfferSource()).isEqualTo(ResolvedOffer.Source.LINK);
@@ -356,7 +356,7 @@ class ExternalOfferLinkingTest {
         assertThat(item.hasUnlinkedExternalOffer()).isTrue();
 
         // when
-        ExternalOfferLinking.LinkResult result = linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+        ExternalOfferLinking.LinkResult result = linking.linkEan(STORE, order, "i1", "2001000000043", "user-1", false);
 
         // then
         verify(orderItemsRepository).save(item);
@@ -373,7 +373,7 @@ class ExternalOfferLinkingTest {
 
         // when / then
         for (String typed : new String[]{"1234567", "123456789012345", "20010000000AB", "2001000000013", "", null}) {
-            assertThatThrownBy(() -> linking.linkEan(STORE, order, "i1", typed, "user-1"))
+            assertThatThrownBy(() -> linking.linkEan(STORE, order, "i1", typed, "user-1", false))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage(ExternalOfferLinking.INVALID_EAN);
         }
@@ -390,7 +390,7 @@ class ExternalOfferLinkingTest {
         when(orderItemsRepository.findById("o1", "i1")).thenReturn(legacy);
 
         // when / then
-        assertThatThrownBy(() -> linking.linkEan(STORE, order, "i1", "x", "user-1"))
+        assertThatThrownBy(() -> linking.linkEan(STORE, order, "i1", "x", "user-1", false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage(ExternalOfferLinking.NO_OFFER_KEY);
     }
@@ -404,7 +404,7 @@ class ExternalOfferLinkingTest {
         when(orderItemsRepository.findById("o1", "i1")).thenReturn(legacy);
 
         // when / then
-        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", "p1", "user-1"))
+        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", "p1", "user-1", false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage(ExternalOfferLinking.NO_OFFER_KEY);
         verify(linkRepository, never()).save(any());
@@ -418,7 +418,7 @@ class ExternalOfferLinkingTest {
         when(orderItemsRepository.findById("o1", "i1")).thenReturn(unlinkedItem("o1", "i1", FulfilmentStatus.New));
 
         // when / then
-        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", "p1", "user-1"))
+        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", "p1", "user-1", false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage(ExternalOfferLinking.NOT_A_MARKETPLACE_ORDER);
         verify(linkRepository, never()).save(any());
@@ -432,7 +432,7 @@ class ExternalOfferLinkingTest {
         openOrders(order);
 
         // when
-        ExternalOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1");
+        ExternalOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1", false);
 
         // then
         assertThat(result.updatedItems()).isEqualTo(1);
@@ -447,7 +447,7 @@ class ExternalOfferLinkingTest {
         openOrders(order);
 
         // when
-        linking.link(STORE, order, "i1", "c1", "p1", "user-1");
+        linking.link(STORE, order, "i1", "c1", "p1", "user-1", false);
 
         // then the date index is asked for the last 90 days of open orders, not for every open order of the store
         ArgumentCaptor<ArchiveIndexRequest> asked = ArgumentCaptor.forClass(ArchiveIndexRequest.class);
@@ -465,7 +465,7 @@ class ExternalOfferLinkingTest {
         openOrders(order);
 
         // when
-        linking.linkEan(STORE, order, "i1", "2001\u00A0000\u2007000043", "user-1");
+        linking.linkEan(STORE, order, "i1", "2001\u00A0000\u2007000043", "user-1", false);
 
         // then
         assertThat(item.getSku()).isEqualTo("2001000000043");
@@ -480,7 +480,7 @@ class ExternalOfferLinkingTest {
 
         // when / then
         for (String typed : new String[]{"20010003", "200100005"}) {
-            assertThat(linking.linkEan(STORE, order, "i1", typed, "user-1").updatedItems()).isEqualTo(1);
+            assertThat(linking.linkEan(STORE, order, "i1", typed, "user-1", false).updatedItems()).isEqualTo(1);
         }
     }
 
@@ -495,7 +495,7 @@ class ExternalOfferLinkingTest {
         openOrders(order, other);
 
         // when
-        ExternalOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1");
+        ExternalOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "c1", "p1", "user-1", false);
 
         // then
         assertThat(result.updatedItems()).isEqualTo(1);
@@ -514,7 +514,7 @@ class ExternalOfferLinkingTest {
         openOrders(order, other);
 
         // when
-        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1", false);
 
         // then the next import would resolve the line by the link, which outranks the code
         assertThat(byCode.getExternalOfferSource()).isEqualTo(ResolvedOffer.Source.LINK);
@@ -533,7 +533,7 @@ class ExternalOfferLinkingTest {
         openOrders(order, other);
 
         // when
-        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1", false);
 
         // then
         assertThat(byCode.getExternalOfferSource()).isEqualTo(ResolvedOffer.Source.MFN);
@@ -554,7 +554,7 @@ class ExternalOfferLinkingTest {
         openOrders(order, other);
 
         // when
-        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1", false);
 
         // then
         assertThat(byHand.getSku()).isEqualTo("DMW-9");
@@ -573,7 +573,7 @@ class ExternalOfferLinkingTest {
         openOrders(order, other);
 
         // when
-        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1", false);
 
         // then
         assertThat(own.getSku()).isEqualTo("RAW-1");
@@ -593,7 +593,7 @@ class ExternalOfferLinkingTest {
                 List.of("2001000000050"), ExternalOfferLinkSource.MANUAL, "user-0", NOW)));
 
         // when
-        ExternalOfferLinking.LinkResult result = linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+        ExternalOfferLinking.LinkResult result = linking.linkEan(STORE, order, "i1", "2001000000043", "user-1", false);
 
         // then
         assertThat(result.updatedItems()).isEqualTo(2);
@@ -613,7 +613,7 @@ class ExternalOfferLinkingTest {
         openOrders(order);
 
         // when
-        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1");
+        linking.linkEan(STORE, order, "i1", "2001000000043", "user-1", false);
 
         // then the item looks as the next import of the offer would bring it
         assertThat(chosen.getSku()).isEqualTo("2001000000043");
@@ -634,7 +634,7 @@ class ExternalOfferLinkingTest {
                 List.of(EAN), ExternalOfferLinkSource.MANUAL, "user-0", NOW)));
 
         // when
-        ExternalOfferLinking.LinkResult result = linking.linkEan(STORE, order, "i1", EAN, "user-1");
+        ExternalOfferLinking.LinkResult result = linking.linkEan(STORE, order, "i1", EAN, "user-1", false);
 
         // then
         assertThat(result.updatedItems()).isZero();
@@ -650,10 +650,10 @@ class ExternalOfferLinkingTest {
         when(resolver.isOwnOffer(STORE, KEY)).thenReturn(true);
 
         // when / then
-        assertThatThrownBy(() -> linking.linkEan(STORE, order, "i1", "2001000000043", "user-1"))
+        assertThatThrownBy(() -> linking.linkEan(STORE, order, "i1", "2001000000043", "user-1", false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage(ExternalOfferLinking.OWN_OFFER);
-        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", "p1", "user-1"))
+        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", "p1", "user-1", false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage(ExternalOfferLinking.OWN_OFFER);
         verify(linkRepository, never()).save(any());

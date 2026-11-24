@@ -134,7 +134,11 @@ public class OrdersManager {
         manualWarehouseItemFulfilment.run(storeId, orderItem, warehouseItem);
     }
 
-    public Result removeFromOrder(String storeId, String orderId, List<String> orderItemIds) {
+    /**
+     * anyStatus: the store lets its admin remove fulfilled items too (OrderEditPolicy#editsItemsInAnyStatus). Only the order's
+     * line goes: its delivery, warehouse documents and stock are left as they are, by the owner's decision.
+     */
+    public Result removeFromOrder(String storeId, String orderId, List<String> orderItemIds, boolean anyStatus) {
         Order order = ordersRepository.findById(storeId, orderId);
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
         List<OrderItem> selectedOrderItems = orderItems.stream()
@@ -143,7 +147,7 @@ public class OrdersManager {
 
         int removed = 0;
         for (OrderItem selectedOrderItem : selectedOrderItems) {
-            if (selectedOrderItem.isNew() || selectedOrderItem.isService()) {
+            if (anyStatus || selectedOrderItem.isNew() || selectedOrderItem.isService()) {
                 orderItems.remove(selectedOrderItem);
                 orderItemsRepository.delete(selectedOrderItem);
 
@@ -316,9 +320,10 @@ public class OrdersManager {
         return new Result(order, orderItems);
     }
 
-    public Order splitOrder(String storeId, String orderId, List<String> orderItemIds) {
+    /** editPolicy: which documents still stop the split for the user who asks (Order#canBeSplit). */
+    public Order splitOrder(String storeId, String orderId, List<String> orderItemIds, OrderEditPolicy editPolicy) {
         Order original = ordersRepository.findById(storeId, orderId);
-        List<OrderItem> selectedItems = selectItemsToMoveOut(storeId, original, orderItemIds);
+        List<OrderItem> selectedItems = selectItemsToMoveOut(storeId, original, orderItemIds, editPolicy);
 
         Order newOrder = original.createSplit();
         ordersRepository.save(newOrder);
@@ -327,25 +332,27 @@ public class OrdersManager {
         return newOrder;
     }
 
-    public Order moveOrderItemsToOrder(String storeId, String orderId, String targetOrderId, List<String> orderItemIds) {
+    public Order moveOrderItemsToOrder(String storeId, String orderId, String targetOrderId, List<String> orderItemIds,
+                                       OrderEditPolicy editPolicy) {
         Order original = ordersRepository.findById(storeId, orderId);
         Order target = StringUtils.isBlank(targetOrderId) ? null : ordersRepository.findById(storeId, targetOrderId.trim());
 
         if (target == null || target.getOrderId().equals(original.getOrderId())) {
             throw new IllegalStateException("split.order.target.not.found");
         }
-        if (!target.canBeSplit()) {
+        if (!target.canBeSplit(editPolicy)) {
             throw new IllegalStateException("split.order.target.invalid.state");
         }
-        List<OrderItem> selectedItems = selectItemsToMoveOut(storeId, original, orderItemIds);
+        List<OrderItem> selectedItems = selectItemsToMoveOut(storeId, original, orderItemIds, editPolicy);
         List<OrderItem> targetItems = orderItemsRepository.findByOrderId(target.getOrderId());
 
         moveItems(original, target, targetItems, selectedItems);
         return target;
     }
 
-    private List<OrderItem> selectItemsToMoveOut(String storeId, Order original, List<String> orderItemIds) {
-        if (!original.canBeSplit()) {
+    private List<OrderItem> selectItemsToMoveOut(String storeId, Order original, List<String> orderItemIds,
+                                                 OrderEditPolicy editPolicy) {
+        if (!original.canBeSplit(editPolicy)) {
             throw new IllegalStateException("split.order.invalid.state");
         }
         if (orderItemIds == null || orderItemIds.isEmpty()) {
@@ -401,10 +408,11 @@ public class OrdersManager {
                 .max().orElse(bandStart - 1) + 1;
     }
 
-    public void splitGroupItem(String orderId, String itemId, List<SplitGroupComponent> components) {
+    /** anyStatus: the store lets its admin split a fulfilled set too (OrderEditPolicy#editsItemsInAnyStatus). */
+    public void splitGroupItem(String orderId, String itemId, List<SplitGroupComponent> components, boolean anyStatus) {
         OrderItem source = orderItemsRepository.findById(orderId, itemId);
 
-        if (source == null || !source.isNew() || source.isService()) {
+        if (source == null || (!source.isNew() && !anyStatus) || source.isService()) {
             throw new IllegalStateException("split.group.invalid.state");
         }
         if (components == null || components.size() < 2) {
@@ -438,14 +446,15 @@ public class OrdersManager {
         orderItemsRepository.delete(source);
     }
 
-    public void deleteOrder(String storeId, String orderId) {
+    /** editPolicy: an invoice keeps the order only while the store did not release its sale documents. */
+    public void deleteOrder(String storeId, String orderId, OrderEditPolicy editPolicy) {
         Order order = ordersRepository.findById(storeId, orderId);
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(orderId);
 
         if (!orderItems.isEmpty()) {
             throw new IllegalStateException("Order must have no items to be deleted");
         }
-        if (order.isInvoiced()) {
+        if (editPolicy.invoiceLocks(order)) {
             throw new IllegalStateException("Order must not have an invoice to be deleted");
         }
         if (order.hasRecordedPayments()) {

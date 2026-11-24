@@ -74,8 +74,7 @@ class OrderControllersAuthorizationTest {
             }
 
             // then
-            String expected = handler.getName().equals("removeDocument") ? "hasRole('ADMIN')" : "!hasRole('SUPER_ADMIN')";
-            assertThat(handler.getAnnotation(PreAuthorize.class).value()).as(path).isEqualTo(expected);
+            assertThat(handler.getAnnotation(PreAuthorize.class).value()).as(path).isEqualTo("!hasRole('SUPER_ADMIN')");
         }
     }
 

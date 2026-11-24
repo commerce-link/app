@@ -77,11 +77,23 @@ class OrdersManagerBulkResultTest {
         given(item("new", FulfilmentStatus.New, false), service, item("ordered", FulfilmentStatus.Ordered, true));
 
         // when
-        OrdersManager.Result result = ordersManager.removeFromOrder(STORE_ID, ORDER_ID, List.of("new", "service", "ordered"));
+        OrdersManager.Result result = ordersManager.removeFromOrder(STORE_ID, ORDER_ID, List.of("new", "service", "ordered"), false);
 
         // then
         assertThat(result.getChanged()).isEqualTo(2);
         assertThat(result.getRequested()).isEqualTo(3);
+    }
+
+    @Test
+    void removalTakesFulfilledItemsTooWhenTheStoreLetsItsAdminEditThem() {
+        // given
+        given(item("new", FulfilmentStatus.New, false), item("ordered", FulfilmentStatus.Ordered, true));
+
+        // when
+        OrdersManager.Result result = ordersManager.removeFromOrder(STORE_ID, ORDER_ID, List.of("new", "ordered"), true);
+
+        // then
+        assertThat(result.getChanged()).isEqualTo(2);
     }
 
     @Test

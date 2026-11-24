@@ -665,7 +665,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
 
         // when
-        ordersManager.deleteOrder(STORE_ID, ORDER_ID);
+        ordersManager.deleteOrder(STORE_ID, ORDER_ID, OrderEditPolicy.STRICT);
 
         // then
         InOrder inOrder = inOrder(orderLifecycleEventPublisher, ordersRepository);
@@ -687,7 +687,7 @@ class OrdersManagerTest {
                 .when(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCancelled);
 
         // when / then
-        assertThatThrownBy(() -> ordersManager.deleteOrder(STORE_ID, ORDER_ID))
+        assertThatThrownBy(() -> ordersManager.deleteOrder(STORE_ID, ORDER_ID, OrderEditPolicy.STRICT))
                 .isInstanceOf(RuntimeException.class);
         verify(ordersRepository, never()).delete(order);
     }
@@ -702,7 +702,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
 
         // when
-        ordersManager.deleteOrder(STORE_ID, ORDER_ID);
+        ordersManager.deleteOrder(STORE_ID, ORDER_ID, OrderEditPolicy.STRICT);
 
         // then
         verify(ordersRepository).delete(order);
@@ -719,7 +719,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
 
         // when
-        ordersManager.deleteOrder(STORE_ID, ORDER_ID);
+        ordersManager.deleteOrder(STORE_ID, ORDER_ID, OrderEditPolicy.STRICT);
 
         // then
         verify(ordersRepository).delete(order);
@@ -738,7 +738,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
 
         // when / then
-        assertThatThrownBy(() -> ordersManager.deleteOrder(STORE_ID, ORDER_ID))
+        assertThatThrownBy(() -> ordersManager.deleteOrder(STORE_ID, ORDER_ID, OrderEditPolicy.STRICT))
                 .isInstanceOf(IllegalStateException.class);
         verify(ordersRepository, never()).delete(order);
     }
@@ -753,7 +753,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
 
         // when
-        ordersManager.deleteOrder(STORE_ID, ORDER_ID);
+        ordersManager.deleteOrder(STORE_ID, ORDER_ID, OrderEditPolicy.STRICT);
 
         // then
         verify(ordersRepository).delete(order);
@@ -769,7 +769,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(new OrderItem()));
 
         // when / then
-        assertThatThrownBy(() -> ordersManager.deleteOrder(STORE_ID, ORDER_ID))
+        assertThatThrownBy(() -> ordersManager.deleteOrder(STORE_ID, ORDER_ID, OrderEditPolicy.STRICT))
                 .isInstanceOf(IllegalStateException.class);
         verify(ordersRepository, never()).delete(order);
     }
@@ -784,7 +784,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(new ArrayList<>(List.of(service)));
 
         // when
-        ordersManager.removeFromOrder(STORE_ID, ORDER_ID, List.of(service.getItemId()));
+        ordersManager.removeFromOrder(STORE_ID, ORDER_ID, List.of(service.getItemId()), false);
 
         // then
         verify(orderItemsRepository).delete(service);
@@ -801,7 +801,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(product));
 
         // when
-        ordersManager.removeFromOrder(STORE_ID, ORDER_ID, List.of(product.getItemId()));
+        ordersManager.removeFromOrder(STORE_ID, ORDER_ID, List.of(product.getItemId()), false);
 
         // then
         verify(orderItemsRepository, never()).delete(any(OrderItem.class));
@@ -819,7 +819,7 @@ class OrdersManagerTest {
         // when / then
         assertThatThrownBy(() -> ordersManager.splitGroupItem(ORDER_ID, source.getItemId(), List.of(
                 new SplitGroupComponent("MONTAZ-A", "Montaż A", 1, 60.0),
-                new SplitGroupComponent("MONTAZ-B", "Montaż B", 1, 40.0))))
+                new SplitGroupComponent("MONTAZ-B", "Montaż B", 1, 40.0)), false))
                 .isInstanceOf(IllegalStateException.class);
         verify(orderItemsRepository, never()).save(any(OrderItem.class));
         verify(orderItemsRepository, never()).delete(any(OrderItem.class));
@@ -975,7 +975,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(itemA, itemB));
 
         // when
-        Order newOrder = ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId()));
+        Order newOrder = ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId()), OrderEditPolicy.STRICT);
 
         // then
         assertThat(newOrder).isNotNull();
@@ -1012,7 +1012,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(itemA, itemB));
 
         // when
-        Order newOrder = ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId()));
+        Order newOrder = ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId()), OrderEditPolicy.STRICT);
 
         // then
         ArgumentCaptor<OrderItem> movedCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -1036,7 +1036,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(itemA, itemB));
 
         // when
-        Order newOrder = ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId()));
+        Order newOrder = ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId()), OrderEditPolicy.STRICT);
 
         // then
         ArgumentCaptor<OrderItem> movedCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -1062,7 +1062,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(itemA, itemB));
 
         // when
-        Order newOrder = ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId()));
+        Order newOrder = ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId()), OrderEditPolicy.STRICT);
 
         // then
         ArgumentCaptor<OrderItem> movedCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -1085,7 +1085,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(itemA, itemB));
 
         // when
-        Order newOrder = ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of("item-a", "item-b"));
+        Order newOrder = ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of("item-a", "item-b"), OrderEditPolicy.STRICT);
 
         // then
         verify(orderItemsRepository, times(2)).save(any(OrderItem.class));
@@ -1108,7 +1108,7 @@ class OrdersManagerTest {
         when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq(STORE_ID), any())).thenReturn(Set.of("item-b"));
 
         // when / then
-        assertThatThrownBy(() -> ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId())))
+        assertThatThrownBy(() -> ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId()), OrderEditPolicy.STRICT))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("split.order.items.in.dropship");
         verify(ordersRepository, never()).save(any());
@@ -1128,7 +1128,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(itemA, itemB));
 
         // when / then
-        assertThatThrownBy(() -> ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId())))
+        assertThatThrownBy(() -> ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId()), OrderEditPolicy.STRICT))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("split.order.items.have.fulfilment");
         verify(orderItemsRepository, never()).save(any(OrderItem.class));
@@ -1152,7 +1152,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId("target-order")).thenReturn(List.of(existing));
 
         // when
-        Order result = ordersManager.moveOrderItemsToOrder(STORE_ID, ORDER_ID, "target-order", List.of("item-b"));
+        Order result = ordersManager.moveOrderItemsToOrder(STORE_ID, ORDER_ID, "target-order", List.of("item-b"), OrderEditPolicy.STRICT);
 
         // then
         assertThat(result).isSameAs(target);
@@ -1181,7 +1181,7 @@ class OrdersManagerTest {
 
         // when / then
         for (String targetId : List.of("missing", ORDER_ID, "")) {
-            assertThatThrownBy(() -> ordersManager.moveOrderItemsToOrder(STORE_ID, ORDER_ID, targetId, List.of("item-b")))
+            assertThatThrownBy(() -> ordersManager.moveOrderItemsToOrder(STORE_ID, ORDER_ID, targetId, List.of("item-b"), OrderEditPolicy.STRICT))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessage("split.order.target.not.found");
         }
@@ -1207,7 +1207,7 @@ class OrdersManagerTest {
         when(orderItemsRepository.findByOrderId("target-order")).thenReturn(List.of());
 
         // when
-        ordersManager.moveOrderItemsToOrder(STORE_ID, ORDER_ID, "target-order", List.of("item-b"));
+        ordersManager.moveOrderItemsToOrder(STORE_ID, ORDER_ID, "target-order", List.of("item-b"), OrderEditPolicy.STRICT);
 
         // then
         verify(orderItemsRepository).delete(itemB);
@@ -1229,7 +1229,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, "target-order")).thenReturn(target);
 
         // when / then
-        assertThatThrownBy(() -> ordersManager.moveOrderItemsToOrder(STORE_ID, ORDER_ID, "target-order", List.of("item-b")))
+        assertThatThrownBy(() -> ordersManager.moveOrderItemsToOrder(STORE_ID, ORDER_ID, "target-order", List.of("item-b"), OrderEditPolicy.STRICT))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("split.order.target.invalid.state");
         verify(orderItemsRepository, never()).save(any(OrderItem.class));

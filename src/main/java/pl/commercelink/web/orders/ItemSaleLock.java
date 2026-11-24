@@ -2,6 +2,7 @@ package pl.commercelink.web.orders;
 
 import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderEditPolicy;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.receipts.ReceiptLock;
 
@@ -59,7 +60,12 @@ public enum ItemSaleLock {
 
     /** The same, worded after why the e-receipt locks the order (still issuing, or fiscalised and being attached). */
     public static ItemSaleLock of(Order order, ReceiptLock receiptLock) {
-        if (order.hasClosingDocument()) {
+        return of(order, receiptLock, OrderEditPolicy.STRICT);
+    }
+
+    /** editPolicy: a store that lets its orders change after a sale document has no INVOICED lock. */
+    public static ItemSaleLock of(Order order, ReceiptLock receiptLock, OrderEditPolicy editPolicy) {
+        if (editPolicy.saleDocumentLocks(order)) {
             return INVOICED;
         }
         return switch (receiptLock) {

@@ -101,7 +101,7 @@ class ExternalOfferLinkingImportParityTest {
         OrderItem item = itemCarrying(order, "Lampy", "DMW-OLD");
 
         // when
-        linking.linkEan(STORE, order, item.getItemId(), TYPED, "user-1");
+        linking.linkEan(STORE, order, item.getItemId(), TYPED, "user-1", false);
 
         // then
         OrderItem imported = importedLine(order);
@@ -116,7 +116,7 @@ class ExternalOfferLinkingImportParityTest {
         OrderItem item = itemCarrying(order, "Lampy", "DMW-OLD");
 
         // when
-        linking.linkEan(STORE, order, item.getItemId(), TYPED, "user-1");
+        linking.linkEan(STORE, order, item.getItemId(), TYPED, "user-1", false);
 
         // then
         OrderItem imported = importedLine(order);

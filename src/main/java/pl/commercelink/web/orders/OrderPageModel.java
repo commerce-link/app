@@ -204,9 +204,12 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     public record ReceiptEarlierRow(int attemptNo, String statusKey, String statusTone, String outcome) {
     }
 
-    /** prefixKey: the word before the number (OrderLabels#documentPrefix). */
-    public record DocumentRow(String prefixKey, String number, String href, boolean external, String issuedAt,
-                              boolean removable, String removeHref) {
+    /**
+     * prefixKey: the word before the number (OrderLabels#documentPrefix). A row has no action: a document stays on
+     * its order, since unpinning one lost its id (owner decision 2026-11-24); an order is corrected past its
+     * documents through OrderEditPolicy instead.
+     */
+    public record DocumentRow(String prefixKey, String number, String href, boolean external, String issuedAt) {
     }
 
     /**

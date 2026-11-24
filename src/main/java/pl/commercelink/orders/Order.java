@@ -381,13 +381,6 @@ public class Order {
         documents.add(document);
     }
 
-    public boolean removeDocument(DocumentType type, String number) {
-        if (type == null || !type.isInvoiceOrReceipt()) {
-            return false;
-        }
-        return documents.removeIf(d -> d.getType() == type && Objects.equals(d.getNumber(), number));
-    }
-
     public void addDocumentIfMissing(Document document) {
         if (document != null && !hasDocument(document)) {
             documents.add(document);
@@ -574,11 +567,12 @@ public class Order {
     }
 
     @DynamoDBIgnore
-    public boolean canBeSplit() {
+    /** editPolicy: a WZ and an invoice stop the split only while the store did not release them. */
+    public boolean canBeSplit(OrderEditPolicy editPolicy) {
         return hasOneOfStatuses(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly, OrderStatus.Assembled)
                 && isZero(getPaidAmount())
-                && !getDocumentByType(DocumentType.GoodsIssue).isPresent()
-                && !isInvoiced();
+                && !editPolicy.goodsIssueLocks(this)
+                && !editPolicy.invoiceLocks(this);
     }
 
     @DynamoDBIgnore

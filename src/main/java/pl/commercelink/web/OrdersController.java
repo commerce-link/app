@@ -51,7 +51,6 @@ import pl.commercelink.pricelist.PricelistFinder;
 import pl.commercelink.products.ProductData;
 import pl.commercelink.products.ProductDataResolver;
 import pl.commercelink.products.StoreCategories;
-import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.rest.client.HttpClientException;
@@ -836,13 +835,13 @@ public class OrdersController extends BaseController {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
         // the same reasons the page greys the "add items" button with; a stale page must not get past them
         List<OrderItem> items = orderItemsRepository.findByOrderId(orderId);
+        Store store = storesRepository.findById(getStoreId());
         String locked = OrderPageModelFactory.addItemsLockedKey(order,
                 !dropshipItemLookup.itemIdsInDropshipDeliveries(getStoreId(), items).isEmpty(),
-                receiptAttemptService.receiptLock(order));
+                receiptAttemptService.receiptLock(order), OrderEditPolicy.of(store, isAdmin()));
         if (locked != null) {
             return refuse(redirectAttributes, orderId, locked, locale);
         }
-        Store store = storesRepository.findById(getStoreId());
         InventoryView inventoryView = inventory.withEnabledSuppliersOnly(getStoreId());
 
         // every entry is resolved before anything is saved, so an unknown pricelist row rejects the whole batch
@@ -1071,11 +1070,12 @@ public class OrdersController extends BaseController {
             boolean serviceFlagLocked = orderItem.hasSupplierAllocation();
             // an e-receipt being issued has frozen the item prices it sends, as a document already on the order has
             ReceiptLock receiptLock = receiptAttemptService.receiptLock(order);
-            boolean priceLocked = !order.getDocuments().isEmpty() || receiptLock.locks();
+            OrderEditPolicy editPolicy = editPolicy();
+            boolean priceLocked = editPolicy.priceLocks(order) || receiptLock.locks();
             // The sale document (or the e-receipt being issued) lists the item's name, quantity and VAT rate: a post
             // that changes any of them is refused, not silently trimmed, so the operator learns the save did not
             // happen; an unchanged value passes and the stored one is put back to rule out any drift.
-            ItemSaleLock saleLock = ItemSaleLock.of(order, receiptLock);
+            ItemSaleLock saleLock = ItemSaleLock.of(order, receiptLock, editPolicy);
             if (saleLock != null) {
                 if (ItemSaleLock.changes(orderItem, updatedItem)) {
                     model.addAttribute("itemError",
@@ -1128,10 +1128,10 @@ public class OrdersController extends BaseController {
             }
             // Same lock as the item menu's toggle: the flag is only read when the closing invoice is issued, so after
             // that a change would silently not apply; the page shows the box disabled and the stored value stays.
-            if (order.hasClosingDocument() || receiptLock.locks()) {
+            if (editPolicy.saleDocumentLocks(order) || receiptLock.locks()) {
                 updatedItem.setConsolidated(orderItem.isConsolidated());
             }
-            orderItem.update(updatedItem);
+            orderItem.update(updatedItem, fullEdit(order, orderItem, editPolicy, receiptLock));
 
             if (!wasService && orderItem.isService()) {
                 orderItem.markAsWarehouseFulfilled();
@@ -1168,7 +1168,9 @@ public class OrdersController extends BaseController {
         OrderItem orderItem = requireItem(orderId, form.getItemId());
         Store store = storesRepository.findById(getStoreId());
 
-        if (!orderItem.isReleasable()) {
+        boolean anyStatus = OrderItemRow.editsItemsInAnyStatus(order, OrderEditPolicy.of(store, isAdmin()),
+                receiptAttemptService.receiptLock(order));
+        if (!orderItem.isReleasable() && !anyStatus) {
             return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
                     messageSource.getMessage("order.item.assign.supplier.blocked", null, locale));
         }
@@ -1298,17 +1300,23 @@ public class OrdersController extends BaseController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String assignSku(@PathVariable String orderId, @RequestParam String itemId, @RequestParam String sku,
                             RedirectAttributes redirectAttributes, Locale locale) {
-        requireOrder(ordersRepository, getStoreId(), orderId);
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
         OrderItem orderItem = requireItem(orderId, itemId);
-        // The same rule the menu shows: the SKU feeds marketplace item keys and RMA, so it is set before fulfilment only.
-        if (!orderItem.isNew() || orderItem.isGroup()) {
+        // The same rule the menu shows: the SKU feeds marketplace item keys and RMA, so it is set before fulfilment
+        // only, unless the store lets its admin change fulfilled items.
+        boolean anyStatus = !orderItem.isNew()
+                && OrderItemRow.editsItemsInAnyStatus(order, editPolicy(), receiptAttemptService.receiptLock(order));
+        if ((!orderItem.isNew() && !anyStatus) || orderItem.isGroup()) {
             return refuse(redirectAttributes, orderId, "order.item.assign.sku.locked", locale);
         }
         orderItem.setSku(sku);
-        // a New item's EAN can only come from its offer link; the typed codes replace that link's codes
-        orderItem.setEan(null);
-        // the operator's code replaces whatever recognised the item, so a later link does not re-fill it
-        orderItem.setExternalOfferSource(null);
+        if (!anyStatus) {
+            // a New item's EAN can only come from its offer link; the typed codes replace that link's codes. A
+            // fulfilled item's EAN is the goods it was fulfilled with and stays.
+            orderItem.setEan(null);
+            // the operator's code replaces whatever recognised the item, so a later link does not re-fill it
+            orderItem.setExternalOfferSource(null);
+        }
         orderItemsRepository.save(orderItem);
         return details(orderId);
     }
@@ -1326,16 +1334,18 @@ public class OrdersController extends BaseController {
             return refuse(redirectAttributes, orderId, "order.item.error.closed", locale);
         }
         OrderItem orderItem = requireItem(orderId, itemId);
-        // the rule of "Assign SKU": the codes are filled before fulfilment only
-        if (!orderItem.isNew() || orderItem.isGroup()) {
+        // the rule of "Assign SKU": the codes are filled before fulfilment only, unless the store lets its admin
+        // change fulfilled items
+        boolean anyStatus = OrderItemRow.editsItemsInAnyStatus(order, editPolicy(), receiptAttemptService.receiptLock(order));
+        if ((!orderItem.isNew() && !anyStatus) || orderItem.isGroup()) {
             return refuse(redirectAttributes, orderId, "order.item.link.offer.locked", locale);
         }
         ExternalOfferLinking.LinkResult result;
         try {
             // a typed EAN wins: the dialog clears the product choice when one is typed; spaces alone are a bad EAN
             result = StringUtils.isNotEmpty(ean)
-                    ? externalOfferLinking.linkEan(getStoreId(), order, itemId, ean, getUserId())
-                    : externalOfferLinking.link(getStoreId(), order, itemId, categoryId, productId, getUserId());
+                    ? externalOfferLinking.linkEan(getStoreId(), order, itemId, ean, getUserId(), anyStatus)
+                    : externalOfferLinking.link(getStoreId(), order, itemId, categoryId, productId, getUserId(), anyStatus);
         } catch (IllegalArgumentException e) {
             return refuse(redirectAttributes, orderId, e.getMessage(), locale);
         }
@@ -1366,13 +1376,15 @@ public class OrdersController extends BaseController {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
         // splitting a set replaces its line with the components' names, quantities and prices: the sale document (or
         // the e-receipt being issued) lists the set, so the menu greys it with the same reason
-        ItemSaleLock saleLock = ItemSaleLock.of(order, receiptAttemptService.receiptLock(order));
+        OrderEditPolicy editPolicy = editPolicy();
+        ItemSaleLock saleLock = ItemSaleLock.of(order, receiptAttemptService.receiptLock(order), editPolicy);
         if (saleLock != null) {
             return refuse(redirectAttributes, orderId, saleLock.splitGroupRefusalKey(), locale);
         }
         requireItem(orderId, form.getItemId());
         try {
-            ordersManager.splitGroupItem(orderId, form.getItemId(), form.toComponents());
+            // no sale lock means no e-receipt in flight either, so the policy alone opens a fulfilled set
+            ordersManager.splitGroupItem(orderId, form.getItemId(), form.toComponents(), editPolicy.editsItemsInAnyStatus(order));
         } catch (IllegalStateException e) {
             return refuse(redirectAttributes, orderId, "error.message." + e.getMessage(), locale);
         }
@@ -1389,7 +1401,7 @@ public class OrdersController extends BaseController {
             return refuse(redirectAttributes, orderId, "order.item.error.closed", locale);
         }
         // The flag is only read when the closing invoice is issued; after that a change would silently not apply.
-        if (order.hasClosingDocument()) {
+        if (editPolicy().saleDocumentLocks(order)) {
             return refuse(redirectAttributes, orderId, "order.item.consolidation.locked", locale);
         }
         ReceiptLock receiptLock = receiptAttemptService.receiptLock(order);
@@ -1411,18 +1423,20 @@ public class OrdersController extends BaseController {
         model.addAttribute("isCompletedOrder", order.isClosed());
         model.addAttribute("serviceFlagLocked", orderItem.hasSupplierAllocation());
         ReceiptLock receiptLock = receiptAttemptService.receiptLock(order);
-        boolean priceLocked = !order.getDocuments().isEmpty() || receiptLock.locks();
-        boolean consolidationLocked = order.hasClosingDocument() || receiptLock.locks();
+        OrderEditPolicy editPolicy = editPolicy();
+        boolean priceLocked = editPolicy.priceLocks(order) || receiptLock.locks();
+        boolean consolidationLocked = editPolicy.saleDocumentLocks(order) || receiptLock.locks();
         // name, quantity and VAT rate are read-only with the reason; saveOrderItem refuses a post that changes them
-        ItemSaleLock saleLock = ItemSaleLock.of(order, receiptLock);
+        ItemSaleLock saleLock = ItemSaleLock.of(order, receiptLock, editPolicy);
         model.addAttribute("saleLock", saleLock);
+        model.addAttribute("fullEdit", fullEdit(order, orderItem, editPolicy, receiptLock));
         model.addAttribute("priceLocked", priceLocked);
         // a closing document or the e-receipt says why; any other document (advance invoice, WZ) keeps the old reason
         model.addAttribute("priceLockedKey", !priceLocked ? null
                 : saleLock != null ? saleLock.priceKey() : "order.item.form.price.locked");
         model.addAttribute("consolidationLocked", consolidationLocked);
         model.addAttribute("consolidationLockedKey", !consolidationLocked ? null
-                : order.hasClosingDocument() ? "order.item.consolidation.locked"
+                : editPolicy.saleDocumentLocks(order) ? "order.item.consolidation.locked"
                 : receiptLock.key("order.item.consolidation.locked.receipt"));
         // the item's history, by serial number, lives on the item page (the order's "Więcej" menu no longer names one item)
         model.addAttribute("serialHistory", OrderLinks.serialHistory(orderItem.getSerialNo()));
@@ -1475,7 +1489,7 @@ public class OrdersController extends BaseController {
             return refuse(redirectAttributes, orderId, receiptLock.key(DELETE_LOCKED_RECEIPT), locale);
         }
         try {
-            ordersManager.deleteOrder(getStoreId(), orderId);
+            ordersManager.deleteOrder(getStoreId(), orderId, editPolicy());
         } catch (IllegalStateException e) {
             // a page left open while the order gained an item or an invoice: the reason, not an error page
             return refuse(redirectAttributes, orderId, "order.page.delete.unavailable", locale);
@@ -1515,15 +1529,18 @@ public class OrdersController extends BaseController {
         }
         // the page leaves "Usuń" out of an invoiced order (its invoice or receipt lists the items); a stale page or a
         // hand-made request must not get past that either
-        if (order.hasClosingDocument()) {
+        OrderEditPolicy editPolicy = editPolicy();
+        if (editPolicy.saleDocumentLocks(order)) {
             return refuse(redirectAttributes, orderId, "order.items.remove.locked.invoiced", locale);
         }
         String locked = receiptLockedKey(orderId);
         if (locked != null) {
             return refuse(redirectAttributes, orderId, locked, locale);
         }
+        // past the e-receipt check above, so the policy alone says whether fulfilled items go as well
+        boolean anyStatus = editPolicy.editsItemsInAnyStatus(order);
         return bulk(BulkAction.REMOVE, orderId, form, redirectAttributes, locale,
-                ids -> ordersManager.removeFromOrder(getStoreId(), orderId, ids));
+                ids -> ordersManager.removeFromOrder(getStoreId(), orderId, ids, anyStatus));
     }
 
     @PostMapping("/dashboard/orders/{orderId}/moveSelectedItemsToAllocation")
@@ -1610,7 +1627,7 @@ public class OrdersController extends BaseController {
             return refuse(redirectAttributes, orderId, locked, locale);
         }
         try {
-            Order newOrder = ordersManager.splitOrder(getStoreId(), orderId, form.getSelectedOrderItemIds());
+            Order newOrder = ordersManager.splitOrder(getStoreId(), orderId, form.getSelectedOrderItemIds(), editPolicy());
             OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.bulk.split.done",
                     new Object[]{form.getSelectedOrderItemIds().size()}, locale));
             return "redirect:/dashboard/orders/" + newOrder.getOrderId();
@@ -1647,7 +1664,8 @@ public class OrdersController extends BaseController {
             return refuse(redirectAttributes, orderId, "order.move.target.locked.receipt", locale);
         }
         try {
-            Order target = ordersManager.moveOrderItemsToOrder(getStoreId(), orderId, resolution.order().getOrderId(), selected);
+            Order target = ordersManager.moveOrderItemsToOrder(getStoreId(), orderId, resolution.order().getOrderId(), selected,
+                    editPolicy());
             OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.bulk.move.done",
                     new Object[]{selected.size(), ConversionUtil.getShortenedId(orderId)}, locale));
             return "redirect:/dashboard/orders/" + target.getOrderId();
@@ -1673,7 +1691,7 @@ public class OrdersController extends BaseController {
         }
         Order target = resolution.order();
         String reason = target.getOrderId().equals(orderId) ? messageSource.getMessage("order.move.self", null, locale)
-                : !target.canBeSplit() ? messageSource.getMessage("order.move.target.locked", null, locale)
+                : !target.canBeSplit(editPolicy()) ? messageSource.getMessage("order.move.target.locked", null, locale)
                 : receiptAttemptService.receiptLock(target).locks() ? messageSource.getMessage("order.move.target.locked.receipt", null, locale)
                 : null;
         // the amount leaves the server fully formatted, so the dialog script only prints it
@@ -1721,7 +1739,7 @@ public class OrdersController extends BaseController {
         boolean billingType = "billing".equals(type);
         String locked = order.isClosed() ? "order.address.error.closed"
                 : CustomerView.lockedKey(order, billingType,
-                        billingType ? receiptAttemptService.receiptLock(order) : ReceiptLock.NONE);
+                        billingType ? receiptAttemptService.receiptLock(order) : ReceiptLock.NONE, editPolicy());
         if (locked != null) {
             return refuse(redirectAttributes, orderId, locked, locale);
         }
@@ -1754,7 +1772,7 @@ public class OrdersController extends BaseController {
         // once an invoice or a label exists the address is fixed; the card hides "Edit" with the same reason
         String refusal = existingOrder.isClosed() ? "order.address.error.closed"
                 : CustomerView.lockedKey(existingOrder, billing,
-                        billing ? receiptAttemptService.receiptLock(existingOrder) : ReceiptLock.NONE);
+                        billing ? receiptAttemptService.receiptLock(existingOrder) : ReceiptLock.NONE, editPolicy());
         if (refusal != null) {
             if (async) {
                 response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
@@ -1928,7 +1946,7 @@ public class OrdersController extends BaseController {
         if (paymentsClosed(order)) {
             return refuse(redirectAttributes, orderId, PAYMENTS_CLOSED, locale);
         }
-        String methodLocked = OrderPaymentForm.methodLockedKey(order, receiptAttemptService.receiptLock(order));
+        String methodLocked = OrderPaymentForm.methodLockedKey(order, receiptAttemptService.receiptLock(order), editPolicy());
         return paymentPage(order, OrderPaymentForm.of(orderId, index, order.getPayments().get(index), methodLocked)
                 .withRestAvailable(order), model);
     }
@@ -1960,7 +1978,7 @@ public class OrdersController extends BaseController {
         boolean known = index >= 0 && index < current.size();
         // the sale's document fixes the method (owner decision Q3); read once, for the check and the form shown again
         String methodLocked = OrderPaymentForm.methodLockedKey(existingOrder,
-                receiptAttemptService.receiptLock(existingOrder));
+                receiptAttemptService.receiptLock(existingOrder), editPolicy());
         OrderPaymentForm posted = new OrderPaymentForm(orderId, index, version, known && current.get(index).isUnsettled(),
                 known && OrderPaymentForm.isRefund(current.get(index)), source, name, amount, fee, referenceNo,
                 bankTransactionNo, bankTransactionDate, null, null, methodLocked,
@@ -2352,15 +2370,14 @@ public class OrdersController extends BaseController {
         return receiptLock.locks() ? receiptLock.key(BulkReason.RECEIPT_ISSUING.key()) : null;
     }
 
-    /** The receipt row was written by an e-receipt attempt (its document id is the attempt's key), not typed in. */
-    private boolean isAutomaticReceipt(Order order, DocumentType type, String number) {
-        if (type != DocumentType.Receipt) {
-            return false;
-        }
-        List<ReceiptAttempt> attempts = receiptAttemptService.attemptsOf(order.getStoreId(), order.getOrderId());
-        return order.getDocuments().stream()
-                .filter(d -> d.getType() == DocumentType.Receipt && Objects.equals(d.getNumber(), number))
-                .anyMatch(d -> attempts.stream().anyMatch(a -> a.getReceiptKey().equals(d.getId())));
+    /** Which documents still lock an order for the logged-in user: the store's settings for its admin, all otherwise. */
+    private OrderEditPolicy editPolicy() {
+        return OrderEditPolicy.of(storesRepository.findById(getStoreId()), isAdmin());
+    }
+
+    /** Every field of the item page is open: a new item, or any item for the admin of a store that released its documents. */
+    private static boolean fullEdit(Order order, OrderItem item, OrderEditPolicy editPolicy, ReceiptLock receiptLock) {
+        return item.isNew() || OrderItemRow.editsItemsInAnyStatus(order, editPolicy, receiptLock);
     }
 
     /** A shipment the customer and the marketplace are told about: it went out, with its number or for collection. */
@@ -2395,7 +2412,7 @@ public class OrdersController extends BaseController {
         if (locked != null) {
             return refuse(redirectAttributes, orderId, locked, locale);
         }
-        // the dialog marks the number as required; a blank one would add a row nobody can unpin (removal matches on it)
+        // the dialog marks the number as required: a row without one names no document
         if (StringUtils.isBlank(document.getNumber()) || document.getType() == null) {
             return refuse(redirectAttributes, orderId, "order.documents.add.error.number", locale);
         }
@@ -2405,52 +2422,13 @@ public class OrdersController extends BaseController {
             return refuse(redirectAttributes, orderId, "order.documents.add.error.link", locale);
         }
         // a typed document has no id, as the dialog posts none: an e-receipt attempt's key posted here would make it
-        // pass for that attempt's own document, hidden from the card and impossible to unpin
+        // pass for that attempt's own document and hide it from the card
         document.setId(null);
         document.setNumber(document.getNumber().trim());
         document.setLink(link);
         order.addDocument(document);
         orderLifecycle.update(order);
         OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.documents.added", null, locale));
-        return details(orderId);
-    }
-
-    @GetMapping("/dashboard/orders/{orderId}/removeDocument")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String confirmRemoveDocument(@PathVariable String orderId, @RequestParam DocumentType type,
-                                        @RequestParam(required = false) String number, Model model, Locale locale) {
-        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
-        boolean present = order.getDocuments().stream()
-                .anyMatch(d -> d.getType() == type && Objects.equals(d.getNumber(), number));
-        if (!present || isAutomaticReceipt(order, type, number)) {
-            return details(orderId);
-        }
-        return confirmPage(model, order, "order.documents.unpin", new Object[]{number}, null,
-                OrderLinks.removeDocumentPath(orderId, type, number), true, locale);
-    }
-
-    @PostMapping("/dashboard/orders/{orderId}/removeDocument")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String removeDocument(@PathVariable String orderId, @RequestParam DocumentType type,
-                                 @RequestParam(required = false) String number,
-                                 RedirectAttributes redirectAttributes, Locale locale) {
-        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
-
-        // an automatically issued receipt's document id is the attempt's own key; removing it here would strand the
-        // order's document without ever touching the attempt, so the attempt would still poll or hold its result
-        if (isAutomaticReceipt(order, type, number)) {
-            return refuse(redirectAttributes, orderId, "receipts.document.remove.automatic", locale);
-        }
-
-        if (order.isClosed() || !order.removeDocument(type, number)) {
-            return refuse(redirectAttributes, orderId, "error.message.document.cannot.be.removed", locale);
-        }
-
-        // saving via OrderLifecycle would re-trigger automatic invoice generation for delivered orders
-        ordersRepository.save(order);
-        // so the bell hears here that the order may have lost the document that settled its dead e-receipt attempts
-        receiptAttemptService.reconcileDeadAttemptAlerts(order);
-        OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.documents.unpinned", null, locale));
         return details(orderId);
     }
 
