@@ -1,26 +1,62 @@
 package pl.commercelink.inventory.supplier;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.InventoryRepository;
+import pl.commercelink.inventory.supplier.api.FeedData;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.support.ResourceDownloadException;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
 
 @Service
-@RequiredArgsConstructor
 public class GlobalSupplierFeedService {
+
+    // A reload converts the feed's prices with the exchange rates of its day, so a feed unchanged for longer is stored
+    // again, for the instances to reload it with the current ones.
+    static final Duration MAX_AGE_OF_KEPT_FEED = Duration.ofHours(24);
 
     private final GlobalSupplierProviderFactory globalSupplierProviderFactory;
     private final InventoryRepository inventoryRepository;
+    private final Clock clock;
+
+    @Autowired
+    public GlobalSupplierFeedService(GlobalSupplierProviderFactory globalSupplierProviderFactory,
+                                     InventoryRepository inventoryRepository) {
+        this(globalSupplierProviderFactory, inventoryRepository, Clock.systemUTC());
+    }
+
+    GlobalSupplierFeedService(GlobalSupplierProviderFactory globalSupplierProviderFactory,
+                              InventoryRepository inventoryRepository, Clock clock) {
+        this.globalSupplierProviderFactory = globalSupplierProviderFactory;
+        this.inventoryRepository = inventoryRepository;
+        this.clock = clock;
+    }
 
     public void loadFeed(String supplierName) throws ResourceDownloadException {
         Optional<SupplierProvider> provider = globalSupplierProviderFactory.get(supplierName);
         if (provider.isEmpty()) {
             return;
         }
-        provider.get().download().ifPresent(feedData ->
-                inventoryRepository.store(supplierName, feedData.data(), feedData.extension()));
+        provider.get().download().ifPresent(feed -> storeIfChanged(supplierName, feed));
+    }
+
+    // An unchanged feed keeps its file and with it the file's date, so no instance parses and regroups it again.
+    private void storeIfChanged(String supplierName, FeedData feed) {
+        String hash = FeedHash.of(feed.data(), feed.extension());
+        Instant keptSince = clock.instant().minus(MAX_AGE_OF_KEPT_FEED);
+        boolean unchanged = inventoryRepository.storedHash(supplierName, feed.extension())
+                .filter(stored -> stored.hash().equals(hash) && stored.feedStoredAt().isAfter(keptSince))
+                .isPresent();
+        if (unchanged) {
+            inventoryRepository.storeHash(supplierName, hash);
+            return;
+        }
+        inventoryRepository.store(supplierName, feed.data(), feed.extension());
+        // stored last: a download whose feed was not stored must not be taken for unchanged when it comes again
+        inventoryRepository.storeHash(supplierName, hash);
     }
 }

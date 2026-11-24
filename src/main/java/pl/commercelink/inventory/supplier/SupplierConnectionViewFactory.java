@@ -38,7 +38,7 @@ public class SupplierConnectionViewFactory {
         // Global connections have no file in this store's namespace at all, so the platform-wide
         // feeds bucket is only worth listing when at least one connection actually needs it.
         Map<String, LocalDateTime> globalFeeds = hasGlobalConnection
-                ? inventoryRepository.getLatestModifiedPerSupplier()
+                ? inventoryRepository.getLastDownloadedPerSupplier()
                 : Map.of();
         List<SupplierConnectionView> external = new ArrayList<>();
         List<SupplierConnectionView> manual = new ArrayList<>();
