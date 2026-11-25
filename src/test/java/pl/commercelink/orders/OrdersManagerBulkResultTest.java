@@ -85,6 +85,18 @@ class OrdersManagerBulkResultTest {
     }
 
     @Test
+    void removalTakesFulfilledItemsTooWhenTheStoreLetsItsAdminEditThem() {
+        // given
+        given(item("new", FulfilmentStatus.New, false), item("ordered", FulfilmentStatus.Ordered, true));
+
+        // when
+        OrdersManager.Result result = ordersManager.removeFromOrder(STORE_ID, ORDER_ID, List.of("new", "ordered"), true);
+
+        // then
+        assertThat(result.getChanged()).isEqualTo(2);
+    }
+
+    @Test
     void dropshipItemsAreSkippedAndCountedSeparately() {
         // given
         given(item("d1", FulfilmentStatus.Ordered, true), item("w1", FulfilmentStatus.New, false));

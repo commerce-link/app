@@ -18,6 +18,7 @@ import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.externaloffers.ExternalOfferResolver;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderEditPolicy;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderReviewStatus;
 import pl.commercelink.orders.OrderStatus;
@@ -116,18 +117,19 @@ public class OrderPageModelFactory {
         // the order's e-receipt attempts are read once here; the documents card and every lock below derive from them
         ReceiptOrderState receipts = receiptAttemptService.orderState(store, order, receiptAlerts, locale);
         ReceiptLock receiptLock = receipts.receiptLock(order);
+        OrderEditPolicy editPolicy = OrderEditPolicy.of(store, viewer.admin());
         return new OrderPageModel(order.getOrderId(), order.getShortenedOrderId(),
                 viewer.superAdmin() ? null : OrderBackLink.sanitize(viewer.back()),
                 closed, readOnly, viewer.superAdmin(), viewer.admin(), store == null ? null : store.getName(),
                 header(order, items, dropshipItemIds, store, viewer, readOnly, links, locale, dropship, receipts, receiptLock),
-                items(order, items, store, viewer, readOnly, links, hasDropshipItems, hasWarehouseDocument, dropship,
-                        receiptLock, locale),
+                items(order, items, store, viewer, readOnly, links, hasDropshipItems, dropship, receiptLock, editPolicy,
+                        locale),
                 shipments(order, store, readOnly, locale),
-                documents(order, store, viewer, closed, readOnly,
+                documents(order, store, viewer, readOnly,
                         documentsEnabled && hasWarehouseItems && !hasWarehouseDocument, receipts, receiptLock),
                 // a cancelled order still takes payments: the refund of what the customer paid is recorded after the cancel
-                payments(order, viewer.superAdmin() || order.hasStatus(OrderStatus.Completed), receiptLock),
-                CustomerView.of(order, readOnly, receiptLock, locale),
+                payments(order, viewer.superAdmin() || order.hasStatus(OrderStatus.Completed), receiptLock, editPolicy),
+                CustomerView.of(order, readOnly, receiptLock, editPolicy, locale),
                 settings(order, items, readOnly),
                 FinancesView.of(order, items),
                 history(order, readOnly),
@@ -267,8 +269,8 @@ public class OrderPageModelFactory {
 
     private OrderPageModel.ItemsCard items(Order order, List<OrderItem> items, Store store, Viewer viewer,
                                            boolean readOnly, OrderLinks links, boolean hasDropshipItems,
-                                           boolean hasWarehouseDocument, DropshipAssessment dropship,
-                                           ReceiptLock receiptLock, Locale locale) {
+                                           DropshipAssessment dropship, ReceiptLock receiptLock,
+                                           OrderEditPolicy editPolicy, Locale locale) {
         SupplierLabelMap labels = labels(store, locale);
         OrderItemRow.Context context = new OrderItemRow.Context(order, readOnly, viewer.superAdmin(), labels,
                 // the state pill links the delivery or the planning of one; the store's warehouse is no target there
@@ -276,7 +278,8 @@ public class OrderPageModelFactory {
                 item -> SupplierRegistry.WAREHOUSE.equalsIgnoreCase(item.getDeliveryId()) ? null
                         : deliveryHref(order, item, viewer, links, dropship),
                 serial -> viewer.superAdmin() ? null : OrderLinks.itemHistory(serial),
-                receiptLock, hasDropshipItems, key -> externalOfferResolver.isOwnOffer(order.getStoreId(), key));
+                receiptLock, hasDropshipItems, key -> externalOfferResolver.isOwnOffer(order.getStoreId(), key),
+                editPolicy);
         List<OrderItem> sorted = items.stream().sorted(Comparator.comparingInt(OrderItem::getPosition)).toList();
         List<OrderItemRow> products = new ArrayList<>();
         List<OrderItemRow> services = new ArrayList<>();
@@ -291,21 +294,21 @@ public class OrderPageModelFactory {
                 services.add(OrderItemRow.of(item, index++, context));
             }
         }
-        boolean canSplitOrder = order.canBeSplit() && !items.isEmpty();
-        String addReason = addItemsLockedKey(order, hasDropshipItems, receiptLock);
+        boolean canSplitOrder = order.canBeSplit(editPolicy) && !items.isEmpty();
+        String addReason = addItemsLockedKey(order, hasDropshipItems, receiptLock, editPolicy);
         List<OrderPageModel.SerialItemRow> serialItems = items.stream()
                 .filter(i -> i.hasOneOfTheStatuses(FulfilmentStatus.Delivered)).filter(OrderItem::isProduct)
                 .map(i -> serialItemRow(i, labels)).toList();
         List<OrderPageModel.BulkActionButton> bulk = new ArrayList<>();
         for (BulkAction action : BulkAction.values()) {
-            if (!action.inSelectionRow() || action == BulkAction.REMOVE && order.hasClosingDocument()) {
+            if (!action.inSelectionRow() || action == BulkAction.REMOVE && editPolicy.saleDocumentLocks(order)) {
                 continue;
             }
             BulkReason reason = bulkReason(action, canSplitOrder, hasDropshipItems, receiptLock);
             bulk.add(OrderPageModel.BulkActionButton.of(action, reason,
                     "/dashboard/orders/" + order.getOrderId() + "/" + action.path()));
         }
-        boolean selectable = !readOnly && !hasWarehouseDocument;
+        boolean selectable = !readOnly && !editPolicy.goodsIssueLocks(order);
         Map<String, SplitGroupPreviewDto> previews = readOnly ? Map.of() : items.stream()
                 .filter(OrderItem::isNew).filter(OrderItem::isGroup)
                 .collect(Collectors.toMap(OrderItem::getItemId,
@@ -550,16 +553,16 @@ public class OrderPageModelFactory {
                 ? "order.shipments.remove.error.courier" : null;
     }
 
-    private OrderPageModel.DocumentsCard documents(Order order, Store store, Viewer viewer, boolean closed,
+    private OrderPageModel.DocumentsCard documents(Order order, Store store, Viewer viewer,
                                                    boolean readOnly, boolean goodsIssue, ReceiptOrderState receipts,
                                                    ReceiptLock receiptLock) {
         List<DocumentType> manual = manualDocumentTypes(order, receipts.blocksManualReceipt());
         DocumentType next = order.getNextDocumentToIssue().orElse(null);
         // the document an e-receipt attempt attached (its id is the attempt's key) is the e-receipt row itself, never
-        // listed again as a "Paragon" that could be unpinned; a receipt typed in by hand stays an ordinary row
+        // listed again as a "Paragon"; a receipt typed in by hand stays an ordinary row
         List<OrderPageModel.DocumentRow> rows = order.getDocuments().stream()
                 .filter(d -> !isAutomaticReceipt(d, receipts))
-                .map(d -> documentRow(order, d, viewer, closed)).toList();
+                .map(d -> documentRow(d, viewer)).toList();
         // while an attempt owns the receipt the invoicing system must not issue a second sale document; the
         // controller refuses it too (OrdersController#createInvoice)
         List<DocumentType> issuable = receipts.blocksManualReceipt() ? List.of() : order.getIssuableDocumentTypes();
@@ -713,24 +716,21 @@ public class OrderPageModelFactory {
         return lower.startsWith("https://") || lower.startsWith("http://") ? trimmed : null;
     }
 
-    private OrderPageModel.DocumentRow documentRow(Order order, Document document, Viewer viewer, boolean closed) {
-        boolean removable = viewer.admin() && !viewer.superAdmin() && !closed && document.getType() != null
-                && document.getType().isInvoiceOrReceipt();
+    private OrderPageModel.DocumentRow documentRow(Document document, Viewer viewer) {
         // an external link is typed in by hand, so only a web address is rendered; the internal warehouse path is ours
         String href = document.isExternal() ? safeWebUrl(document.getLink()) : document.getViewUrl();
         if (viewer.superAdmin() && href != null && !document.isExternal()) {
             href = null;
         }
-        String removeHref = !removable ? null
-                : OrderLinks.removeDocumentPath(order.getOrderId(), document.getType(), document.getNumber());
         return new OrderPageModel.DocumentRow(OrderLabels.documentPrefix(document.getType()), document.getNumber(), href,
-                document.isExternal(), OrderFormats.date(document.getIssuedAt()), removable, removeHref);
+                document.isExternal(), OrderFormats.date(document.getIssuedAt()));
     }
 
-    private OrderPageModel.PaymentsCard payments(Order order, boolean readOnly, ReceiptLock receiptLock) {
+    private OrderPageModel.PaymentsCard payments(Order order, boolean readOnly, ReceiptLock receiptLock,
+                                                 OrderEditPolicy editPolicy) {
         // every payment is listed, complete or not: an incomplete one is still money recorded against the order
         List<Payment> payments = order.getPayments() == null ? List.of() : order.getPayments();
-        String methodLocked = OrderPaymentForm.methodLockedKey(order, receiptLock);
+        String methodLocked = OrderPaymentForm.methodLockedKey(order, receiptLock, editPolicy);
         String base = "/dashboard/orders/" + order.getOrderId() + "/payments/";
         List<OrderPageModel.PaymentRow> rows = new ArrayList<>();
         List<OrderPaymentForm> forms = new ArrayList<>();
@@ -909,13 +909,19 @@ public class OrderPageModelFactory {
 
     /** The same, worded after why the e-receipt locks the order (still issuing, or fiscalised and being attached). */
     public static String addItemsLockedKey(Order order, boolean hasDropshipItems, ReceiptLock receiptLock) {
+        return addItemsLockedKey(order, hasDropshipItems, receiptLock, OrderEditPolicy.STRICT);
+    }
+
+    /** editPolicy: the WZ and the sale document lock only while the store did not release them. */
+    public static String addItemsLockedKey(Order order, boolean hasDropshipItems, ReceiptLock receiptLock,
+                                           OrderEditPolicy editPolicy) {
         if (order.isClosed()) {
             return "order.items.add.locked.closed";
         }
-        if (order.getDocumentByType(DocumentType.GoodsIssue).isPresent()) {
+        if (editPolicy.goodsIssueLocks(order)) {
             return "order.items.add.locked.goods.issue";
         }
-        if (order.hasClosingDocument()) {
+        if (editPolicy.saleDocumentLocks(order)) {
             return "order.items.add.locked.invoiced";
         }
         if (receiptLock.locks()) {

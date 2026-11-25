@@ -1,6 +1,7 @@
 package pl.commercelink.web.orders;
 
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderEditPolicy;
 import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.orders.Shipment;
 
@@ -26,8 +27,14 @@ public record CustomerView(AddressBlock billing, AddressBlock shipping, String s
 
     /** receiptLock: why the order's e-receipt locks it, if it does (ReceiptOrderState#receiptLock). */
     public static CustomerView of(Order order, boolean readOnly, ReceiptLock receiptLock, Locale locale) {
+        return of(order, readOnly, receiptLock, OrderEditPolicy.STRICT, locale);
+    }
+
+    /** editPolicy: whether the store's invoice or receipt still fixes the billing address. */
+    public static CustomerView of(Order order, boolean readOnly, ReceiptLock receiptLock, OrderEditPolicy editPolicy,
+                                  Locale locale) {
         String base = "/dashboard/orders/" + order.getOrderId() + "/address?type=";
-        String billingLockedKey = lockedKey(order, true, receiptLock);
+        String billingLockedKey = lockedKey(order, true, receiptLock, editPolicy);
         String shippingLockedKey = lockedKey(order, false);
         return new CustomerView(AddressBlock.of(order.getBillingDetails(), locale),
                 AddressBlock.of(order.getShippingDetails(), locale),
@@ -61,8 +68,12 @@ public record CustomerView(AddressBlock billing, AddressBlock shipping, String s
 
     /** The same, worded after why the e-receipt locks the order (still issuing, or fiscalised and being attached). */
     public static String lockedKey(Order order, boolean billing, ReceiptLock receiptLock) {
+        return lockedKey(order, billing, receiptLock, OrderEditPolicy.STRICT);
+    }
+
+    public static String lockedKey(Order order, boolean billing, ReceiptLock receiptLock, OrderEditPolicy editPolicy) {
         if (billing) {
-            return order.isInvoiced() ? "order.customer.billing.locked"
+            return editPolicy.invoiceLocks(order) ? "order.customer.billing.locked"
                     : receiptLock.locks() ? receiptLock.key("order.customer.billing.locked.receipt") : null;
         }
         return order.hasShippingLabel() ? "order.customer.shipping.locked.label" : null;

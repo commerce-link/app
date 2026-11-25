@@ -4,7 +4,8 @@
 <!--/* One item of an order: the "Edit" entry of the item menu, the item dialogs' page without JavaScript, and a read-only
        view from the item name of a closed order. Field names are the OrderItem properties the controller binds. */-->
 <div layout:fragment="content">
-    <section class="cl-page" th:with="item=${orderItem}, fullEdit=${orderItem.isNew()}">
+    <!--/* fullEdit (model): every field is open, for a new item or for the admin of a store that released its documents */-->
+    <section class="cl-page" th:with="item=${orderItem}">
         <div class="cl-page-body is-form">
             <div th:replace="~{fragments/settings-header :: subpageWithActions(|/dashboard/orders/${orderId}|, #{order.page.title(${shortId})},
                     ${#strings.isEmpty(orderItem.name)} ? #{order.item.page.form} : ${orderItem.name}, ~{::itemLead},

@@ -7,10 +7,13 @@ import pl.commercelink.externaloffers.ResolvedOffer;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderEditPolicy;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.api.ItemCondition;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -362,5 +365,29 @@ class OrderItemRowTest {
         assertThat(whileIssuing.available()).isFalse();
         assertThat(whileIssuing.reasonKey()).isEqualTo("order.item.unavailable.receipt");
         assertThat(open.available()).isTrue();
+    }
+
+    @Test
+    void anAdminOfAStoreThatReleasedItsDocumentsKeepsTheItemActionsPastTheNewStatus() {
+        // given
+        OrderItem delivered = item(FulfilmentStatus.Delivered, "MFN-1");
+        Order order = new Order("store-1");
+        OrderEditPolicy released = new OrderEditPolicy(false, true, false);
+
+        // when
+        List<ItemAction.State> strict = OrderItemRow.actions(delivered, order, ReceiptLock.NONE, false, OrderEditPolicy.STRICT, key -> false);
+        List<ItemAction.State> expert = OrderItemRow.actions(delivered, order, ReceiptLock.NONE, false, released, key -> false);
+        List<ItemAction.State> issuing = OrderItemRow.actions(delivered, order, ReceiptLock.ISSUING, false, released, key -> false);
+
+        // then
+        assertThat(strict).filteredOn(a -> a.action() == ItemAction.ASSIGN_SKU || a.action() == ItemAction.ASSIGN_SUPPLIER)
+                .hasSize(2).noneMatch(ItemAction.State::available);
+        assertThat(expert).filteredOn(a -> a.action() == ItemAction.ASSIGN_SKU || a.action() == ItemAction.ASSIGN_SUPPLIER
+                        || a.action() == ItemAction.ASSIGN_WAREHOUSE)
+                .hasSize(3).allMatch(ItemAction.State::available);
+        assertThat(issuing).filteredOn(a -> a.action() == ItemAction.ASSIGN_SKU)
+                .singleElement().satisfies(a -> assertThat(a.available()).isFalse());
+        assertThat(OrderItemRow.editsItemsInAnyStatus(order, released, ReceiptLock.NONE)).isTrue();
+        assertThat(OrderItemRow.editsItemsInAnyStatus(order, released, ReceiptLock.ISSUING)).isFalse();
     }
 }

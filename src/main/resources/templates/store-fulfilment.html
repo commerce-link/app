@@ -107,6 +107,14 @@
                             </div>
                         </fieldset>
 
+                        <fieldset class="cl-fieldset" id="order-edit">
+                            <legend class="cl-fieldset-title" th:text="#{store.fulfilment.orderEdit.title}"></legend>
+                            <p class="cl-help" th:text="#{store.fulfilment.orderEdit.description}"></p>
+                            <div th:replace="~{fragments/settings-form :: check('orderEditAfterWarehouseDocuments', 'store.fulfilment.orderEdit.warehouse', *{orderEditAfterWarehouseDocuments}, 'store.fulfilment.orderEdit.warehouse.description', null, null)}"></div>
+                            <div th:replace="~{fragments/settings-form :: check('orderEditAfterSaleDocuments', 'store.fulfilment.orderEdit.sale', *{orderEditAfterSaleDocuments}, 'store.fulfilment.orderEdit.sale.description', null, null)}"></div>
+                            <div th:replace="~{fragments/settings-form :: check('orderEditAfterAdvanceDocuments', 'store.fulfilment.orderEdit.advance', *{orderEditAfterAdvanceDocuments}, 'store.fulfilment.orderEdit.advance.description', null, null)}"></div>
+                        </fieldset>
+
                         <div class="cl-card-footer">
                             <button class="cl-button is-primary" type="submit" th:text="#{form.save.changes}"></button>
                         </div>
