@@ -1,5 +1,7 @@
 package pl.commercelink.inventory.supplier;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.InventoryRepository;
@@ -13,6 +15,7 @@ import java.time.Instant;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class GlobalSupplierFeedService {
 
     // A reload converts the feed's prices with the exchange rates of its day, so a feed unchanged for longer is stored
@@ -27,13 +30,6 @@ public class GlobalSupplierFeedService {
     public GlobalSupplierFeedService(GlobalSupplierProviderFactory globalSupplierProviderFactory,
                                      InventoryRepository inventoryRepository) {
         this(globalSupplierProviderFactory, inventoryRepository, Clock.systemUTC());
-    }
-
-    GlobalSupplierFeedService(GlobalSupplierProviderFactory globalSupplierProviderFactory,
-                              InventoryRepository inventoryRepository, Clock clock) {
-        this.globalSupplierProviderFactory = globalSupplierProviderFactory;
-        this.inventoryRepository = inventoryRepository;
-        this.clock = clock;
     }
 
     public void loadFeed(String supplierName) throws ResourceDownloadException {

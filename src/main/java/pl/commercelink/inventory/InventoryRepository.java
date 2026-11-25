@@ -1,5 +1,6 @@
 package pl.commercelink.inventory;
 
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 import pl.commercelink.inventory.supplier.HashedFeedFile;
@@ -9,6 +10,7 @@ import java.io.IOException;
 import java.io.Reader;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 @Repository
@@ -18,7 +20,7 @@ public class InventoryRepository {
     // outside the feed names the reload reads, also for a version that does not know the hashes, so writing a hash
     // never makes an instance reload a feed
     private static final String HASH_PREFIX = "feed-hashes/";
-    private static final String HASH_EXTENSION = ".sha256";
+    private static final String HASH_SUFFIX = ".sha256";
 
     private final FileStorage fileStorage;
     private final String bucketName;
@@ -55,11 +57,11 @@ public class InventoryRepository {
     }
 
     private String hashKey(String supplierName) {
-        return HASH_PREFIX + fileName(supplierName) + HASH_EXTENSION;
+        return HASH_PREFIX + fileName(supplierName) + HASH_SUFFIX;
     }
 
     private static String fileName(String supplierName) {
-        return supplierName.toLowerCase();
+        return supplierName.toLowerCase(Locale.ROOT);
     }
 
     /** The date of each supplier's feed file, which tells the instances to reload the feed. */
@@ -77,8 +79,8 @@ public class InventoryRepository {
         for (Map.Entry<String, LocalDateTime> entry : objects.entrySet()) {
             String key = entry.getKey();
             if (isHash(key)) {
-                String supplierName = key.substring(HASH_PREFIX.length(), key.length() - HASH_EXTENSION.length());
-                lastDownloaded.computeIfPresent(supplierName, (supplier, feed) -> later(feed, entry.getValue()));
+                String supplierName = key.substring(HASH_PREFIX.length(), key.length() - HASH_SUFFIX.length());
+                lastDownloaded.computeIfPresent(supplierName, (supplier, feed) -> ObjectUtils.max(feed, entry.getValue()));
             }
         }
         return lastDownloaded;
@@ -97,10 +99,6 @@ public class InventoryRepository {
     }
 
     private static boolean isHash(String key) {
-        return key.startsWith(HASH_PREFIX) && key.endsWith(HASH_EXTENSION);
-    }
-
-    private static LocalDateTime later(LocalDateTime first, LocalDateTime second) {
-        return first.isAfter(second) ? first : second;
+        return key.startsWith(HASH_PREFIX) && key.endsWith(HASH_SUFFIX);
     }
 }

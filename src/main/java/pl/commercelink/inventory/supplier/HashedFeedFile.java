@@ -43,17 +43,17 @@ public final class HashedFeedFile {
 
     private boolean storeIfChanged(FeedData feed, Predicate<StoredHash> keepStored, Runnable afterStore) {
         String hash = FeedHash.of(feed.data(), feed.extension());
-        boolean unchanged = storedHash()
+        boolean changed = storedHash()
                 .filter(stored -> stored.hash().equals(hash) && keepStored.test(stored))
-                .isPresent();
-        if (!unchanged) {
+                .isEmpty();
+        if (changed) {
             fileStorage.put(bucketName, feedKey, feed.data());
             afterStore.run();
         }
         // written last: the hash says that everything a changed feed needs is done, so a download that stopped before
         // afterStore finished must not be taken for unchanged when it comes again
         fileStorage.put(bucketName, hashKey, hash.getBytes(StandardCharsets.UTF_8));
-        return !unchanged;
+        return changed;
     }
 
     // A hash written before the feed file (the file put by hand, or by a version that keeps no hash) no longer describes

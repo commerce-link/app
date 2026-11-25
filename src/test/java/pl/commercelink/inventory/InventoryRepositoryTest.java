@@ -36,7 +36,8 @@ class InventoryRepositoryTest {
         FeedData feed = new FeedData("rows".getBytes(), "csv");
 
         // when
-        repository.hashedFeed("Acadia", "csv").storeIfChanged(feed, stored -> true);
+        repository.hashedFeed("Acadia", "csv").storeIfChanged(feed, () -> {
+        });
 
         // then
         verify(fileStorage).findLastModified("feeds", "feed-hashes/acadia.sha256");

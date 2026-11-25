@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.supplier;
 
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 import pl.commercelink.starter.storage.FileStorage;
@@ -60,13 +61,9 @@ public class StoreFeedRepository {
             if (marker <= 0) {
                 continue;
             }
-            byIdentity.merge(fileName.substring(0, marker), entry.getValue(), StoreFeedRepository::later);
+            byIdentity.merge(fileName.substring(0, marker), entry.getValue(), ObjectUtils::max);
         }
         return byIdentity;
-    }
-
-    private static LocalDateTime later(LocalDateTime first, LocalDateTime second) {
-        return first.isAfter(second) ? first : second;
     }
 
     private String key(String storeId, String supplierName, String fileExtension) {
