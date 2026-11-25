@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.inventory.supplier.api.FeedData;
 import pl.commercelink.starter.storage.FileStorage;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
@@ -49,27 +50,18 @@ class StoreFeedRepositoryTest {
 
     @Test
     void hashIsKeptNextToTheFeedUnderItsPrefix() {
+        // given
+        FeedData feed = new FeedData("rows".getBytes(), "csv");
+
         // when
-        repository.storeHash("oh4d5y15it", "Acme", "abc123");
+        repository.hashedFeed("oh4d5y15it", "Acme", "csv").storeIfChanged(feed, () -> {
+        });
 
         // then
-        verify(fileStorage).put("commercelink-stores", "oh4d5y15it/supplier-feeds/acme-feed.sha256", "abc123".getBytes());
-    }
-
-    @Test
-    void storedHashIsReadBack() {
-        // given
-        when(fileStorage.canRead("commercelink-stores", "oh4d5y15it/supplier-feeds/acme-feed.sha256")).thenReturn(true);
-        when(fileStorage.getBytes("commercelink-stores", "oh4d5y15it/supplier-feeds/acme-feed.sha256")).thenReturn("abc123\n".getBytes());
-
-        // when / then
-        assertEquals(java.util.Optional.of("abc123"), repository.storedHash("oh4d5y15it", "Acme"));
-    }
-
-    @Test
-    void feedWithoutAHashHasNone() {
-        // when / then
-        assertEquals(java.util.Optional.empty(), repository.storedHash("oh4d5y15it", "Acme"));
+        verify(fileStorage).findLastModified("commercelink-stores", "oh4d5y15it/supplier-feeds/acme-feed.sha256");
+        verify(fileStorage).put("commercelink-stores", "oh4d5y15it/supplier-feeds/acme-feed.csv", feed.data());
+        verify(fileStorage).put("commercelink-stores", "oh4d5y15it/supplier-feeds/acme-feed.sha256",
+                FeedHash.of(feed.data(), "csv").getBytes());
     }
 
     @Test

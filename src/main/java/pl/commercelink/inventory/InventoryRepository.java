@@ -2,16 +2,14 @@ package pl.commercelink.inventory;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
+import pl.commercelink.inventory.supplier.HashedFeedFile;
 import pl.commercelink.starter.storage.FileStorage;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 @Repository
 public class InventoryRepository {
@@ -34,41 +32,8 @@ public class InventoryRepository {
         // bucket already exists, no reason to init
     }
 
-    public void store(String supplierName, byte[] data) {
-        store(supplierName, data, "csv");
-    }
-
-    public void store(String supplierName, byte[] data, String fileExtension) {
-        String key = createKey(supplierName, fileExtension);
-        fileStorage.put(bucketName, key, data);
-    }
-
-    /**
-     * The hash of the supplier's feed as it was last downloaded, with the time the feed file was stored. None when the
-     * feed file is newer than the hash (put by hand, or by a version that keeps no hash), since the hash no longer
-     * describes the stored file then.
-     */
-    public Optional<StoredHash> storedHash(String supplierName, String fileExtension) {
-        String hashKey = hashKey(supplierName);
-        Optional<Instant> hashedAt = fileStorage.findLastModified(bucketName, hashKey);
-        if (hashedAt.isEmpty()) {
-            return Optional.empty();
-        }
-        Optional<Instant> storedAt = fileStorage.findLastModified(bucketName, createKey(supplierName, fileExtension));
-        if (storedAt.isEmpty() || storedAt.get().isAfter(hashedAt.get())) {
-            return Optional.empty();
-        }
-        String hash = new String(fileStorage.getBytes(bucketName, hashKey), StandardCharsets.UTF_8).trim();
-        return Optional.of(new StoredHash(hash, storedAt.get()));
-    }
-
-    /** @param feedStoredAt when the feed file the hash describes was stored */
-    public record StoredHash(String hash, Instant feedStoredAt) {
-    }
-
-    // Written again by a download that found the feed unchanged, which keeps the supplier's last download date moving.
-    public void storeHash(String supplierName, String hash) {
-        fileStorage.put(bucketName, hashKey(supplierName), hash.getBytes(StandardCharsets.UTF_8));
+    public HashedFeedFile hashedFeed(String supplierName, String fileExtension) {
+        return new HashedFeedFile(fileStorage, bucketName, createKey(supplierName, fileExtension), hashKey(supplierName));
     }
 
     public boolean canRead(String supplierName) {

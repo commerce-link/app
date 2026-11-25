@@ -46,17 +46,8 @@ public class GlobalSupplierFeedService {
 
     // An unchanged feed keeps its file and with it the file's date, so no instance parses and regroups it again.
     private void storeIfChanged(String supplierName, FeedData feed) {
-        String hash = FeedHash.of(feed.data(), feed.extension());
         Instant keptSince = clock.instant().minus(MAX_AGE_OF_KEPT_FEED);
-        boolean unchanged = inventoryRepository.storedHash(supplierName, feed.extension())
-                .filter(stored -> stored.hash().equals(hash) && stored.feedStoredAt().isAfter(keptSince))
-                .isPresent();
-        if (unchanged) {
-            inventoryRepository.storeHash(supplierName, hash);
-            return;
-        }
-        inventoryRepository.store(supplierName, feed.data(), feed.extension());
-        // stored last: a download whose feed was not stored must not be taken for unchanged when it comes again
-        inventoryRepository.storeHash(supplierName, hash);
+        inventoryRepository.hashedFeed(supplierName, feed.extension())
+                .storeIfChanged(feed, stored -> stored.feedStoredAt().isAfter(keptSince));
     }
 }

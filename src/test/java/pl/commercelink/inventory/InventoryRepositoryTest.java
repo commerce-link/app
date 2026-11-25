@@ -5,23 +5,20 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.inventory.supplier.api.FeedData;
 import pl.commercelink.starter.storage.FileStorage;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class InventoryRepositoryTest {
-
-    private static final Instant STORED_AT = Instant.parse("2026-11-24T07:55:18Z");
 
     @Mock
     private FileStorage fileStorage;
@@ -34,67 +31,17 @@ class InventoryRepositoryTest {
     }
 
     @Test
-    void hashIsKeptOutsideTheFeedNames() {
-        // when
-        repository.storeHash("Acadia", "abc123");
-
-        // then
-        verify(fileStorage).put("feeds", "feed-hashes/acadia.sha256", "abc123".getBytes());
-    }
-
-    @Test
-    void storedHashIsReadWhenWrittenAfterTheFeed() {
+    void feedAndItsHashAreKeptUnderTheirOwnNames() {
         // given
-        when(fileStorage.findLastModified("feeds", "feed-hashes/acadia.sha256")).thenReturn(Optional.of(STORED_AT.plusSeconds(1)));
-        when(fileStorage.findLastModified("feeds", "acadia-feed.csv")).thenReturn(Optional.of(STORED_AT));
-        when(fileStorage.getBytes("feeds", "feed-hashes/acadia.sha256")).thenReturn("abc123\n".getBytes());
-
-        // when / then
-        assertThat(repository.storedHash("Acadia", "csv")).contains(new InventoryRepository.StoredHash("abc123", STORED_AT));
-    }
-
-    @Test
-    void storedHashHoldsForAFeedWrittenInTheSameSecond() {
-        // given
-        when(fileStorage.findLastModified("feeds", "feed-hashes/acadia.sha256")).thenReturn(Optional.of(STORED_AT));
-        when(fileStorage.findLastModified("feeds", "acadia-feed.csv")).thenReturn(Optional.of(STORED_AT));
-        when(fileStorage.getBytes("feeds", "feed-hashes/acadia.sha256")).thenReturn("abc123".getBytes());
-
-        // when / then
-        assertThat(repository.storedHash("Acadia", "csv")).contains(new InventoryRepository.StoredHash("abc123", STORED_AT));
-    }
-
-    @Test
-    void storedHashIsIgnoredWhenTheFeedWasWrittenAfterIt() {
-        // given
-        when(fileStorage.findLastModified("feeds", "feed-hashes/acadia.sha256")).thenReturn(Optional.of(STORED_AT));
-        when(fileStorage.findLastModified("feeds", "acadia-feed.csv")).thenReturn(Optional.of(STORED_AT.plusSeconds(60)));
+        FeedData feed = new FeedData("rows".getBytes(), "csv");
 
         // when
-        Optional<InventoryRepository.StoredHash> hash = repository.storedHash("Acadia", "csv");
+        repository.hashedFeed("Acadia", "csv").storeIfChanged(feed, stored -> true);
 
         // then
-        assertThat(hash).isEmpty();
-        verify(fileStorage, never()).getBytes(anyString(), anyString());
-    }
-
-    @Test
-    void storedHashIsIgnoredWhenTheFeedIsMissing() {
-        // given
-        when(fileStorage.findLastModified("feeds", "feed-hashes/acadia.sha256")).thenReturn(Optional.of(STORED_AT));
-        when(fileStorage.findLastModified("feeds", "acadia-feed.xml")).thenReturn(Optional.empty());
-
-        // when / then
-        assertThat(repository.storedHash("Acadia", "xml")).isEmpty();
-    }
-
-    @Test
-    void feedWithoutAHashHasNone() {
-        // given
-        when(fileStorage.findLastModified("feeds", "feed-hashes/acadia.sha256")).thenReturn(Optional.empty());
-
-        // when / then
-        assertThat(repository.storedHash("Acadia", "csv")).isEmpty();
+        verify(fileStorage).findLastModified("feeds", "feed-hashes/acadia.sha256");
+        verify(fileStorage).put("feeds", "acadia-feed.csv", feed.data());
+        verify(fileStorage).put(eq("feeds"), eq("feed-hashes/acadia.sha256"), any(byte[].class));
     }
 
     @Test

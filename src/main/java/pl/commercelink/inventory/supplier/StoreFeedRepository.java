@@ -6,12 +6,10 @@ import pl.commercelink.starter.storage.FileStorage;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 
 @Repository
 public class StoreFeedRepository {
@@ -31,18 +29,10 @@ public class StoreFeedRepository {
         fileStorage.put(bucketName, key(storeId, supplierName, fileExtension), data);
     }
 
-    public Optional<String> storedHash(String storeId, String supplierName) {
-        String key = key(storeId, supplierName, HASH_EXTENSION);
-        if (!fileStorage.canRead(bucketName, key)) {
-            return Optional.empty();
-        }
-        return Optional.of(new String(fileStorage.getBytes(bucketName, key), StandardCharsets.UTF_8).trim());
-    }
-
-    // Kept next to the feed under the feed's prefix, so deleting the feed deletes it too. Written again by an import
-    // that found the feed unchanged, which is what keeps the "last update" date of the connection moving.
-    public void storeHash(String storeId, String supplierName, String hash) {
-        fileStorage.put(bucketName, key(storeId, supplierName, HASH_EXTENSION), hash.getBytes(StandardCharsets.UTF_8));
+    // The hash is kept next to the feed under the feed's prefix, so deleting the feed deletes it too.
+    HashedFeedFile hashedFeed(String storeId, String supplierName, String fileExtension) {
+        return new HashedFeedFile(fileStorage, bucketName,
+                key(storeId, supplierName, fileExtension), key(storeId, supplierName, HASH_EXTENSION));
     }
 
     public boolean canRead(String storeId, String supplierName, String fileExtension) {

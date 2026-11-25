@@ -36,19 +36,11 @@ public class StoreSupplierFeedService {
     }
 
     private void storeIfChanged(String storeId, String supplierName, FeedData feed) {
-        String hash = FeedHash.of(feed.data(), feed.extension());
-        if (storeFeedRepository.storedHash(storeId, supplierName).filter(hash::equals).isPresent()) {
-            if (!storeInventoryProvider.keepIfRecent(storeId)) {
-                storeInventoryRefresh.request(storeId);
-            }
-            storeFeedRepository.storeHash(storeId, supplierName, hash);
-            return;
+        boolean stored = storeFeedRepository.hashedFeed(storeId, supplierName, feed.extension())
+                .storeIfChanged(feed, () -> storeInventoryRefresh.request(storeId));
+        if (!stored && !storeInventoryProvider.keepIfRecent(storeId)) {
+            storeInventoryRefresh.request(storeId);
         }
-        storeFeedRepository.store(storeId, supplierName, feed.data(), feed.extension());
-        storeInventoryRefresh.request(storeId);
-        // stored last: an import that stopped before asking for the rebuild must not be taken for unchanged when it is
-        // delivered again
-        storeFeedRepository.storeHash(storeId, supplierName, hash);
     }
 
     private void requireReadableConfiguration(Store store, String supplierName) {
