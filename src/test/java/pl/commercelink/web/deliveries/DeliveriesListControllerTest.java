@@ -9,6 +9,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.util.LinkedMultiValueMap;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.IntegrationType;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
 
 import java.util.Locale;
 
@@ -20,6 +23,8 @@ import static org.mockito.Mockito.*;
 class DeliveriesListControllerTest {
 
     @Mock DeliveryListService service;
+    @Mock StoresRepository stores;
+    @Mock Store store;
     @InjectMocks DeliveriesListController controller;
 
     @Test
@@ -37,6 +42,42 @@ class DeliveriesListControllerTest {
             // then
             assertThat(view).isEqualTo("deliveries");
             verify(service).page(eq(new DeliveryListService.ListActor("store-1", false, true)), any(), any(), any());
+        }
+    }
+
+    @Test
+    void adminOfAStoreWithAnInvoicingSystemGetsTheInvoiceAutoSyncButton() {
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            // given
+            security.when(CustomSecurityContext::getStoreId).thenReturn("store-1");
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+            security.when(() -> CustomSecurityContext.hasRole("ADMIN")).thenReturn(true);
+            when(stores.findById("store-1")).thenReturn(store);
+            when(store.hasIntegration(IntegrationType.INVOICING_PROVIDER)).thenReturn(true);
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            controller.deliveries(new LinkedMultiValueMap<>(), new Locale("pl"), model);
+
+            // then
+            assertThat(model.get("canAutoSyncInvoices")).isEqualTo(true);
+            assertThat(model.get("invoicingConnected")).isEqualTo(true);
+        }
+    }
+
+    @Test
+    void superAdminGetsNoInvoiceAutoSyncButton() {
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            // given
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            controller.deliveries(new LinkedMultiValueMap<>(), new Locale("pl"), model);
+
+            // then
+            assertThat(model.containsAttribute("canAutoSyncInvoices")).isFalse();
+            verifyNoInteractions(stores);
         }
     }
 

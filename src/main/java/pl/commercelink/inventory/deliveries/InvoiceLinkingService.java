@@ -61,6 +61,17 @@ public class InvoiceLinkingService {
         deliveriesRepository.save(delivery);
     }
 
+    /** Links the invoice unless somebody linked one to the delivery meanwhile; says whether it did. */
+    public boolean linkUnlessInvoiced(String storeId, String deliveryId, Invoice inv) {
+        var delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null || delivery.isInvoiced()) {
+            return false;
+        }
+        delivery.addDocument(new Document(inv.id(), inv.number(), inv.viewUrl(), DocumentType.InvoiceVat));
+        deliveriesRepository.save(delivery);
+        return true;
+    }
+
     public void unlinkInvoice(String storeId, String deliveryId, String invoiceId) {
         var delivery = deliveriesRepository.findById(storeId, deliveryId);
         Document doc = delivery.findDocumentById(invoiceId);
