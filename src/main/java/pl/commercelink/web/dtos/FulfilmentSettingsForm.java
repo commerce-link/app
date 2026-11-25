@@ -15,7 +15,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Settings › Order fulfilment: delivery time, how new orders are fulfilled and the customer's order page. The day counts
+ * Settings › Order fulfilment: delivery time, how new orders are fulfilled, the customer's order page and which
+ * documents still lock an order's data (OrderEditPolicy). The day counts
  * are taken as text so a blank or mistyped value gets a message at the field instead of a binding error. The supplier
  * settings of the same configuration (connections, global configuration, inventory cache) belong to the suppliers page
  * and are carried over from the store unchanged.
@@ -34,6 +35,9 @@ public class FulfilmentSettingsForm {
     private boolean clientShippingAddressChangeEnabled;
     private boolean clientPreferredShippingDateEnabled;
     private Map<String, List<String>> preferredShippingDays = new LinkedHashMap<>();
+    private boolean orderEditAfterWarehouseDocuments;
+    private boolean orderEditAfterSaleDocuments;
+    private boolean orderEditAfterAdvanceDocuments;
 
     public static FulfilmentSettingsForm from(Store store) {
         FulfilmentConfiguration config = store.getFulfilmentConfiguration() != null
@@ -47,6 +51,9 @@ public class FulfilmentSettingsForm {
         form.clientOrderPageEnabled = config.isClientOrderPageEnabled();
         form.clientShippingAddressChangeEnabled = config.isClientShippingAddressChangeEnabled();
         form.clientPreferredShippingDateEnabled = config.isClientPreferredShippingDateEnabled();
+        form.orderEditAfterWarehouseDocuments = config.isOrderEditAfterWarehouseDocuments();
+        form.orderEditAfterSaleDocuments = config.isOrderEditAfterSaleDocuments();
+        form.orderEditAfterAdvanceDocuments = config.isOrderEditAfterAdvanceDocuments();
         for (ShipmentType type : ShipmentType.values()) {
             form.preferredShippingDays.put(type.name(), dayNames(config.preferredShippingDaysFor(type)));
         }
@@ -89,6 +96,9 @@ public class FulfilmentSettingsForm {
         config.setClientOrderPageEnabled(clientOrderPageEnabled);
         config.setClientShippingAddressChangeEnabled(clientShippingAddressChangeEnabled);
         config.setClientPreferredShippingDateEnabled(clientPreferredShippingDateEnabled);
+        config.setOrderEditAfterWarehouseDocuments(orderEditAfterWarehouseDocuments);
+        config.setOrderEditAfterSaleDocuments(orderEditAfterSaleDocuments);
+        config.setOrderEditAfterAdvanceDocuments(orderEditAfterAdvanceDocuments);
         Map<String, List<String>> days = new LinkedHashMap<>();
         for (ShipmentType type : ShipmentType.values()) {
             days.put(type.name(), dayNames(selectedDays(type)));

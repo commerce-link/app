@@ -113,7 +113,12 @@ public class OrderItem extends Item {
     }
 
     public void update(OrderItem other) {
-        if (isNew()) {
+        update(other, false);
+    }
+
+    /** fullEdit: the store lets its admin change a fulfilled item like a new one (OrderEditPolicy#editsItemsInAnyStatus). */
+    public void update(OrderItem other, boolean fullEdit) {
+        if (isNew() || fullEdit) {
             updateAllFields(other);
         } else {
             updateLimitedFields(other);

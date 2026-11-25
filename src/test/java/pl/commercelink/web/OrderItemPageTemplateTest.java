@@ -58,6 +58,7 @@ class OrderItemPageTemplateTest {
         variables.put("categories", List.of("Laptopy", "Monitory"));
         variables.put("categoryGroups", List.of(new StoreCategories.Group("Sklep", List.of("Laptopy", "Monitory"))));
         variables.put("isCompletedOrder", closed);
+        variables.put("fullEdit", item.isNew());
         variables.put("serviceFlagLocked", false);
         variables.put("priceLocked", false);
         variables.put("consolidationLocked", false);

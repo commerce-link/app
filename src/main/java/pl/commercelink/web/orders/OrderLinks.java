@@ -1,8 +1,6 @@
 package pl.commercelink.web.orders;
 
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.web.util.UriComponentsBuilder;
-import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.SerialNumbers;
 
@@ -55,18 +53,6 @@ public record OrderLinks(String base, String storeId, boolean superAdmin) {
             return path;
         }
         return path.startsWith("/dashboard/deliveries/") ? "/dashboard/store/" + storeId + path.substring("/dashboard".length()) : null;
-    }
-
-    /**
-     * The unpin address with the document in its query, used both for the row's link and for the GET confirmation
-     * page it opens, so the two never drift apart. '+' is encoded by hand: a query value reads it back as a space.
-     * Unpinning is offered only to a store admin, never a super admin, so the store-scoped form is always right.
-     */
-    public static String removeDocumentPath(String orderId, DocumentType type, String number) {
-        return UriComponentsBuilder.fromPath("/dashboard/orders/" + orderId + "/removeDocument")
-                .queryParam("type", type.name())
-                .queryParam("number", number)
-                .encode().build().toUriString().replace("+", "%2B");
     }
 
     /** The history of one physical item, by its serial number (the store's page; a super admin has none). */

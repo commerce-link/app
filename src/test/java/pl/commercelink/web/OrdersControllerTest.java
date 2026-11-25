@@ -36,6 +36,7 @@ import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderEditPolicy;
 import pl.commercelink.orders.OrderReviewStatus;
 import pl.commercelink.orders.OrderItemDraft;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
@@ -2251,6 +2252,54 @@ class OrdersControllerTest {
     }
 
     @Test
+    void anAdminOfAStoreThatReleasedItsDocumentsEditsAFulfilledItemLikeANewOne() {
+        // given
+        OrderItem item = existingOrderItem("Obudowy", false);
+        item.setStatus(FulfilmentStatus.Delivered);
+        item.setSku("OLD-SKU");
+        OrderItem posted = postedOrderItem("Obudowy");
+        posted.setSku("NEW-SKU");
+        posted.setQty(3);
+        when(storesRepository.findById(STORE_ID)).thenReturn(storeReleasingSaleDocuments());
+        securityStub.when(() -> CustomSecurityContext.hasRole("ADMIN")).thenReturn(true);
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, null, new ExtendedModelMap());
+
+        // then
+        assertThat(item.getSku()).isEqualTo("NEW-SKU");
+        assertThat(item.getQty()).isEqualTo(3);
+    }
+
+    @Test
+    void aUserWithoutTheAdminRoleKeepsTheLimitedEditOfAFulfilledItem() {
+        // given
+        OrderItem item = existingOrderItem("Obudowy", false);
+        item.setStatus(FulfilmentStatus.Delivered);
+        item.setSku("OLD-SKU");
+        OrderItem posted = postedOrderItem("Obudowy");
+        posted.setSku("NEW-SKU");
+        posted.setQty(3);
+        when(storesRepository.findById(STORE_ID)).thenReturn(storeReleasingSaleDocuments());
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, null, new ExtendedModelMap());
+
+        // then
+        assertThat(item.getSku()).isEqualTo("OLD-SKU");
+        assertThat(item.getQty()).isEqualTo(1);
+    }
+
+    private Store storeReleasingSaleDocuments() {
+        pl.commercelink.stores.FulfilmentConfiguration configuration = new pl.commercelink.stores.FulfilmentConfiguration();
+        configuration.setOrderEditAfterSaleDocuments(true);
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setFulfilmentConfiguration(configuration);
+        return store;
+    }
+
+    @Test
     void savingItemWithBlankCategoryNormalizesItToNull() {
         // given
         OrderItem item = existingOrderItem(null, true);
@@ -2441,88 +2490,6 @@ class OrdersControllerTest {
         // then
         assertThat(item.getDeliveryId()).isEqualTo("Acme");
         verify(orderItemsRepository).save(item);
-    }
-
-    @Test
-    @DisplayName("removeDocument removes the invoice and saves the order without triggering the lifecycle")
-    void removeDocumentRemovesInvoiceAndSavesWithoutLifecycle() {
-        // given
-        Order existingOrder = invoicedOrder();
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
-
-        // when
-        String view = ordersController.removeDocument(ORDER_ID, pl.commercelink.documents.DocumentType.InvoiceVat, "FV/1/2026", redirectAttributes, Locale.ENGLISH);
-
-        // then
-        assertThat(existingOrder.getDocuments()).isEmpty();
-        verify(ordersRepository).save(existingOrder);
-        verifyNoInteractions(orderLifecycle);
-        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-    }
-
-    @Test
-    @DisplayName("removeDocument sets error flash and does not save when the order is completed")
-    void removeDocumentRejectsCompletedOrder() {
-        // given
-        Order existingOrder = invoicedOrder();
-        existingOrder.setStatus(OrderStatus.Completed);
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
-        when(messageSource.getMessage(eq("error.message.document.cannot.be.removed"), any(), eq(Locale.ENGLISH)))
-                .thenReturn("Cannot remove");
-
-        // when
-        ordersController.removeDocument(ORDER_ID, pl.commercelink.documents.DocumentType.InvoiceVat, "FV/1/2026", redirectAttributes, Locale.ENGLISH);
-
-        // then
-        assertThat(existingOrder.getDocuments()).hasSize(1);
-        verify(ordersRepository, never()).save(any());
-        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), eq("Cannot remove"));
-    }
-
-    @Test
-    @DisplayName("removeDocument sets error flash and does not save when the document is a warehouse document")
-    void removeDocumentRejectsWarehouseDocument() {
-        // given
-        Order existingOrder = orderBase();
-        existingOrder.addDocument(new pl.commercelink.documents.Document(
-                "wz-1", "WZ/1/2026", null, pl.commercelink.documents.DocumentType.GoodsIssue));
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
-        when(messageSource.getMessage(eq("error.message.document.cannot.be.removed"), any(), eq(Locale.ENGLISH)))
-                .thenReturn("Cannot remove");
-
-        // when
-        ordersController.removeDocument(ORDER_ID, pl.commercelink.documents.DocumentType.GoodsIssue, "WZ/1/2026", redirectAttributes, Locale.ENGLISH);
-
-        // then
-        assertThat(existingOrder.getDocuments()).hasSize(1);
-        verify(ordersRepository, never()).save(any());
-        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), eq("Cannot remove"));
-    }
-
-    @Test
-    @DisplayName("removeDocument refuses to remove a document an e-receipt attempt issued automatically")
-    void removeDocumentRefusesAnAutomaticReceipt() {
-        // given
-        String receiptKey = ORDER_ID + ":R1";
-        Order existingOrder = orderBase();
-        existingOrder.addDocument(new pl.commercelink.documents.Document(
-                receiptKey, receiptKey, null, pl.commercelink.documents.DocumentType.Receipt));
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
-        ReceiptAttempt attempt = new ReceiptAttempt();
-        attempt.setReceiptKey(receiptKey);
-        when(receiptAttemptService.attemptsOf(STORE_ID, ORDER_ID)).thenReturn(List.of(attempt));
-        when(messageSource.getMessage(eq("receipts.document.remove.automatic"), any(), eq(Locale.ENGLISH)))
-                .thenReturn("Cannot remove automatic receipt");
-
-        // when
-        String view = ordersController.removeDocument(ORDER_ID, pl.commercelink.documents.DocumentType.Receipt,
-                receiptKey, redirectAttributes, Locale.ENGLISH);
-
-        // then
-        assertThat(existingOrder.getDocuments()).hasSize(1);
-        verify(ordersRepository, never()).save(any());
-        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), eq("Cannot remove automatic receipt"));
-        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
     }
 
     @Test
@@ -4018,7 +3985,7 @@ class OrdersControllerTest {
         void theConfirmationPagesPostBackToTheirOwnAddress() {
             // given
             Order order = order(OrderStatus.Shipping);
-            order.addDocument(document(DocumentType.InvoiceVat, "FV/1"));
+            order.addDocument(new Document(null, "FV/1", null, DocumentType.InvoiceVat));
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
             String base = "/dashboard/orders/" + ORDER_ID;
 
@@ -4027,13 +3994,11 @@ class OrdersControllerTest {
             ExtendedModelMap cancel = new ExtendedModelMap();
             ExtendedModelMap goodsOut = new ExtendedModelMap();
             ExtendedModelMap shipment = new ExtendedModelMap();
-            ExtendedModelMap unpin = new ExtendedModelMap();
             List<String> views = List.of(
                     ordersController.confirmDeleteOrder(ORDER_ID, delete, new RedirectAttributesModelMap(), polish),
                     ordersController.confirmCancelOrder(ORDER_ID, cancel, new RedirectAttributesModelMap(), polish),
                     ordersController.confirmGoodsOut(ORDER_ID, goodsOut, polish),
-                    ordersController.confirmCancelShipment(ORDER_ID, shipment, polish),
-                    ordersController.confirmRemoveDocument(ORDER_ID, DocumentType.InvoiceVat, "FV/1", unpin, polish));
+                    ordersController.confirmCancelShipment(ORDER_ID, shipment, polish));
 
             // then
             assertThat(views).containsOnly("settings-confirm");
@@ -4042,7 +4007,6 @@ class OrdersControllerTest {
             assertThat(((ConfirmAction) goodsOut.get("confirm")).actionPath()).isEqualTo(base + "/goods-out");
             assertThat(((ConfirmAction) goodsOut.get("confirm")).destructive()).isFalse();
             assertThat(((ConfirmAction) shipment.get("confirm")).actionPath()).isEqualTo(base + "/cancelShipment");
-            assertThat(((ConfirmAction) unpin.get("confirm")).actionPath()).startsWith(base + "/removeDocument");
             assertThat(((ConfirmAction) delete.get("confirm")).cancelPath()).isEqualTo(base);
             verifyNoInteractions(ordersManager, shipmentCancelService);
         }
@@ -4082,18 +4046,6 @@ class OrdersControllerTest {
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
             assertThat(flash(redirect)).containsEntry("errorMessage", "error.message.no.eligible.invoice.to.create");
             verifyNoInteractions(invoiceCreationEventPublisher);
-        }
-
-        @Test
-        void theRemoveDocumentConfirmationOfAMissingDocumentGoesBackToTheOrder() {
-            // given
-            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.New));
-
-            // when
-            String view = ordersController.confirmRemoveDocument(ORDER_ID, DocumentType.InvoiceVat, "FV/9", new ExtendedModelMap(), polish);
-
-            // then
-            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
         }
 
         @Test
@@ -4666,7 +4618,7 @@ class OrdersControllerTest {
         void aCompleteBulkActionSaysHowManyItemsChanged() {
             // given
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
-            when(ordersManager.removeFromOrder(STORE_ID, ORDER_ID, List.of("a", "b")))
+            when(ordersManager.removeFromOrder(STORE_ID, ORDER_ID, List.of("a", "b"), false))
                     .thenReturn(new OrdersManager.Result(orderBase(), List.of(), 0, 2, 2));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
@@ -4757,7 +4709,7 @@ class OrdersControllerTest {
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
             Order target = new Order(STORE_ID);
             when(orderReferenceResolver.resolve(STORE_ID, "51aa")).thenReturn(OrderReferenceResolver.Resolution.found(target));
-            when(ordersManager.moveOrderItemsToOrder(STORE_ID, ORDER_ID, target.getOrderId(), List.of("a"))).thenReturn(target);
+            when(ordersManager.moveOrderItemsToOrder(STORE_ID, ORDER_ID, target.getOrderId(), List.of("a"), OrderEditPolicy.STRICT)).thenReturn(target);
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
@@ -4788,7 +4740,7 @@ class OrdersControllerTest {
             assertThat(flash(ambiguous)).containsEntry("errorMessage", "order.move.ambiguous [2]");
             assertThat(flash(unknown)).containsEntry("errorMessage", "order.move.not.found [0]");
             assertThat(flash(own)).containsEntry("errorMessage", "order.move.self [1]");
-            verify(ordersManager, never()).moveOrderItemsToOrder(any(), any(), any(), any());
+            verify(ordersManager, never()).moveOrderItemsToOrder(any(), any(), any(), any(), any());
         }
 
         @Test
@@ -6252,7 +6204,7 @@ class OrdersControllerTest {
         void itemsOfAnRmaReplacementOrderAreRemovedAndMergedOnInvoice() {
             // given
             OrderItem item = storedNewItem(rmaReplacement());
-            when(ordersManager.removeFromOrder(STORE_ID, ORDER_ID, List.of("a")))
+            when(ordersManager.removeFromOrder(STORE_ID, ORDER_ID, List.of("a"), false))
                     .thenReturn(new OrdersManager.Result(orderBase(), List.of(), 0, 1, 1));
             RedirectAttributesModelMap remove = new RedirectAttributesModelMap();
             RedirectAttributesModelMap consolidate = new RedirectAttributesModelMap();
@@ -6264,7 +6216,7 @@ class OrdersControllerTest {
             // then
             assertThat(flash(remove)).doesNotContainKey("errorMessage");
             assertThat(flash(consolidate)).doesNotContainKey("errorMessage");
-            verify(ordersManager).removeFromOrder(STORE_ID, ORDER_ID, List.of("a"));
+            verify(ordersManager).removeFromOrder(STORE_ID, ORDER_ID, List.of("a"), false);
             assertThat(item.isConsolidated()).isTrue();
             verify(orderItemsRepository).save(item);
         }
@@ -6395,24 +6347,6 @@ class OrdersControllerTest {
         }
 
         @Test
-        void unpinningTheTypedReceiptRaisesTheDeadAttemptAlertAgain() {
-            // given: a POS sale whose e-receipt blocked, settled by the cash register receipt typed in
-            Order order = order(OrderStatus.Delivered);
-            order.addDocument(document(DocumentType.Receipt, "KASA/13"));
-            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-
-            // when
-            ordersController.removeDocument(ORDER_ID, DocumentType.Receipt, "KASA/13", new RedirectAttributesModelMap(),
-                    polish);
-
-            // then: the save bypasses the lifecycle, so the bell is reconciled with the order right after it
-            InOrder saveThenReconcile = inOrder(ordersRepository, receiptAttemptService);
-            saveThenReconcile.verify(ordersRepository).save(order);
-            saveThenReconcile.verify(receiptAttemptService).reconcileDeadAttemptAlerts(order);
-            assertThat(order.getDocuments()).isEmpty();
-        }
-
-        @Test
         void aTypedDocumentCannotTakeAnAttemptsId() {
             // given: a crafted post carrying the dead attempt's key as the document id
             Order order = order(OrderStatus.Delivered);
@@ -6423,7 +6357,7 @@ class OrdersControllerTest {
             // when
             ordersController.addReceipt(ORDER_ID, forged, new RedirectAttributesModelMap(), polish);
 
-            // then: stored as an ordinary typed document the card lists and can unpin
+            // then: stored as an ordinary typed document the card lists
             assertThat(order.getDocuments()).singleElement().satisfies(d -> {
                 assertThat(d.getNumber()).isEqualTo("KASA/13");
                 assertThat(d.getId()).isNull();

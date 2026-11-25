@@ -46,6 +46,45 @@ class FulfilmentSettingsFormTest {
     }
 
     @Test
+    void theOrderEditSettingsAreReadFromTheStoreAndSavedBack() {
+        // given
+        Store store = new Store();
+        FulfilmentConfiguration stored = new FulfilmentConfiguration();
+        stored.setOrderEditAfterSaleDocuments(true);
+        store.setFulfilmentConfiguration(stored);
+        FulfilmentSettingsForm posted = valid();
+        posted.setOrderEditAfterWarehouseDocuments(true);
+
+        // when
+        FulfilmentSettingsForm shown = FulfilmentSettingsForm.from(store);
+        FulfilmentConfiguration saved = posted.toFulfilmentConfiguration(store);
+
+        // then
+        assertThat(shown.isOrderEditAfterSaleDocuments()).isTrue();
+        assertThat(shown.isOrderEditAfterWarehouseDocuments()).isFalse();
+        assertThat(shown.isOrderEditAfterAdvanceDocuments()).isFalse();
+        assertThat(saved.isOrderEditAfterWarehouseDocuments()).isTrue();
+        assertThat(saved.isOrderEditAfterSaleDocuments()).isFalse();
+    }
+
+    @Test
+    void theOrderEditSettingsSurviveASupplierConnectionChange() {
+        // given
+        FulfilmentConfiguration stored = new FulfilmentConfiguration();
+        stored.setOrderEditAfterWarehouseDocuments(true);
+        stored.setOrderEditAfterSaleDocuments(true);
+        stored.setOrderEditAfterAdvanceDocuments(true);
+
+        // when
+        FulfilmentConfiguration copy = stored.withConnections(List.of());
+
+        // then
+        assertThat(copy.isOrderEditAfterWarehouseDocuments()).isTrue();
+        assertThat(copy.isOrderEditAfterSaleDocuments()).isTrue();
+        assertThat(copy.isOrderEditAfterAdvanceDocuments()).isTrue();
+    }
+
+    @Test
     void fromReadsTheConfiguredDaysOfAShipmentType() {
         // given
         Store store = new Store();

@@ -1,7 +1,7 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/* Document rows, issuing and unpinning. Issuable types and the next type come as Option/key from the model. The
+<!--/* Document rows and issuing. Issuable types and the next type come as Option/key from the model. The
        order's e-receipt is the first row: its newest attempt with its own actions, the earlier attempts collapsed
        under it; the document the attempt attached is that row, never a second "Paragon" row. */-->
 <section th:fragment="card" class="cl-card" id="dokumenty" aria-labelledby="documents-title"
@@ -76,13 +76,6 @@
                     <span th:unless="${d.href() != null}" th:text="${d.number()}"></span>
                 </p>
                 <p class="cl-list-desc" th:if="${d.issuedAt() != null}" th:text="#{order.documents.issued(${d.issuedAt()})}"></p>
-            </div>
-            <div class="cl-list-actions" th:if="${d.removable()}">
-                <a class="cl-link-button is-danger" data-cl-confirm th:href="@{${d.removeHref()}}"
-                   th:attr="data-cl-confirm-title=#{order.documents.unpin.confirm.title(${d.number()})},
-                            data-cl-confirm-message=#{order.documents.unpin.confirm.message},
-                            data-cl-confirm-action=#{order.documents.unpin.confirm.action}"
-                   th:text="#{order.documents.unpin}"></a>
             </div>
         </li>
     </ul>

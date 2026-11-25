@@ -4,6 +4,8 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
+import lombok.Getter;
+import lombok.Setter;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 
@@ -47,6 +49,19 @@ public class FulfilmentConfiguration {
     private boolean clientPreferredShippingDateEnabled = false;
     @DynamoDBAttribute(attributeName = "preferredShippingDays")
     private Map<String, List<String>> preferredShippingDays;
+    // read through OrderEditPolicy, never one by one
+    @Getter
+    @Setter
+    @DynamoDBAttribute(attributeName = "orderEditAfterWarehouseDocuments")
+    private boolean orderEditAfterWarehouseDocuments = false;
+    @Getter
+    @Setter
+    @DynamoDBAttribute(attributeName = "orderEditAfterSaleDocuments")
+    private boolean orderEditAfterSaleDocuments = false;
+    @Getter
+    @Setter
+    @DynamoDBAttribute(attributeName = "orderEditAfterAdvanceDocuments")
+    private boolean orderEditAfterAdvanceDocuments = false;
 
     public FulfilmentConfiguration() {
     }
@@ -190,6 +205,9 @@ public class FulfilmentConfiguration {
         copy.setClientShippingAddressChangeEnabled(clientShippingAddressChangeEnabled);
         copy.setClientPreferredShippingDateEnabled(clientPreferredShippingDateEnabled);
         copy.setPreferredShippingDays(preferredShippingDays);
+        copy.setOrderEditAfterWarehouseDocuments(orderEditAfterWarehouseDocuments);
+        copy.setOrderEditAfterSaleDocuments(orderEditAfterSaleDocuments);
+        copy.setOrderEditAfterAdvanceDocuments(orderEditAfterAdvanceDocuments);
         copy.setSupplierConnections(new ArrayList<>(connections));
         return copy;
     }

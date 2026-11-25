@@ -2597,4 +2597,30 @@ class OrderPageModelFactoryTest {
         assertThat(shipping.rmaHref()).isNull();
         assertThat(superAdmin.rmaHref()).isNull();
     }
+
+    @Test
+    void aStoreThatReleasedItsDocumentsKeepsTheOrderEditableAfterThem() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        order.addDocument(new Document("wz-1", "WZ/1", null, DocumentType.GoodsIssue));
+        order.addDocument(new Document("fv-1", "FV/1", null, DocumentType.InvoiceVat));
+        List<OrderItem> items = List.of(item(FulfilmentStatus.New));
+
+        // when
+        OrderPageModel locked = factory.build(order, items, ADMIN, PL);
+        FulfilmentConfiguration fulfilment = new FulfilmentConfiguration();
+        fulfilment.setOrderEditAfterWarehouseDocuments(true);
+        fulfilment.setOrderEditAfterSaleDocuments(true);
+        storesRepository.findById("store-1").setFulfilmentConfiguration(fulfilment);
+        OrderPageModel released = factory.build(order, items, ADMIN, PL);
+
+        // then
+        assertThat(locked.items().canAddItems()).isFalse();
+        assertThat(locked.items().selectable()).isFalse();
+        assertThat(locked.customer().billingLockedKey()).isEqualTo("order.customer.billing.locked");
+        assertThat(released.items().canAddItems()).isTrue();
+        assertThat(released.items().selectable()).isTrue();
+        assertThat(released.items().bulkStandalone().action()).isEqualTo(BulkAction.REMOVE);
+        assertThat(released.customer().billingLockedKey()).isNull();
+    }
 }

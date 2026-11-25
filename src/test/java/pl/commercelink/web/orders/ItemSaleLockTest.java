@@ -5,6 +5,8 @@ import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
+import pl.commercelink.receipts.ReceiptLock;
+import pl.commercelink.orders.OrderEditPolicy;
 import pl.commercelink.orders.OrderItem;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,6 +43,20 @@ class ItemSaleLockTest {
         assertThat(ItemSaleLock.of(invoiced, true)).isEqualTo(ItemSaleLock.INVOICED);
         assertThat(ItemSaleLock.of(open, true)).isEqualTo(ItemSaleLock.RECEIPT_ISSUING);
         assertThat(ItemSaleLock.of(open, false)).isNull();
+    }
+
+    @Test
+    void aStoreThatReleasedSaleDocumentsKeepsOnlyTheReceiptBeingIssuedAsALock() {
+        // given
+        Order invoiced = new Order("store-1");
+        invoiced.addDocument(new Document("f1", "FV/1", null, DocumentType.InvoiceVat));
+        OrderEditPolicy afterSale = new OrderEditPolicy(false, true, false);
+
+        // when / then
+        assertThat(ItemSaleLock.of(invoiced, ReceiptLock.NONE, afterSale)).isNull();
+        assertThat(ItemSaleLock.of(invoiced, ReceiptLock.ISSUING, afterSale)).isEqualTo(ItemSaleLock.RECEIPT_ISSUING);
+        assertThat(ItemSaleLock.of(invoiced, ReceiptLock.NONE, new OrderEditPolicy(true, false, true)))
+                .isEqualTo(ItemSaleLock.INVOICED);
     }
 
     @Test
