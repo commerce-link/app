@@ -24,7 +24,6 @@ import pl.commercelink.orders.ClientShippingAddressChangeException;
 import pl.commercelink.orders.ClientShippingAddressChangeService;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItemsRepository;
-import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.stores.Store;
@@ -265,8 +264,8 @@ public class ClientOrderController {
             return new Lookup(null, store, null);
         }
         Order order = ordersRepository.findById(storeId, orderId);
-        // A completed order has nothing left to track; the link expires with it rather than staying public forever.
-        if (order == null || order.hasStatus(OrderStatus.Completed)) {
+        // The link expires with the order rather than staying public forever.
+        if (order == null || !order.hasClientOrderPage()) {
             return new Lookup(null, store, order);
         }
         return new Lookup(new ClientOrderContext(store, order), store, order);
@@ -278,7 +277,7 @@ public class ClientOrderController {
         model.addAttribute("publicPage", lookup.store() != null
                 ? PublicPageFactory.of(lookup.store(), path, locale)
                 : PublicPageFactory.unknownStore(path, locale));
-        // Only a completed order is known by now; for a missing or hidden one the page must not confirm that it exists.
+        // Only an order whose page expired is known by now; for a missing or hidden one the page must not confirm that it exists.
         model.addAttribute("shortId", lookup.order() != null ? lookup.order().getShortenedOrderId() : null);
         response.setStatus(HttpServletResponse.SC_NOT_FOUND);
         return UNAVAILABLE;

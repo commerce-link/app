@@ -91,6 +91,42 @@ class OrderTest {
         assertThat(url).isEqualTo("https://app.example.com/store/store-1/client/order/order-1");
     }
 
+    @ParameterizedTest
+    @EnumSource(value = OrderStatus.class, names = {"Completed", "Cancelled"}, mode = EnumSource.Mode.EXCLUDE)
+    @DisplayName("hasClientOrderPage holds for every open order")
+    void openOrderHasClientOrderPage(OrderStatus status) {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(status);
+
+        // when / then
+        assertThat(order.hasClientOrderPage()).isTrue();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = OrderStatus.class, names = {"Completed", "Cancelled"})
+    @DisplayName("hasClientOrderPage ends with a closed order that owes no refund")
+    void closedOrderHasNoClientOrderPage(OrderStatus status) {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(status);
+
+        // when / then
+        assertThat(order.hasClientOrderPage()).isFalse();
+    }
+
+    @Test
+    @DisplayName("hasClientOrderPage stays for a cancelled order until its refund is recorded")
+    void cancelledOrderAwaitingRefundKeepsClientOrderPage() {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Cancelled);
+        order.addPayment(Payment.bankTransfer("REF-1", "Jan", 1249));
+
+        // when / then
+        assertThat(order.hasClientOrderPage()).isTrue();
+    }
+
     @Test
     @DisplayName("getIssuableDocumentTypes returns empty for non-B2B order")
     void returnsEmptyForNonB2B() {

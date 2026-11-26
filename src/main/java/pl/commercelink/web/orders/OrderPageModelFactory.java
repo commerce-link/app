@@ -164,7 +164,7 @@ public class OrderPageModelFactory {
             primary = new OrderPageModel.PrimaryAction("order.page.action.courier", links.details() + "/shipping", "fa-truck");
         }
         String splitFrom = order.getSplitFromOrderId();
-        boolean clientPage = store != null && store.isClientOrderPageEnabled() && !order.hasStatus(OrderStatus.Completed);
+        boolean clientPage = store != null && store.isClientOrderPageEnabled() && order.hasClientOrderPage();
         String sourceName = order.getSource() == null ? null : StringUtils.trimToNull(order.getSource().getName());
         // the type only stands in for a missing name: "Allegro (Marketplace)" says nothing the name does not
         String sourceTypeKey = order.getSource() == null || sourceName != null ? null
