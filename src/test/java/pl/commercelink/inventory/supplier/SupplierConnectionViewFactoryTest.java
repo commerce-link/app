@@ -100,7 +100,7 @@ class SupplierConnectionViewFactoryTest {
         // given -- global connections ride the platform-wide feed
         Store store = storeWith(connection("Elko", ConnectionMode.GLOBAL));
         when(storeFeedRepository.feedLastModifiedByIdentity("store-1")).thenReturn(Map.of());
-        when(inventoryRepository.getLatestModifiedPerSupplier()).thenReturn(Map.of());
+        when(inventoryRepository.getLastDownloadedPerSupplier()).thenReturn(Map.of());
         when(supplierRegistry.exists("Elko")).thenReturn(true);
 
         // when
@@ -162,7 +162,7 @@ class SupplierConnectionViewFactoryTest {
         Store store = storeWith(connection("Elko", ConnectionMode.GLOBAL));
         when(storeFeedRepository.feedLastModifiedByIdentity("store-1"))
                 .thenReturn(Map.of("elko", LocalDateTime.of(2026, 9, 11, 6, 0)));
-        when(inventoryRepository.getLatestModifiedPerSupplier()).thenReturn(Map.of());
+        when(inventoryRepository.getLastDownloadedPerSupplier()).thenReturn(Map.of());
         when(supplierRegistry.exists("Elko")).thenReturn(true);
 
         // when
@@ -180,7 +180,7 @@ class SupplierConnectionViewFactoryTest {
         Store store = storeWith(connection("Elko", ConnectionMode.GLOBAL));
         when(storeFeedRepository.feedLastModifiedByIdentity("store-1"))
                 .thenReturn(Map.of("elko", LocalDateTime.of(2020, 1, 1, 0, 0)));
-        when(inventoryRepository.getLatestModifiedPerSupplier())
+        when(inventoryRepository.getLastDownloadedPerSupplier())
                 .thenReturn(Map.of("elko", LocalDateTime.of(2026, 9, 11, 6, 0)));
         when(supplierRegistry.exists("Elko")).thenReturn(true);
 
@@ -197,7 +197,7 @@ class SupplierConnectionViewFactoryTest {
         // given
         Store store = storeWith(connection("Elko", ConnectionMode.GLOBAL));
         when(storeFeedRepository.feedLastModifiedByIdentity("store-1")).thenReturn(Map.of());
-        when(inventoryRepository.getLatestModifiedPerSupplier())
+        when(inventoryRepository.getLastDownloadedPerSupplier())
                 .thenReturn(Map.of("otherSupplier", LocalDateTime.of(2026, 9, 11, 6, 0)));
         when(supplierRegistry.exists("Elko")).thenReturn(true);
 
@@ -214,7 +214,7 @@ class SupplierConnectionViewFactoryTest {
         // given
         Store store = storeWith(connection("ELKO", ConnectionMode.GLOBAL));
         when(storeFeedRepository.feedLastModifiedByIdentity("store-1")).thenReturn(Map.of());
-        when(inventoryRepository.getLatestModifiedPerSupplier())
+        when(inventoryRepository.getLastDownloadedPerSupplier())
                 .thenReturn(Map.of("elko", LocalDateTime.of(2026, 9, 11, 6, 0)));
         when(supplierRegistry.exists("ELKO")).thenReturn(true);
 
@@ -239,7 +239,7 @@ class SupplierConnectionViewFactoryTest {
 
         // then
         assertThat(views.external().get(0).feedLastModified()).isEqualTo(LocalDateTime.of(2026, 9, 11, 6, 0));
-        verify(inventoryRepository, never()).getLatestModifiedPerSupplier();
+        verify(inventoryRepository, never()).getLastDownloadedPerSupplier();
     }
 
     @Test
@@ -254,7 +254,7 @@ class SupplierConnectionViewFactoryTest {
         factory.views(store);
 
         // then
-        verify(inventoryRepository, never()).getLatestModifiedPerSupplier();
+        verify(inventoryRepository, never()).getLastDownloadedPerSupplier();
     }
 
     @Test
@@ -263,7 +263,7 @@ class SupplierConnectionViewFactoryTest {
         Store store = storeWith(connection("Elko", ConnectionMode.GLOBAL),
                 connection("Kosatec", ConnectionMode.GLOBAL));
         when(storeFeedRepository.feedLastModifiedByIdentity("store-1")).thenReturn(Map.of());
-        when(inventoryRepository.getLatestModifiedPerSupplier()).thenReturn(Map.of());
+        when(inventoryRepository.getLastDownloadedPerSupplier()).thenReturn(Map.of());
         when(supplierRegistry.exists("Elko")).thenReturn(true);
         when(supplierRegistry.exists("Kosatec")).thenReturn(true);
 
@@ -271,7 +271,7 @@ class SupplierConnectionViewFactoryTest {
         factory.views(store);
 
         // then
-        verify(inventoryRepository, times(1)).getLatestModifiedPerSupplier();
+        verify(inventoryRepository, times(1)).getLastDownloadedPerSupplier();
     }
 
     @Test

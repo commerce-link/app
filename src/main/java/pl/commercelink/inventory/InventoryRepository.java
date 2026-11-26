@@ -1,17 +1,26 @@
 package pl.commercelink.inventory;
 
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
+import pl.commercelink.inventory.supplier.HashedFeedFile;
 import pl.commercelink.starter.storage.FileStorage;
 
 import java.io.IOException;
 import java.io.Reader;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 @Repository
 public class InventoryRepository {
+
+    private static final String FEED_MARKER = "-feed";
+    // outside the feed names the reload reads, also for a version that does not know the hashes, so writing a hash
+    // never makes an instance reload a feed
+    private static final String HASH_PREFIX = "feed-hashes/";
+    private static final String HASH_SUFFIX = ".sha256";
 
     private final FileStorage fileStorage;
     private final String bucketName;
@@ -25,13 +34,8 @@ public class InventoryRepository {
         // bucket already exists, no reason to init
     }
 
-    public void store(String supplierName, byte[] data) {
-        store(supplierName, data, "csv");
-    }
-
-    public void store(String supplierName, byte[] data, String fileExtension) {
-        String key = createKey(supplierName, fileExtension);
-        fileStorage.put(bucketName, key, data);
+    public HashedFeedFile hashedFeed(String supplierName, String fileExtension) {
+        return new HashedFeedFile(fileStorage, bucketName, createKey(supplierName, fileExtension), hashKey(supplierName));
     }
 
     public boolean canRead(String supplierName) {
@@ -49,21 +53,52 @@ public class InventoryRepository {
     }
 
     private String createKey(String supplierName, String fileExtension) {
-        return supplierName.toLowerCase() + "-feed." + fileExtension;
+        return fileName(supplierName) + FEED_MARKER + "." + fileExtension;
     }
 
-    public Map<String, LocalDateTime> getLatestModifiedPerSupplier() {
-        Map<String, LocalDateTime> lastModifiedMap = fileStorage.getAllObjectLastModified(bucketName, "");
-        Map<String, LocalDateTime> lastModifiedPerSupplier = new HashMap<>();
+    private String hashKey(String supplierName) {
+        return HASH_PREFIX + fileName(supplierName) + HASH_SUFFIX;
+    }
 
-        for (Map.Entry<String, LocalDateTime> entry : lastModifiedMap.entrySet()) {
+    private static String fileName(String supplierName) {
+        return supplierName.toLowerCase(Locale.ROOT);
+    }
+
+    /** The date of each supplier's feed file, which tells the instances to reload the feed. */
+    public Map<String, LocalDateTime> getLatestModifiedPerSupplier() {
+        return feedsBySupplier(fileStorage.getAllObjectLastModified(bucketName, ""));
+    }
+
+    /**
+     * When each supplier's feed was last downloaded: the later of its file and its hash, since a download that found
+     * the feed unchanged writes the hash only.
+     */
+    public Map<String, LocalDateTime> getLastDownloadedPerSupplier() {
+        Map<String, LocalDateTime> objects = fileStorage.getAllObjectLastModified(bucketName, "");
+        Map<String, LocalDateTime> lastDownloaded = feedsBySupplier(objects);
+        for (Map.Entry<String, LocalDateTime> entry : objects.entrySet()) {
             String key = entry.getKey();
-            if (key.contains("-feed")) {
-                String supplierName = key.substring(0, key.indexOf("-feed"));
+            if (isHash(key)) {
+                String supplierName = key.substring(HASH_PREFIX.length(), key.length() - HASH_SUFFIX.length());
+                lastDownloaded.computeIfPresent(supplierName, (supplier, feed) -> ObjectUtils.max(feed, entry.getValue()));
+            }
+        }
+        return lastDownloaded;
+    }
+
+    private static Map<String, LocalDateTime> feedsBySupplier(Map<String, LocalDateTime> objects) {
+        Map<String, LocalDateTime> lastModifiedPerSupplier = new HashMap<>();
+        for (Map.Entry<String, LocalDateTime> entry : objects.entrySet()) {
+            String key = entry.getKey();
+            if (!isHash(key) && key.contains(FEED_MARKER)) {
+                String supplierName = key.substring(0, key.indexOf(FEED_MARKER));
                 lastModifiedPerSupplier.put(supplierName, entry.getValue());
             }
         }
-
         return lastModifiedPerSupplier;
+    }
+
+    private static boolean isHash(String key) {
+        return key.startsWith(HASH_PREFIX) && key.endsWith(HASH_SUFFIX);
     }
 }
