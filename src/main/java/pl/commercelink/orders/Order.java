@@ -834,6 +834,15 @@ public class Order {
         return ConversionUtil.getShortenedId(orderId);
     }
 
+    /**
+     * The customer's page lives while there is something left to follow: a closed order has none, except a cancelled
+     * one whose refund is still owed, which the page announces.
+     */
+    @DynamoDBIgnore
+    public boolean hasClientOrderPage() {
+        return !isClosed() || awaitsRefund();
+    }
+
     @DynamoDBIgnore
     public String createClientOrderUrl(String domain) {
         return domain + "/store/" + this.storeId + "/client/order/" + this.orderId;

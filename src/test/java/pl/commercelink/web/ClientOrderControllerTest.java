@@ -31,6 +31,7 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -146,10 +147,29 @@ class ClientOrderControllerTest {
     }
 
     @Test
-    @DisplayName("getOrderForClient still renders a cancelled order")
-    void rendersCancelledOrder() {
+    @DisplayName("getOrderForClient returns 404 for a cancelled order with nothing to refund")
+    void returns404ForCancelledOrderWithoutRefundDue() {
         // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.Cancelled));
+
+        // when
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        String template = controller.getOrderForClient(STORE_ID, ORDER_ID, null, null, new ExtendedModelMap(), response, Locale.ENGLISH);
+
+        // then
+        assertThat(template).isEqualTo("client-order/unavailable");
+        assertThat(response.getStatus()).isEqualTo(404);
+        verifyNoInteractions(orderItemsRepository);
+    }
+
+    @Test
+    @DisplayName("getOrderForClient still renders a cancelled order whose refund is owed")
+    void rendersCancelledOrderAwaitingRefund() {
+        // given
+        Order order = order(OrderStatus.Cancelled);
+        order.addPayment(Payment.bankTransfer("REF-1", "Jan", 1249));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
         Model model = new ExtendedModelMap();

@@ -224,10 +224,12 @@ class OrderPageModelFactoryTest {
         // when
         OrderPageModel open = factory.build(order(OrderStatus.Assembly), List.of(), superAdmin, PL);
         OrderPageModel completed = factory.build(order(OrderStatus.Completed), List.of(), superAdmin, PL);
+        OrderPageModel cancelled = factory.build(order(OrderStatus.Cancelled), List.of(), superAdmin, PL);
 
         // then
         assertThat(open.header().clientOrderUrl()).startsWith("https://app.example");
         assertThat(completed.header().clientOrderUrl()).isNull();
+        assertThat(cancelled.header().clientOrderUrl()).isNull();
     }
 
     @Test
