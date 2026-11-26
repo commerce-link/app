@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.invoicing.api.Invoice;
-import pl.commercelink.invoicing.api.InvoiceDirection;
 import pl.commercelink.invoicing.api.InvoicingProvider;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -21,8 +20,9 @@ import java.util.List;
 
 /**
  * Does for every received delivery without a purchase invoice what the operator does on its page: "Połącz" by the
- * supplier's order number, "Synchronizuj", save. Only a perfect match ({@link InvoiceAutoMatch}) is saved; any other
- * delivery is left exactly as it was, not even linked.
+ * supplier's order number, "Synchronizuj", save. Unlike the operator it looks only among the invoices still awaiting
+ * approval. Only a perfect match ({@link InvoiceAutoMatch}) is saved; any other delivery is left exactly as it was,
+ * not even linked.
  */
 @Slf4j
 @Service
@@ -31,7 +31,7 @@ public class InvoiceAutoSyncService {
     // every delivery costs a few calls to the invoicing system and the load balancer cuts a long request off
     static final Duration BUDGET = Duration.ofSeconds(20);
 
-    private enum Outcome { SYNCED, NO_INVOICE, SEVERAL_INVOICES, NEEDS_REVIEW }
+    private enum Outcome { SYNCED, SYNCED_INVOICE_NOT_APPROVED, NO_INVOICE, SEVERAL_INVOICES, NEEDS_REVIEW }
 
     private final StoresRepository storesRepository;
     private final InvoicingProviderFactory invoicingProviderFactory;
@@ -78,6 +78,7 @@ public class InvoiceAutoSyncService {
                 .toList();
 
         List<String> synced = new ArrayList<>();
+        List<String> invoiceNotApproved = new ArrayList<>();
         List<String> failed = new ArrayList<>();
         int noInvoice = 0;
         int severalInvoices = 0;
@@ -94,6 +95,10 @@ public class InvoiceAutoSyncService {
             try {
                 switch (linkAndSync(storeId, provider, delivery)) {
                     case SYNCED -> synced.add(delivery.getShortenedDeliveryId());
+                    case SYNCED_INVOICE_NOT_APPROVED -> {
+                        synced.add(delivery.getShortenedDeliveryId());
+                        invoiceNotApproved.add(delivery.getShortenedDeliveryId());
+                    }
                     case NO_INVOICE -> noInvoice++;
                     case SEVERAL_INVOICES -> severalInvoices++;
                     case NEEDS_REVIEW -> needsReview++;
@@ -105,7 +110,7 @@ public class InvoiceAutoSyncService {
             }
             lastChecked = delivery.getReceivedAt();
         }
-        return new InvoiceAutoSyncResult(true, synced, noInvoice, severalInvoices, needsReview, failed, remaining,
+        return new InvoiceAutoSyncResult(true, synced, invoiceNotApproved, noInvoice, severalInvoices, needsReview, failed, remaining,
                 remaining > 0 ? lastChecked : null);
     }
 
@@ -117,7 +122,7 @@ public class InvoiceAutoSyncService {
         if (StringUtils.isBlank(delivery.getExternalDeliveryId()) || delivery.isExternalDeliveryIdProvisional()) {
             return Outcome.NO_INVOICE;
         }
-        List<Invoice> invoices = provider.fetchInvoicesByOrderId(delivery.getExternalDeliveryId(), InvoiceDirection.Purchase);
+        List<Invoice> invoices = provider.fetchPurchaseInvoicesAwaitingApprovalByOrderId(delivery.getExternalDeliveryId());
         if (invoices == null || invoices.isEmpty()) {
             return Outcome.NO_INVOICE;
         }
@@ -125,6 +130,9 @@ public class InvoiceAutoSyncService {
             return Outcome.SEVERAL_INVOICES;
         }
         Invoice invoice = invoices.get(0);
+        if (!InvoiceAutoMatch.paymentsAgree(invoice, delivery)) {
+            return Outcome.NEEDS_REVIEW;
+        }
         InvoiceSyncPreview preview = previewBuilder.build(storeId, delivery.getDeliveryId(), invoice.id());
         if (preview == null || !InvoiceAutoMatch.isPerfect(preview)) {
             return Outcome.NEEDS_REVIEW;
@@ -132,7 +140,7 @@ public class InvoiceAutoSyncService {
         if (!invoiceLinkingService.linkUnlessInvoiced(storeId, delivery.getDeliveryId(), invoice)) {
             return Outcome.NEEDS_REVIEW;
         }
-        invoiceSyncService.apply(storeId, preview);
-        return Outcome.SYNCED;
+        boolean invoiceApproved = invoiceSyncService.apply(storeId, preview);
+        return invoiceApproved ? Outcome.SYNCED : Outcome.SYNCED_INVOICE_NOT_APPROVED;
     }
 }

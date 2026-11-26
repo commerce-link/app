@@ -39,9 +39,15 @@ public class InvoiceAutoSyncController {
             redirect.addFlashAttribute(ERROR, text(locale, "payments.sync.notConfigured"));
             return BACKLOG_LIST;
         }
+        List<String> problems = new ArrayList<>();
         if (!result.failed().isEmpty()) {
-            redirect.addFlashAttribute(ERROR,
-                    text(locale, "deliveries.list.invoiceAutoSync.result.failed", String.join(", ", result.failed())));
+            problems.add(text(locale, "deliveries.list.invoiceAutoSync.result.failed", String.join(", ", result.failed())));
+        }
+        if (!result.invoiceNotApproved().isEmpty()) {
+            problems.add(text(locale, "deliveries.list.invoiceAutoSync.result.invoiceNotApproved", String.join(", ", result.invoiceNotApproved())));
+        }
+        if (!problems.isEmpty()) {
+            redirect.addFlashAttribute(ERROR, String.join(" ", problems));
         }
         redirect.addFlashAttribute(NOTICE, summary(result, locale));
         if (result.continueAfter() != null) {

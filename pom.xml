@@ -94,7 +94,7 @@
         <dependency>
             <groupId>pl.commercelink</groupId>
             <artifactId>invoicing-api</artifactId>
-            <version>0.2.0</version>
+            <version>0.3.0</version>
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
@@ -365,7 +365,7 @@
                 <dependency>
                     <groupId>pl.commercelink</groupId>
                     <artifactId>invoicing-dev</artifactId>
-                    <version>0.1.0</version>
+                    <version>0.2.0</version>
                 </dependency>
                 <dependency>
                     <groupId>pl.commercelink</groupId>

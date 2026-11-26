@@ -1,6 +1,9 @@
 package pl.commercelink.inventory.deliveries;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.invoicing.api.Invoice;
+import pl.commercelink.invoicing.api.Price;
+import pl.commercelink.orders.Payment;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
 
 import java.util.ArrayList;
@@ -9,6 +12,35 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class InvoiceAutoMatchTest {
+
+    @Test
+    void paymentsAgreeWhenBothSidesArePaidInFullOrNeitherHoldsAPayment() {
+        // given
+        Delivery unpaid = delivery();
+        Delivery paid = delivery();
+        paid.addPayment(Payment.outgoingBankTransfer("FV/1", null, 123.0));
+
+        // when / then
+        assertThat(InvoiceAutoMatch.paymentsAgree(invoice(false, false), unpaid)).isTrue();
+        assertThat(InvoiceAutoMatch.paymentsAgree(invoice(true, false), paid)).isTrue();
+    }
+
+    @Test
+    void paymentsDisagreeWhenOnlyOneSideIsPaidOrEitherIsPaidInPart() {
+        // given
+        Delivery unpaid = delivery();
+        Delivery paid = delivery();
+        paid.addPayment(Payment.outgoingBankTransfer("FV/1", null, 123.0));
+        Delivery paidInPart = delivery();
+        paidInPart.addPayment(Payment.outgoingBankTransfer("FV/1", null, 23.0));
+
+        // when / then
+        assertThat(InvoiceAutoMatch.paymentsAgree(invoice(true, false), unpaid)).isFalse();
+        assertThat(InvoiceAutoMatch.paymentsAgree(invoice(false, false), paid)).isFalse();
+        assertThat(InvoiceAutoMatch.paymentsAgree(invoice(false, true), unpaid)).isFalse();
+        assertThat(InvoiceAutoMatch.paymentsAgree(invoice(true, false), paidInPart)).isFalse();
+        assertThat(InvoiceAutoMatch.paymentsAgree(invoice(false, false), paidInPart)).isFalse();
+    }
 
     @Test
     void everyProductOnItsOwnLineAtTheSamePriceIsPerfect() {
@@ -111,5 +143,16 @@ class InvoiceAutoMatchTest {
         option.setPriceNet(priceNet);
         option.setTotalNet(priceNet * qty);
         return option;
+    }
+
+    private static Delivery delivery() {
+        Delivery delivery = new Delivery("store-1", "ZK/1", "Acme");
+        delivery.setTax(1.23);
+        delivery.increaseTotalCost(100.0);
+        return delivery;
+    }
+
+    private static Invoice invoice(boolean paid, boolean partiallyPaid) {
+        return new Invoice("inv-1", "FV/1", null, Price.fromNet(100.0), null, "PLN", 1.0, paid, null, List.of(), null, null, partiallyPaid);
     }
 }

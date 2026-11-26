@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.deliveries;
 
+import pl.commercelink.invoicing.api.Invoice;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
 import pl.commercelink.web.dtos.InvoiceSyncPreview.MatchState;
 
@@ -20,6 +21,14 @@ public final class InvoiceAutoMatch {
                 && matchesOrIsAbsent(preview.getShippingCostState())
                 && matchesOrIsAbsent(preview.getPaymentCostState())
                 && preview.getUnassignedOptions().isEmpty();
+    }
+
+    /**
+     * The run changes no payment, so both sides have to agree already: paid in full on both, or no payment on either.
+     * A part payment on one side is the operator's to settle.
+     */
+    public static boolean paymentsAgree(Invoice invoice, Delivery delivery) {
+        return invoice.paid() ? delivery.isFullyPaid() : invoice.unpaid() && delivery.getPayments().isEmpty();
     }
 
     private static boolean matchesOrIsAbsent(MatchState extraCost) {

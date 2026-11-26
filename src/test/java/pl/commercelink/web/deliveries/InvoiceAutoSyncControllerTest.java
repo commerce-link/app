@@ -43,7 +43,7 @@ class InvoiceAutoSyncControllerTest {
             security.when(CustomSecurityContext::getStoreId).thenReturn("store-1");
             when(messages.getMessage(anyString(), any(), any())).thenAnswer(call -> call.getArgument(0));
             when(service.run("store-1", null))
-                    .thenReturn(new InvoiceAutoSyncResult(true, List.of("8c124850"), 1, 0, 0, List.of(), 3, STOPPED_AT));
+                    .thenReturn(new InvoiceAutoSyncResult(true, List.of("8c124850"), List.of(), 1, 0, 0, List.of(), 3, STOPPED_AT));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
@@ -65,7 +65,7 @@ class InvoiceAutoSyncControllerTest {
             security.when(CustomSecurityContext::getStoreId).thenReturn("store-1");
             when(messages.getMessage(anyString(), any(), any())).thenAnswer(call -> call.getArgument(0));
             when(service.run("store-1", STOPPED_AT))
-                    .thenReturn(new InvoiceAutoSyncResult(true, List.of(), 0, 0, 0, List.of(), 0, null));
+                    .thenReturn(new InvoiceAutoSyncResult(true, List.of(), List.of(), 0, 0, 0, List.of(), 0, null));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
@@ -78,6 +78,26 @@ class InvoiceAutoSyncControllerTest {
     }
 
     @Test
+    void syncedDeliveriesWithAnUnapprovedInvoiceAreNamedInTheErrorMessage() {
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            // given
+            security.when(CustomSecurityContext::getStoreId).thenReturn("store-1");
+            when(messages.getMessage(anyString(), any(), any()))
+                    .thenAnswer(call -> call.<String>getArgument(0) + List.of(call.<Object[]>getArgument(1)));
+            when(service.run("store-1", null))
+                    .thenReturn(new InvoiceAutoSyncResult(true, List.of("8c124850"), List.of("8c124850"), 0, 0, 0, List.of(), 0, null));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            controller.autoSync(null, redirect, PL);
+
+            // then
+            assertThat(redirect.getFlashAttributes().get(InvoiceAutoSyncController.ERROR))
+                    .isEqualTo("deliveries.list.invoiceAutoSync.result.invoiceNotApproved[8c124850]");
+        }
+    }
+
+    @Test
     void failedDeliveriesAreNamedInTheErrorMessage() {
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             // given
@@ -85,7 +105,7 @@ class InvoiceAutoSyncControllerTest {
             when(messages.getMessage(anyString(), any(), any()))
                     .thenAnswer(call -> call.<String>getArgument(0) + List.of(call.<Object[]>getArgument(1)));
             when(service.run("store-1", null))
-                    .thenReturn(new InvoiceAutoSyncResult(true, List.of(), 0, 0, 0, List.of("8c124850", "9fb71f29"), 0, null));
+                    .thenReturn(new InvoiceAutoSyncResult(true, List.of(), List.of(), 0, 0, 0, List.of("8c124850", "9fb71f29"), 0, null));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
