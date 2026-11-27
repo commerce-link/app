@@ -3,6 +3,7 @@ package pl.commercelink.inventory.deliveries;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -31,6 +32,8 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -253,6 +256,38 @@ class InvoiceSyncServiceTest {
     }
 
     @Test
+    void applyApprovesTheInvoiceAfterTheDeliveryIsSaved() {
+        // given
+        Delivery delivery = new Delivery("store-1", null, "Acme");
+        delivery.setDeliveryId("delivery-1");
+
+        // when
+        boolean approved = applyInvoice(delivery, invoice("inv-1", false));
+
+        // then
+        assertThat(approved).isTrue();
+        InOrder order = inOrder(deliveriesRepository, invoicingProvider);
+        order.verify(deliveriesRepository).save(delivery);
+        order.verify(invoicingProvider).approveInvoiceById("inv-1", InvoiceDirection.Purchase);
+    }
+
+    @Test
+    void applyKeepsTheSyncWhenTheInvoiceCannotBeApproved() {
+        // given
+        Delivery delivery = new Delivery("store-1", null, "Acme");
+        delivery.setDeliveryId("delivery-1");
+        doThrow(new IllegalStateException("503")).when(invoicingProvider).approveInvoiceById("inv-1", InvoiceDirection.Purchase);
+
+        // when
+        boolean approved = applyInvoice(delivery, invoice("inv-1", false));
+
+        // then
+        assertThat(approved).isFalse();
+        assertThat(delivery.isSynced()).isTrue();
+        verify(deliveriesRepository).save(delivery);
+    }
+
+    @Test
     void applyLeavesThePaymentTermsOfADeliveryWithoutAnOrderDate() {
         // given
         Delivery delivery = new Delivery("store-1", null, "Acme");
@@ -271,7 +306,7 @@ class InvoiceSyncServiceTest {
         verify(deliveriesRepository).save(delivery);
     }
 
-    private void applyInvoice(Delivery delivery, Invoice invoice) {
+    private boolean applyInvoice(Delivery delivery, Invoice invoice) {
         Store store = new Store();
         when(storesRepository.findById("store-1")).thenReturn(store);
         when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
@@ -281,7 +316,7 @@ class InvoiceSyncServiceTest {
         InvoiceSyncPreview preview = new InvoiceSyncPreview();
         preview.setDeliveryId(delivery.getDeliveryId());
         preview.setInvoiceId(invoice.id());
-        invoiceSyncService.apply("store-1", preview);
+        return invoiceSyncService.apply("store-1", preview);
     }
 
     private static Delivery invoicedDelivery(String id, String invoiceId) {

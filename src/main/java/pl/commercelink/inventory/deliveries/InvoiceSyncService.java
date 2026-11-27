@@ -89,7 +89,8 @@ public class InvoiceSyncService {
         return new InvoiceSyncResult(true, checked, paidDeliveries, unpaid, failedInvoices);
     }
 
-    public void apply(String storeId, InvoiceSyncPreview preview) {
+    /** Saves the sync and then approves the invoice in the invoicing system; says whether the approval went through. */
+    public boolean apply(String storeId, InvoiceSyncPreview preview) {
         Store store = storesRepository.findById(storeId);
         InvoicingProvider invoicingProvider = invoicingProviderFactory.get(store);
         Invoice invoice = invoicingProvider.fetchInvoiceById(preview.getInvoiceId(), InvoiceDirection.Purchase);
@@ -120,6 +121,18 @@ public class InvoiceSyncService {
         }
 
         updateDelivery(storeId, preview, preview.getDeliveryId(), positionById, invoice, allocationsCostDelta);
+        return approve(invoicingProvider, invoice, preview.getDeliveryId());
+    }
+
+    private boolean approve(InvoicingProvider invoicingProvider, Invoice invoice, String deliveryId) {
+        try {
+            invoicingProvider.approveInvoiceById(invoice.id(), InvoiceDirection.Purchase);
+            return true;
+        } catch (RuntimeException e) {
+            // the sync is saved already and stands; only the invoice still shows as awaiting approval
+            log.error("Purchase invoice {} of delivery {} was synced but could not be approved", invoice.id(), deliveryId, e);
+            return false;
+        }
     }
 
     private void updateDelivery(String storeId, InvoiceSyncPreview preview, String deliveryId, Map<String, InvoicePosition> positionById, Invoice invoice, double allocationsCostDelta) {

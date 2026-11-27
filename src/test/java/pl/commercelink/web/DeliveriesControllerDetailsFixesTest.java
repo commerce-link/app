@@ -341,6 +341,7 @@ class DeliveriesControllerDetailsFixesTest {
         when(deliveriesRepository.findById(STORE_ID, delivery.getDeliveryId())).thenReturn(delivery);
         InvoiceSyncPreview form = new InvoiceSyncPreview();
         form.setDeliveryId(delivery.getDeliveryId());
+        when(invoiceSynchronizationService.apply(STORE_ID, form)).thenReturn(true);
 
         // when
         String view = controller.applyInvoiceSync(form, redirectAttributes, PL);
@@ -350,6 +351,23 @@ class DeliveriesControllerDetailsFixesTest {
         verify(invoiceSynchronizationService).apply(STORE_ID, form);
         verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE,
                 new OrderNotice(OrderLabels.OK, "deliveries.details.invoice.synced", null, null));
+    }
+
+    @Test
+    void aSyncWhoseInvoiceWasNotApprovedSaysSoInsteadOfReportingSuccess() {
+        // given
+        Delivery delivery = warehouse();
+        when(deliveriesRepository.findById(STORE_ID, delivery.getDeliveryId())).thenReturn(delivery);
+        InvoiceSyncPreview form = new InvoiceSyncPreview();
+        form.setDeliveryId(delivery.getDeliveryId());
+        when(invoiceSynchronizationService.apply(STORE_ID, form)).thenReturn(false);
+
+        // when
+        controller.applyInvoiceSync(form, redirectAttributes, PL);
+
+        // then
+        verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE,
+                new OrderNotice(OrderLabels.WARN, "deliveries.details.invoice.syncedNotApproved", null, null));
     }
 
     @Test

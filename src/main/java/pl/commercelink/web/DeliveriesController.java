@@ -1275,8 +1275,12 @@ public class DeliveriesController {
         if (isEditLocked(getStoreId(), form.getDeliveryId())) {
             return redirectEditLocked(getStoreId(), form.getDeliveryId(), redirectAttributes, locale);
         }
-        invoiceSynchronizationService.apply(getStoreId(), form);
-        OrderFlash.saved(redirectAttributes, messageSource.getMessage("deliveries.details.invoice.synced", null, locale));
+        boolean invoiceApproved = invoiceSynchronizationService.apply(getStoreId(), form);
+        if (invoiceApproved) {
+            OrderFlash.saved(redirectAttributes, messageSource.getMessage("deliveries.details.invoice.synced", null, locale));
+        } else {
+            OrderFlash.warning(redirectAttributes, messageSource.getMessage("deliveries.details.invoice.syncedNotApproved", null, locale));
+        }
         return "redirect:/dashboard/deliveries/details?deliveryId=" + form.getDeliveryId();
     }
 
