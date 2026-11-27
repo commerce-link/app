@@ -268,7 +268,7 @@ class InvoiceSyncServiceTest {
         assertThat(approved).isTrue();
         InOrder order = inOrder(deliveriesRepository, invoicingProvider);
         order.verify(deliveriesRepository).save(delivery);
-        order.verify(invoicingProvider).approvePurchaseInvoice("inv-1");
+        order.verify(invoicingProvider).approveInvoiceById("inv-1", InvoiceDirection.Purchase);
     }
 
     @Test
@@ -276,7 +276,7 @@ class InvoiceSyncServiceTest {
         // given
         Delivery delivery = new Delivery("store-1", null, "Acme");
         delivery.setDeliveryId("delivery-1");
-        doThrow(new IllegalStateException("503")).when(invoicingProvider).approvePurchaseInvoice("inv-1");
+        doThrow(new IllegalStateException("503")).when(invoicingProvider).approveInvoiceById("inv-1", InvoiceDirection.Purchase);
 
         // when
         boolean approved = applyInvoice(delivery, invoice("inv-1", false));

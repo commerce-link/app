@@ -126,7 +126,7 @@ public class InvoiceSyncService {
 
     private boolean approve(InvoicingProvider invoicingProvider, Invoice invoice, String deliveryId) {
         try {
-            invoicingProvider.approvePurchaseInvoice(invoice.id());
+            invoicingProvider.approveInvoiceById(invoice.id(), InvoiceDirection.Purchase);
             return true;
         } catch (RuntimeException e) {
             // the sync is saved already and stands; only the invoice still shows as awaiting approval

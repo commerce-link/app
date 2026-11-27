@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.invoicing.api.Invoice;
+import pl.commercelink.invoicing.api.InvoiceDirection;
 import pl.commercelink.invoicing.api.InvoicingProvider;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.Payment;
@@ -61,7 +62,7 @@ class InvoiceAutoSyncServiceTest {
         Delivery delivery = delivery("11111111-aaaa", "ZK/1", DAY);
         backlogWithTimeToSpare(delivery);
         Invoice invoice = invoice("inv-1");
-        when(provider.fetchPurchaseInvoicesAwaitingApprovalByOrderId("ZK/1")).thenReturn(List.of(invoice));
+        when(provider.fetchInvoicesByOrderId("ZK/1", InvoiceDirection.Purchase)).thenReturn(List.of(invoice));
         InvoiceSyncPreview preview = preview(50.0);
         when(previewBuilder.build(STORE, "11111111-aaaa", "inv-1")).thenReturn(preview);
         when(invoiceLinkingService.linkUnlessInvoiced(STORE, "11111111-aaaa", invoice)).thenReturn(true);
@@ -86,7 +87,7 @@ class InvoiceAutoSyncServiceTest {
         Delivery delivery = delivery("11111111-aaaa", "ZK/1", DAY);
         backlogWithTimeToSpare(delivery);
         Invoice invoice = invoice("inv-1");
-        when(provider.fetchPurchaseInvoicesAwaitingApprovalByOrderId("ZK/1")).thenReturn(List.of(invoice));
+        when(provider.fetchInvoicesByOrderId("ZK/1", InvoiceDirection.Purchase)).thenReturn(List.of(invoice));
         InvoiceSyncPreview preview = preview(50.0);
         when(previewBuilder.build(STORE, "11111111-aaaa", "inv-1")).thenReturn(preview);
         when(invoiceLinkingService.linkUnlessInvoiced(STORE, "11111111-aaaa", invoice)).thenReturn(true);
@@ -101,14 +102,35 @@ class InvoiceAutoSyncServiceTest {
     }
 
     @Test
+    void approvedInvoiceIsNotTakenForTheDelivery() {
+        // given
+        backlogWithTimeToSpare(delivery("11111111-aaaa", "ZK/1", DAY), delivery("22222222-bbbb", "ZK/2", DAY.plusHours(1)));
+        when(provider.fetchInvoicesByOrderId("ZK/1", InvoiceDirection.Purchase)).thenReturn(List.of(approvedInvoice("inv-1")));
+        Invoice awaiting = invoice("inv-3");
+        when(provider.fetchInvoicesByOrderId("ZK/2", InvoiceDirection.Purchase)).thenReturn(List.of(approvedInvoice("inv-2"), awaiting));
+        InvoiceSyncPreview preview = preview(50.0);
+        when(previewBuilder.build(STORE, "22222222-bbbb", "inv-3")).thenReturn(preview);
+        when(invoiceLinkingService.linkUnlessInvoiced(STORE, "22222222-bbbb", awaiting)).thenReturn(true);
+        when(invoiceSyncService.apply(STORE, preview)).thenReturn(true);
+
+        // when
+        InvoiceAutoSyncResult result = service.run(STORE, null);
+
+        // then
+        assertThat(result.noInvoice()).isEqualTo(1);
+        assertThat(result.severalInvoices()).isZero();
+        assertThat(result.synced()).hasSize(1);
+    }
+
+    @Test
     void deliveryWhosePaymentDisagreesWithTheInvoiceIsNotEvenLinked() {
         // given
         Delivery paidDelivery = delivery("11111111-aaaa", "ZK/1", DAY);
         paidDelivery.addPayment(Payment.outgoingBankTransfer("FV/0", null, 50.0));
         Delivery unpaidDelivery = delivery("22222222-bbbb", "ZK/2", DAY.plusHours(1));
         backlogWithTimeToSpare(paidDelivery, unpaidDelivery);
-        when(provider.fetchPurchaseInvoicesAwaitingApprovalByOrderId("ZK/1")).thenReturn(List.of(invoice("inv-1")));
-        when(provider.fetchPurchaseInvoicesAwaitingApprovalByOrderId("ZK/2")).thenReturn(List.of(paidInvoice("inv-2")));
+        when(provider.fetchInvoicesByOrderId("ZK/1", InvoiceDirection.Purchase)).thenReturn(List.of(invoice("inv-1")));
+        when(provider.fetchInvoicesByOrderId("ZK/2", InvoiceDirection.Purchase)).thenReturn(List.of(paidInvoice("inv-2")));
 
         // when
         InvoiceAutoSyncResult result = service.run(STORE, null);
@@ -122,7 +144,7 @@ class InvoiceAutoSyncServiceTest {
     void invoiceThatNeedsALookIsNotEvenLinked() {
         // given
         backlogWithTimeToSpare(delivery("11111111-aaaa", "ZK/1", DAY));
-        when(provider.fetchPurchaseInvoicesAwaitingApprovalByOrderId("ZK/1")).thenReturn(List.of(invoice("inv-1")));
+        when(provider.fetchInvoicesByOrderId("ZK/1", InvoiceDirection.Purchase)).thenReturn(List.of(invoice("inv-1")));
         when(previewBuilder.build(STORE, "11111111-aaaa", "inv-1")).thenReturn(preview(50.01));
 
         // when
@@ -143,8 +165,8 @@ class InvoiceAutoSyncServiceTest {
         Delivery provisional = delivery("44444444-dddd", "TMP-4", DAY.plusHours(3));
         provisional.setExternalDeliveryIdProvisional(true);
         backlogWithTimeToSpare(none, several, noNumber, provisional);
-        when(provider.fetchPurchaseInvoicesAwaitingApprovalByOrderId("ZK/1")).thenReturn(List.of());
-        when(provider.fetchPurchaseInvoicesAwaitingApprovalByOrderId("ZK/2")).thenReturn(List.of(invoice("inv-1"), invoice("inv-2")));
+        when(provider.fetchInvoicesByOrderId("ZK/1", InvoiceDirection.Purchase)).thenReturn(List.of());
+        when(provider.fetchInvoicesByOrderId("ZK/2", InvoiceDirection.Purchase)).thenReturn(List.of(invoice("inv-1"), invoice("inv-2")));
 
         // when
         InvoiceAutoSyncResult result = service.run(STORE, null);
@@ -152,7 +174,7 @@ class InvoiceAutoSyncServiceTest {
         // then
         assertThat(result.noInvoice()).isEqualTo(3);
         assertThat(result.severalInvoices()).isEqualTo(1);
-        verify(provider, never()).fetchPurchaseInvoicesAwaitingApprovalByOrderId("TMP-4");
+        verify(provider, never()).fetchInvoicesByOrderId("TMP-4", InvoiceDirection.Purchase);
         verifyNoInteractions(previewBuilder, invoiceLinkingService, invoiceSyncService);
     }
 
@@ -161,7 +183,7 @@ class InvoiceAutoSyncServiceTest {
         // given
         backlogWithTimeToSpare(delivery("11111111-aaaa", "ZK/1", DAY));
         Invoice invoice = invoice("inv-1");
-        when(provider.fetchPurchaseInvoicesAwaitingApprovalByOrderId("ZK/1")).thenReturn(List.of(invoice));
+        when(provider.fetchInvoicesByOrderId("ZK/1", InvoiceDirection.Purchase)).thenReturn(List.of(invoice));
         when(previewBuilder.build(STORE, "11111111-aaaa", "inv-1")).thenReturn(preview(50.0));
         when(invoiceLinkingService.linkUnlessInvoiced(STORE, "11111111-aaaa", invoice)).thenReturn(false);
 
@@ -179,9 +201,9 @@ class InvoiceAutoSyncServiceTest {
         Delivery broken = delivery("11111111-aaaa", "ZK/1", DAY);
         Delivery fine = delivery("22222222-bbbb", "ZK/2", DAY.plusHours(1));
         backlogWithTimeToSpare(fine, broken);
-        when(provider.fetchPurchaseInvoicesAwaitingApprovalByOrderId("ZK/1")).thenThrow(new IllegalStateException("503"));
+        when(provider.fetchInvoicesByOrderId("ZK/1", InvoiceDirection.Purchase)).thenThrow(new IllegalStateException("503"));
         Invoice invoice = invoice("inv-2");
-        when(provider.fetchPurchaseInvoicesAwaitingApprovalByOrderId("ZK/2")).thenReturn(List.of(invoice));
+        when(provider.fetchInvoicesByOrderId("ZK/2", InvoiceDirection.Purchase)).thenReturn(List.of(invoice));
         InvoiceSyncPreview preview = preview(50.0);
         when(previewBuilder.build(STORE, "22222222-bbbb", "inv-2")).thenReturn(preview);
         when(invoiceLinkingService.linkUnlessInvoiced(STORE, "22222222-bbbb", invoice)).thenReturn(true);
@@ -201,7 +223,7 @@ class InvoiceAutoSyncServiceTest {
         backlog(delivery("11111111-aaaa", "ZK/1", DAY), delivery("22222222-bbbb", "ZK/2", DAY.plusHours(1)),
                 delivery("33333333-cccc", "ZK/3", DAY.plusHours(2)));
         when(clock.millis()).thenReturn(0L, 0L, InvoiceAutoSyncService.BUDGET.toMillis());
-        when(provider.fetchPurchaseInvoicesAwaitingApprovalByOrderId("ZK/1")).thenReturn(List.of());
+        when(provider.fetchInvoicesByOrderId("ZK/1", InvoiceDirection.Purchase)).thenReturn(List.of());
 
         // when
         InvoiceAutoSyncResult result = service.run(STORE, null);
@@ -216,14 +238,14 @@ class InvoiceAutoSyncServiceTest {
     void nextRunContinuesAfterTheDeliveriesAlreadyChecked() {
         // given
         backlogWithTimeToSpare(delivery("11111111-aaaa", "ZK/1", DAY), delivery("22222222-bbbb", "ZK/2", DAY.plusHours(1)));
-        when(provider.fetchPurchaseInvoicesAwaitingApprovalByOrderId("ZK/2")).thenReturn(List.of());
+        when(provider.fetchInvoicesByOrderId("ZK/2", InvoiceDirection.Purchase)).thenReturn(List.of());
 
         // when
         InvoiceAutoSyncResult result = service.run(STORE, DAY);
 
         // then
         assertThat(result.checked()).isEqualTo(1);
-        verify(provider, never()).fetchPurchaseInvoicesAwaitingApprovalByOrderId("ZK/1");
+        verify(provider, never()).fetchInvoicesByOrderId("ZK/1", InvoiceDirection.Purchase);
     }
 
     @Test
@@ -260,6 +282,10 @@ class InvoiceAutoSyncServiceTest {
 
     private static Invoice invoice(String id) {
         return new Invoice(id, "FV/" + id, null, Price.fromNet(100.0), null, "PLN", 1.0, false, null, List.of(), null, null);
+    }
+
+    private static Invoice approvedInvoice(String id) {
+        return new Invoice(id, "FV/" + id, null, Price.fromNet(100.0), null, "PLN", 1.0, false, null, List.of(), null, null, false, true);
     }
 
     private static Invoice paidInvoice(String id) {

@@ -153,6 +153,6 @@ class InvoiceAutoMatchTest {
     }
 
     private static Invoice invoice(boolean paid, boolean partiallyPaid) {
-        return new Invoice("inv-1", "FV/1", null, Price.fromNet(100.0), null, "PLN", 1.0, paid, null, List.of(), null, null, partiallyPaid);
+        return new Invoice("inv-1", "FV/1", null, Price.fromNet(100.0), null, "PLN", 1.0, paid, null, List.of(), null, null, partiallyPaid, false);
     }
 }

@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.invoicing.api.Invoice;
+import pl.commercelink.invoicing.api.InvoiceDirection;
 import pl.commercelink.invoicing.api.InvoicingProvider;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -20,7 +21,7 @@ import java.util.List;
 
 /**
  * Does for every received delivery without a purchase invoice what the operator does on its page: "Połącz" by the
- * supplier's order number, "Synchronizuj", save. Unlike the operator it looks only among the invoices still awaiting
+ * supplier's order number, "Synchronizuj", save. Unlike the operator it takes only the invoices still awaiting
  * approval. Only a perfect match ({@link InvoiceAutoMatch}) is saved; any other delivery is left exactly as it was,
  * not even linked.
  */
@@ -122,8 +123,8 @@ public class InvoiceAutoSyncService {
         if (StringUtils.isBlank(delivery.getExternalDeliveryId()) || delivery.isExternalDeliveryIdProvisional()) {
             return Outcome.NO_INVOICE;
         }
-        List<Invoice> invoices = provider.fetchPurchaseInvoicesAwaitingApprovalByOrderId(delivery.getExternalDeliveryId());
-        if (invoices == null || invoices.isEmpty()) {
+        List<Invoice> invoices = invoicesAwaitingApproval(provider, delivery.getExternalDeliveryId());
+        if (invoices.isEmpty()) {
             return Outcome.NO_INVOICE;
         }
         if (invoices.size() > 1) {
@@ -142,5 +143,10 @@ public class InvoiceAutoSyncService {
         }
         boolean invoiceApproved = invoiceSyncService.apply(storeId, preview);
         return invoiceApproved ? Outcome.SYNCED : Outcome.SYNCED_INVOICE_NOT_APPROVED;
+    }
+
+    private static List<Invoice> invoicesAwaitingApproval(InvoicingProvider provider, String orderNumber) {
+        List<Invoice> invoices = provider.fetchInvoicesByOrderId(orderNumber, InvoiceDirection.Purchase);
+        return invoices == null ? List.of() : invoices.stream().filter(invoice -> !invoice.approved()).toList();
     }
 }
